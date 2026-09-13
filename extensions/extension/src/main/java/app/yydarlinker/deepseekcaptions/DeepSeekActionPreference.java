@@ -89,7 +89,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
         new Thread(() -> {
             String result;
             try {
-                String translated = DeepSeekApiClient.test(config);
+                String translated = ContextualBatchApiClient.test(config);
                 result = "API 可用：" + translated;
             } catch (Throwable error) {
                 String detail = error.getMessage();

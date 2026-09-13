@@ -379,6 +379,7 @@ final class CaptionButtonController {
     }
 
     static void noteAiTrackSelected() {
+        ignoreUiStateUntilMs = SystemClock.uptimeMillis() + 700L;
         synchronized (NATIVE_STATE_LOCK) {
             clearNativeTrackAuthorityLocked();
             nativeMenuSelectionArmed = false;
@@ -684,6 +685,7 @@ final class CaptionButtonController {
                 if (turnCaptionsOffOnTouchUp) {
                     turnCaptionsOffOnTouchUp = false;
                     captionIntent = CaptionIntentPolicy.OFF;
+                    CaptionChoice.toggle(false);
                     clearNativeTrackAuthority();
                     selectDefaultUntilMs = 0L;
                     suppressDefaultUntilMs = now + SELECTION_WINDOW_MS;
@@ -691,6 +693,7 @@ final class CaptionButtonController {
                     DynamicCaptionController.deactivateFromCaptionButton();
                 } else {
                     captionIntent = CaptionIntentPolicy.ON;
+                    CaptionChoice.toggle(true);
                     clearNativeTrackAuthority();
                     Activity activity = activityRef.get();
                     if (activity != null && DeepSeekConfig.load(activity).enabled &&

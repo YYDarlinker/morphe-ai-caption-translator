@@ -36,9 +36,6 @@ final class CaptionDiagnostics {
                     .putString(HISTORY, next)
                     .apply();
 
-            // These are deliberately transport-only side effects. The semantic ledger emits these
-            // checkpoints after its own request bookkeeping and before the next schedule, which is
-            // the safest point to undo a network failure accidentally feeding semantic window growth.
         } catch (Throwable ignored) {
         }
     }
@@ -55,7 +52,7 @@ final class CaptionDiagnostics {
             String detail = p.getString(DETAIL, "");
             long time = p.getLong(TIME, 0L);
             String audit = TokenCostAudit.uiText(context);
-            String header = "显示文本调试：" +
+            String header = "引擎：Anchored / dual-mode-r2\n当前模式：" + (CaptionChoice.translates() ? "自动翻译" : "原字幕（零翻译 API）") + "\n显示文本调试：" +
                     (DeepSeekConfig.displayTextDebugEnabled(context) ? "开" : "关");
             if (stage == null || stage.isEmpty()) {
                 String base = "尚未捕获到自动翻译请求。启用并填写 API Key 后，播放视频并从“自动翻译”选择任意目标语言，再回来点“刷新诊断”。";

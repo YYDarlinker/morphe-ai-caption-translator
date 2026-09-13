@@ -47,8 +47,8 @@ public final class DeepSeekEnabledPreference extends android.preference.SwitchPr
 
     private void updateSummary() {
         DeepSeekConfig.Snapshot current = DeepSeekConfig.load(getContext());
-        if (!current.enabled) setSummary("关闭后不接管 YouTube 自动翻译");
-        else if (current.apiKey.isEmpty()) setSummary("已启用；请继续填写 API Key");
+        if (!current.enabled) setSummary("关闭后使用 YouTube 原生字幕显示");
+        else if (current.apiKey.isEmpty()) setSummary("原字幕可直接显示；自动翻译需填写 API Key");
         else setSummary("已启用；从自动翻译选择任意语言即可启动 AI 字幕");
     }
 }

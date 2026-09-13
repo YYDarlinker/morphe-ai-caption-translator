@@ -12,6 +12,9 @@ import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
@@ -91,6 +94,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
         m.addInstructionsWithLabels(0,body.trimIndent());runtime.methods.remove(stub);runtime.methods.add(m)
     }
     bind("language","check-cast p0, ${track.type}\niget-object v0, p0, ${language.id()}\nreturn-object v0")
+    bind("vss","check-cast p0, ${track.type}\niget-object v0, p0, ${vss.id()}\nreturn-object v0")
     bind("url","check-cast p0, ${track.type}\niget-object v0, p0, ${url.id()}\nreturn-object v0")
     bind("cloneSimplified", """
         check-cast p0, ${track.type}
@@ -115,10 +119,136 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
     mutable(listMethod).apply {
         val returns=implementation!!.instructions.mapIndexedNotNull { i,ins ->
             if(ins.opcode==Opcode.RETURN_OBJECT) i to (ins as OneRegisterInstruction).registerA else null }
-        for((i,r) in returns.reversed()) addInstructions(i,
-            "invoke-static/range {v$r .. v$r}, $BRIDGE->augmentTranslations(Ljava/util/List;)Ljava/util/List;\nmove-result-object v$r")
+        for((i,r) in returns.reversed()) {
+            // Replace the labeled instruction itself: branch targets must execute the hook.
+            replaceInstruction(i,"invoke-static/range {v$r .. v$r}, $BRIDGE->augmentTranslations(Ljava/util/List;)Ljava/util/List;")
+            addInstructions(i+1,"move-result-object v$r\nreturn-object v$r")
+        }
     }
-    mutable(selector).addInstructions(0,"invoke-static/range {p1 .. p1}, $BRIDGE->onSelection($OBJECT)V")
+    mutable(selector).addInstructions(0,"invoke-static/range {p0 .. p2}, $BRIDGE->onNativeSelection($OBJECT$OBJECT$OBJECT)V")
+    // Global per-launch memory uses fresh native tracks; never carries old-video URLs.
+    val owner=classDefBy(selector.definingClass)
+    val defaultTrack=owner.methods.filter { it.parameterTypes.isEmpty() && it.returnType==track.type }.unique("native default selector")
+    val modelField=defaultTrack.code().mapNotNull { it.field() }.first { it.definingClass==owner.type && it.type==listMethod.definingClass }
+    val nativeList=classDefBy(listMethod.definingClass).methods.filter {
+        it.parameterTypes.isEmpty() && it.returnType=="Ljava/util/List;" && it.name!=listMethod.name
+    }.unique("native original track list")
+    fun listAccessor(m:Method) = """
+        check-cast p0, ${owner.type}
+        iget-object v0, p0, ${modelField.id()}
+        if-eqz v0, :done
+        invoke-virtual {v0}, ${m.id()}
+        move-result-object v0
+        :done
+        return-object v0
+    """
+    bind("nativeTracks",listAccessor(nativeList));bind("translatedTracks",listAccessor(listMethod))
+    mutable(defaultTrack).apply {
+        if(implementation!!.registerCount < 2) throw PatchException("AI memory: no scratch register")
+        addInstructionsWithLabels(0,"""
+            invoke-static {p0}, $BRIDGE->resolveRemembered($OBJECT)$OBJECT
+            move-result-object v0
+            if-eqz v0, :original_default
+            check-cast v0, ${track.type}
+            return-object v0
+        """.trimIndent(),ExternalLabel("original_default",implementation!!.instructions.first()))
+    }
+    val initializer=owner.methods.filter { m -> m.returnType=="V" && m.parameterTypes.size==2 &&
+        m.code().any { it.opcode==Opcode.IPUT_OBJECT && it.field()?.id()==modelField.id() } &&
+        m.code().any { it.call()?.id()==defaultTrack.id() }
+    }.unique("caption model ready initializer")
+    // Replace the shared model-ready branch entry, not one of several native settings flags.
+    val ci=initializer.code();val dc=ci.indexOfFirst { it.call()?.id()==defaultTrack.id() }
+    val entry=(0 until dc).filter { i ->
+        ci[i].opcode==Opcode.IGET_OBJECT && ci[i].field()?.id()==modelField.id() &&
+        ci.getOrNull(i+1)?.opcode==Opcode.IF_NEZ && ci.getOrNull(i+3)?.opcode==Opcode.IGET_BOOLEAN
+    }.unique("model ready decision")+3
+    val nativeRead=ci[entry] as TwoRegisterInstruction
+    val scratch=(ci.first() as OneRegisterInstruction).registerA
+    val enabled=ci[dc-1]
+    val eventType=(enabled as ReferenceInstruction).reference.toString()
+    val disabledIndex=(dc+1 until ci.size).filter { i -> ci[i].opcode==Opcode.NEW_INSTANCE &&
+        (ci[i] as? ReferenceInstruction)?.reference.toString()==eventType }.firstOrNull()
+        ?: throw PatchException("AI memory: disabled event missing")
+    mutable(initializer).apply {
+        val on=implementation!!.instructions[dc-1];val off=implementation!!.instructions[disabledIndex]
+        replaceInstruction(entry,"invoke-static {}, $BRIDGE->restoreDecision()I")
+        addInstructionsWithLabels(entry+1,"""
+            move-result v$scratch
+            if-ltz v$scratch, :native_settings
+            if-eqz v$scratch, :remembered_off
+            const/4 v$scratch, 0x0
+            goto :remembered_on
+            :remembered_off
+            const/4 v$scratch, 0x0
+            goto :off_event
+            :native_settings
+            const/4 v$scratch, 0x0
+            iget-boolean v${nativeRead.registerA}, v${nativeRead.registerB}, ${ci[entry].field()!!.id()}
+        """.trimIndent(),ExternalLabel("remembered_on",on),ExternalLabel("off_event",off))
+    }
+
+    // Both modern protobuf settings and legacy CC rows consume this shared metadata field.
+    val metadataField=listCode.mapNotNull { it.field() }.first { it.definingClass==listMethod.definingClass && it.type.startsWith("L") }
+    val metadata=classDefBy(metadataField.type)
+    val metadataBase=classDefBy(metadata.superclass!!)
+    val schema=metadata.methods.flatMap { it.code() }.mapNotNull { it.text() }.filter { it.startsWith("\u0001\u0007") }.unique("translation metadata schema")
+    if(schema!="\u0001\u0007\u0000\u0001\u0001\u0007\u0007\u0000\u0004\u0004\u0001\u041b\u0002\u001b\u0003\u041b\u0004\u1004\u0000\u0005\u1409\u0001\u0006\u0016\u0007\u1409\u0002")
+        throw PatchException("AI menu: metadata wire schema changed")
+    // In this verified schema field d is field 3, but bind through the schema object table, not class name.
+    val schemaCode=metadata.methods.first { it.code().any { ins -> ins.text()==schema } }.code()
+    val schemaNames=schemaCode.mapNotNull { it.text() }.filter { name -> metadata.fields.any { it.name==name } }
+    val translationField=metadata.fields.firstOrNull { it.name==schemaNames.getOrNull(3) }
+        ?: throw PatchException("AI menu: translation field missing")
+    val translationEntryType=listCode.filter { it.opcode==Opcode.CHECK_CAST }.map {
+        (it as ReferenceInstruction).reference.toString()
+    }.distinct().mapNotNull { classDefByOrNull(it) }.filter { cls -> cls.methods.any { m -> m.code().any { ins ->
+        ins.text()=="\u0001\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0002\u0001\u0001\u1008\u0000\u0002\u1409\u0001\u0003\u0016\u0004\u0016"
+    } } }.unique("translation entry wire schema")
+    val parse=metadataBase.methods.filter { it.name=="parseFrom" && it.parameterTypes.toList()==listOf(metadataBase.type,"[B")
+        && AccessFlags.PUBLIC.isSet(it.accessFlags) }.unique("public metadata parser")
+    val instance=metadata.fields.filter { it.type==metadata.type && AccessFlags.STATIC.isSet(it.accessFlags) }.unique("metadata default")
+    bind("augmentMetadata", """
+        check-cast p0, ${metadata.type}
+        invoke-virtual {p0}, ${metadata.type}->toByteArray()[B
+        move-result-object v0
+        invoke-static {v0}, Lapp/yydarlinker/deepseekcaptions/CaptionLanguageMetadata;->addSimplified([B)[B
+        move-result-object v0
+        sget-object v1, ${instance.id()}
+        invoke-static {v1, v0}, ${parse.id()}
+        move-result-object v0
+        return-object v0
+    """)
+    val constructors=classDefBy(listMethod.definingClass).methods.filter { it.name=="<init>" &&
+        it.code().any { ins -> ins.opcode==Opcode.IPUT_OBJECT && ins.field()?.id()==metadataField.id() } }
+    if(constructors.isEmpty()) throw PatchException("AI menu: metadata constructor missing")
+    constructors.forEach { ctor ->
+        val writeIndex=ctor.code().indexOfFirst { it.opcode==Opcode.IPUT_OBJECT && it.field()?.id()==metadataField.id() }
+        val write=ctor.code()[writeIndex] as TwoRegisterInstruction
+        mutable(ctor).apply {
+            replaceInstruction(writeIndex,"invoke-static/range {v${write.registerA} .. v${write.registerA}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT")
+            addInstructions(writeIndex+1,"move-result-object v${write.registerA}\ncheck-cast v${write.registerA}, ${metadata.type}\niput-object v${write.registerA}, v${write.registerB}, ${metadataField.id()}")
+        }
+    }
+    data class ReadHook(val m:Method,val index:Int,val dest:Int,val receiver:Int)
+    val reads=mutableListOf<ReadHook>()
+    classDefForEach { cls ->
+        if(cls.type==metadata.type || cls.type.startsWith("Lapp/")) return@classDefForEach
+        cls.methods.forEach { m -> m.code().forEachIndexed { i,ins ->
+            if(ins.opcode==Opcode.IGET_OBJECT && ins.field()?.id()==translationField.id()) {
+                val r=ins as TwoRegisterInstruction;reads.add(ReadHook(m,i,r.registerA,r.registerB))
+            }
+        } }
+    }
+    if(reads.isEmpty()) throw PatchException("AI menu: no translation metadata consumers")
+    reads.groupBy { it.m.id() }.values.forEach { hooks ->
+        val m=mutable(hooks.first().m)
+        hooks.sortedByDescending { it.index }.forEach { h ->
+            m.replaceInstruction(h.index,"invoke-static/range {v${h.receiver} .. v${h.receiver}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT")
+            m.addInstructions(h.index+1,"move-result-object v${h.dest}\ncheck-cast v${h.dest}, ${metadata.type}\niget-object v${h.dest}, v${h.dest}, ${translationField.id()}")
+        }
+    }
+    java.util.logging.Logger.getLogger("AI captions").info("Shared translation metadata readers hooked: ${reads.size}; mode-aware memory ready")
     val renderer=mutableClassDefBy("Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;")
     if(renderer.methods.any { it.name=="draw" && it.parameterTypes.toList()==listOf("Landroid/graphics/Canvas;") })
         throw PatchException("AI captions: native draw override already exists")

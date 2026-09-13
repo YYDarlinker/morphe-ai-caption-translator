@@ -116,6 +116,7 @@ final class CaptionMusicSuppressor {
     }
 
     private static void sanitize() {
+        if(!CaptionChoice.translates()) return; // Source tracks keep their original annotations.
         Activity activity = activityRef.get();
         if (activity == null || !prepare()) return;
         try {

@@ -14,8 +14,6 @@ private const val TEXT_PREF_CLASS =
     "app.yydarlinker.deepseekcaptions.DeepSeekTextPreference"
 private const val MODEL_PREF_CLASS =
     "app.yydarlinker.deepseekcaptions.DeepSeekModelPreference"
-private const val DEFAULT_LANGUAGE_PREF_CLASS =
-    "app.yydarlinker.deepseekcaptions.DeepSeekDefaultLanguagePreference"
 private const val SLIDER_PREF_CLASS =
     "app.yydarlinker.deepseekcaptions.DeepSeekSliderPreference"
 private const val ACTION_PREF_CLASS =
@@ -97,7 +95,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
     android:viewportHeight="24">
     <path
         android:fillColor="?android:attr/textColorPrimary"
-        android:pathData="M19,4L5,4a3,3 0,0 0,-3 3v10a3,3 0,0 0,3 3h14a3,3 0,0 0,3 -3L22,7a3,3 0,0 0,-3 -3zM20,17a1,1 0,0 1,-1 1L5,18a1,1 0,0 1,-1 -1L4,7a1,1 0,0 1,1 -1h14a1,1 0,0 1,1 1v10zM6,9h5v2L6,11L6,9zM13,9h5v2h-5L13,9zM6,13h5v2L6,15v-2zM13,13h5v2h-5v-2z" />
+        android:pathData="M3,5L17,5L17,17L8,17L4,21L4,17L3,17ZM5,7L5,15L15,15L15,7ZM6,9L14,9L14,10.5L6,10.5ZM6,12L12,12L12,13.5L6,13.5ZM20,1L21,4L24,5L21,6L20,9L19,6L16,5L19,4Z" />
 </vector>
 """
         )
@@ -110,7 +108,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
     android:viewportHeight="24">
     <path
         android:fillColor="?android:attr/textColorPrimary"
-        android:pathData="M19,3L5,3a4,4 0,0 0,-4 4v10a4,4 0,0 0,4 4h14a4,4 0,0 0,4 -4L23,7a4,4 0,0 0,-4 -4zM11,12L6,12L6,9h5v3zM18,12h-5L13,9h5v3zM11,16L6,16v-3h5v3zM18,16h-5v-3h5v3z" />
+        android:pathData="M3,5L17,5L17,17L8,17L4,21L4,17L3,17ZM5,7L5,15L15,15L15,7ZM6,9L14,9L14,10.5L6,10.5ZM6,12L12,12L12,13.5L6,13.5ZM20,1L21,4L24,5L21,6L20,9L19,6L16,5L19,4Z" />
 </vector>
 """
         )
@@ -202,16 +200,10 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
 
                 screen.addCategory("翻译").apply {
                     addPreference(
-                        DEFAULT_LANGUAGE_PREF_CLASS,
-                        "deepseek_caption_default_language",
-                        "字幕按钮默认语言",
-                        "默认：AI 中文（简体）",
-                    )
-                    addPreference(
                         TEXT_PREF_CLASS,
                         "deepseek_caption_prompt",
                         "翻译要求",
-                        "原生字幕段逐项翻译；停止输入后自动保存",
+                        "仅自动翻译模式调用 API；原字幕原文显示",
                     )
                 }
 

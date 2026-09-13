@@ -114,6 +114,7 @@ static void setMainActivity(Activity activity) {
     }
 
     static String restoreTargetAfterMiniplayer(String url) {
+        if(!CaptionChoice.translates()) return url;
         Session session = active;
         if (session == null || session.cancelled || !session.visible) return url;
         long now = SystemClock.elapsedRealtime();
@@ -166,15 +167,20 @@ static void setMainActivity(Activity activity) {
             deactivate("实验翻译核心已关闭");
             return;
         }
-        activate(context, session.translatedUrl);
+        String resume=session.translatedUrl;
+        deactivate("配置已更新");
+        if(session.sourceOnly) activateSource(context,resume); else activate(context, resume);
     }
 
+    static void activateSource(Context context,String sourceUrl) {
+        activateInternal(context,sourceUrl,true,true);
+    }
     static void activate(Context context, String translatedUrl) {
         activateInternal(context, translatedUrl, true);
     }
 
     static void prewarm(Context context, String sourceUrl) {
-        if (context == null || !DeepSeekCaptionHook.isYouTubeTimedTextUrl(sourceUrl) ||
+        if (!CaptionChoice.isOn() || !CaptionChoice.translates() || context == null || !DeepSeekCaptionHook.isYouTubeTimedTextUrl(sourceUrl) ||
                 TargetLanguage.fromUrl(sourceUrl) != null || !DeepSeekConfig.isReady(context) ||
                 !DeepSeekConfig.contextualUnitCoreEnabled(context)) return;
         String code = DeepSeekConfig.defaultTargetLanguage(context);
@@ -190,12 +196,15 @@ static void setMainActivity(Activity activity) {
     }
 
     private static void activateInternal(Context context, String translatedUrl, boolean visible) {
+        activateInternal(context,translatedUrl,visible,false);
+    }
+    private static void activateInternal(Context context, String translatedUrl, boolean visible, boolean sourceOnly) {
         if (context == null || translatedUrl == null) return;
         Context app = context.getApplicationContext();
         DeepSeekConfig.Snapshot config = DeepSeekConfig.load(app);
-        TargetLanguage target = TargetLanguage.fromUrl(translatedUrl);
+        TargetLanguage target = sourceOnly ? TargetLanguage.fromCode(CaptionChoice.language()) : TargetLanguage.fromUrl(translatedUrl);
         if (target == null) return;
-        String requestKey = CaptionEngine.requestKey(app, translatedUrl) + "|contextual-unit-v1";
+        String requestKey = CaptionEngine.requestKey(app, translatedUrl) + (sourceOnly ? "|source-overlay-v1" : "|anchored-v1");
         String videoId = videoIdFromUrl(translatedUrl);
         if (videoId.isEmpty()) videoId = currentVideoId;
         if (videoId.isEmpty()) {
@@ -211,11 +220,12 @@ static void setMainActivity(Activity activity) {
         synchronized (ACTIVE_LOCK) {
             Session current = active;
             if (current != null && !current.cancelled && current.requestKey.equals(requestKey) &&
-                    sameTranslationConfig(current.config, config) && !current.terminalError) {
+                    sameTranslationConfig(current.config, config)) {
                 current.activatedAtMs = SystemClock.elapsedRealtime();
                 boolean instant = visible && !current.visible && current.firstReady;
                 if (visible) current.visible = true;
                 if (current.visible) render(current, current.currentTimeMs);
+                if (current.terminalError) return;
                 if (instant) {
                     CaptionDiagnostics.mark(app, "CONTEXTUAL_SHOWN_FROM_PREWARM",
                             "预热已完成源轨、固定单元和缓存恢复，选择后立即显示");
@@ -229,13 +239,14 @@ static void setMainActivity(Activity activity) {
                     SESSION_IDS.incrementAndGet(), app, translatedUrl, requestKey,
                     videoId, target, config
             );
+            session.sourceOnly = sourceOnly;
             session.visible = visible;
             session.currentTimeMs = estimatedVideoTime(SystemClock.elapsedRealtime());
             active = session;
         }
 
         scheduleDisplayTick();
-        if (!config.ready()) {
+        if (!sourceOnly && !config.ready()) {
             session.error = "请先在 Morphe 设置中启用 AI 字幕并填写 API Key";
             session.terminalError = true;
             if (session.visible) CaptionOverlay.showStatus(session.error, overlayGuard(session, session.generation));
@@ -360,7 +371,7 @@ static void setMainActivity(Activity activity) {
 
     private static void loadAndStart(Session session) {
         try {
-            RawCaptionSource.Source source = RawCaptionSource.load(session.context, session.translatedUrl, false);
+            RawCaptionSource.Source source = RawCaptionSource.load(session.context, session.translatedUrl, false, !session.sourceOnly);
             if (!isCurrent(session) || session.cancelled) return;
             long stageStarted = SystemClock.elapsedRealtime();
             int appendEvents = SourceAtomTimeline.countAppendEvents(source.body);
@@ -380,7 +391,7 @@ static void setMainActivity(Activity activity) {
                     "; nativeRatio="+atomized.preciseRatio());
             if (!sessionMayContinue(session)) return;
             stageStarted = SystemClock.elapsedRealtime();
-            TranslationUnitTimeline.Result timeline = AnchoredWindowPlanner.build(atomized);
+            TranslationUnitTimeline.Result timeline = session.sourceOnly ? NativeSourcePlan.build(source.document) : AnchoredWindowPlanner.build(atomized);
             markPreprocessStage(session, "TranslationUnitTimeline.build", stageStarted);
             if (!sessionMayContinue(session)) return;
             if (timeline.units.isEmpty()) {
@@ -430,7 +441,11 @@ static void setMainActivity(Activity activity) {
                     session.suppressedBridges = new boolean[count];
                     for (int i = 0; i < count; i++) {
                         TranslationUnitTimeline.Unit unit = session.units.get(i);
-                        if (ContextualCaptionTextPolicy.suppressWithoutTranslation(unit.sourceText)) {
+                        if(session.sourceOnly) {
+                            session.translations[i]=unit.sourceText;
+                            session.anchoredPlans[i]=AnchoredCaptionPlan.source(unit.startMs,unit.endMs,unit.sourceText);
+                            session.states[i]=READY;
+                        } else if (ContextualCaptionTextPolicy.suppressWithoutTranslation(unit.sourceText)) {
                             session.translations[i] = "";
                             session.states[i] = READY;
                             suppressedNonSpeech++;
@@ -446,7 +461,7 @@ static void setMainActivity(Activity activity) {
 
             if (!sessionMayPublish(session)) return;
             stageStarted = SystemClock.elapsedRealtime();
-            int cached = restoreCache(session);
+            int cached = session.sourceOnly ? 0 : restoreCache(session);
             markPreprocessStage(session, "cache restore", stageStarted);
             boolean currentCacheHit;
             synchronized (session.lock) {
@@ -480,7 +495,7 @@ static void setMainActivity(Activity activity) {
     }
 
     private static void schedule(Session session) {
-        if (!isCurrent(session) || session.cancelled || !session.timelineReady || !session.visible) return;
+        if (!isCurrent(session) || session.cancelled || session.sourceOnly || session.terminalError || !session.timelineReady || !session.visible) return;
         Request cancelBackground = null;
         Request startRealtime = null;
         Request startBackground = null;
@@ -761,6 +776,7 @@ static void setMainActivity(Activity activity) {
     }
 
     private static void translateBatch(Session session, Request request) {
+        if(!CaptionModePolicy.mayCallApi(session.sourceOnly,session.terminalError,session.cancelled)) return;
         long started = SystemClock.elapsedRealtime();
         try {
             ContextualBatchApiClient.Result result = ContextualBatchApiClient.translate(
@@ -799,6 +815,11 @@ static void setMainActivity(Activity activity) {
             );
             finishBatch(session, request, result, started);
         } catch (Throwable failure) {
+            if(failure instanceof ContextualBatchApiClient.PermanentException) {
+                synchronized(session.lock) { detachRequestLocked(session,request); }
+                failSession(session,failure.getMessage());
+                return;
+            }
             failBatch(session, request, failure, started);
         }
     }
@@ -1187,7 +1208,7 @@ static void setMainActivity(Activity activity) {
         long renderGeneration;
         synchronized (session.lock) {
             renderGeneration = session.generation;
-            if (!session.timelineReady || session.units.isEmpty()) {
+            if (session.terminalError || !session.timelineReady || session.units.isEmpty()) {
                 text = session.error.isEmpty()
                         ? session.targetLanguage.displayName + " AI 字幕准备中…"
                         : session.error;
@@ -1567,6 +1588,11 @@ static void setMainActivity(Activity activity) {
         if (!isCurrent(session) || session.cancelled) return;
         session.error = detail == null || detail.trim().isEmpty() ? "AI 字幕不可用" : detail.trim();
         session.terminalError = true;
+        synchronized(session.lock) {
+            if(session.realtimeRequest!=null) session.realtimeRequest.cancel();
+            if(session.backgroundRequest!=null) session.backgroundRequest.cancel();
+            session.realtimeRequest=null;session.backgroundRequest=null;
+        }
         if (session.visible) CaptionOverlay.showStatus(session.error, overlayGuard(session, session.generation));
         CaptionDiagnostics.mark(session.context, "CONTEXTUAL_CORE_ERROR", session.error);
     }
@@ -1638,6 +1664,7 @@ static void setMainActivity(Activity activity) {
         final boolean concurrentRescue;
         final long generation;
         final long sequence;
+        volatile boolean sourceOnly;
         volatile boolean cancelled;
         volatile boolean bodySent;
         volatile long bodySentAtMs;
@@ -1681,7 +1708,7 @@ static void setMainActivity(Activity activity) {
         }
     }
 
-    private static final class DisplaySlice {
+    static final class DisplaySlice {
         final long startMs;
         final long endMs;
         final String text;
@@ -1693,7 +1720,7 @@ static void setMainActivity(Activity activity) {
         }
     }
 
-    private static final class DisplayPlan {
+    static final class DisplayPlan {
         final List<DisplaySlice> slices;
         final String boundaryReason;
         final String rejectionSummary;
@@ -1745,6 +1772,7 @@ static void setMainActivity(Activity activity) {
         final Object lock = new Object();
         final Object cacheWriteLock = new Object();
 
+        volatile boolean sourceOnly;
         volatile boolean cancelled;
         volatile boolean visible;
         volatile boolean timelineReady;

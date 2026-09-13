@@ -463,8 +463,8 @@ final class TokenCostAudit {
             if (!model.isEmpty()) out.append("\n当前模型：").append(model);
             out.append("\n当前 Core：").append(
                     "contextual_unit_v1".equals(session.optString("active_core", ""))
-                            ? "Contextual Unit v1"
-                            : "Semantic Ledger v2"
+                            ? "Anchored AI Captions"
+                            : "历史核心"
             );
             out.append("\nAPI：").append(format(value(totalAll, "attempts"))).append(" 次尝试")
                     .append(" · ").append(format(value(totalAll, "http_ok"))).append(" 次 2xx")
@@ -495,8 +495,8 @@ final class TokenCostAudit {
             appendBucketLine(out, state, "background_page", "  页级合并");
             appendBucketLine(out, state, "background_block", "  块级(fallback)");
             appendBucketLine(out, state, "background_alt", "  边界二次观察");
-            appendBucketLine(out, state, "unit_realtime", "实验核心·当前批次");
-            appendBucketLine(out, state, "unit_background", "实验核心·后台批次");
+            appendBucketLine(out, state, "unit_realtime", "时间锚·当前批次");
+            appendBucketLine(out, state, "unit_background", "时间锚·后台批次");
             appendBucketLine(out, state, "core_semantic_ledger_v2", "Core·Semantic Ledger v2");
             appendBucketLine(out, state, "core_contextual_unit_v1", "Core·Contextual Unit v1");
             appendBucketLine(out, state, "display", "显示切片");
@@ -600,8 +600,8 @@ final class TokenCostAudit {
                         .append(" · 未命中 units ").append(format(value(metrics, "unit_cache_miss_units")))
                         .append(" · 当前 unit 命中 ").append(format(value(metrics, "unit_cache_current_hits")));
             }
-            appendCoreRate(out, session, metrics, "semantic_ledger_v2", "Semantic Ledger v2");
-            appendCoreRate(out, session, metrics, "contextual_unit_v1", "Contextual Unit v1");
+            appendCoreRate(out, session, metrics, "semantic_ledger_v2", "历史核心");
+            appendCoreRate(out, session, metrics, "contextual_unit_v1", "Anchored AI Captions");
             long requestBytes = value(sessionAll, "request_bytes");
             long sessionAttempts = value(sessionAll, "attempts");
             if (sessionAttempts > 0L) {

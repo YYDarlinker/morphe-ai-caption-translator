@@ -11,7 +11,7 @@ final class PageCaptionController {
     static boolean isVisibleActive() { return ContextualUnitCaptionController.isVisibleActive(); }
     static void deactivateFromCaptionButton() { ContextualUnitCaptionController.deactivateFromCaptionButton(); }
     static void deactivateFromNativeCaptionState() { ContextualUnitCaptionController.deactivateFromNativeCaptionState(); }
-    static void setMainActivity(Activity activity) { ContextualUnitCaptionController.setMainActivity(activity); }
+    static void setMainActivity(Activity activity) { if(activity!=null) TokenCostAudit.onCoreSelected(activity,"contextual_unit_v1"); ContextualUnitCaptionController.setMainActivity(activity); }
     static void onPlayerType(String rawType) { ContextualUnitCaptionController.onPlayerType(rawType); }
     static String restoreTargetAfterMiniplayer(String url) { return ContextualUnitCaptionController.restoreTargetAfterMiniplayer(url); }
     static void onVideoId(String videoId) { currentId=videoId==null ? "" : videoId; ContextualUnitCaptionController.onVideoId(videoId); }

@@ -14,7 +14,6 @@ final class DeepSeekConfig {
     private static final String PROMPT = "prompt";
     private static final String CAPTION_TEXT_SIZE = "caption_text_size";
     private static final String BACKGROUND_OPACITY = "background_opacity";
-    private static final String DEFAULT_TARGET_LANGUAGE = "default_target_language";
     private static final String POSITION_PORTRAIT_Y = "position_portrait_y";
     private static final String POSITION_LANDSCAPE_Y = "position_landscape_y";
 
@@ -30,7 +29,6 @@ final class DeepSeekConfig {
     static final int DEFAULT_BACKGROUND_OPACITY = 70;
     static final boolean DEFAULT_CONTEXTUAL_UNIT_CORE = true;
     static final boolean DEFAULT_DISPLAY_TEXT_DEBUG = false;
-    static final String DEFAULT_TARGET_LANGUAGE_CODE = "zh-Hans";
 
     private DeepSeekConfig() {}
 
@@ -38,6 +36,13 @@ final class DeepSeekConfig {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+    static boolean enabled(Context context) { return prefs(context).getBoolean(ENABLED,false); }
+    static Snapshot displayStyle(Context context) {
+        SharedPreferences p=prefs(context);
+        return new Snapshot(p.getBoolean(ENABLED,false),"","","",
+            clampTextSize(p.getInt(CAPTION_TEXT_SIZE,DEFAULT_CAPTION_TEXT_SIZE)),
+            clampOpacity(p.getInt(BACKGROUND_OPACITY,DEFAULT_BACKGROUND_OPACITY)),"");
+    }
     static Snapshot load(Context context) {
         SharedPreferences p = prefs(context);
         String prompt = safe(p.getString(PROMPT, DEFAULT_PROMPT), DEFAULT_PROMPT);
@@ -106,18 +111,7 @@ final class DeepSeekConfig {
     }
 
     static String defaultTargetLanguage(Context context) {
-        String value = prefs(context).getString(
-                DEFAULT_TARGET_LANGUAGE,
-                DEFAULT_TARGET_LANGUAGE_CODE
-        );
-        if (value == null || value.trim().isEmpty()) return "";
-        return TargetLanguage.fromCode(value).code;
-    }
-
-    static void saveDefaultTargetLanguage(Context context, String value) {
-        String clean = value == null ? "" : value.trim();
-        if (!clean.isEmpty()) clean = TargetLanguage.fromCode(clean).code;
-        prefs(context).edit().putString(DEFAULT_TARGET_LANGUAGE, clean).apply();
+        return CaptionChoice.isOn() && CaptionChoice.translates() ? CaptionChoice.language() : "";
     }
 
     static boolean isReady(Context context) {

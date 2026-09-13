@@ -32,6 +32,11 @@ final class ContextualBatchApiClient {
     static final String LANE_REALTIME = "unit_realtime";
     static final String LANE_BACKGROUND = "unit_background";
 
+    private static volatile String minimalIdentity="";
+    private static volatile String blockedIdentity="";
+    private static volatile String blockedMessage="";
+    private static String identity(DeepSeekConfig.Snapshot c) { return c.baseUrl+"\n"+c.model+"\n"+c.apiKey; }
+    static synchronized void resetRejection() { blockedIdentity="";blockedMessage="";minimalIdentity=""; }
     private ContextualBatchApiClient() {}
 
     static Result translate(
@@ -45,6 +50,7 @@ final class ContextualBatchApiClient {
             boolean priority
     ) throws Exception {
         if (targets == null || targets.isEmpty()) return Result.EMPTY;
+        if(identity(config).equals(blockedIdentity)) throw new PermanentException("configuration_blocked",blockedMessage,"");
         validateTargetIds(targets);
         if (!config.ready()) {
             throw new PermanentException("configuration", "AI 字幕翻译尚未启用或没有 API Key", "");
@@ -87,22 +93,8 @@ final class ContextualBatchApiClient {
                 MAX_OUTPUT_TOKENS,
                 sourceChars * 2 + targets.size() * 96 + 320
         ));
-        JSONObject request = new JSONObject()
-                .put("model", config.model)
-                .put("stream", false)
-                .put("temperature", 0.0)
-                .put("response_format", new JSONObject().put("type", "json_object"))
-                .put("messages", new JSONArray()
-                        .put(new JSONObject().put("role", "system").put("content", systemPrompt))
-                        .put(new JSONObject().put("role", "user").put("content", payload.toString())));
-
-        boolean dashScopeQwen = isDashScope(config.baseUrl) && isQwenModel(config.model);
-        if (isDeepSeekModel(config.model)) {
-            request.put("thinking", new JSONObject().put("type", "disabled"));
-        } else if (dashScopeQwen) {
-            request.put("enable_thinking", false);
-        }
-        request.put("max_tokens", outputTokens);
+        JSONObject request = ProviderRequestPolicy.request(config,systemPrompt,payload,outputTokens);
+        if(identity(config).equals(minimalIdentity)) ProviderRequestPolicy.removeOptional(request);
 
         int contextCount = (contextBefore == null ? 0 : contextBefore.size()) +
                 (contextAfter == null ? 0 : contextAfter.size());
@@ -123,43 +115,38 @@ final class ContextualBatchApiClient {
                 priority ? LANE_REALTIME : LANE_BACKGROUND
         );
 
-        boolean thinkingFallback = request.has("thinking") || request.has("enable_thinking");
-        boolean responseFormatFallback = request.has("response_format");
-        boolean maxTokensFallback = request.has("max_tokens");
-        Exception last = null;
-        for (int attempt = 0; attempt < 1; attempt++) {
-            ensureActive(deadline, control);
+        boolean negotiated=false;
+        while(true) {
+            ensureActive(deadline,control);
             try {
-                String content = post(config, request, deadline, control, audit);
-                Result result = parseAnchored(content, targets, atoms);
-                TokenCostAudit.recordUnitBatchOutcome(audit, result.validCount());
+                Result result=parseAnchored(post(config,request,deadline,control,audit),targets,atoms);
+                if(negotiated) minimalIdentity=identity(config);
+                TokenCostAudit.recordUnitBatchOutcome(audit,result.validCount());
                 return result;
-            } catch (IllegalStateException rejected) {
-                if (thinkingFallback && unsupportedThinking(rejected)) {
-                    thinkingFallback = false;
-                    request.remove("thinking");
-                    request.remove("enable_thinking");
-                    attempt--;
-                    continue;
+            } catch(ProviderRequestException rejected) {
+                if(!negotiated && ProviderRequestPolicy.removeOptional(request)) {
+                    negotiated=true; continue; // exactly one minimal-schema retry, no window isolation.
                 }
-                if (responseFormatFallback && unsupportedResponseFormat(rejected)) {
-                    responseFormatFallback = false;
-                    request.remove("response_format");
-                    attempt--;
-                    continue;
-                }
-                if (maxTokensFallback && providerRejectsParameter(rejected, "max_tokens")) {
-                    maxTokensFallback = false;
-                    throw new PermanentException("output_limit_unsupported",
-                            "供应商不支持输出预算，请选择支持 max_tokens 的兼容端点", "");
-                }
-                throw rejected;
-            } catch (RetryableException | BatchFormatException retryable) {
-                last = retryable;
-                if (attempt + 1 < 1 && remainingMillis(deadline) > 700L) Thread.sleep(220L);
+                blockedMessage="API 拒绝字幕请求（"+ProviderRequestPolicy.reason(rejected.providerDetail)+
+                    "）。已停止自动重试，请检查 API 地址/模型并运行测试 API。";
+                blockedIdentity=identity(config);
+                throw new PermanentException(rejected.category(),blockedMessage, "");
             }
         }
-        throw last == null ? new IllegalStateException("AI 字幕固定单元翻译失败") : last;
+    }
+
+    static String test(DeepSeekConfig.Snapshot config) throws Exception {
+        resetRejection();
+        java.util.List<SourceAtomTimeline.Atom> atoms=java.util.Arrays.asList(
+            new SourceAtomTimeline.Atom(0,1000,"Hello",0,true),new SourceAtomTimeline.Atom(1000,2000,"world.",0,true));
+        TranslationUnitTimeline.Unit unit=new TranslationUnitTimeline.Unit(0,"test",0,1,0,0,0,2000,
+            "Hello world.",TranslationUnitTimeline.Confidence.HIGH,"test");
+        DeepSeekConfig.Snapshot enabled=new DeepSeekConfig.Snapshot(true,config.baseUrl,config.model,config.prompt,
+            config.captionTextSize,config.backgroundOpacity,config.apiKey);
+        Result result=translate(java.util.Collections.singletonList(unit),atoms,java.util.Collections.emptyList(),
+            java.util.Collections.emptyList(),enabled,TargetLanguage.SIMPLIFIED_CHINESE,null,true);
+        if(result.validCount()!=1) throw new BatchFormatException("API 未返回有效时间锚字幕；请更换模型");
+        return result.translationsById.get("test");
     }
 
     static Result parseAnchored(String content, List<TranslationUnitTimeline.Unit> targets,
@@ -477,7 +464,7 @@ final class ContextualBatchApiClient {
     static boolean requiresBatchIsolation(Throwable error) {
         Throwable current = error;
         while (current != null) {
-            if (current instanceof ProviderRequestException) return true;
+            if (current instanceof ProviderRequestException) return false;
             current = current.getCause();
         }
         return false;
@@ -566,7 +553,8 @@ final class ContextualBatchApiClient {
             JSONObject error = root.optJSONObject("error");
             if (error == null) error = root;
             appendSafeCategoryPart(category, error.optString("code", ""));
-            appendSafeCategoryPart(category, error.optString("param", ""));
+            if (!error.isNull("param")) appendSafeCategoryPart(category, error.optString("param", ""));
+            appendSafeCategoryPart(category, ProviderRequestPolicy.reason(response));
         } catch (Throwable ignored) {
             // HTTP status remains sufficient for recovery; never persist provider response text.
         }

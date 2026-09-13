@@ -119,6 +119,7 @@ final class CaptionLifecycleRestore {
      * source refresh to repaint native captions underneath the AI overlay.
      */
     static String restoreAfterLifecycle(String url) {
+        if(!CaptionChoice.translates()) return url;
         if (!DynamicCaptionController.isVisibleActive() ||
                 retainedTargetCode.isEmpty() ||
                 !DeepSeekCaptionHook.isYouTubeTimedTextUrl(url) ||

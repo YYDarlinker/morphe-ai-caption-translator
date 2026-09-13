@@ -71,6 +71,19 @@ public final class DeepSeekCaptionHook {
             // Fall through to the ordinary caption path rather than breaking YouTube captions.
         }
 
+        if(initialContext!=null && DeepSeekConfig.load(initialContext).enabled &&
+                isYouTubeTimedTextUrl(originalUrl) && CaptionChoice.known() &&
+                (!CaptionChoice.isOn() || (!CaptionChoice.translates() && TargetLanguage.fromUrl(originalUrl)!=null))) {
+            // A late auto-translation fetch must not revive Off or change source-only mode.
+            return CLOSED_TRANSLATION_SINK;
+        }
+        if(initialContext!=null && DeepSeekConfig.load(initialContext).enabled &&
+                DeepSeekCaptionHook.isYouTubeTimedTextUrl(originalUrl) && TargetLanguage.fromUrl(originalUrl)==null &&
+                CaptionChoice.isOn() && !CaptionChoice.translates()) {
+            ContextualUnitCaptionController.activateSource(initialContext,originalUrl);
+            try { return LoopbackCaptionServer.get(initialContext).urlFor(originalUrl); }
+            catch(Exception failure) { return CLOSED_TRANSLATION_SINK; }
+        }
         String selectedUrl = DynamicCaptionController.restoreTargetAfterMiniplayer(originalUrl);
         selectedUrl = CaptionLifecycleRestore.restoreAfterLifecycle(selectedUrl);
         final boolean aiEnabled = initialContext != null &&

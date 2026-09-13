@@ -59,6 +59,9 @@ final class AnchoredCaptionPlan {
         if(next!=count) throw new IllegalArgumentException("incomplete token coverage");
         return new AnchoredCaptionPlan(out,full.toString());
     }
+    static AnchoredCaptionPlan source(long start,long end,String text) {
+        return new AnchoredCaptionPlan(Collections.singletonList(new Segment(0,0,start,end,text)),text);
+    }
     JSONArray toJson() {
         JSONArray rows=new JSONArray();
         for(Segment s:segments) rows.put(new JSONArray().put(s.to).put(s.text));

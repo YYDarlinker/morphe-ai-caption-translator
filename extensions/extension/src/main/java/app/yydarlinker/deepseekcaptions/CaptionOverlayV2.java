@@ -307,7 +307,7 @@ final class CaptionOverlay {
     }
 
     private static void configure(FrameLayout anchor, TextView view, Activity activity, Rect bounds) {
-        DeepSeekConfig.Snapshot style = DeepSeekConfig.load(activity);
+        DeepSeekConfig.Snapshot style = DeepSeekConfig.displayStyle(activity);
         int anchorWidth = Math.max(1, Math.round(bounds.width() * 0.92f));
         int configured = pendingStatus
                 ? Math.max(DeepSeekConfig.MIN_CAPTION_TEXT_SIZE, style.captionTextSize - 4)

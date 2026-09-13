@@ -1,6 +1,10 @@
 package app.yydarlinker.deepseekcaptions;
 
 import android.content.Context;
+import android.app.AlertDialog;
+import android.content.ClipboardManager;
+import android.content.ClipData;
+import android.widget.Button;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
@@ -109,6 +113,16 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         }
         lastCommitted = KEY_API_KEY.equals(getKey()) ? "" : initial.trim();
         root.addView(editor, matchWrap());
+        if(KEY_API_KEY.equals(getKey())) {
+            // A dialog isolates Android text gestures from the host ListView long-press handler.
+            editor.setFocusable(false);
+            editor.setOnClickListener(v -> editApiKey());
+            editor.setOnLongClickListener(v -> { editApiKey(); return true; });
+            Button edit=new Button(context);
+            edit.setText("填写 / 粘贴 API Key");
+            edit.setOnClickListener(v -> editApiKey());
+            root.addView(edit,matchWrap());
+        }
 
         state = new TextView(context);
         state.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
@@ -146,6 +160,43 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
             }
         });
         return root;
+    }
+
+    private void editApiKey() {
+        EditText input=new EditText(getContext());
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        input.setHint("输入或粘贴 API Key");
+        input.setLongClickable(true);
+        input.setSelectAllOnFocus(false);
+        input.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        LinearLayout box=new LinearLayout(getContext());box.setPadding(dp(20),dp(8),dp(20),dp(8));box.addView(input,matchWrap());
+        AlertDialog dialog=new AlertDialog.Builder(getContext()).setTitle("API Key")
+            .setView(box).setNegativeButton("取消",null).setPositiveButton("加密保存",null)
+            .setNeutralButton("从剪贴板粘贴",null).create();
+        dialog.setOnShowListener(v -> {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(button -> {
+                ClipboardManager clipboard=(ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip=clipboard==null ? null : clipboard.getPrimaryClip();
+                if(clip!=null && clip.getItemCount()>0) {
+                    CharSequence text=clip.getItemAt(0).getText();
+                    if(text!=null) { input.setText(text);input.setSelection(input.length()); }
+                }
+            });
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(button -> {
+                String key=input.getText().toString().trim();
+                if(key.isEmpty() || key.indexOf('\n')>=0 || key.indexOf('\r')>=0) {
+                    input.setError("请输入完整的单行 API Key");return;
+                }
+                try { SecureApiKey.save(getContext(),key);updateState(true,null);
+                    DeepSeekModelPreference.onCredentialsChanged(getContext());
+                    DynamicCaptionController.refreshConfiguration(getContext());
+                    input.setText("");dialog.dismiss();
+                } catch(Exception failed) { input.setError("加密保存失败"); }
+            });
+        });
+        dialog.setOnDismissListener(v -> input.setText(""));
+        dialog.show();
     }
 
     private void configureEditor(EditText value) {

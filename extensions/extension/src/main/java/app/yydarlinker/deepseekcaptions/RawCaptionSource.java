@@ -34,6 +34,9 @@ final class RawCaptionSource {
             String translatedUrl,
             boolean publishSharedTimeline
     ) throws Exception {
+        return load(context,translatedUrl,publishSharedTimeline,true);
+    }
+    static Source load(Context context,String translatedUrl,boolean publishSharedTimeline,boolean calibrate) throws Exception {
         String sourceUrl = CaptionEngine.sourceCaptionUrl(translatedUrl);
         LoadedTrack provider = loadTrack(context, sourceUrl, "SOURCE", true);
 
@@ -54,7 +57,7 @@ final class RawCaptionSource {
                     "SOURCE_TIMING_BASE",
                     "当前底层轨就是英语（自动生成），直接使用其同步时间轴"
             );
-        } else if (identity.englishProvider) {
+        } else if (calibrate && identity.englishProvider) {
             CaptionDiagnostics.mark(
                     context,
                     "ASR_TIMING_PROBE",

@@ -128,7 +128,7 @@ public final class ContextualBatchApiClientHarness {
                 ContextualBatchApiClient.failureKind(rejectedBatch),
                 "generic HTTP 400 must remain recoverable"
         );
-        assertEquals(true, ContextualBatchApiClient.requiresBatchIsolation(rejectedBatch),
+        assertEquals(false, ContextualBatchApiClient.requiresBatchIsolation(rejectedBatch),
                 "HTTP 400 batch rejection requests per-unit isolation");
         assertEquals(
                 "http_400_invalid_parameter_response_format",
@@ -136,7 +136,7 @@ public final class ContextualBatchApiClientHarness {
                 "provider category contains only safe structured fields"
         );
         assertEquals(
-                "http_400_invalid_parameter_response_format",
+                "http_400_invalid_parameter_response_format_response_format_unsupported",
                 ContextualBatchApiClient.safeProviderCategory(
                         400,
                         "{\"error\":{\"code\":\"invalid parameter\",\"param\":\"response_format\"," +

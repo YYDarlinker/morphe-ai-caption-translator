@@ -21,7 +21,7 @@ for i,line in enumerate(code):
     if "->augmentTranslations(" in line:
         assert code[i+1].startswith("move-result-object") and code[i+2].startswith("return-object")
 manager=instructions(read("anws"))
-assert sum("->restoreDecision()I" in x for x in manager)==1
+assert sum("->restoreDecision()I" in x for x in manager)==2 # model-ready gate plus missing-language guard
 assert sum("->resolveRemembered(" in x for x in manager)==1
 assert sum("->onNativeSelection(" in x for x in manager)==1
 window=read("com/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView")

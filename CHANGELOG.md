@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.1...v1.0.2) (2026-09-13)
+
+### 🐛 Bug Fixes
+
+* require explicit translation selection before paid requests ([c408a18](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/c408a180a273d92f1851dff9c8e7aee16a4be9b8))
+
 ## [1.0.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.0...v1.0.1) (2026-09-13)
 
 ### 🐛 Bug Fixes

@@ -1,3 +1,9 @@
+## [1.0.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.3...v1.0.4) (2026-09-13)
+
+### 🐛 Bug Fixes
+
+* reduce avoidable caption rejection and restore native inline editing ([4f8b501](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/4f8b50188c97db6e9ddb914f7013147e1ec5731d))
+
 ## [1.0.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.2...v1.0.3) (2026-09-13)
 
 ### 🐛 Bug Fixes

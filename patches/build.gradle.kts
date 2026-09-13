@@ -2,7 +2,7 @@ group = "app.yydarlinker"
 
 patches {
     about {
-        name = "YYDarlinker AI Caption Translator Patches"
+        name = "Anchored AI Captions"
         description = "Real-time multilingual YouTube captions through a user-provided OpenAI-compatible API"
         source = "https://github.com/YYDarlinker/morphe-ai-caption-translator"
         author = "YYDarlinker"

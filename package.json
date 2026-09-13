@@ -7,5 +7,8 @@
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "gradle-semantic-release-plugin": "^1.10.3",
     "semantic-release": "^25.0.7"
-  }
+  },
+  "name": "anchored-ai-captions",
+  "private": true,
+  "description": "Release tooling for independent Anchored AI Captions (compatible with Morphe)"
 }

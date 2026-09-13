@@ -1,10 +1,12 @@
-# AI Caption Translator for YouTube / Morphe
+# Anchored AI Captions
+
+Independent YouTube AI subtitle addon, compatible with Morphe.
 
 This repository is a Morphe custom patch. It routes YouTube automatic-translation selections through a user-provided OpenAI-compatible API and displays the result in a dedicated in-player subtitle box.
 
-## v1.0.0-dev.1 delivery
+## Caption engine
 
-This release replaces the previous multi-stage display path with an anchored joint translation plan:
+The caption engine uses an anchored joint translation plan:
 
 - local code creates bounded source windows, never final subtitles;
 - one API request translates a window and selects sentence ranges over numbered source atoms;

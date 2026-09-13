@@ -10,8 +10,6 @@ private const val LEGACY_PREF_CLASS = "app.yydarlinker.deepseekcaptions.DeepSeek
 private const val PREF_KEY = "morphe_settings_screen_13_ai_captions"
 private const val ENABLED_PREF_CLASS =
     "app.yydarlinker.deepseekcaptions.DeepSeekEnabledPreference"
-private const val CORE_PREF_CLASS =
-    "app.yydarlinker.deepseekcaptions.DeepSeekCorePreference"
 private const val TEXT_PREF_CLASS =
     "app.yydarlinker.deepseekcaptions.DeepSeekTextPreference"
 private const val MODEL_PREF_CLASS =

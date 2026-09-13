@@ -11,7 +11,10 @@ with zipfile.ZipFile(p) as z:
     assert "YYDarlinker/morphe-ai-caption-translator" in mf, "wrong repository identity"
     assert "YYDarlinker/morphe-ai-captions\n" not in mf
     assert v in mf, "wrong version"
-    with zipfile.ZipFile(io.BytesIO(z.read("extensions/extension.mpe"))) as e:
-        assert e.testzip() is None
-        assert any(n.endswith(".dex") for n in e.namelist())
+    dex=z.read("extensions/extension.mpe")
+    assert dex.startswith(b"dex\n"), "Morphe extension must be raw DEX"
+    assert int.from_bytes(dex[32:36],"little")==len(dex), "extension DEX length mismatch"
+    assert b"AnchoredCaptionPlan" in dex and b"NativeCaptionBridge" in dex
+    assert b"SemanticLedgerCaptionController" not in dex and b"LocalDisplaySliceFallback" not in dex
+
 print(json.dumps({"asset":p.name,"bytes":p.stat().st_size,"sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"root_dex":True,"extension":True}))

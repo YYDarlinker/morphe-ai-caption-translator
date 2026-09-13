@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  * Small OpenAI-compatible translation client retained for settings tests and compatibility callers.
  *
  * <p>Runtime subtitle segmentation no longer lives here. Final subtitle pages are planned by
- * {@link SemanticPageApiClient}; this client only preserves the older one-input/one-output helper
+ * the anchored request client; this client only preserves the older one-input/one-output helper
  * contract for code that still needs a plain translation request.</p>
  */
 final class DeepSeekApiClient {

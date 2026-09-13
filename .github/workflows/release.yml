@@ -29,6 +29,9 @@ jobs:
           current="$(jq -r '.version // empty' patches-bundle.json)"
           python3 .github/scripts/validate_morphe_metadata.py "$current"
 
+      - name: Test release metadata rejection paths
+        run: python3 .github/scripts/test_release_contract.py
+
       # semantic-release v25 records prerelease channel membership in a per-tag Git note.
       # If a tag is manually recreated without that note, semantic-release can restart at dev.1.
       - name: Validate semantic-release dev channel baseline
@@ -86,6 +89,10 @@ jobs:
           gh release view "$tag" --json tagName,isPrerelease,assets > "$RUNNER_TEMP/release.json"
           jq -e --arg tag "$tag" '.tagName == $tag' "$RUNNER_TEMP/release.json" >/dev/null
           jq -r '.assets[].name' "$RUNNER_TEMP/release.json" | grep -Fx "$expected"
+
+      - name: Verify anonymous Manager source chain
+        if: steps.release.outputs.new_release_published == 'true'
+        run: python3 .github/scripts/verify_remote_source.py "${{ github.ref_name }}" "${{ steps.release.outputs.new_release_version }}"
 
       - name: Attest
         if: steps.release.outputs.new_release_published == 'true'

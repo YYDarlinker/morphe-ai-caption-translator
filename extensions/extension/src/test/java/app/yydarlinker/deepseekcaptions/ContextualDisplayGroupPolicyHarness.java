@@ -12,7 +12,6 @@ public final class ContextualDisplayGroupPolicyHarness {
         testDecimalAndAbbreviationStayOpen();
         testSpeakerAndGapStopGrouping();
         testBoundedWait();
-        testCapacityLimit();
         testCanonicalJoin();
         System.out.println("ContextualDisplayGroupPolicyHarness: OK");
     }
@@ -109,21 +108,6 @@ public final class ContextualDisplayGroupPolicyHarness {
         states[1] = 2;
         if (!ContextualDisplayGroupPolicy.allReady(states, group, 2)) {
             throw new AssertionError("complete group not reported ready");
-        }
-    }
-
-    private static void testCapacityLimit() {
-        List<SourceAtomTimeline.Atom> atoms = Arrays.asList(
-                new SourceAtomTimeline.Atom(0, 1_000, "first", 0, false),
-                new SourceAtomTimeline.Atom(1_000, 2_000, "second", 0, false)
-        );
-        StringBuilder wide = new StringBuilder();
-        for (int i = 0; i < 61; i++) wide.append('a');
-        if (!LocalDisplaySliceFallback.exceedsContextualHardLimit(atoms, wide.toString())) {
-            throw new AssertionError("group over hard display width was not detected");
-        }
-        if (LocalDisplaySliceFallback.exceedsContextualHardLimit(atoms, "short sentence.")) {
-            throw new AssertionError("normal group was incorrectly over hard capacity");
         }
     }
 

@@ -1,4 +1,4 @@
-rootProject.name = "morphe-ai-captions"
+rootProject.name = "anchored-ai-captions"
 
 pluginManagement {
     repositories {

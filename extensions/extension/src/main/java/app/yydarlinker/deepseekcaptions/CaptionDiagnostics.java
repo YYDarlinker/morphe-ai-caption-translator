@@ -39,7 +39,6 @@ final class CaptionDiagnostics {
             // These are deliberately transport-only side effects. The semantic ledger emits these
             // checkpoints after its own request bookkeeping and before the next schedule, which is
             // the safest point to undo a network failure accidentally feeding semantic window growth.
-            SemanticLedgerRequestRecovery.observeStage(cleanStage);
         } catch (Throwable ignored) {
         }
     }

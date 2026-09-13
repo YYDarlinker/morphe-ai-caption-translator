@@ -23,3 +23,5 @@ Rendering no longer decrypts the API key to read font/background style on every 
 ## Honest acceptance scope
 
 Automated HTTP tests use a local mock, not the user's provider or real credentials. Static combined-APK checks prove hooks and branch entries exist; they cannot certify ART behavior, visual clipboard interaction, the two device menu variants, or speech quality. Those require a fresh on-phone check of the released version. No API key is requested or published in the repository.
+
+Final recovery review: a successful Test API restarts an existing stopped session; a new video lacking the remembered source language returns no selected track instead of silently choosing another language. Automatic prefetch is not permission to call the paid API on cold start or after Off.

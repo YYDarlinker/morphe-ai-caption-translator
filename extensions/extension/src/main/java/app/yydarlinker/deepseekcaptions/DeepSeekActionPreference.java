@@ -102,6 +102,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             postToUi(() -> {
                 setEnabled(true);
                 setSummary("使用当前已自动保存的配置测试连接");
+                if(message.startsWith("API 可用：")) DynamicCaptionController.refreshConfiguration(getContext());
                 toast(message);
             });
         }, "DeepSeekCaptionApiTest").start();

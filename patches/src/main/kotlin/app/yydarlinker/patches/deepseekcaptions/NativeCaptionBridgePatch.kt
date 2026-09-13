@@ -148,7 +148,13 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
         addInstructionsWithLabels(0,"""
             invoke-static {p0}, $BRIDGE->resolveRemembered($OBJECT)$OBJECT
             move-result-object v0
-            if-eqz v0, :original_default
+            if-nez v0, :remembered_track
+            invoke-static {}, $BRIDGE->restoreDecision()I
+            move-result v0
+            if-ltz v0, :original_default
+            const/4 v0, 0x0
+            return-object v0
+            :remembered_track
             check-cast v0, ${track.type}
             return-object v0
         """.trimIndent(),ExternalLabel("original_default",implementation!!.instructions.first()))

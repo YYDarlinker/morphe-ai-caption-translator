@@ -83,7 +83,7 @@ def main() -> None:
     if signature is not None and not isinstance(signature, str):
         fail("signature_download_url must be a string, null, or omitted")
 
-    repository = os.environ.get("GITHUB_REPOSITORY", "YYDarlinker/youtube-ai-caption-translator")
+    repository = os.environ.get("GITHUB_REPOSITORY", "YYDarlinker/morphe-ai-caption-translator")
     expected_url = (
         f"https://github.com/{repository}/releases/download/"
         f"v{version}/patches-{version}.mpp"

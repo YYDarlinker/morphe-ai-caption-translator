@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-08-21T14:21:03Z",
-  "description": "## v2.3.0-dev.8\n\n此版本为 Morphe 开发测试版，需要 真实 Android 设备验证。\n\n- 将显示分组前置到首次上屏前：根据 source-side immutable unit 只读判断分句归属，整组翻译 READY 后一次性冻结 DisplayPlan。\n- 禁止后续 unit READY 回写已显示计划；本版不恢复 CONTINUATION_GROUP 或 rebuildDisplayContinuityLocked 式回写机制。\n- 增加显示分组等待上限 800ms；超时或成员 permanent failure 时抑制不完整组，并记录 CONTEXTUAL_DISPLAY_SUPPRESSED。\n- 保留 strict 显示路径现有两行容量和语义边界；整组超过 hard capacity 且无安全切点时不强行整句溢出上屏。\n- 增加默认关闭的“显示文本调试”开关；开启后 DISPLAY_SELECTED 可附 source、canonical 和 group=x-y，供人工抽查。\n\n验收要点：\n\n① 开启“显示文本调试”后抽查 20 个含逗号/句号句子：同一分句必须在同一 group=x-y 内一次性呈现；\n② 无 CONTINUATION_GROUP 事件；无整句先显后被自身子切片替换；\n③ 分组等待 ≤800ms，超时/成员判负必有 CONTEXTUAL_DISPLAY_SUPPRESSED，且每组至多一条；\n④ 统计 display_group_member_permanent_failure 出现次数；\n⑤ 冷启动新视频：记录四段 CONTEXTUAL_PREPROCESS_STAGE 耗时，以及 CONTEXTUAL_UNIT_TIMELINE_READY 到首个有效 DISPLAY_SELECTED 的总耗时；\n⑥ 本版不含独立成义闸与风控 fail-fast，偶发碎片与风控期缺失属预期。\n\n不声明所有播放器、供应商和 生命周期问题已彻底解决。",
-  "download_url": "https://github.com/YYDarlinker/youtube-ai-caption-translator/releases/download/v2.3.0-dev.8/patches-2.3.0-dev.8.mpp",
+  "created_at": "2026-09-13T14:09:50",
+  "description": "Development build. Source metadata repaired; device playback and translation quality remain unverified.",
+  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.0.0-dev.1/patches-1.0.0-dev.1.mpp",
   "signature_download_url": "",
-  "version": "2.3.0-dev.8"
+  "version": "1.0.0-dev.1"
 }

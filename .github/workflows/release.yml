@@ -1,8 +1,13 @@
 name: Release
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
   push:
+    branches: [main, dev]
 
 jobs:
   release:
@@ -55,7 +60,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # Semantic release is the only publisher. Its prepare phase validates generated metadata
       # before @semantic-release/git creates a release commit or a version tag.
@@ -87,10 +92,10 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-name: 'Morphe Patches ${{ steps.release.outputs.new_release_git_tag }}'
-          subject-path: patches/build/libs/patches-*.mpp
+          subject-path: patches/build/libs/patches-${{ steps.release.outputs.new_release_version }}.mpp
 
       - name: Verify project compiles
         if: steps.release.outputs.new_release_published != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew :patches:buildAndroid clean --no-daemon
+        run: ./gradlew :extensions:extension:testDebugUnitTest :patches:buildAndroid --no-daemon

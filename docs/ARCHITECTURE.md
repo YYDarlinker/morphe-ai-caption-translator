@@ -40,8 +40,8 @@ The host bindings are resolved structurally at patch time and fail closed if the
 
 ## Verification boundary
 
-Build and unit regression: passed on September 13, 2026. The current regression suite contains 17 executed tests and one intentionally ignored historical test that reproduces the retired target-length display splitter defect.
+Build and unit regression: passed on September 13, 2026. The current regression suite contains 17 discovered tests: 16 passed and one intentionally ignored historical test that reproduces the retired target-length display splitter defect.
 
-The combined Morphe operation was structurally executed against the original YouTube 21.07.247 APK (SHA-256 `afed0724c7cbdec08626573f5e0c405db76e11fe9bfdafbc3884690a766666db`) with official `Captions` plus `AI caption translator`. The result rebuilt successfully, and no patch step failed.
+The combined Morphe operation was structurally executed against the original YouTube 21.07.247 APK (SHA-256 `afed0724c7cbdec08626573f5e0c405db76e11fe9bfdafbc3884690a766666db`) with the official default patch set (including `Captions`) plus `AI caption translator`. The result rebuilt successfully, and no patch step failed.
 
 A real phone is still required to judge API-provider behavior, the CC/settings menu interaction, subtitle visual placement, and playback under seek/miniplayer transitions.

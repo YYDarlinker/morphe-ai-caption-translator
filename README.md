@@ -34,3 +34,14 @@ The AI overlay owns automatic-translation tracks while enabled. Selecting Off hi
 ## License
 
 GPLv3. See `LICENSE`.
+
+## Remote source installation and release contract
+
+Add the repository URL, not a release-page URL, in Morphe Expert mode:
+`https://github.com/YYDarlinker/morphe-ai-caption-translator`
+
+Manager resolves `patches-bundle.json` from `main` with prerelease disabled, and `dev` with prerelease enabled. Both channels must contain a valid, timezone-free `created_at`, matching version metadata, and a public MPP download URL. An uploaded release asset alone is not a usable patch source.
+
+This project's regular release channel is for normal source installation; it does **not** certify device playback or translation quality. The original 1.0.0-dev.1 was manually published with a stale manifest and is superseded by the automated metadata repair release. Real-phone validation remains required. Do not select the old AI translator addon together with this replacement (shared runtime namespace).
+
+The release pipeline uses Morphe's changelog generator and semantic-release, builds the Android MPP and extension, executes tests, validates the generated manifest, and checks root DEX / extension / version / repository identity before uploading. No more in-place replacement of published assets.

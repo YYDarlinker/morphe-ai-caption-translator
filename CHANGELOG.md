@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.0...v1.0.1) (2026-09-13)
+
+### 🐛 Bug Fixes
+
+* restore caption output and separate source display from AI translation ([015fe49](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/015fe49a53bb12f0c20856472dcc753974f6eefd))
+
 ## 1.0.0 (2026-09-13)
 
 ### 🐛 Bug Fixes

@@ -91,8 +91,7 @@ jobs:
           jq -r '.assets[].name' "$RUNNER_TEMP/release.json" | grep -Fx "$expected"
 
       - name: Verify anonymous Manager source chain
-        if: steps.release.outputs.new_release_published == 'true'
-        run: python3 .github/scripts/verify_remote_source.py "${{ github.ref_name }}" "${{ steps.release.outputs.new_release_version }}"
+        run: python3 .github/scripts/verify_remote_source.py "${{ github.ref_name }}" "$(jq -r .version patches-bundle.json)"
 
       - name: Attest
         if: steps.release.outputs.new_release_published == 'true'

@@ -17,6 +17,8 @@ for attempt in range(6):
     try:
         manifest=json.loads(get(base+"/patches-bundle.json?check="+str(time.time_ns())))
         if expected and manifest["version"]!=expected: raise ValueError("raw manifest not updated yet")
+        listing=json.loads(get(base+"/patches-list.json?check="+str(time.time_ns())))
+        if listing["version"]!=manifest["version"]: raise ValueError("raw list and manifest CDN versions not yet coherent")
         break
     except Exception:
         if attempt==5: raise
@@ -25,7 +27,6 @@ v=manifest["version"]
 assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?",manifest["created_at"])
 assert datetime.fromisoformat(manifest["created_at"]).tzinfo is None
 assert manifest["download_url"]==f"https://github.com/{repo}/releases/download/v{v}/patches-{v}.mpp"
-listing=json.loads(get(base+"/patches-list.json?check="+str(time.time_ns())))
 assert listing["version"]==v and len(listing["patches"])==1
 body=get(manifest["download_url"])
 with zipfile.ZipFile(io.BytesIO(body)) as z:

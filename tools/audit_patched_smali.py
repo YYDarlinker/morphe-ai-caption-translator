@@ -4,7 +4,8 @@ from pathlib import Path
 root=Path(sys.argv[1]); report={}
 def read(name):
     matches=list(root.glob("smali*/"+name+".smali"));assert len(matches)==1,(name,len(matches))
-    return matches[0].read_text(encoding="utf-8")
+    text=matches[0].read_text(encoding="utf-8")
+    return re.sub(r"\\u([0-9a-fA-F]{4})",lambda m:chr(int(m.group(1),16)),text)
 def instructions(text):
     return [line.strip() for line in text.splitlines() if line.strip() and not line.strip().startswith((".","#"))]
 bridge=read("app/yydarlinker/deepseekcaptions/NativeCaptionBridge")

@@ -1,3 +1,9 @@
+## [1.0.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.4...v1.0.5) (2026-09-13)
+
+### 🐛 Bug Fixes
+
+* improve subtitle readability timing and inline paste ([c5eec87](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/c5eec8798039dad5fc1150f48a396c81270f2709))
+
 ## [1.0.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.3...v1.0.4) (2026-09-13)
 
 ### 🐛 Bug Fixes

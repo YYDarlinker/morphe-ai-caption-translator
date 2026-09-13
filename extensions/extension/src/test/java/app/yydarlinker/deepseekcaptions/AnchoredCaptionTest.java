@@ -9,7 +9,7 @@ import static org.junit.Assert.*;
 public class AnchoredCaptionTest {
     private List<SourceAtomTimeline.Atom> atoms(int count) {
         List<SourceAtomTimeline.Atom> a=new ArrayList<>();
-        for(int i=0;i<count;i++) a.add(new SourceAtomTimeline.Atom(1000+i*400,1300+i*400,"word"+i,i,true));
+        for(int i=0;i<count;i++) a.add(new SourceAtomTimeline.Atom(1000+i*800,1700+i*800,"word"+i,i,true));
         return a;
     }
     private TranslationUnitTimeline.Unit unit(List<SourceAtomTimeline.Atom> a) {
@@ -25,8 +25,8 @@ public class AnchoredCaptionTest {
     @Test public void exactSourceRangesAndSilenceArePreserved() throws Exception {
         List<SourceAtomTimeline.Atom> a=atoms(4);
         AnchoredCaptionPlan p=AnchoredCaptionPlan.parse(new JSONArray("[[1,\"第一分句\"],[3,\"第二分句\"]]"),a,unit(a));
-        assertEquals(1000,p.segments.get(0).startMs); assertEquals(1700,p.segments.get(0).endMs);
-        assertEquals(1800,p.segments.get(1).startMs); assertEquals(2500,p.segments.get(1).endMs);
+        assertEquals(1000,p.segments.get(0).startMs); assertEquals(2500,p.segments.get(0).endMs);
+        assertEquals(2600,p.segments.get(1).startMs); assertEquals(4100,p.segments.get(1).endMs);
         assertEquals(p.toJson().toString(),AnchoredCaptionPlan.parse(p.toJson(),a,unit(a)).toJson().toString());
     }
     @Test public void rejectsOverlapOmissionAndInventedIndices() throws Exception {

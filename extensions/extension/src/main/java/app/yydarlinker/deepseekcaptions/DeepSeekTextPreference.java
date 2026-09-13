@@ -90,16 +90,17 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         root.setTag(getKey());
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
-        root.setPadding(dp(16), dp(9), dp(16), dp(7));
+        root.setPadding(dp(20), dp(10), dp(20), dp(10));
 
         TextView title = new TextView(context);
         title.setText(getTitle());
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        title.setAlpha(.78f);
         root.addView(title, matchWrap());
 
-        editor = new EditText(context);
+        editor = new InlineCaptionEditor(context);
         editor.setFocusableInTouchMode(true);
-        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         editor.setPadding(0, dp(3), 0, dp(3));
         configureEditor(editor);
         String initial = initialValue();
@@ -110,13 +111,7 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         lastCommitted = KEY_API_KEY.equals(getKey()) ? "" : initial.trim();
         root.addView(editor, matchWrap());
         editor.setLongClickable(true);
-        editor.setOnTouchListener((view,event) -> {
-            if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN)
-                view.getParent().requestDisallowInterceptTouchEvent(true);
-            if(event.getActionMasked()==android.view.MotionEvent.ACTION_UP || event.getActionMasked()==android.view.MotionEvent.ACTION_CANCEL)
-                view.getParent().requestDisallowInterceptTouchEvent(false);
-            return false; // Android EditText owns selection handles and the native Paste menu.
-        });
+
 
         state = new TextView(context);
         state.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
@@ -133,7 +128,10 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
             }
         });
         editor.setOnFocusChangeListener((view, hasFocus) -> {
-            if (!hasFocus) commitNow(editor.getText().toString(), true);
+            if (!hasFocus) {
+                String text=editor.getText().toString();commitNow(text,true);
+                if(KEY_API_KEY.equals(getKey()) && text.trim().equals(lastCommitted)) editor.setText("");
+            }
         });
         editor.setOnEditorActionListener((view, actionId, event) -> {
             boolean done = actionId == EditorInfo.IME_ACTION_DONE ||
@@ -160,12 +158,11 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         String key = getKey();
         if (KEY_API_KEY.equals(key)) {
             value.setSingleLine(true);
-            value.setInputType(InputType.TYPE_CLASS_TEXT |
-                    InputType.TYPE_TEXT_VARIATION_PASSWORD |
-                    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+            value.setInputType(CaptionInputPolicy.keyInputType());
+            ((InlineCaptionEditor)value).sensitive(true);
+            value.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
             boolean saved = !DeepSeekConfig.load(getContext()).apiKey.isEmpty();
             value.setHint(saved ? "已加密保存；输入可替换" : "请输入 API Key");
-            value.setImeOptions(EditorInfo.IME_ACTION_DONE);
         } else if (KEY_PROMPT.equals(key)) {
             value.setSingleLine(false);
             value.setMinLines(3);
@@ -208,6 +205,9 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         String value = raw == null ? "" : raw.trim();
         if (value.equals(lastCommitted)) return;
         if (KEY_API_KEY.equals(getKey()) && value.isEmpty()) return;
+        if(KEY_API_KEY.equals(getKey()) && (value.contains("\n") || value.contains("\r"))) {
+            if(editor!=null)editor.setError("API Key 应为单行");return;
+        }
 
         try {
             saveValue(value);
@@ -252,8 +252,8 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         DeepSeekConfig.Snapshot current = DeepSeekConfig.load(getContext());
         if (KEY_API_KEY.equals(getKey())) {
             state.setText(current.apiKey.isEmpty()
-                    ? "填写后自动加密保存"
-                    : (justSaved ? "已自动加密保存" : "已使用 Android Keystore 加密保存"));
+                    ? "编辑时可见；离开后清空，加密保存"
+                    : (justSaved ? "已自动加密保存" : "已加密保存，不回显原 Key"));
         } else {
             CharSequence summary = getSummary();
             state.setText(justSaved ? "已自动保存" :

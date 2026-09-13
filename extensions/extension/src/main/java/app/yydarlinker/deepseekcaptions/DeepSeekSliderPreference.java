@@ -62,7 +62,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         LinearLayout root = new LinearLayout(context);
         root.setTag(getKey());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(10), dp(16), dp(8));
+        root.setPadding(dp(20), dp(10), dp(20), dp(10));
 
         LinearLayout heading = new LinearLayout(context);
         heading.setOrientation(LinearLayout.HORIZONTAL);

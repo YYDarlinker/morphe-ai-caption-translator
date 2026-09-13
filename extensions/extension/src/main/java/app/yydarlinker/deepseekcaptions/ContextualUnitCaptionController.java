@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-explicit-anchor-r3".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-readable-anchor-r4".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -385,6 +385,7 @@ static void setMainActivity(Activity activity) {
             }
             stageStarted = SystemClock.elapsedRealtime();
             SourceAtomTimeline.Result atomized = SourceAtomTimeline.build(source.body, source.document);
+            if(!session.sourceOnly) atomized=ModelNameProtection.protect(atomized);
             markPreprocessStage(session, "SourceAtomTimeline.build", stageStarted);
             CaptionDiagnostics.mark(session.context, "ANCHORED_TIMING_PROVENANCE",
                     "native="+atomized.nativeTimedAtoms+";estimated="+atomized.estimatedAtoms+
@@ -465,6 +466,7 @@ static void setMainActivity(Activity activity) {
             markPreprocessStage(session, "cache restore", stageStarted);
             boolean currentCacheHit;
             synchronized (session.lock) {
+                prepareBoundaryGroupsLocked(session);
                 int current = anchor(session.units, session.currentTimeMs);
                 session.firstReady = isReadyLocked(session, current);
                 currentCacheHit = session.firstReady;
@@ -906,6 +908,7 @@ static void setMainActivity(Activity activity) {
                 session.states[request.focus] = PENDING;
                 session.retryAfterMs[request.focus] = 0L;
             }
+            prepareBoundaryGroupsLocked(session);
             stabilized = resolveStableBridgesLocked(session);
             int current = anchor(session.units, session.currentTimeMs);
             if (isReadyLocked(session, current) && !session.firstReady) {
@@ -947,6 +950,27 @@ static void setMainActivity(Activity activity) {
         if (applied > 0 || stabilized > 0) persistCacheAsync(session);
         markCompleteIfNeeded(session);
         schedule(session);
+    }
+
+    private static void prepareBoundaryGroupsLocked(Session session) {
+        if(session.sourceOnly)return;
+        for(int i=0;i+1<session.units.size();i++) {
+            if(session.states[i]!=READY || session.states[i+1]!=READY ||
+                session.displayPlans[i]!=null || session.displayPlans[i+1]!=null)continue;
+            ContextualDisplayGroupPolicy.Group ga=session.displayGroupsByUnit[i],gb=session.displayGroupsByUnit[i+1];
+            if(ga==null || gb==null || ga.firstUnit!=ga.lastUnit || gb.firstUnit!=gb.lastUnit)continue;
+            TranslationUnitTimeline.Unit a=session.units.get(i),b=session.units.get(i+1);
+            List<AnchoredCaptionPlan.Segment> joined=CrossWindowReadability.merge(session.anchoredPlans[i],session.anchoredPlans[i+1],
+                a.fromAtom,b.fromAtom,session.currentTimeMs);
+            if(joined.isEmpty())continue;
+            List<DisplaySlice> slices=new ArrayList<>();StringBuilder text=new StringBuilder();
+            for(AnchoredCaptionPlan.Segment segment:joined){slices.add(new DisplaySlice(segment.startMs,segment.endMs,segment.text));
+                if(text.length()>0)text.append(' ');text.append(segment.text);}
+            ContextualDisplayGroupPolicy.Group group=new ContextualDisplayGroupPolicy.Group(i,i+1,a.fromAtom,b.toAtom,
+                a.startMs,b.endMs,a.sourceText+" "+b.sourceText);
+            session.displayGroupsByUnit[i]=group;session.displayGroupsByUnit[i+1]=group;
+            session.displayPlans[i]=new DisplayPlan(Collections.unmodifiableList(slices),"readable_boundary_join","",i,i+1,group.sourceText,text.toString());
+        }
     }
 
     private static DisplayPlan buildDisplayPlan(
@@ -1228,7 +1252,9 @@ static void setMainActivity(Activity activity) {
                     missReason = "before_first_unit";
                 } else {
                     TranslationUnitTimeline.Unit unit = session.units.get(index);
-                    if (timeMs < unit.startMs || timeMs >= unit.endMs) {
+                    ContextualDisplayGroupPolicy.Group displayGroup=session.displayGroupsByUnit[index];
+                    long displayEnd=displayGroup==null ? unit.endMs : displayGroup.endMs;
+                    if (timeMs < unit.startMs || timeMs >= displayEnd) {
                         missReason = "source_timeline_gap";
                     } else {
                         ContextualDisplayGroupPolicy.Group group =

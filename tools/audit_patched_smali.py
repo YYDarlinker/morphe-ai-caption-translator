@@ -28,7 +28,13 @@ window=read("com/google/android/libraries/youtube/player/subtitles/ui/SubtitleWi
 assert "->suppressNativeDraw()Z" in window
 editor=read("app/yydarlinker/deepseekcaptions/DeepSeekTextPreference")
 assert "Landroid/app/AlertDialog" not in editor
-assert "setLongClickable" in editor
+assert "InlineCaptionEditor" in editor
+inline=read("app/yydarlinker/deepseekcaptions/InlineCaptionEditor")
+assert "startActionMode" in inline and "onTextContextMenuItem" in inline
+assert "PasswordTransformationMethod" not in editor
+assert "keyInputType" in editor
+assert "->merge(" in read("app/yydarlinker/deepseekcaptions/AnchoredCaptionPlan")
+assert "SourceFormatPolicy;->json3" in read("app/yydarlinker/deepseekcaptions/RawCaptionSource")
 fragment=read("app/morphe/extension/shared/settings/preference/AbstractPreferenceFragment")
 assert "->consumePathCopy(" in fragment and "aiCaptionOriginalLongClick" in fragment
 assert ".super Lapp/yydarlinker/deepseekcaptions/AddonSwitchPreference;" in read("app/yydarlinker/deepseekcaptions/DeepSeekEnabledPreference")

@@ -38,7 +38,17 @@ final class RawCaptionSource {
     }
     static Source load(Context context,String translatedUrl,boolean publishSharedTimeline,boolean calibrate) throws Exception {
         String sourceUrl = CaptionEngine.sourceCaptionUrl(translatedUrl);
-        LoadedTrack provider = loadTrack(context, sourceUrl, "SOURCE", true);
+        LoadedTrack provider;
+        String timedUrl=calibrate ? SourceFormatPolicy.json3(sourceUrl) : sourceUrl;
+        try {
+            provider=loadTrack(context,timedUrl,"SOURCE",true);
+            CaptionDocument.parse(provider.body,provider.contentType); // Reject unreadable preferred format.
+            sourceUrl=timedUrl;
+        } catch(Exception unavailable) {
+            if(timedUrl.equals(sourceUrl)) throw unavailable;
+            CaptionDiagnostics.mark(context,"SOURCE_FORMAT_FALLBACK","JSON3 不可用；单次回退原格式，时间精度会明确报告");
+            provider=loadTrack(context,sourceUrl,"SOURCE",true);
+        }
 
         byte[] body = provider.body;
         String contentType = provider.contentType;

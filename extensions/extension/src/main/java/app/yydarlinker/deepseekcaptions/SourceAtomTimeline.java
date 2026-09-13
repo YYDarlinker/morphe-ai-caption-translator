@@ -118,8 +118,9 @@ final class SourceAtomTimeline {
                     long segmentStart;
                     long segmentEnd;
                     boolean nativeBoundary = segment.offset != Long.MIN_VALUE;
+                    if(j==0 && !nativeBoundary) for(Segment other:segments) if(other.offset!=Long.MIN_VALUE){nativeBoundary=true;break;}
                     if (nativeBoundary) {
-                        segmentStart = eventStart + Math.max(0L, segment.offset);
+                        segmentStart = eventStart + (segment.offset==Long.MIN_VALUE ? 0L : Math.max(0L, segment.offset));
                         segmentEnd = nextNativeSegmentTime(segments, j + 1, eventStart, cueEnd);
                         if (segmentEnd <= segmentStart) segmentEnd = cueEnd;
                         segmentStart = clamp(segmentStart, cueStart, Math.max(cueStart, cueEnd - 1L));
@@ -424,6 +425,9 @@ final class SourceAtomTimeline {
                     Character.isLetterOrDigit(text.charAt(i + 1))) {
                 current.append(c);
                 continue;
+            }
+            if(c=='.' && i>0 && i+1<text.length() && Character.isDigit(text.charAt(i-1)) && Character.isDigit(text.charAt(i+1))) {
+                current.append(c);continue;
             }
             if (isPunctuation(c)) {
                 current.append(c);

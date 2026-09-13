@@ -132,17 +132,18 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         root.setTag(KEY_MODEL);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
-        root.setPadding(dp(16), dp(9), dp(16), dp(8));
+        root.setPadding(dp(20), dp(10), dp(20), dp(10));
 
         TextView title = new TextView(context);
         title.setText(getTitle());
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        title.setAlpha(.78f);
         root.addView(title, matchWrap());
 
-        editor = new EditText(context);
+        editor = new InlineCaptionEditor(context);
         editor.setSingleLine(true);
         editor.setFocusableInTouchMode(true);
-        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         editor.setImeOptions(EditorInfo.IME_ACTION_DONE);
         editor.setHint("可从下方选择，也可手动输入模型 ID");
@@ -156,8 +157,11 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         controls.setOrientation(LinearLayout.HORIZONTAL);
         controls.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        refresh = new Button(context);
-        refresh.setText("获取模型");
+        refresh = new Button(context,null,android.R.attr.borderlessButtonStyle);
+        refresh.setTextSize(13);
+        refresh.setMinimumWidth(0);
+        refresh.setMinHeight(dp(36));
+        refresh.setText("刷新");
         refresh.setAllCaps(false);
         refresh.setOnClickListener(view -> fetchModels(true));
         controls.addView(refresh, new LinearLayout.LayoutParams(
@@ -169,11 +173,6 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         state.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         state.setAlpha(0.72f);
         state.setPadding(dp(10), 0, 0, 0);
-        controls.addView(state, new LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-        ));
         root.addView(controls, matchWrap());
 
         choices = new Spinner(context);
@@ -197,7 +196,9 @@ public final class DeepSeekModelPreference extends android.preference.Preference
 
             @Override public void onNothingSelected(AdapterView<?> parentView) {}
         });
-        root.addView(choices, matchWrap());
+        controls.addView(choices,0,new LinearLayout.LayoutParams(0,dp(44),1f));
+        state.setPadding(0,dp(4),0,0);state.setMaxLines(2);
+        root.addView(state,matchWrap());
 
         editor.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -308,20 +309,27 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     private void showModels(List<String> models, boolean newlyFetched) {
         if (choices == null) return;
         List<String> entries = new ArrayList<>(models.size() + 1);
-        entries.add("选择接口返回的模型（" + models.size() + " 个）");
+        entries.add("选择模型（" + models.size() + "）");
         entries.addAll(models);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 getContext(),
                 android.R.layout.simple_spinner_item,
                 entries
-        );
+        ) {
+            @Override public View getView(int position,View reused,ViewGroup parent){
+                View v=super.getView(position,reused,parent);if(v instanceof TextView){((TextView)v).setTextSize(14);((TextView)v).setSingleLine(true);((TextView)v).setEllipsize(android.text.TextUtils.TruncateAt.END);}return v;
+            }
+            @Override public View getDropDownView(int position,View reused,ViewGroup parent){
+                View v=super.getDropDownView(position,reused,parent);if(v instanceof TextView)((TextView)v).setTextSize(14);return v;
+            }
+        };
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         populatingChoices = true;
         choices.setAdapter(adapter);
         choices.setSelection(0, false);
         choices.setVisibility(View.VISIBLE);
         populatingChoices = false;
-        setState(newlyFetched ? "模型列表已更新；选择后立即保存" : "选择后立即保存", false);
+        setState(newlyFetched ? "列表已更新" : "可选择模型或直接输入 ID", false);
     }
 
     private void scheduleCredentialRefresh() {

@@ -77,8 +77,10 @@ final class ContextualBatchApiClient {
                     unit == null ? "" : unit.sourceText
             );
             sourceChars += text.length();
-            JSONObject item=new JSONObject().put("id",unit.id).put("last_id",unit.toAtom-unit.fromAtom)
+            JSONObject item=new JSONObject().put("id",unit.id).put("last_id",unit.toAtom-unit.fromAtom).put("span_ms",unit.endMs-unit.startMs)
                     .put("tokens",AnchoredCaptionPlan.tokens(atoms,unit));
+            JSONArray protectedTerms=ModelNameProtection.terms(atoms,unit);
+            if(protectedTerms.length()>0)item.put("preserve_terms",protectedTerms);
             if(repair.containsKey(unit.id)) item.put("previous_validation_error",repair.get(unit.id));
             targetValues.put(item);
         }

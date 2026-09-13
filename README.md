@@ -61,3 +61,15 @@ This addon now owns its subtitle language/state memory and Simplified Chinese me
 Source atoms now carry printed numeric IDs and last_id, so the model copies boundaries instead of counting an implicit array. Lossless JSON representations are normalized; exact coverage, timing, and translation-quality checks remain mandatory. Retry feedback contains only error codes and endpoint indices, never raw model output. Context is capped to 160 characters on each side; background batching stays within the existing 30-second planning horizon. There is no second segmentation API pass and the retry cap is unchanged.
 
 Co-timed source text is merged into a single real interval instead of overlapping artificial 1ms spans. Continuous playback no longer replays an earlier slice on a slightly delayed clock callback. No universal negative time offset is introduced: noisy ASR calibration smaller than three times the anchor MAD is declined. These address measurable error paths; exact device synchronization and real-model semantic quality still require device comparison.
+
+## Readability revision (readable-anchors-r4)
+
+Translation mode first requests the same source track as JSON3 to obtain native word offsets. Signed identity bytes remain untouched; when the format is signed or unavailable, the original format is retained with explicit estimated-timing diagnostics. This is not an extra speech-recognition or translation service.
+
+Brief translated fragments are merged locally **before display**, using the original union of source intervals. Adjacent ready windows can join a brief boundary only while neither display plan has been rendered. Long gaps, empty/non-speech spans, oversized text and overlong unions are not merged. There is no target-length timing reallocation or extra model pass.
+
+Version/model compounds are protected before window boundaries are selected. The user-confirmed GPT 5.6 Soul/Sol ASR case is corrected only inside that model name; ordinary uses of soul remain translatable. At most eight distinct protected model names are supplied per window.
+
+API fields use the Android floating text action bar and delegate Paste to Android. The key field intentionally uses normal text input, **visible while editing**, not a password input type that invokes OEM secure keyboards. Stored keys are never loaded into the editor; successful input is cleared on focus loss and remains encrypted at rest. No personalized keyboard learning is requested, but this is a keyboard hint, not an OS-wide privacy guarantee. Other keyboard settings are not changed.
+
+The settings page now uses consistent insets and typography, compact model controls, and an inset rounded 16:9 preview. Automated Android-framework tests cover long-touch/Paste and preview geometry; actual OEM keyboard and visual behavior still require device validation.

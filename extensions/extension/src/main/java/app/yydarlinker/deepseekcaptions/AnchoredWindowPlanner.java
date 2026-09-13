@@ -33,6 +33,14 @@ final class AnchoredWindowPlanner {
                 if (gap) break; // Never translate across long silence/speaker breaks.
             }
             if (candidate >= from && end > candidate && candidate-from >= 8) end = candidate;
+            else if(end+1<atoms.size() && candidate<from) {
+                // Hard transport limits prefer a preceding clause, never a dangling connector.
+                for(int cut=end;cut>Math.max(from,end-10);cut--) {
+                    String t=atoms.get(cut).text.trim();
+                    if(!t.isEmpty() && SentenceBoundaryUtil.weak(t.charAt(t.length()-1))){end=cut;break;}
+                }
+                while(end>from && atoms.get(end).text.trim().toLowerCase(java.util.Locale.ROOT).matches("and|or|the|a|an|of|to|with|for|as|than"))end--;
+            }
             SourceAtomTimeline.Atom first=atoms.get(from), last=atoms.get(end);
             String text=SourceAtomTimeline.join(atoms,from,end);
             int index=units.size();

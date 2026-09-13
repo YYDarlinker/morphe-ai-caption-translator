@@ -14,3 +14,5 @@ dependencies {
 android { testOptions { unitTests.isReturnDefaultValues = true } }
 
 dependencies { testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0") }
+
+dependencies { testImplementation("org.robolectric:robolectric:4.14.1") }

@@ -5,7 +5,7 @@ import android.util.AttributeSet;
 
 /** Opt-in source/canonical text fields for display-selection diagnostics. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekDisplayTextDebugPreference extends android.preference.SwitchPreference {
+public final class DeepSeekDisplayTextDebugPreference extends AddonSwitchPreference {
     public DeepSeekDisplayTextDebugPreference(Context context) {
         super(context);
         initialize();

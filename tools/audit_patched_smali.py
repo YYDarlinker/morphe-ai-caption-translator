@@ -27,11 +27,16 @@ assert sum("->onNativeSelection(" in x for x in manager)==1
 window=read("com/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView")
 assert "->suppressNativeDraw()Z" in window
 editor=read("app/yydarlinker/deepseekcaptions/DeepSeekTextPreference")
-assert "BUTTON_NEUTRAL" in editor or "const/4" in editor
-assert "从剪贴板粘贴" in editor and "加密保存" in editor
+assert "Landroid/app/AlertDialog" not in editor
+assert "setLongClickable" in editor
+fragment=read("app/morphe/extension/shared/settings/preference/AbstractPreferenceFragment")
+assert "->consumePathCopy(" in fragment and "aiCaptionOriginalLongClick" in fragment
+assert ".super Lapp/yydarlinker/deepseekcaptions/AddonSwitchPreference;" in read("app/yydarlinker/deepseekcaptions/DeepSeekEnabledPreference")
+assert ".super Landroid/preference/Preference;" in read("app/yydarlinker/deepseekcaptions/AddonSwitchPreference")
+assert "onDraw" in read("app/yydarlinker/deepseekcaptions/SubtitleStylePreview$Preview")
 provider=read("app/yydarlinker/deepseekcaptions/ProviderRequestPolicy")
 assert "Return valid JSON only." in provider
 report.update(metadata_constructor=True,metadata_readers=2,branch_safe_list_return=True,
               native_memory_on_off=True,native_mode_selection=True,native_draw_guard=True,
-              api_key_dialog=True,explicit_json_prompt=True)
+              inline_native_editing=True,scoped_copy_handler=True,self_managed_switch=True,style_preview=True,explicit_json_prompt=True)
 print(json.dumps(report,indent=2))

@@ -115,6 +115,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 valueLabel.setText(format(minimum + progress));
+                if(fromUser) SubtitleStylePreview.update(getKey(),minimum+progress);
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -135,14 +136,14 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     }
 
     private int currentValue() {
-        DeepSeekConfig.Snapshot current = DeepSeekConfig.load(getContext());
+        DeepSeekConfig.Snapshot current = DeepSeekConfig.displayStyle(getContext());
         return KEY_TEXT_SIZE.equals(getKey())
                 ? current.captionTextSize
                 : current.backgroundOpacity;
     }
 
     private String format(int value) {
-        return KEY_TEXT_SIZE.equals(getKey()) ? value + " sp" : value + "%";
+        return KEY_TEXT_SIZE.equals(getKey()) ? value + "（相对字号）" : value + "%";
     }
 
     private void saveValue(int value) {

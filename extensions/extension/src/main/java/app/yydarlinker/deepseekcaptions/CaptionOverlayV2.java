@@ -567,7 +567,7 @@ final class CaptionOverlay {
 
     private static void applyBackground(TextView view, Activity activity, int opacity) {
         GradientDrawable bg = new GradientDrawable();
-        int alpha = Math.round(255f * Math.max(0, Math.min(100, opacity)) / 100f);
+        int alpha = SubtitleStyleMetrics.alpha(opacity);
         bg.setColor(Color.argb(alpha, 0, 0, 0));
         bg.setCornerRadius(dp(activity, 5));
         view.setBackground(bg);
@@ -577,7 +577,7 @@ final class CaptionOverlay {
         float density = activity.getResources().getDisplayMetrics().density;
         if (density <= 0f || bounds.width() <= 0 || bounds.height() <= 0) return configuredSp;
         float shortDp = Math.min(bounds.width(), bounds.height()) / density;
-        return configuredSp * clamp(shortDp / 220f, 0.72f, 2.25f);
+        return SubtitleStyleMetrics.scaledSp(configuredSp,shortDp);
     }
 
     private static void remember(Rect bounds) {

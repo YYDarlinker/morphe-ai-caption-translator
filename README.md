@@ -35,7 +35,7 @@ When enabled, the custom subtitle box displays both modes, but **only Auto-trans
 
 On each new app process, choose a subtitle language once in the player. The process then remembers On/Off, language, and original-versus-translated mode across videos. There is no default-language setting. Closing captions retains the last language for the next On; killing/restarting the app begins a new selection session.
 
-The API Key row has an explicit editor button. Its isolated password dialog supports normal Android paste and a user-triggered Paste from clipboard button. Keys are never copied into diagnostics.
+API fields are edited inline with Android EditText selection/Paste. The host breadcrumb-copy handler is bypassed only for the API configuration rows; there is no API-key dialog. Keys are never copied into diagnostics. The style section includes a live 16:9 fullscreen-ratio preview.
 
 Test API now sends the **same anchored protocol** as playback. A rejected optional schema is negotiated once; persistent invalid requests stop at configuration level and display a visible error instead of silently failing every subtitle window. Run Test API after correcting the endpoint/model/key. Network latency and translation quality depend on the provider.
 
@@ -55,3 +55,9 @@ This project's regular release channel is for normal source installation; it doe
 The release pipeline uses Morphe's changelog generator and semantic-release, builds the Android MPP and extension, executes tests, validates the generated manifest, and checks root DEX / extension / version / repository identity before uploading. No more in-place replacement of published assets.
 
 This addon now owns its subtitle language/state memory and Simplified Chinese menu entry. Do not simultaneously select another AI translator, HansFix language remapping, or the separate Remember subtitle language patch; keep the official Captions patch selected. Installed sources may remain; this restriction concerns selected overlapping patches.
+
+## Continuity revision (explicit-anchors-r3)
+
+Source atoms now carry printed numeric IDs and last_id, so the model copies boundaries instead of counting an implicit array. Lossless JSON representations are normalized; exact coverage, timing, and translation-quality checks remain mandatory. Retry feedback contains only error codes and endpoint indices, never raw model output. Context is capped to 160 characters on each side; background batching stays within the existing 30-second planning horizon. There is no second segmentation API pass and the retry cap is unchanged.
+
+Co-timed source text is merged into a single real interval instead of overlapping artificial 1ms spans. Continuous playback no longer replays an earlier slice on a slightly delayed clock callback. No universal negative time offset is introduced: noisy ASR calibration smaller than three times the anchor MAD is declined. These address measurable error paths; exact device synchronization and real-model semantic quality still require device comparison.

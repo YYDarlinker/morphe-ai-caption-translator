@@ -5,7 +5,7 @@ import android.util.AttributeSet;
 
 /** Native Morphe switch that persists immediately. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekEnabledPreference extends android.preference.SwitchPreference {
+public final class DeepSeekEnabledPreference extends AddonSwitchPreference {
     public DeepSeekEnabledPreference(Context context) {
         super(context);
         initialize();

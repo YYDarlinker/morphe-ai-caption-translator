@@ -35,7 +35,7 @@ final class ContextualUnitCaptionController {
     private static final long REALTIME_LOOKAHEAD_MS = 10_000L;
     private static final long BACKGROUND_LOW_WATER_MS = 12_000L;
     private static final long BACKGROUND_HIGH_WATER_MS = 30_000L;
-    private static final long BACKGROUND_BATCH_SPAN_MS = 18_000L;
+    private static final long BACKGROUND_BATCH_SPAN_MS = 30_000L;
     private static final int REALTIME_MAX_UNITS = 4;
     private static final int BACKGROUND_MAX_UNITS = 3;
     private static final int CONTEXT_UNITS_PER_SIDE = 1;
@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-anchored-joint-plan-v1".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-explicit-anchor-r3".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -294,7 +294,7 @@ static void setMainActivity(Activity activity) {
 
         Session session = active;
         if (session == null || session.cancelled) return;
-        session.currentTimeMs = clean;
+        session.currentTimeMs = PLAYBACK_CLOCK.estimate(now);
         boolean debounceStartupSeek = false;
         boolean logStartupDebounce = false;
         if (seek) {
@@ -316,7 +316,7 @@ static void setMainActivity(Activity activity) {
         if (ContextualUnitCorePolicy.shouldReprioritizeSeek(seek, debounceStartupSeek)) {
             reprioritizeAfterSeek(session, clean);
         }
-        render(session, clean);
+        render(session, session.currentTimeMs);
         schedule(session);
         scheduleDisplayTick();
     }
@@ -779,6 +779,11 @@ static void setMainActivity(Activity activity) {
         if(!CaptionModePolicy.mayCallApi(session.sourceOnly,session.terminalError,session.cancelled)) return;
         long started = SystemClock.elapsedRealtime();
         try {
+            java.util.Map<String,String> repairs=new java.util.HashMap<>();
+            synchronized(session.lock) { for(int index:request.indices) {
+                String reason=session.lastFailureReasons[index];
+                if(reason!=null && !reason.isEmpty()) repairs.put(session.units.get(index).id,reason);
+            } }
             ContextualBatchApiClient.Result result = ContextualBatchApiClient.translate(
                     request.targets,
                     session.atoms,
@@ -811,7 +816,7 @@ static void setMainActivity(Activity activity) {
                             }
                         }
                     },
-                    request.priority
+                    request.priority, repairs
             );
             finishBatch(session, request, result, started);
         } catch (Throwable failure) {
@@ -879,11 +884,14 @@ static void setMainActivity(Activity activity) {
                         deferredToBackground = true;
                         continue;
                     }
+                    String rejection=result==null ? "missing_response" : result.rejectionReasons.get(id);
+                    CaptionDiagnostics.mark(session.context,"ANCHOR_RESPONSE_REJECTED",
+                            "unit="+index+";reason="+(rejection==null ? "missing_id" : rejection));
                     scheduleRetryLocked(
                             session,
                             index,
                             request.priority && index == request.focus,
-                            "batch_missing_or_invalid",
+                            rejection==null ? "missing_id" : rejection,
                             ContextualUnitCorePolicy.FailureKind.RETRYABLE_PROTOCOL
                     );
                     if (session.states[index] == PERMANENT_FAILURE) permanent++;
@@ -918,7 +926,7 @@ static void setMainActivity(Activity activity) {
                     session.context,
                     "CONTEXTUAL_UNIT_QUALITY_REJECTED",
                     "本地质量门拒绝 " + result.invalidIds.size() +
-                            " 个结构可解析但内容不合格的 unit；仅安排对应 unit repair"
+                            " 个时间锚/结构/质量不合格的 unit；具体原因见 ANCHOR_RESPONSE_REJECTED"
             );
         }
         long buffer = bufferAheadMs(session);

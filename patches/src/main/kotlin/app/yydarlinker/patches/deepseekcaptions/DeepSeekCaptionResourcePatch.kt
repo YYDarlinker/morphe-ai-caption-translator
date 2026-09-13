@@ -208,6 +208,8 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                 }
 
                 screen.addCategory("字幕样式").apply {
+                    addPreference("app.yydarlinker.deepseekcaptions.SubtitleStylePreview",
+                        "deepseek_caption_style_preview", "横屏字幕预览")
                     addPreference(
                         SLIDER_PREF_CLASS,
                         "deepseek_caption_text_size",

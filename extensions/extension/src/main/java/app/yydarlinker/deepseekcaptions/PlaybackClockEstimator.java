@@ -25,6 +25,7 @@ final class PlaybackClockEstimator {
         }
     }
 
+    private long lastEstimate;
     private long videoTimeMs;
     private long realtimeMs;
     private float playbackRate = 1f;
@@ -35,6 +36,7 @@ final class PlaybackClockEstimator {
         this.realtimeMs = Math.max(0L, realtimeMs);
         this.playbackRate = clampRate(initialRate <= 0f ? 1f : initialRate);
         this.stableRateSample = false;
+        this.lastEstimate = this.videoTimeMs;
     }
 
     synchronized Update update(long newVideoTimeMs, long newRealtimeMs, long seekThresholdMs) {
@@ -49,6 +51,8 @@ final class PlaybackClockEstimator {
 
         long realDelta = cleanRealtime - realtimeMs;
         long videoDelta = cleanVideo - videoTimeMs;
+        if(realDelta<MIN_RATE_SAMPLE_MS && Math.abs(videoDelta)<seekThresholdMs)
+            return new Update(false,false,playbackRate);
         boolean stale = realDelta > MAX_FRESH_CALLBACK_GAP_MS;
         boolean uncertain = !stale && realDelta > MAX_PRECISE_CALLBACK_GAP_MS;
         boolean obviousBackwardSeek = videoDelta < -seekThresholdMs;
@@ -99,6 +103,7 @@ final class PlaybackClockEstimator {
             }
         }
 
+        if(seek || paused) lastEstimate=cleanVideo;
         videoTimeMs = cleanVideo;
         realtimeMs = cleanRealtime;
         return new Update(seek, stale, playbackRate);
@@ -107,9 +112,9 @@ final class PlaybackClockEstimator {
     synchronized long estimate(long nowRealtimeMs) {
         if (realtimeMs <= 0L || playbackRate <= 0f) return videoTimeMs;
         long elapsed = Math.max(0L, nowRealtimeMs - realtimeMs);
-        return videoTimeMs + Math.round(
-                Math.min(elapsed, MAX_CLOCK_EXTRAPOLATION_MS) * playbackRate
-        );
+        long estimate=videoTimeMs + Math.round(Math.min(elapsed, MAX_CLOCK_EXTRAPOLATION_MS) * playbackRate);
+        lastEstimate=Math.max(lastEstimate,estimate);
+        return lastEstimate;
     }
 
     synchronized float playbackRate() {

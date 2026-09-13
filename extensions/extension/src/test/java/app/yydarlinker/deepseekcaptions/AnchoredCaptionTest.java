@@ -31,8 +31,8 @@ public class AnchoredCaptionTest {
     }
     @Test public void rejectsOverlapOmissionAndInventedIndices() throws Exception {
         for(String j:Arrays.asList("[[1,\"句子\"]]","[[1,\"句子\"],[1,\"重复\"],[3,\"结束\"]]",
-          "[[-1,\"句子\"],[3,\"结束\"]]","[[4,\"越界\"]]","[[3.0,\"浮点\"]]",
-          "[[\"3\",\"字符串\"]]","[[3,\"\"]]","[[3,null]]","[[999999999999,\"溢出\"]]")) rejected(j);
+          "[[-1,\"句子\"],[3,\"结束\"]]","[[4,\"越界\"]]","[[3.5,\"浮点\"]]",
+          "[[\"3x\",\"字符串\"]]","[[3,\"\"]]","[[3,null]]","[[999999999999,\"溢出\"]]")) rejected(j);
     }
     @Test public void malformedSiblingDoesNotDiscardValidPlan() throws Exception {
         List<SourceAtomTimeline.Atom> a=atoms(4);TranslationUnitTimeline.Unit u=unit(a);

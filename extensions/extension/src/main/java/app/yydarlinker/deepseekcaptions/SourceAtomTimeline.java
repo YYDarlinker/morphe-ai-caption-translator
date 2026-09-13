@@ -385,19 +385,22 @@ final class SourceAtomTimeline {
     }
 
     private static List<Atom> normalize(List<Atom> input) {
-        if (input.isEmpty()) return Collections.emptyList();
-        List<Atom> out = new ArrayList<>(input.size());
-        long previousStart = 0L;
-        for (int i = 0; i < input.size(); i++) {
-            Atom atom = input.get(i);
-            long start = Math.max(previousStart, atom.startMs);
-            long end = Math.max(start + 1L, atom.endMs);
-            if (i + 1 < input.size()) {
-                long nextStart = Math.max(start + 1L, input.get(i + 1).startMs);
-                if (end > nextStart) end = nextStart;
+        if(input.isEmpty()) return Collections.emptyList();
+        List<Atom> out=new ArrayList<>();
+        for(Atom atom:input) {
+            if(out.isEmpty()) {out.add(atom);continue;}
+            Atom previous=out.get(out.size()-1);
+            if(atom.startMs<=previous.startMs) {
+                // Co-timed text has no defensible internal boundary. Keep it as one anchored span
+                // rather than creating overlapping 1ms tokens later rejected as invalid output.
+                String text=previous.text+(needsSpace(previous.text,atom.text) ? " " : "")+atom.text;
+                out.set(out.size()-1,new Atom(previous.startMs,Math.max(previous.endMs,atom.endMs),
+                    text,previous.cueIndex,previous.precise && atom.precise));
+            } else {
+                if(previous.endMs>atom.startMs) out.set(out.size()-1,new Atom(previous.startMs,
+                    atom.startMs,previous.text,previous.cueIndex,previous.precise));
+                out.add(atom);
             }
-            out.add(new Atom(start, end, atom.text, atom.cueIndex, atom.precise));
-            previousStart = start;
         }
         return Collections.unmodifiableList(out);
     }

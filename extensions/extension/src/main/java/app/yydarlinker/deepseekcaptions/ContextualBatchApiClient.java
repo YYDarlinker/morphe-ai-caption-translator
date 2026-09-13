@@ -49,6 +49,11 @@ final class ContextualBatchApiClient {
             DeepSeekApiClient.RequestControl control,
             boolean priority
     ) throws Exception {
+        return translate(targets,atoms,contextBefore,contextAfter,config,targetLanguage,control,priority,java.util.Collections.emptyMap());
+    }
+    static Result translate(List<TranslationUnitTimeline.Unit> targets,List<SourceAtomTimeline.Atom> atoms,
+            List<String> contextBefore,List<String> contextAfter,DeepSeekConfig.Snapshot config,TargetLanguage targetLanguage,
+            DeepSeekApiClient.RequestControl control,boolean priority,Map<String,String> repair) throws Exception {
         if (targets == null || targets.isEmpty()) return Result.EMPTY;
         if(identity(config).equals(blockedIdentity)) throw new PermanentException("configuration_blocked",blockedMessage,"");
         validateTargetIds(targets);
@@ -72,18 +77,19 @@ final class ContextualBatchApiClient {
                     unit == null ? "" : unit.sourceText
             );
             sourceChars += text.length();
-            targetValues.put(new JSONObject()
-                    .put("id", unit == null ? "" : unit.id)
-                    .put("tokens", AnchoredCaptionPlan.tokens(atoms, unit)));
+            JSONObject item=new JSONObject().put("id",unit.id).put("last_id",unit.toAtom-unit.fromAtom)
+                    .put("tokens",AnchoredCaptionPlan.tokens(atoms,unit));
+            if(repair.containsKey(unit.id)) item.put("previous_validation_error",repair.get(unit.id));
+            targetValues.put(item);
         }
         JSONObject payload = new JSONObject()
                 .put("target_language", target.code)
                 .put("targets", targetValues);
         if (contextBefore != null && !contextBefore.isEmpty()) {
-            payload.put("context_before", sanitizedContext(contextBefore));
+            payload.put("context_before", boundedContext(contextBefore,true));
         }
         if (contextAfter != null && !contextAfter.isEmpty()) {
-            payload.put("context_after", sanitizedContext(contextAfter));
+            payload.put("context_after", boundedContext(contextAfter,false));
         }
 
         String systemPrompt = AnchoredCaptionPlan.PROMPT
@@ -98,13 +104,7 @@ final class ContextualBatchApiClient {
 
         int contextCount = (contextBefore == null ? 0 : contextBefore.size()) +
                 (contextAfter == null ? 0 : contextAfter.size());
-        int contextChars = 0;
-        if (contextBefore != null) {
-            for (String value : contextBefore) contextChars += value == null ? 0 : value.length();
-        }
-        if (contextAfter != null) {
-            for (String value : contextAfter) contextChars += value == null ? 0 : value.length();
-        }
+        int contextChars=payload.optString("context_before","").length()+payload.optString("context_after","").length();
         TokenCostAudit.Request audit = TokenCostAudit.beginUnitBatch(
                 config,
                 priority,
@@ -153,10 +153,11 @@ final class ContextualBatchApiClient {
                                 List<SourceAtomTimeline.Atom> atoms) throws Exception {
         validateTargetIds(targets);
         JSONObject root;
-        try { root = new JSONObject(content.trim()); }
+        try { root = new JSONObject(stripJsonFence(content)); }
         catch (Exception e) { throw new BatchFormatException("invalid anchored JSON", e); }
         JSONArray rows = root.optJSONArray("translations");
         if (rows == null) throw new BatchFormatException("missing translations");
+        Map<String,String> reasons=new HashMap<>();
         Map<String, AnchoredCaptionPlan> plans = new HashMap<>();
         Map<String, String> texts = new HashMap<>();
         Set<String> seen = new HashSet<>();
@@ -172,12 +173,41 @@ final class ContextualBatchApiClient {
             try {
                 AnchoredCaptionPlan plan=AnchoredCaptionPlan.parse(row.optJSONArray("segments"),atoms,unit);
                 plans.put(id,plan); texts.put(id,plan.canonical);
-            } catch(Exception rejected) { invalid.add(id); }
+            } catch(Exception rejected) { invalid.add(id); reasons.put(id,(rejected.getMessage()==null ? "invalid_structure" : rejected.getMessage())+";last="+(unit.toAtom-unit.fromAtom)+";ends="+safeEnds(row.optJSONArray("segments"))); }
         }
         for(TranslationUnitTimeline.Unit unit:targets) if(!plans.containsKey(unit.id)) missing.add(unit.id);
         Result result=new Result(texts,missing,invalid,unknown);
         result.plansById.putAll(plans);
+        result.rejectionReasons.putAll(reasons);
         return result;
+    }
+
+    static String safeEnds(JSONArray rows) {
+        if(rows==null)return "missing";
+        StringBuilder result=new StringBuilder();
+        for(int i=0;i<Math.min(rows.length(),12);i++) {
+            if(i>0)result.append(',');
+            try {
+                JSONArray row=rows.optJSONArray(i);JSONObject item=rows.optJSONObject(i);
+                Object n=row!=null ? row.get(row.length()==3 ? 1 : 0) : item.get(item.has("end_id") ? "end_id" : "end");
+                result.append(AnchoredCaptionPlan.exactIndex(n));
+            }catch(Exception bad){result.append('?');}
+        }
+        return result.toString();
+    }
+
+    static String stripJsonFence(String content) {
+        String text=content==null ? "" : content.trim();
+        if(text.startsWith("```json\n") || text.startsWith("```\n")) {
+            if(text.endsWith("```")) text=text.substring(text.indexOf('\n')+1,text.length()-3).trim();
+        }
+        return text;
+    }
+    static String boundedContext(List<String> values,boolean before) {
+        String text=String.join(" ",values);
+        if(text.length()<=160) return text;
+        if(before) {text=text.substring(text.length()-160);int space=text.indexOf(' ');return space<0 ? text : text.substring(space+1);}
+        text=text.substring(0,160);int space=text.lastIndexOf(' ');return space<0 ? text : text.substring(0,space);
     }
 
     private static Result parse(
@@ -582,6 +612,7 @@ final class ContextualBatchApiClient {
                 new ArrayList<>(),
                 new ArrayList<>()
         );
+        final Map<String,String> rejectionReasons=new HashMap<>();
         final Map<String, AnchoredCaptionPlan> plansById = new HashMap<>();
         final Map<String, String> translationsById;
         final List<String> missingIds;

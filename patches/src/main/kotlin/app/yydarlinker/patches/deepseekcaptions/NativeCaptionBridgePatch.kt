@@ -270,4 +270,27 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
         return-void
     """.trimIndent())
     renderer.methods.add(draw)
+    val fragment=mutableClassDefBy("Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;")
+    val copyPath=fragment.methods.filter { it.name=="onPreferenceLongClick" && it.returnType=="Z" &&
+        it.parameterTypes.map { t -> t.toString() }==listOf("Landroid/widget/AdapterView;","Landroid/view/View;","I","J") }
+        .unique("official breadcrumb long-press handler")
+    val originalName="aiCaptionOriginalLongClick"
+    if(fragment.methods.any { it.name==originalName }) throw PatchException("AI settings: handler already wrapped")
+    val original=ImmutableMethod(fragment.type,originalName,copyPath.parameters,copyPath.returnType,
+        copyPath.accessFlags,copyPath.annotations,null,copyPath.implementation).toMutable()
+    val wrapper=ImmutableMethod(fragment.type,copyPath.name,copyPath.parameters,copyPath.returnType,
+        copyPath.accessFlags,copyPath.annotations,null,MutableMethodImplementation(7)).toMutable()
+    wrapper.addInstructionsWithLabels(0,"""
+        invoke-static/range {p1 .. p5}, Lapp/yydarlinker/deepseekcaptions/ApiInputPolicy;->consumePathCopy(Landroid/widget/AdapterView;Landroid/view/View;IJ)Z
+        move-result v0
+        if-eqz v0, :original_copy
+        const/4 v0, 0x1
+        return v0
+        :original_copy
+        invoke-direct/range {p0 .. p5}, ${fragment.type}->$originalName(Landroid/widget/AdapterView;Landroid/view/View;IJ)Z
+        move-result v0
+        return v0
+    """.trimIndent())
+    fragment.methods.remove(copyPath);fragment.methods.add(original);fragment.methods.add(wrapper)
+
 }

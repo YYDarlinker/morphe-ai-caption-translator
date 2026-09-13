@@ -113,6 +113,8 @@ final class CaptionTimingCalibrator {
         if (Math.abs(offset) < MIN_CORRECTION_MS) {
             return Calibration.synced(offset, filtered.size(), mad);
         }
+        if(Math.abs(offset)<Math.max(MIN_CORRECTION_MS,3L*mad))
+            return Calibration.skip("校时偏移未显著超过锚点离散度，保留原时间",offset,filtered.size(),mad);
         return Calibration.apply(offset, filtered.size(), mad);
     }
 

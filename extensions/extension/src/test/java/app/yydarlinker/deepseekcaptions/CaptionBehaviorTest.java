@@ -13,6 +13,11 @@ public class CaptionBehaviorTest {
         assertTrue(CaptionModePolicy.mayCallApi(false,false,false));
         assertFalse(CaptionModePolicy.mayCallApi(false,true,false));
     }
+    @Test public void prefetchedTranslatedUrlIsNotAUserSelection() {
+        for(boolean chosen:new boolean[]{false,true}) for(boolean on:new boolean[]{false,true})
+            for(boolean mode:new boolean[]{false,true})
+                assertEquals(chosen&&on&&mode,CaptionModePolicy.mayTranslateSelection(chosen,on,mode));
+    }
     @Test public void coldStartHasNoDefaultLanguage(){assertFalse(CaptionChoice.isOn());assertEquals("",CaptionChoice.language());}
     @Test public void offKeepsLanguageAndModeForNextOn(){
         CaptionChoice.select("ja",true);CaptionChoice.toggle(false);assertFalse(CaptionChoice.isOn());

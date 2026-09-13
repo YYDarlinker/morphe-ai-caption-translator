@@ -71,6 +71,13 @@ public final class DeepSeekCaptionHook {
             // Fall through to the ordinary caption path rather than breaking YouTube captions.
         }
 
+        if(initialContext!=null && DeepSeekConfig.enabled(initialContext) &&
+                isYouTubeTimedTextUrl(originalUrl) && TargetLanguage.fromUrl(originalUrl)!=null &&
+                !CaptionModePolicy.mayTranslateSelection(CaptionChoice.known(),CaptionChoice.isOn(),CaptionChoice.translates())) {
+            // YouTube can prefetch remembered tlang URLs while CC is Off, even on cold start.
+            // Only an actual Auto-translate selection grants permission to use the paid API.
+            return CLOSED_TRANSLATION_SINK;
+        }
         if(initialContext!=null && DeepSeekConfig.load(initialContext).enabled &&
                 isYouTubeTimedTextUrl(originalUrl) && CaptionChoice.known() &&
                 (!CaptionChoice.isOn() || (!CaptionChoice.translates() && TargetLanguage.fromUrl(originalUrl)!=null))) {

@@ -5,7 +5,7 @@ import android.net.Uri;
 /** Single production core. Legacy experiments are not selectable from the app. */
 final class PageCaptionController {
     private static volatile String currentId="";
-    static String currentVideoIdSnapshot() { return currentId; }`r`n    static void onPlayerStable() { }
+    static String currentVideoIdSnapshot() { return currentId; }`n    static void onPlayerStable() { }
     private PageCaptionController() {}
     static boolean isVisibleActive() { return ContextualUnitCaptionController.isVisibleActive(); }
     static void deactivateFromCaptionButton() { ContextualUnitCaptionController.deactivateFromCaptionButton(); }
@@ -25,4 +25,5 @@ final class PageCaptionController {
         catch(Exception invalid) { return ""; }
     }
 }
+
 

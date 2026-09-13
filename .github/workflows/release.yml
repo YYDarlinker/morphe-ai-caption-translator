@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  release:
+    name: Release
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate current Morphe metadata
+        run: |
+          current="$(jq -r '.version // empty' patches-bundle.json)"
+          python3 .github/scripts/validate_morphe_metadata.py "$current"
+
+      # semantic-release v25 records prerelease channel membership in a per-tag Git note.
+      # If a tag is manually recreated without that note, semantic-release can restart at dev.1.
+      - name: Validate semantic-release dev channel baseline
+        if: ${{ github.ref == 'refs/heads/dev' }}
+        run: |
+          set -euo pipefail
+          current="$(jq -r '.version // empty' patches-bundle.json)"
+          if [[ "$current" =~ -dev\.[0-9]+$ ]]; then
+            tag="v${current}"
+            git fetch --force origin '+refs/notes/*:refs/notes/*'
+            git rev-parse "${tag}^{commit}" >/dev/null
+            git merge-base --is-ancestor "$tag" HEAD
+            note_ref="semantic-release-${tag}"
+            note="$(git notes --ref "$note_ref" show "$tag")"
+            jq -e '(.channels // []) | index("dev") != null' <<<"$note" >/dev/null
+            echo "semantic-release baseline OK: $tag is on dev channel"
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v5.7.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Semantic release is the only publisher. Its prepare phase validates generated metadata
+      # before @semantic-release/git creates a release commit or a version tag.
+      - name: Release
+        uses: cycjimmy/semantic-release-action@v6
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate published Morphe metadata
+        run: |
+          current="$(jq -r '.version // empty' patches-bundle.json)"
+          python3 .github/scripts/validate_morphe_metadata.py "$current"
+
+      - name: Verify published release asset
+        if: steps.release.outputs.new_release_published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag='${{ steps.release.outputs.new_release_git_tag }}'
+          version='${{ steps.release.outputs.new_release_version }}'
+          expected="patches-${version}.mpp"
+          gh release view "$tag" --json tagName,isPrerelease,assets > "$RUNNER_TEMP/release.json"
+          jq -e --arg tag "$tag" '.tagName == $tag' "$RUNNER_TEMP/release.json" >/dev/null
+          jq -r '.assets[].name' "$RUNNER_TEMP/release.json" | grep -Fx "$expected"
+
+      - name: Attest
+        if: steps.release.outputs.new_release_published == 'true'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: 'Morphe Patches ${{ steps.release.outputs.new_release_git_tag }}'
+          subject-path: patches/build/libs/patches-*.mpp
+
+      - name: Verify project compiles
+        if: steps.release.outputs.new_release_published != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew :patches:buildAndroid clean --no-daemon

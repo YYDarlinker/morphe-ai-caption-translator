@@ -53,8 +53,10 @@ final class SourceAtomTimeline {
     static Result build(byte[] sourceBody, CaptionDocument.Parsed document) {
         if (document == null || document.cues().isEmpty()) return Result.EMPTY;
         List<CaptionDocument.Cue> cues = document.cues();
-        if (looksLikeRollingCaptions(cues)) return fromRollingCues(cues);
         Result json = parseJson3(sourceBody, cues);
+        // Native JSON3 word offsets outrank text repetition heuristics (speech can repeat).
+        if (!json.atoms.isEmpty() && json.nativeTimedAtoms > 0) return json;
+        if (looksLikeRollingCaptions(cues)) return fromRollingCues(cues);
         if (!json.atoms.isEmpty()) return json;
         return fromCues(cues);
     }
@@ -73,7 +75,7 @@ final class SourceAtomTimeline {
             int estimated = 0;
             for (int eventIndex = 0; eventIndex < events.length(); eventIndex++) {
                 JSONObject event = events.optJSONObject(eventIndex);
-                if (event == null || event.optInt("aAppend", 0) == 1) continue;
+                if (event == null) continue;
                 JSONArray segs = event.optJSONArray("segs");
                 if (segs == null || segs.length() == 0) continue;
                 long eventStart = event.optLong("tStartMs", -1L);
@@ -516,6 +518,7 @@ final class SourceAtomTimeline {
         if (isCjk(l) || isCjk(r)) return false;
         if (isPunctuation(r) && !isOpening(r)) return false;
         if (isOpening(l)) return false;
+        if (isPunctuation(l) && !isOpening(l) && Character.isLetterOrDigit(r)) return true;
         return (Character.isLetterOrDigit(l) && Character.isLetterOrDigit(r)) ||
                 (l == '\'' && Character.isLetterOrDigit(r)) ||
                 (Character.isLetterOrDigit(l) && r == '\'');

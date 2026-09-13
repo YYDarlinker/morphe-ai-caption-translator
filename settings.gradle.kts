@@ -1,4 +1,4 @@
-rootProject.name = "youtube-deepseek-caption-patch"
+rootProject.name = "morphe-ai-captions"
 
 pluginManagement {
     repositories {
@@ -17,5 +17,5 @@ pluginManagement {
 }
 
 plugins {
-    id("app.morphe.patches") version "1.3.3"
+    id("app.morphe.patches") version "1.3.4"
 }

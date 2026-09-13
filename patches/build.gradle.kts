@@ -4,10 +4,10 @@ patches {
     about {
         name = "YYDarlinker AI Caption Translator Patches"
         description = "Real-time multilingual YouTube captions through a user-provided OpenAI-compatible API"
-        source = "https://github.com/YYDarlinker/youtube-ai-caption-translator"
+        source = "https://github.com/YYDarlinker/morphe-ai-captions"
         author = "YYDarlinker"
-        contact = "https://github.com/YYDarlinker/youtube-ai-caption-translator/issues"
-        website = "https://github.com/YYDarlinker/youtube-ai-caption-translator"
+        contact = "https://github.com/YYDarlinker/morphe-ai-captions/issues"
+        website = "https://github.com/YYDarlinker/morphe-ai-captions"
         license = "GPLv3"
     }
 }

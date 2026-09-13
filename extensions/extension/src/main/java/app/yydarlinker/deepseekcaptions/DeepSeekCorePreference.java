@@ -48,7 +48,7 @@ public final class DeepSeekCorePreference extends android.preference.SwitchPrefe
 
     private void updateSummary(boolean enabled) {
         setSummary(enabled
-                ? "dev.1 默认核心：固定翻译单元 + 只读上下文；关闭可立即回退 v2.2.0 核心"
-                : "已手动回退 v2.2.0 Semantic Ledger；开启可返回 dev.1 实验核心");
+                ? "单次分句翻译 + 原词时间锚；无独立分句/显示 API 调用"
+                : "旧版多阶段核心（可能产生更高费用）；开启使用时间锚核心");
     }
 }

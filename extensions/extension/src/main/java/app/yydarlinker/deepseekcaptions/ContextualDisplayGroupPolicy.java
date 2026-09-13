@@ -12,6 +12,16 @@ final class ContextualDisplayGroupPolicy {
 
     private ContextualDisplayGroupPolicy() {}
 
+    static Group[] singleWindows(List<TranslationUnitTimeline.Unit> units,
+                                 List<SourceAtomTimeline.Atom> atoms) {
+        Group[] result=new Group[units.size()];
+        for(int i=0;i<units.size();i++) {
+            TranslationUnitTimeline.Unit u=units.get(i);
+            result[i]=new Group(i,i,u.fromAtom,u.toAtom,u.startMs,u.endMs,u.sourceText);
+        }
+        return result;
+    }
+
     static Group[] buildByUnit(
             List<TranslationUnitTimeline.Unit> units,
             List<SourceAtomTimeline.Atom> atoms

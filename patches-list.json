@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.3.0-dev.8",
+  "version": "1.0.0-dev.1",
   "patches": [
     {
       "name": "AI caption translator",
@@ -23,52 +23,10 @@
           ],
           "targets": [
             {
-              "version": "21.32.2",
-              "versionCodes": null,
-              "isExperimental": true,
-              "minSdk": 29,
-              "description": null
-            },
-            {
-              "version": "21.31.523",
-              "versionCodes": null,
-              "isExperimental": true,
-              "minSdk": 29,
-              "description": null
-            },
-            {
-              "version": "21.28.204",
-              "versionCodes": null,
-              "isExperimental": true,
-              "minSdk": 29,
-              "description": null
-            },
-            {
-              "version": "21.04.223",
+              "version": "21.07.247",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": 28,
-              "description": null
-            },
-            {
-              "version": "20.51.39",
-              "versionCodes": null,
-              "isExperimental": false,
-              "minSdk": 28,
-              "description": null
-            },
-            {
-              "version": "20.31.42",
-              "versionCodes": null,
-              "isExperimental": false,
-              "minSdk": 28,
-              "description": null
-            },
-            {
-              "version": "20.21.37",
-              "versionCodes": null,
-              "isExperimental": false,
-              "minSdk": 26,
               "description": null
             }
           ]

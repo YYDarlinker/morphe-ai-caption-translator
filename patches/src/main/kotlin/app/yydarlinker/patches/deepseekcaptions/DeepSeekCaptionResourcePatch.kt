@@ -45,7 +45,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
         document("AndroidManifest.xml").use { document ->
             val application = document.getElementsByTagName("application").item(0) as? Element
                 ?: throw PatchException("YouTube manifest has no <application>")
-            application.setAttribute("android:usesCleartextTraffic", "true")
+            // Preserve the host policy; only the loopback domain is granted cleartext below.
 
             val existing = application.getAttribute(NETWORK_SECURITY_ATTRIBUTE)
             if (existing.startsWith("@xml/")) {
@@ -66,23 +66,23 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                 document(path).use { document ->
                     val root = document.documentElement
                         ?: throw PatchException("Invalid network security config: $path")
-                    val baseNodes = document.getElementsByTagName("base-config")
-                    val base = if (baseNodes.length > 0) {
-                        baseNodes.item(0) as Element
-                    } else {
-                        (document.createElement("base-config") as Element).also(root::appendChild)
-                    }
-                    base.setAttribute("cleartextTrafficPermitted", "true")
+                    val domainConfig = document.createElement("domain-config") as Element
+                    domainConfig.setAttribute("cleartextTrafficPermitted", "true")
+                    val domain = document.createElement("domain") as Element
+                    domain.textContent = "127.0.0.1"
+                    domainConfig.appendChild(domain)
+                    root.appendChild(domainConfig)
                 }
             } else {
                 file.writeText(
                     """<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <domain-config cleartextTrafficPermitted="true"><domain>127.0.0.1</domain></domain-config>
 </network-security-config>
 """
                 )
@@ -208,12 +208,6 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         "deepseek_caption_default_language",
                         "字幕按钮默认语言",
                         "默认：AI 中文（简体）",
-                    )
-                    addPreference(
-                        CORE_PREF_CLASS,
-                        "deepseek_caption_contextual_unit_core",
-                        "实验翻译核心",
-                        "dev.1 默认开启；关闭可回退 v2.2.0 Semantic Ledger",
                     )
                     addPreference(
                         TEXT_PREF_CLASS,

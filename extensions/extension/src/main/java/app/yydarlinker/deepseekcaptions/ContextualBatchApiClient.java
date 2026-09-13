@@ -36,6 +36,7 @@ final class ContextualBatchApiClient {
 
     static Result translate(
             List<TranslationUnitTimeline.Unit> targets,
+            List<SourceAtomTimeline.Atom> atoms,
             List<String> contextBefore,
             List<String> contextAfter,
             DeepSeekConfig.Snapshot config,
@@ -67,7 +68,7 @@ final class ContextualBatchApiClient {
             sourceChars += text.length();
             targetValues.put(new JSONObject()
                     .put("id", unit == null ? "" : unit.id)
-                    .put("text", text));
+                    .put("tokens", AnchoredCaptionPlan.tokens(atoms, unit)));
         }
         JSONObject payload = new JSONObject()
                 .put("target_language", target.code)
@@ -79,21 +80,8 @@ final class ContextualBatchApiClient {
             payload.put("context_after", sanitizedContext(contextAfter));
         }
 
-        String systemPrompt =
-                "你是专业的 YouTube 字幕翻译器。targets 是客户端已经确定好边界和时间的字幕单元；" +
-                "context_before/context_after 只用于理解语境，绝对不能翻译成返回项。" +
-                "先在内部完成一次语义、语法、专名和数字核对，再逐项忠实、自然、简洁地翻译 targets；" +
-                "不得合并、拆分、遗漏、交换或重复任何 target。" +
-                "targets 可能是连续句子中的片段：要利用上下文消除歧义，但不要把上下文内容偷偷补进当前 target；" +
-                "对于关系从句、介词短语、助动词、数量表达和未完句，保留能与相邻 target 自然衔接的语法结构，" +
-                "不要逐词直译成悬空或不合目标语言习惯的片段。" +
-                "只翻译可说出的语言内容；不得输出音乐、音效、舞台说明、方括号注释、说话人箭头或 >>。" +
-                "不得把多词歌词或对白压缩成无对应关系的单字；保留全部数字、大小写专名和品牌名；长句使用自然标点。" +
-                "繁体中文必须使用繁体字，简体中文必须使用简体字；Apple、Nvidia 等专名不得凭空改写。" +
-                "每个返回项必须保留完全相同的 id；不要返回源索引、时间戳、边界判断或解释。" +
-                "目标语言是" + target.promptLabel() + "。用户自定义翻译要求：" + config.prompt +
-                " 只返回合法 JSON：{\"translations\":[{\"id\":\"u0\",\"text\":\"译文\"}]}。" +
-                "translations 的数量和 id 集合必须与 targets 完全一致；不要输出 Markdown 或额外字段。";
+        String systemPrompt = AnchoredCaptionPlan.PROMPT
+                + " Target language: " + target.promptLabel() + ". User translation preferences: " + config.prompt;
 
         int outputTokens = Math.max(768, Math.min(
                 MAX_OUTPUT_TOKENS,
@@ -114,7 +102,7 @@ final class ContextualBatchApiClient {
         } else if (dashScopeQwen) {
             request.put("enable_thinking", false);
         }
-        if (!dashScopeQwen) request.put("max_tokens", outputTokens);
+        request.put("max_tokens", outputTokens);
 
         int contextCount = (contextBefore == null ? 0 : contextBefore.size()) +
                 (contextAfter == null ? 0 : contextAfter.size());
@@ -139,11 +127,11 @@ final class ContextualBatchApiClient {
         boolean responseFormatFallback = request.has("response_format");
         boolean maxTokensFallback = request.has("max_tokens");
         Exception last = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
+        for (int attempt = 0; attempt < 1; attempt++) {
             ensureActive(deadline, control);
             try {
                 String content = post(config, request, deadline, control, audit);
-                Result result = parse(content, targets);
+                Result result = parseAnchored(content, targets, atoms);
                 TokenCostAudit.recordUnitBatchOutcome(audit, result.validCount());
                 return result;
             } catch (IllegalStateException rejected) {
@@ -162,17 +150,47 @@ final class ContextualBatchApiClient {
                 }
                 if (maxTokensFallback && providerRejectsParameter(rejected, "max_tokens")) {
                     maxTokensFallback = false;
-                    request.remove("max_tokens");
-                    attempt--;
-                    continue;
+                    throw new PermanentException("output_limit_unsupported",
+                            "供应商不支持输出预算，请选择支持 max_tokens 的兼容端点", "");
                 }
                 throw rejected;
             } catch (RetryableException | BatchFormatException retryable) {
                 last = retryable;
-                if (attempt + 1 < 2 && remainingMillis(deadline) > 700L) Thread.sleep(220L);
+                if (attempt + 1 < 1 && remainingMillis(deadline) > 700L) Thread.sleep(220L);
             }
         }
         throw last == null ? new IllegalStateException("AI 字幕固定单元翻译失败") : last;
+    }
+
+    static Result parseAnchored(String content, List<TranslationUnitTimeline.Unit> targets,
+                                List<SourceAtomTimeline.Atom> atoms) throws Exception {
+        validateTargetIds(targets);
+        JSONObject root;
+        try { root = new JSONObject(content.trim()); }
+        catch (Exception e) { throw new BatchFormatException("invalid anchored JSON", e); }
+        JSONArray rows = root.optJSONArray("translations");
+        if (rows == null) throw new BatchFormatException("missing translations");
+        Map<String, AnchoredCaptionPlan> plans = new HashMap<>();
+        Map<String, String> texts = new HashMap<>();
+        Set<String> seen = new HashSet<>();
+        List<String> invalid = new ArrayList<>(), unknown = new ArrayList<>(), missing = new ArrayList<>();
+        for (int i=0;i<rows.length();i++) {
+            JSONObject row=rows.optJSONObject(i);
+            if(row==null || !(row.opt("id") instanceof String))
+                throw new BatchFormatException("invalid response id");
+            String id=row.getString("id");
+            TranslationUnitTimeline.Unit unit=targetById(targets,id);
+            if(unit==null) { unknown.add(id); continue; }
+            if(!seen.add(id)) { plans.remove(id); texts.remove(id); invalid.add(id); continue; }
+            try {
+                AnchoredCaptionPlan plan=AnchoredCaptionPlan.parse(row.optJSONArray("segments"),atoms,unit);
+                plans.put(id,plan); texts.put(id,plan.canonical);
+            } catch(Exception rejected) { invalid.add(id); }
+        }
+        for(TranslationUnitTimeline.Unit unit:targets) if(!plans.containsKey(unit.id)) missing.add(unit.id);
+        Result result=new Result(texts,missing,invalid,unknown);
+        result.plansById.putAll(plans);
+        return result;
     }
 
     private static Result parse(
@@ -287,6 +305,7 @@ final class ContextualBatchApiClient {
             ensureActive(deadline, control);
             connection = (HttpURLConnection) new URL(completionUrl(config.baseUrl)).openConnection();
             if (control != null) control.onConnection(connection);
+            connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(boundedTimeout(deadline, CONNECT_TIMEOUT_MS));
             connection.setReadTimeout(boundedTimeout(deadline, READ_TIMEOUT_MS));
@@ -575,6 +594,7 @@ final class ContextualBatchApiClient {
                 new ArrayList<>(),
                 new ArrayList<>()
         );
+        final Map<String, AnchoredCaptionPlan> plansById = new HashMap<>();
         final Map<String, String> translationsById;
         final List<String> missingIds;
         final List<String> invalidIds;

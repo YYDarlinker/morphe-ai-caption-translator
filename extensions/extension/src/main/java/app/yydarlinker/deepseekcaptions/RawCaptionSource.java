@@ -87,7 +87,7 @@ final class RawCaptionSource {
                         CaptionDiagnostics.mark(
                                 context,
                                 "SOURCE_TIMING_CALIBRATED",
-                                "保留原轨文本，仅以英语（自动生成）校时：原轨整体提前 " +
+                                "保留原轨文本，仅以英语（自动生成）校时：原轨减去校准偏移 " +
                                         calibration.offsetMs + " ms；" + calibration.anchors +
                                         " 个文本锚，MAD " + calibration.madMs + " ms"
                         );
@@ -130,7 +130,7 @@ final class RawCaptionSource {
         CaptionDiagnostics.mark(
                 context,
                 "RAW_TIMELINE_READY",
-                "保留 YouTube 原轨 " + document.cues().size() + " 个时间原子；语义分页交由 AI"
+                "保留 YouTube 原轨 " + document.cues().size() + " 个时间原子；分句译文由模型单次生成，本地保留原词时间锚"
         );
         return new Source(body, contentType, sourceUrl, document);
     }

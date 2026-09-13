@@ -114,4 +114,6 @@ val deepSeekChineseCaptionsPatch = bytecodePatch(
             )
         }
     }
+    finalize { installNativeCaptionBridge() }
+
 }

@@ -76,7 +76,7 @@ final class CaptionDocument {
         List<Cue> rawCues = new ArrayList<>();
         for (int i = 0; i < events.length(); i++) {
             JSONObject event = events.optJSONObject(i);
-            if (event == null || event.optInt("aAppend", 0) == 1) continue;
+            if (event == null) continue;
             JSONArray segments = event.optJSONArray("segs");
             if (segments == null || segments.length() == 0) continue;
 

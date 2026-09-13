@@ -37,8 +37,8 @@ final class ContextualUnitCaptionController {
     private static final long BACKGROUND_HIGH_WATER_MS = 30_000L;
     private static final long BACKGROUND_BATCH_SPAN_MS = 18_000L;
     private static final int REALTIME_MAX_UNITS = 4;
-    private static final int BACKGROUND_MAX_UNITS = 6;
-    private static final int CONTEXT_UNITS_PER_SIDE = 2;
+    private static final int BACKGROUND_MAX_UNITS = 3;
+    private static final int CONTEXT_UNITS_PER_SIDE = 1;
     private static final int MAX_REALTIME_LOGICAL_ATTEMPTS = 2;
     private static final long FAILED_REALTIME_BACKOFF_MS = 10_000L;
     private static final long REFILL_SAFETY_MARGIN_MS = 1_500L;
@@ -47,9 +47,9 @@ final class ContextualUnitCaptionController {
     private static final long PLAYER_RESTORE_GRACE_MS = 4_000L;
     private static final long DISPLAY_TICK_MS = 80L;
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
-    private static final int CACHE_FORMAT = 2;
+    private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-contextual-fixed-unit-core-v1".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-anchored-joint-plan-v1".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -369,15 +369,18 @@ static void setMainActivity(Activity activity) {
                 CaptionDiagnostics.mark(
                         session.context,
                         "CONTEXTUAL_JSON3_APPEND_OBSERVED",
-                        "检测到 " + appendEvents + " 个 aAppend events；保持现有保守过滤，等待真实 fixture 判定语义"
+                        "检测到 " + appendEvents + " 个 aAppend events；保留含正文的追加事件；空换行事件不生成字幕"
                 );
             }
             stageStarted = SystemClock.elapsedRealtime();
             SourceAtomTimeline.Result atomized = SourceAtomTimeline.build(source.body, source.document);
             markPreprocessStage(session, "SourceAtomTimeline.build", stageStarted);
+            CaptionDiagnostics.mark(session.context, "ANCHORED_TIMING_PROVENANCE",
+                    "native="+atomized.nativeTimedAtoms+";estimated="+atomized.estimatedAtoms+
+                    "; nativeRatio="+atomized.preciseRatio());
             if (!sessionMayContinue(session)) return;
             stageStarted = SystemClock.elapsedRealtime();
-            TranslationUnitTimeline.Result timeline = TranslationUnitTimeline.build(atomized, source.sourceUrl);
+            TranslationUnitTimeline.Result timeline = AnchoredWindowPlanner.build(atomized);
             markPreprocessStage(session, "TranslationUnitTimeline.build", stageStarted);
             if (!sessionMayContinue(session)) return;
             if (timeline.units.isEmpty()) {
@@ -409,7 +412,8 @@ static void setMainActivity(Activity activity) {
                     session.units = timeline.units;
                     int count = timeline.units.size();
                     session.translations = new String[count];
-                    session.displayGroupsByUnit = ContextualDisplayGroupPolicy.buildByUnit(
+                    session.anchoredPlans = new AnchoredCaptionPlan[count];
+                    session.displayGroupsByUnit = ContextualDisplayGroupPolicy.singleWindows(
                             session.units, session.atoms
                     );
                     session.displayPlans = new DisplayPlan[count];
@@ -494,24 +498,9 @@ static void setMainActivity(Activity activity) {
                 Request background = session.backgroundRequest;
                 boolean backgroundOwnsCurrent = background != null && background.contains(current);
                 if (backgroundOwnsCurrent && background.bodySent) {
-                    long now = SystemClock.elapsedRealtime();
-                    if (ContextualUnitCorePolicy.shouldRescueBodySentCurrent(
-                            session.units.get(current).startMs,
-                            session.currentTimeMs,
-                            background.bodySentAtMs,
-                            now,
-                            session.recentBackgroundLatencyMs,
-                            session.realtimeAttempts[current],
-                            MAX_REALTIME_LOGICAL_ATTEMPTS
-                    )) {
-                        startRealtime = buildConcurrentCurrentRescueLocked(session, current);
-                        if (startRealtime != null) {
-                            session.realtimeRequest = startRealtime;
-                            concurrentRescue = true;
-                        }
-                    } else if (session.lastPromotionSkippedSequence != background.sequence) {
-                        // A fresh in-flight request still gets a bounded chance to complete before
-                        // paying for a current-only duplicate.
+                    // The request already incurred provider work: await its bounded timeout,
+                    // never pay for a speculative concurrent copy of the same source window.
+                    if (session.lastPromotionSkippedSequence != background.sequence) {
                         session.lastPromotionSkippedSequence = background.sequence;
                         promotionSkipped = true;
                     }
@@ -595,26 +584,10 @@ static void setMainActivity(Activity activity) {
     }
 
     private static int resolveStableBridgesLocked(Session session) {
-        int resolved = 0;
-        for (int i = 1; i < session.units.size(); i++) {
-            if (session.states[i] == READY || session.states[i - 1] != READY) continue;
-            TranslationUnitTimeline.Unit previous = session.units.get(i - 1);
-            TranslationUnitTimeline.Unit current = session.units.get(i);
-            if (current.startMs - previous.endMs > 180L ||
-                    current.firstCue > previous.lastCue + 1 ||
-                    !ContextualCaptionTextPolicy.redundantBridge(
-                            previous.sourceText, current.sourceText
-                    )) continue;
-            // A duplicate roll-up bridge is timing inventory, not a new translation unit. Copying
-            // the previous canonical text here made the same long sentence appear twice on-device.
-            session.translations[i] = "";
-            session.states[i] = READY;
-            resetUnitRecoveryLocked(session, i);
-            session.suppressedBridges[i] = true;
-            resolved++;
-        }
-        return resolved;
+        // De-rolling belongs to the source parser. Real repeated speech must still be translated.
+        return 0;
     }
+
     private static boolean hasReadyInventoryAtOrAheadLocked(Session session, int current) {
         long highWater = session.currentTimeMs + BACKGROUND_HIGH_WATER_MS;
         for (int i = Math.max(0, current); i < session.units.size(); i++) {
@@ -792,6 +765,7 @@ static void setMainActivity(Activity activity) {
         try {
             ContextualBatchApiClient.Result result = ContextualBatchApiClient.translate(
                     request.targets,
+                    session.atoms,
                     request.contextBefore,
                     request.contextAfter,
                     session.config,
@@ -871,6 +845,7 @@ static void setMainActivity(Activity activity) {
                 }
                 if (text != null && !text.trim().isEmpty()) {
                     session.translations[index] = text;
+                    session.anchoredPlans[index] = result.plansById.get(id);
                     session.states[index] = READY;
                     resetUnitRecoveryLocked(session, index);
                     applied++;
@@ -950,69 +925,14 @@ static void setMainActivity(Activity activity) {
             ContextualDisplayGroupPolicy.Group group,
             String canonical
     ) {
-        long duration = Math.max(1L, group.endMs - group.startMs);
-        String boundaryReason = "whole_sentence";
-        String rejectionSummary = "";
-        boolean grouped = group.firstUnit != group.lastUnit;
-        if ((grouped || duration > LONG_DISPLAY_THRESHOLD_MS) && canonical.trim().length() >= 8) {
-            List<SourceAtomTimeline.Atom> localAtoms = new ArrayList<>(
-                    session.atoms.subList(group.fromAtom, group.toAtom + 1)
-            );
-            SemanticDisplaySliceApiClient.Result local =
-                    LocalDisplaySliceFallback.sliceContextual(localAtoms, canonical);
-            boolean exceedsHardLimit =
-                    LocalDisplaySliceFallback.exceedsContextualHardLimit(localAtoms, canonical);
-            boundaryReason = local.boundaryReason;
-            rejectionSummary = local.rejectionSummary;
-            if (local.slices.size() > 1) {
-                TokenCostAudit.recordDisplayLocalOutcome(true);
-                List<DisplaySlice> slices = new ArrayList<>(local.slices.size());
-                long previousEnd = group.startMs;
-                for (int i = 0; i < local.slices.size(); i++) {
-                    SemanticDisplaySliceApiClient.Slice slice = local.slices.get(i);
-                    if (slice.from < 0 || slice.to < slice.from || slice.to >= localAtoms.size()) continue;
-                    long start = i == 0 ? group.startMs : previousEnd;
-                    long end = i == local.slices.size() - 1
-                            ? group.endMs
-                            : Math.max(start + 1L, localAtoms.get(slice.to).endMs);
-                    if (end <= start) continue;
-                    slices.add(new DisplaySlice(start, end, slice.text));
-                    previousEnd = end;
-                }
-                if (slices.size() > 1) {
-                    return new DisplayPlan(
-                            Collections.unmodifiableList(slices),
-                            boundaryReason,
-                            rejectionSummary,
-                            group.firstUnit,
-                            group.lastUnit,
-                            group.sourceText,
-                            canonical
-                    );
-                }
-            }
-            if (grouped && exceedsHardLimit) {
-                return new DisplayPlan(
-                        Collections.emptyList(),
-                        "display_group_capacity_no_safe_cut",
-                        rejectionSummary,
-                        group.firstUnit,
-                        group.lastUnit,
-                        group.sourceText,
-                        canonical
-                );
-            }
-            TokenCostAudit.recordDisplayLocalWholeSentence();
+        AnchoredCaptionPlan anchored=session.anchoredPlans[group.firstUnit];
+        List<DisplaySlice> slices=new ArrayList<>();
+        if(anchored!=null) {
+            for(AnchoredCaptionPlan.Segment segment:anchored.segments)
+                slices.add(new DisplaySlice(segment.startMs,segment.endMs,segment.text));
         }
-        return new DisplayPlan(
-                Collections.singletonList(new DisplaySlice(group.startMs, group.endMs, canonical)),
-                boundaryReason,
-                rejectionSummary,
-                group.firstUnit,
-                group.lastUnit,
-                group.sourceText,
-                canonical
-        );
+        return new DisplayPlan(Collections.unmodifiableList(slices), "source_anchored_joint",
+                "", group.firstUnit, group.lastUnit, group.sourceText, canonical);
     }
 
     private static void failBatch(
@@ -1144,7 +1064,7 @@ static void setMainActivity(Activity activity) {
         recordFailureLocked(session, index, reason);
         int failures = session.failureCounts[index];
         ContextualUnitCorePolicy.RetryDecision decision =
-                ContextualUnitCorePolicy.retryDecision(failureKind, failures, priority);
+                AnchoredRetryPolicy.decide(failureKind, failures, priority);
         if (decision.permanent) {
             session.states[index] = PERMANENT_FAILURE;
             session.retryAfterMs[index] = Long.MAX_VALUE;
@@ -1489,6 +1409,10 @@ static void setMainActivity(Activity activity) {
                         restored++;
                         continue;
                     }
+                    AnchoredCaptionPlan restoredPlan;
+                    try { restoredPlan=AnchoredCaptionPlan.parse(value.optJSONArray("segments"),
+                            session.atoms,session.units.get(index)); }
+                    catch(Exception invalidPlan) { continue; }
                     if (!(rawText instanceof String)) continue;
                     String text = ContextualCaptionTextPolicy.translationForDisplay(
                             (String) rawText
@@ -1496,7 +1420,8 @@ static void setMainActivity(Activity activity) {
                     if (text.isEmpty() || !ContextualCaptionTextPolicy.adequateTranslation(
                             session.units.get(index).sourceText, text
                     )) continue;
-                    session.translations[index] = text;
+                    session.translations[index] = restoredPlan.canonical;
+                    session.anchoredPlans[index] = restoredPlan;
                     session.states[index] = READY;
                     restored++;
                 }
@@ -1526,7 +1451,9 @@ static void setMainActivity(Activity activity) {
                             entry.put("suppressed", true);
                         } else {
                             if (session.translations[i] == null) continue;
+                            if(session.anchoredPlans[i]==null) continue;
                             entry.put("text", session.translations[i]);
+                            entry.put("segments", session.anchoredPlans[i].toJson());
                         }
                         values.put(entry);
                     }
@@ -1844,6 +1771,7 @@ static void setMainActivity(Activity activity) {
 
         List<SourceAtomTimeline.Atom> atoms = Collections.emptyList();
         List<TranslationUnitTimeline.Unit> units = Collections.emptyList();
+        AnchoredCaptionPlan[] anchoredPlans = new AnchoredCaptionPlan[0];
         String[] translations = new String[0];
         ContextualDisplayGroupPolicy.Group[] displayGroupsByUnit =
                 new ContextualDisplayGroupPolicy.Group[0];

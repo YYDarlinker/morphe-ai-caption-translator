@@ -61,7 +61,7 @@ final class DeepSeekConfig {
     }
 
     static boolean contextualUnitCoreEnabled(Context context) {
-        return prefs(context).getBoolean(CONTEXTUAL_UNIT_CORE, DEFAULT_CONTEXTUAL_UNIT_CORE);
+        return true; // This release has exactly one production core.
     }
 
     static void saveContextualUnitCoreEnabled(Context context, boolean enabled) {

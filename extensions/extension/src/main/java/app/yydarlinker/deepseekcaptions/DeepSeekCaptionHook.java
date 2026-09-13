@@ -28,6 +28,7 @@ public final class DeepSeekCaptionHook {
             DynamicCaptionController.setMainActivity(activity);
             CaptionLifecycleRestore.install(activity);
             CaptionButtonController.install(activity);
+            NativeCaptionBridge.initialize(activity);
         } catch (Throwable ignored) {
         }
     }
@@ -65,15 +66,7 @@ public final class DeepSeekCaptionHook {
         try {
             if (cronetEngine != null) youtubeCronetEngine = cronetEngine;
 
-            // One atomic decision owns native source-track pass-through. The old check-then-commit
-            // split allowed a stale request to re-enable native captions after the user chose Off.
-            if (CaptionButtonController.consumeNativeTrackPassThrough(initialContext, originalUrl)) {
-                CaptionVideoHandoffV2.onExplicitNativeSelection();
-                if (DynamicCaptionController.isVisibleActive()) {
-                    DynamicCaptionController.deactivateFromNativeCaptionState();
-                }
-                return originalUrl;
-            }
+
         } catch (Throwable ignored) {
             // Fall through to the ordinary caption path rather than breaking YouTube captions.
         }

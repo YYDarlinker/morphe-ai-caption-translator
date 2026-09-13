@@ -54,7 +54,7 @@ final class CaptionTimingCalibrator {
             long providerMid = providerTokens.get(i + NGRAM / 2).midMs;
             long asrMid = asrTokens.get(asrIndex + NGRAM / 2).midMs;
             long delta = providerMid - asrMid;
-            if (delta < -1_500L || delta > MAX_RAW_DELTA_MS) continue;
+            if (Math.abs(delta) > MAX_RAW_DELTA_MS) continue;
 
             deltas.add(delta);
             lastProvider = i;
@@ -93,18 +93,7 @@ final class CaptionTimingCalibrator {
         long mad = medianAbsoluteDeviation(filtered, offset);
         long allowedMad = Math.max(650L, Math.min(1_500L, Math.max(1L, Math.abs(offset)) / 2L));
 
-        if (Math.abs(offset) < MIN_CORRECTION_MS) {
-            return Calibration.synced(offset, filtered.size(), mad);
-        }
-        if (offset < 0L) {
-            return Calibration.skip(
-                    "原轨没有滞后，反而相对 ASR 提前 " + Math.abs(offset) + " ms",
-                    offset,
-                    filtered.size(),
-                    mad
-            );
-        }
-        if (offset > MAX_CORRECTION_MS) {
+        if (Math.abs(offset) > MAX_CORRECTION_MS) {
             return Calibration.skip(
                     "检测到异常大时间差：" + offset + " ms",
                     offset,
@@ -121,6 +110,9 @@ final class CaptionTimingCalibrator {
             );
         }
 
+        if (Math.abs(offset) < MIN_CORRECTION_MS) {
+            return Calibration.synced(offset, filtered.size(), mad);
+        }
         return Calibration.apply(offset, filtered.size(), mad);
     }
 
@@ -129,7 +121,7 @@ final class CaptionTimingCalibrator {
      * Returns null when the source is not JSON3 so callers can use {@link #shiftDocument} instead.
      */
     static byte[] shiftJson3(byte[] body, long offsetMs) {
-        if (body == null || body.length == 0 || offsetMs <= 0L) return null;
+        if (body == null || body.length == 0 || offsetMs == 0L) return null;
         try {
             String raw = new String(body, StandardCharsets.UTF_8).trim();
             if (!raw.startsWith("{") || !raw.contains("\"events\"")) return null;
@@ -153,7 +145,7 @@ final class CaptionTimingCalibrator {
             CaptionDocument.Parsed source,
             long offsetMs
     ) {
-        if (source == null || offsetMs <= 0L) return source;
+        if (source == null || offsetMs == 0L) return source;
         List<CaptionDocument.Cue> shifted = new ArrayList<>();
         for (CaptionDocument.Cue cue : source.cues()) {
             long start = Math.max(0L, cue.startMs - offsetMs);

@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.2...v1.0.3) (2026-09-13)
+
+### 🐛 Bug Fixes
+
+* recover stopped captions after API test without changing language ([edc2f91](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/edc2f91e83e297e9cacb4f01609c7463b0b533b9))
+
 ## [1.0.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.1...v1.0.2) (2026-09-13)
 
 ### 🐛 Bug Fixes

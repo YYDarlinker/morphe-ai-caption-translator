@@ -95,7 +95,7 @@ final class ContextualCaptionTextPolicy {
     }
 
     private static String normalize(String value) {
-        return value == null ? "" : value.replace('\u00a0', ' ').replace("\r", "").trim();
+        return value == null ? "" : value.replace('［','[').replace('］',']').replace('\u00a0', ' ').replace("\r", "").trim();
     }
 
     private static String stripSpeakerArrows(String value) {

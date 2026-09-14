@@ -19,14 +19,14 @@ public final class NativeCaptionBridge {
             Object prototype=null;
             for(Object track:original) {
                 String code=language(track);
-                if(code!=null && !code.isEmpty() && "zh-Hans".equals(TargetLanguage.fromCode(code).code)) return original;
+                if(code!=null && !code.isEmpty() && "zh-Hans".equals(TargetLanguage.fromCode(code).code)) return LanguageMenuOrder.sorted(original,NativeCaptionBridge::language);
                 if(prototype==null && DeepSeekCaptionHook.isYouTubeTimedTextUrl(url(track))) prototype=track;
             }
             if(prototype==null) return original;
             Object simplified=cloneSimplified(prototype);
             if(simplified==null) return original;
             List<Object> copy=new ArrayList<>(original.size()+1);
-            copy.add(simplified); copy.addAll(original); return copy;
+            copy.add(simplified); copy.addAll(original); return LanguageMenuOrder.sorted(copy,NativeCaptionBridge::language);
         } catch(Exception failed) {
             CaptionDiagnostics.mark(context,"AI_MENU_INSERT_FAILED",failed.getClass().getSimpleName());
             return original;

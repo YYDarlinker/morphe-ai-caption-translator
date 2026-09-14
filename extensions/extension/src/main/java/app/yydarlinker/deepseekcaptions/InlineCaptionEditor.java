@@ -10,6 +10,10 @@ public final class InlineCaptionEditor extends EditText {
         setShowSoftInputOnFocus(true);setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);}
     public void sensitive(boolean value){sensitive=value;}
     @Override public boolean onTouchEvent(android.view.MotionEvent e){
+        if(e.getActionMasked()==MotionEvent.ACTION_UP){
+            performClick();requestFocus();android.view.inputmethod.InputMethodManager ime=(android.view.inputmethod.InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if(ime!=null)post(()->ime.showSoftInput(this,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT));
+        }
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN){downX=e.getX();downY=e.getY();requestFocus();if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);}
         if(e.getActionMasked()==MotionEvent.ACTION_MOVE && Math.abs(e.getY()-downY)>ViewConfiguration.get(getContext()).getScaledTouchSlop()
             && Math.abs(e.getY()-downY)>Math.abs(e.getX()-downX) && actions==null){if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);}

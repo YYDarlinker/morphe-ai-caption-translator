@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-readable-anchor-r4".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-presentation-r5".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -110,7 +110,7 @@ static void setMainActivity(Activity activity) {
         if (compactPlayer && !compact) {
             restoreGraceUntilMs = SystemClock.elapsedRealtime() + PLAYER_RESTORE_GRACE_MS;
         }
-        compactPlayer = compact;
+        compactPlayer = compact && !CaptionSurface.isShorts();
     }
 
     static String restoreTargetAfterMiniplayer(String url) {
@@ -349,6 +349,7 @@ static void setMainActivity(Activity activity) {
     }
 
     private static void displayTick() {
+        CaptionOverlay.refreshSurface();
         Session session = active;
         if (session == null || session.cancelled) return;
         long time = estimatedVideoTime(SystemClock.elapsedRealtime());
@@ -872,6 +873,11 @@ static void setMainActivity(Activity activity) {
                     }
                 }
                 if (text != null && !text.trim().isEmpty()) {
+                    AnchoredCaptionPlan candidate=result.plansById.get(id);
+                    if(candidate!=null)for(AnchoredCaptionPlan.Segment seg:candidate.segments){
+                        String issue=CaptionPresentationPolicy.issue(seg.text,seg.endMs-seg.startMs);
+                        if(!issue.isEmpty()) CaptionDiagnostics.mark(session.context,"PRESENTATION_LIMIT", "unit="+index+";reason="+issue+";ms="+(seg.endMs-seg.startMs)+";chars="+CaptionPresentationPolicy.visible(seg.text));
+                    }
                     session.translations[index] = text;
                     session.anchoredPlans[index] = result.plansById.get(id);
                     session.states[index] = READY;
@@ -960,6 +966,7 @@ static void setMainActivity(Activity activity) {
             ContextualDisplayGroupPolicy.Group ga=session.displayGroupsByUnit[i],gb=session.displayGroupsByUnit[i+1];
             if(ga==null || gb==null || ga.firstUnit!=ga.lastUnit || gb.firstUnit!=gb.lastUnit)continue;
             TranslationUnitTimeline.Unit a=session.units.get(i),b=session.units.get(i+1);
+            if(b.sourceText.trim().startsWith(">"))continue;
             List<AnchoredCaptionPlan.Segment> joined=CrossWindowReadability.merge(session.anchoredPlans[i],session.anchoredPlans[i+1],
                 a.fromAtom,b.fromAtom,session.currentTimeMs);
             if(joined.isEmpty())continue;
@@ -1255,7 +1262,7 @@ static void setMainActivity(Activity activity) {
                     ContextualDisplayGroupPolicy.Group displayGroup=session.displayGroupsByUnit[index];
                     long displayEnd=displayGroup==null ? unit.endMs : displayGroup.endMs;
                     if (timeMs < unit.startMs || timeMs >= displayEnd) {
-                        missReason = "source_timeline_gap";
+                        missReason = index==session.units.size()-1 && timeMs>=unit.endMs ? "source_track_ended" : "source_timeline_gap";
                     } else {
                         ContextualDisplayGroupPolicy.Group group =
                                 index < session.displayGroupsByUnit.length
@@ -1323,6 +1330,7 @@ static void setMainActivity(Activity activity) {
                                 selectedSourceText = plan.sourceText;
                                 selectedCanonicalText = plan.canonicalText;
                                 text = plan.textAt(timeMs);
+                                if(!session.sourceOnly) text=CaptionPresentationPolicy.wrap(text);
                                 if (text == null) text = "";
                                 text = text.trim();
                                 if (text.isEmpty()) {

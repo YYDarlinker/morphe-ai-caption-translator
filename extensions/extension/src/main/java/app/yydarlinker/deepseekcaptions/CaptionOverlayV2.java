@@ -55,6 +55,9 @@ final class CaptionOverlay {
     private static int lastHeight = -1;
     private static int lastMaxWidth = -1;
     private static boolean lastStatus;
+    private static long lastSurfaceScan;
+    private static boolean wasShorts;
+    private static long lastSurfaceDiagnostic;
 
     private static Runnable armDrag;
     private static boolean dragging;
@@ -83,9 +86,17 @@ final class CaptionOverlay {
             Activity old = activityRef.get();
             if (old != activity) detach();
             activityRef = new WeakReference<>(activity);
+            CaptionSurface.activity(activity);
             if (!pendingText.isEmpty() && !guardedExpansion) render();
         });
     }
+
+    static void refreshSurface(){runMain(()->{
+        long now=android.os.SystemClock.uptimeMillis();if(now-lastSurfaceScan<500)return;lastSurfaceScan=now;
+        CaptionSurface.refresh();boolean current=CaptionSurface.isShorts();
+        if(current!=wasShorts){wasShorts=current;unbindPlayer();resetGeometry();}
+        if(current){suppressed=false;guardedExpansion=false;if(!pendingText.isEmpty())render();}
+    });}
 
     static void showCaption(String text) { show(text, false, null); }
     static void showStatus(String text) { show(text, true, null); }
@@ -96,7 +107,7 @@ final class CaptionOverlay {
     static void setPlayerType(String rawType) {
         String type = rawType == null ? "" : rawType.trim();
         MAIN.post(() -> {
-            boolean next = compact(type);
+            boolean next = !CaptionSurface.isShorts() && compact(type);
             if (next == suppressed) {
                 if (!next && !guardedExpansion && !pendingText.isEmpty()) scheduleGeometry();
                 return;
@@ -131,7 +142,7 @@ final class CaptionOverlay {
     static void restoreAfterGuardedExpansion(String rawType) {
         String type = rawType == null ? "" : rawType.trim();
         runMain(() -> {
-            boolean next = compact(type);
+            boolean next = !CaptionSurface.isShorts() && compact(type);
             guardedExpansion = false;
             suppressed = next;
             geometryPosted = false;
@@ -232,6 +243,8 @@ final class CaptionOverlay {
 
         configure(anchor, view, activity, bounds);
         anchor.setVisibility(View.VISIBLE);
+        anchor.setElevation(dp(activity,32));
+        surfaceDiagnostic(activity,"OVERLAY_VIEW_VISIBLE","shorts="+CaptionSurface.isShorts()+";bounds="+bounds.toShortString());
         view.setClickable(true);
         anchor.postOnAnimation(() -> {
             if (anchor != anchorRef.get() || dragging || suppressed || guardedExpansion) return;
@@ -245,6 +258,10 @@ final class CaptionOverlay {
         });
     }
 
+    private static void surfaceDiagnostic(Activity activity,String stage,String detail){
+        long now=android.os.SystemClock.uptimeMillis();if(now-lastSurfaceDiagnostic<5000)return;lastSurfaceDiagnostic=now;
+        CaptionDiagnostics.mark(activity,stage,detail);
+    }
     private static TextView ensureView() {
         Activity activity = activityRef.get();
         if (activity == null || activity.isFinishing() || guardedExpansion) return null;
@@ -252,8 +269,8 @@ final class CaptionOverlay {
         if (host == null) return null;
         bindHost(host);
         FrameLayout player = findPlayer(activity, host);
-        if (player == null) return null;
-        bindPlayer(player);
+        if (player == null && !CaptionSurface.isShorts()) return null;
+        if(player!=null && !CaptionSurface.isShorts())bindPlayer(player);
 
         FrameLayout anchor = anchorRef.get();
         TextView text = textRef.get();
@@ -308,7 +325,7 @@ final class CaptionOverlay {
 
     private static void configure(FrameLayout anchor, TextView view, Activity activity, Rect bounds) {
         DeepSeekConfig.Snapshot style = DeepSeekConfig.displayStyle(activity);
-        int anchorWidth = Math.max(1, Math.round(bounds.width() * 0.92f));
+        int anchorWidth = Math.max(1, Math.round(bounds.width() * (CaptionSurface.isShorts()?0.78f:0.90f)));
         int configured = pendingStatus
                 ? Math.max(DeepSeekConfig.MIN_CAPTION_TEXT_SIZE, style.captionTextSize - 4)
                 : style.captionTextSize;
@@ -377,6 +394,10 @@ final class CaptionOverlay {
         float ratio = DeepSeekConfig.hasCaptionPosition(activity, landscape)
                 ? DeepSeekConfig.captionPositionY(activity, landscape)
                 : (landscape ? 0.80f : 0.82f);
+        if(CaptionSurface.isShorts()) {
+            Float nativeY=CaptionSurface.nativeCenter(hostRef.get(),bounds);
+            ratio=DeepSeekConfig.hasShortsPosition(activity)?DeepSeekConfig.shortsPosition(activity):nativeY!=null?nativeY:.72f;
+        }
         float x = bounds.left + (bounds.width() - width) / 2f;
         float y = bounds.top + ratio * bounds.height() - height / 2f;
         anchor.setX(clamp(x, bounds.left, Math.max(bounds.left, bounds.right - width)));
@@ -445,6 +466,7 @@ final class CaptionOverlay {
     private static Rect resolveBounds(Activity activity) {
         FrameLayout host = hostRef.get();
         if (host == null || !host.isAttachedToWindow()) return null;
+        Rect shorts=CaptionSurface.bounds(host);if(shorts!=null)return shorts;
         FrameLayout best = findPlayer(activity, host);
         if (best != null) bindPlayer(best);
         FrameLayout player = playerRef.get();
@@ -509,6 +531,8 @@ final class CaptionOverlay {
         if (!changed) return;
         configure(anchor, view, activity, bounds);
         anchor.setVisibility(View.VISIBLE);
+        anchor.setElevation(dp(activity,32));
+        surfaceDiagnostic(activity,"OVERLAY_VIEW_VISIBLE","shorts="+CaptionSurface.isShorts()+";bounds="+bounds.toShortString());
         view.setClickable(true);
     }
 
@@ -552,7 +576,8 @@ final class CaptionOverlay {
                 if (dragging && finalBounds != null && finalBounds.height() > 0) {
                     boolean landscape = isLandscape(activity);
                     float centerY = anchor.getY() + Math.max(1, anchor.getMeasuredHeight()) / 2f;
-                    DeepSeekConfig.saveCaptionPosition(activity, landscape,
+                    if(CaptionSurface.isShorts())DeepSeekConfig.saveShortsPosition(activity,(centerY-finalBounds.top)/finalBounds.height());
+                    else DeepSeekConfig.saveCaptionPosition(activity, landscape,
                             (centerY - finalBounds.top) / finalBounds.height());
                 } else if (event.getActionMasked() == MotionEvent.ACTION_UP) {
                     view.performClick();

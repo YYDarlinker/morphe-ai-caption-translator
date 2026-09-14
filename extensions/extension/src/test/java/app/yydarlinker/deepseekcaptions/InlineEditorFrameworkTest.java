@@ -50,8 +50,9 @@ public class InlineEditorFrameworkTest {
         android.widget.LinearLayout root=(android.widget.LinearLayout)preference.onCreateView(new android.widget.FrameLayout(activity));
         root.measure(View.MeasureSpec.makeMeasureSpec(600,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(1000,View.MeasureSpec.AT_MOST));
         root.layout(0,0,root.getMeasuredWidth(),root.getMeasuredHeight());
-        SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.getChildAt(0);
-        assertTrue(preview.getLeft()>0);assertTrue(preview.getRight()<root.getWidth());
+        android.widget.LinearLayout pair=(android.widget.LinearLayout)root.getChildAt(0);
+        SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)pair.getChildAt(0);
+        assertTrue(pair.getLeft()>0);assertTrue(pair.getRight()<root.getWidth());
         assertEquals(preview.getWidth()*9f/16f,preview.getHeight(),1f);
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,24);
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);

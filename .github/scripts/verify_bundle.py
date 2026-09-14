@@ -10,7 +10,7 @@ with zipfile.ZipFile(p) as z:
     mf=z.read("META-INF/MANIFEST.MF").decode().replace("\r\n ","").replace("\n ","")
     assert "YYDarlinker/morphe-ai-caption-translator" in mf, "wrong repository identity"
     assert "YYDarlinker/morphe-ai-captions\n" not in mf
-    assert v in mf, "wrong version"
+    assert f"Version: {v}\n" in mf.replace("\r\n", "\n"), "wrong version"
     dex=z.read("extensions/extension.mpe")
     assert dex.startswith(b"dex\n"), "Morphe extension must be raw DEX"
     assert int.from_bytes(dex[32:36],"little")==len(dex), "extension DEX length mismatch"

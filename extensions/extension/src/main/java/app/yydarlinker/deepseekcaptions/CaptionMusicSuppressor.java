@@ -295,6 +295,7 @@ final class CaptionMusicSuppressor {
     }
 
     private static void maskRenderer(Activity activity, View view) {
+        CaptionSurface.nativeRenderer(view);
         if (maskedRenderers.containsKey(view)) {
             if (view.getAlpha() != 0f) view.setAlpha(0f);
             return;

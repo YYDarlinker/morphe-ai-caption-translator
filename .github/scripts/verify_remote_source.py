@@ -1,5 +1,5 @@
 """Anonymous end-to-end source verification: branch JSON -> asset -> DEX and identity."""
-import hashlib, io, json, re, sys, time, urllib.request, zipfile
+import hashlib, io, json, os, re, sys, time, urllib.request, zipfile
 from pathlib import Path
 from datetime import datetime
 repo="YYDarlinker/morphe-ai-caption-translator"
@@ -28,7 +28,13 @@ assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?",manifes
 assert datetime.fromisoformat(manifest["created_at"]).tzinfo is None
 assert manifest["download_url"]==f"https://github.com/{repo}/releases/download/v{v}/patches-{v}.mpp"
 assert listing["version"]==v and len(listing["patches"])==1
+changelog=get(base+"/CHANGELOG.md?check="+str(time.time_ns())).decode("utf-8")
+heading=re.search(r"^## \[([^\]]+)\]",changelog,re.MULTILINE)
+assert heading and heading.group(1)==v, "remote CHANGELOG latest version differs from manifest"
+assert "`n" not in manifest["description"], "invalid description newline escapes"
 body=get(manifest["download_url"])
+if os.environ.get("EXPECTED_ASSET_SHA256"):
+    assert hashlib.sha256(body).hexdigest()==os.environ["EXPECTED_ASSET_SHA256"], "published asset differs from final CI bundle"
 with zipfile.ZipFile(io.BytesIO(body)) as z:
     assert z.testzip() is None
     assert "classes.dex" in z.namelist() and z.read("classes.dex").startswith(b"dex\n")

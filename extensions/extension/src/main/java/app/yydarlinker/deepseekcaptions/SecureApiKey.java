@@ -68,6 +68,7 @@ final class SecureApiKey {
         }
     }
 
+    static boolean hasSavedValue(Context context){return prefs(context).contains(VALUE);}
     static boolean hasKey(Context context) {
         return !load(context).isEmpty();
     }

@@ -51,7 +51,7 @@ final class CaptionPlayerTransitionGuard {
 
     static void onPlayerType(String rawType) {
         String type = rawType == null ? "" : rawType.trim();
-        boolean nextCompact = compact(type);
+        boolean nextCompact = !CaptionSurface.isShorts() && compact(type);
 
         // Renderer discovery may walk a bounded part of the player View tree. Keep that work out of
         // the same animation-critical window already used for overlay geometry and CC state guards.

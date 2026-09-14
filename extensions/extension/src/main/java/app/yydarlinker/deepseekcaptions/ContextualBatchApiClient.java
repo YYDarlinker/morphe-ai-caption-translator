@@ -79,6 +79,9 @@ final class ContextualBatchApiClient {
             sourceChars += text.length();
             JSONObject item=new JSONObject().put("id",unit.id).put("last_id",unit.toAtom-unit.fromAtom).put("span_ms",unit.endMs-unit.startMs)
                     .put("tokens",AnchoredCaptionPlan.tokens(atoms,unit));
+            JSONArray times=new JSONArray();
+            for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(new JSONArray().put(n-unit.fromAtom).put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0)));
+            item.put("timing_ds",times);
             JSONArray protectedTerms=ModelNameProtection.terms(atoms,unit);
             if(protectedTerms.length()>0)item.put("preserve_terms",protectedTerms);
             if(repair.containsKey(unit.id)) item.put("previous_validation_error",repair.get(unit.id));
@@ -207,9 +210,9 @@ final class ContextualBatchApiClient {
     }
     static String boundedContext(List<String> values,boolean before) {
         String text=String.join(" ",values);
-        if(text.length()<=160) return text;
-        if(before) {text=text.substring(text.length()-160);int space=text.indexOf(' ');return space<0 ? text : text.substring(space+1);}
-        text=text.substring(0,160);int space=text.lastIndexOf(' ');return space<0 ? text : text.substring(0,space);
+        if(text.length()<=96) return text;
+        if(before) {text=text.substring(text.length()-96);int space=text.indexOf(' ');return space<0 ? text : text.substring(space+1);}
+        text=text.substring(0,96);int space=text.lastIndexOf(' ');return space<0 ? text : text.substring(0,space);
     }
 
     private static Result parse(

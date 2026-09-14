@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 import os
 import re
 import sys
@@ -34,14 +35,22 @@ def normalize_version(value: object) -> str:
 
 
 def gradle_version() -> str:
-    for line in Path("gradle.properties").read_text(encoding="utf-8").splitlines():
-        match = re.fullmatch(r"\s*version\s*=\s*(\S+)\s*", line)
-        if match:
-            return normalize_version(match.group(1))
-    fail("gradle.properties has no version property")
+    text = Path("gradle.properties").read_text(encoding="utf-8")
+    values = re.findall(r"^\s*version\s*=\s*(\S+)\s*$", text, re.MULTILINE)
+    if len(values) != 1:
+        fail("gradle.properties must contain exactly one version property")
+    return normalize_version(values[0])
+
+
+def validate_text_files() -> None:
+    for name in ("gradle.properties", "patches-bundle.json", "patches-list.json", "CHANGELOG.md"):
+        text = Path(name).read_text(encoding="utf-8")
+        if re.search(r"^(?:<{7}|={7}|>{7})(?:\s|$)", text, re.MULTILINE):
+            fail(f"unresolved merge conflict in {name}")
 
 
 def main() -> None:
+    validate_text_files()
     expected = normalize_version(sys.argv[1]) if len(sys.argv) > 1 else ""
     bundle = load_json("patches-bundle.json")
     patch_list = load_json("patches-list.json")
@@ -58,9 +67,14 @@ def main() -> None:
             f"(YYYY-MM-DDTHH:MM:SS[.fraction]); got {timestamp!r}"
         )
 
+    try:
+        datetime.fromisoformat(timestamp)
+    except ValueError:
+        fail("created_at is not a valid calendar date")
+
     version = normalize_version(bundle["version"])
-    if not version:
-        fail("patches-bundle.json version is empty")
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", version):
+        fail("patches-bundle.json version is not a release version")
     if expected and version != expected:
         fail(f"expected version {expected!r}, got {version!r}")
 
@@ -78,6 +92,15 @@ def main() -> None:
 
     if not isinstance(bundle["description"], str):
         fail("description must be a string")
+
+    if "`n" in bundle["description"] or "`r" in bundle["description"]:
+        fail("description contains unexpanded PowerShell newline escapes")
+    changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+    heading = re.search(r"^## \[([^\]]+)\]", changelog, re.MULTILINE)
+    if not heading or heading.group(1) != version:
+        fail("CHANGELOG.md latest release does not match bundle version")
+    if not bundle["description"].startswith(f"## [{version}]"):
+        fail("bundle description does not describe its version")
 
     signature = bundle.get("signature_download_url")
     if signature is not None and not isinstance(signature, str):

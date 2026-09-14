@@ -21,11 +21,11 @@ final class ReadableCaptionPlan {
         return Collections.unmodifiableList(out);
     }
     private static boolean brief(AnchoredCaptionPlan.Segment s){
-        long ms=s.endMs-s.startMs;return !s.text.trim().isEmpty() && (ms<900 || ms<1400 && s.text.codePointCount(0,s.text.length())<=8);
+        long ms=s.endMs-s.startMs;return !s.text.trim().isEmpty() && (ms<950 || ms<1400 && s.text.codePointCount(0,s.text.length())<=8);
     }
     private static boolean canJoin(AnchoredCaptionPlan.Segment a,AnchoredCaptionPlan.Segment b){
         return !a.text.trim().isEmpty() && !b.text.trim().isEmpty() && a.to+1==b.from &&
-            b.startMs>=a.endMs && b.startMs-a.endMs<=250 && b.endMs-a.startMs<=12000 && width(join(a.text,b.text))<=130;
+            b.startMs>=a.endMs && b.startMs-a.endMs<=250 && b.endMs-a.startMs<=8500 && CaptionPresentationPolicy.visible(join(a.text,b.text)) <= (CaptionPresentationPolicy.cjk(join(a.text,b.text))?32:84);
     }
     private static int width(String text){int n=0;for(int cp:text.codePoints().toArray())n+=cp>255?2:1;return n;}
     static String join(String a,String b){

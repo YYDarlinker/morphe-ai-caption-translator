@@ -8,27 +8,21 @@ public final class CaptionLanguageMetadata {
     public static byte[] addSimplified(byte[] original) {
         if(original==null || original.length>1024*1024) return original;
         try {
-            List<Field> root=fields(original);
-            byte[] prototype=null;
-            for(Field f:root) if(f.number==3 && f.wire==2) {
-                for(Field v:fields(f.value)) if(v.number==1 && v.wire==2) {
-                    String code=new String(v.value,StandardCharsets.UTF_8);
-                    if(code.equals("zh-Hans") || code.equals("zh-CN")) return original;
-                    if(prototype==null) prototype=f.value;
-                }
-            }
-            if(prototype==null) return original; // No invented source track or unavailable menu.
-            ByteArrayOutputStream entry=new ByteArrayOutputStream();
-            write(entry,1,"zh-Hans".getBytes(StandardCharsets.UTF_8));
-            ByteArrayOutputStream label=new ByteArrayOutputStream();
-            write(label,4,"中文（简体）".getBytes(StandardCharsets.UTF_8));
-            write(entry,2,label.toByteArray());
-            for(Field f:fields(prototype)) if(f.number!=1 && f.number!=2) entry.write(f.raw);
-            ByteArrayOutputStream out=new ByteArrayOutputStream();
-            // Prepend only a new translation language; all original fields/unknown data stay intact.
-            write(out,3,entry.toByteArray());out.write(original);return out.toByteArray();
+            List<Field> root=fields(original);List<byte[]> languages=new ArrayList<>();byte[] prototype=null;boolean hasHans=false;
+            for(Field f:root)if(f.number==3&&f.wire==2){languages.add(f.value);String code=code(f.value);
+                if(LanguageMenuOrder.rank(code)==1)hasHans=true;if(prototype==null)prototype=f.value;}
+            if(prototype==null)return original;
+            if(!hasHans){ByteArrayOutputStream entry=new ByteArrayOutputStream();
+                write(entry,1,"zh-Hans".getBytes(StandardCharsets.UTF_8));ByteArrayOutputStream label=new ByteArrayOutputStream();
+                write(label,4,"中文（简体）".getBytes(StandardCharsets.UTF_8));write(entry,2,label.toByteArray());
+                for(Field f:fields(prototype))if(f.number!=1&&f.number!=2)entry.write(f.raw);languages.add(entry.toByteArray());}
+            languages.sort((a,b)->LanguageMenuOrder.compare(code(a),code(b)));
+            ByteArrayOutputStream out=new ByteArrayOutputStream();boolean wrote=false;
+            for(Field f:root){if(f.number==3&&f.wire==2){if(!wrote){for(byte[] item:languages)write(out,3,item);wrote=true;}}else out.write(f.raw);}
+            byte[] result=out.toByteArray();return Arrays.equals(original,result)?original:result;
         } catch(Exception malformed) { return original; }
     }
+    private static String code(byte[] bytes){for(Field f:fields(bytes))if(f.number==1&&f.wire==2)return new String(f.value,StandardCharsets.UTF_8);return "";}
     static void write(ByteArrayOutputStream out,int number,byte[] value) {
         varint(out,(number<<3)|2);varint(out,value.length);out.write(value,0,value.length);
     }

@@ -180,7 +180,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         "停止输入后自动保存",
                     )
                     addPreference(
-                        TEXT_PREF_CLASS,
+                        "app.yydarlinker.deepseekcaptions.ApiKeyPreference",
                         "deepseek_caption_api_key",
                         "API Key",
                     )
@@ -214,7 +214,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         SLIDER_PREF_CLASS,
                         "deepseek_caption_text_size",
                         "字幕大小",
-                        "相对画面比例 12–36，详情页与全屏一致",
+                        "相对画面比例 12–22，详情页与全屏一致",
                     )
                     addPreference(
                         SLIDER_PREF_CLASS,

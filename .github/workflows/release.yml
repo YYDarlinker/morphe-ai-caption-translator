@@ -1,17 +1,18 @@
 name: Release
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-publisher
   cancel-in-progress: false
 
 on:
   workflow_dispatch:
   push:
-    branches: [main, dev]
+    branches: [main]
 
 jobs:
   release:
     name: Release
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
       packages: write
@@ -32,23 +33,11 @@ jobs:
       - name: Test release metadata rejection paths
         run: python3 .github/scripts/test_release_contract.py
 
-      # semantic-release v25 records prerelease channel membership in a per-tag Git note.
-      # If a tag is manually recreated without that note, semantic-release can restart at dev.1.
-      - name: Validate semantic-release dev channel baseline
-        if: ${{ github.ref == 'refs/heads/dev' }}
+      - name: Reject stale release checkout
         run: |
           set -euo pipefail
-          current="$(jq -r '.version // empty' patches-bundle.json)"
-          if [[ "$current" =~ -dev\.[0-9]+$ ]]; then
-            tag="v${current}"
-            git fetch --force origin '+refs/notes/*:refs/notes/*'
-            git rev-parse "${tag}^{commit}" >/dev/null
-            git merge-base --is-ancestor "$tag" HEAD
-            note_ref="semantic-release-${tag}"
-            note="$(git notes --ref "$note_ref" show "$tag")"
-            jq -e '(.channels // []) | index("dev") != null' <<<"$note" >/dev/null
-            echo "semantic-release baseline OK: $tag is on dev channel"
-          fi
+          remote="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$remote" = "$(git rev-parse HEAD)" || { echo "::error::main changed; release the latest commit instead"; exit 1; }
 
       - name: Setup Java
         uses: actions/setup-java@v5.7.0
@@ -89,6 +78,13 @@ jobs:
           gh release view "$tag" --json tagName,isPrerelease,assets > "$RUNNER_TEMP/release.json"
           jq -e --arg tag "$tag" '.tagName == $tag' "$RUNNER_TEMP/release.json" >/dev/null
           jq -r '.assets[].name' "$RUNNER_TEMP/release.json" | grep -Fx "$expected"
+
+      - name: Verify final published bundle
+        if: steps.release.outputs.new_release_published == 'true'
+        run: |
+          version='${{ steps.release.outputs.new_release_version }}'
+          python3 .github/scripts/verify_bundle.py "$version"
+          echo "EXPECTED_ASSET_SHA256=$(sha256sum patches/build/libs/patches-${version}.mpp | cut -d' ' -f1)" >> "$GITHUB_ENV"
 
       - name: Verify anonymous Manager source chain
         run: python3 .github/scripts/verify_remote_source.py "${{ github.ref_name }}" "$(jq -r .version patches-bundle.json)"

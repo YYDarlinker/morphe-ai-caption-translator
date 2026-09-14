@@ -8,7 +8,7 @@ import java.util.List;
 
 /** Strict, immutable source-range contract shared by network responses and disk-cache restore. */
 final class AnchoredCaptionPlan {
-    static final String PROMPT = "Translate caption windows into natural, concise target-language subtitles. "
+    static final String PROMPT = CaptionPresentationPolicy.requestRules() + " Translate caption windows into natural, concise target-language subtitles. "
             + "tokens is an ordered array of [id, source text] pairs. Copy the printed IDs; do NOT count words. "
             + "Read the whole window and read-only context before choosing complete clauses. Do not split a dependent clause into a standalone fragment. "
             + "Return {\"translations\":[{\"id\":\"same id\",\"segments\":[[inclusiveEndIndex,\"translation\"]]}]}. "

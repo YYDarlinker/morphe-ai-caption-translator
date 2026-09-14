@@ -24,7 +24,7 @@ import android.widget.TextView;
  * keeps every setting on the page itself: there is no editor dialog and no page-level Save button.</p>
  */
 @SuppressWarnings("deprecation")
-public final class DeepSeekTextPreference extends android.preference.Preference {
+public class DeepSeekTextPreference extends android.preference.Preference {
     static final String KEY_BASE_URL = "deepseek_caption_base_url";
     static final String KEY_API_KEY = "deepseek_caption_api_key";
     static final String KEY_PROMPT = "deepseek_caption_prompt";
@@ -75,7 +75,10 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         View safeView = convertView != null && key != null && key.equals(convertView.getTag())
                 ? convertView
                 : null;
-        return super.getView(safeView, parent);
+        View bound=super.getView(safeView,parent);
+        if(editor!=null){editor.setEnabled(true);editor.setFocusable(true);editor.setFocusableInTouchMode(true);editor.setClickable(true);editor.setLongClickable(true);editor.setCursorVisible(true);}
+        if(bound instanceof ViewGroup){((ViewGroup)bound).setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);bound.setFocusable(false);}
+        return bound;
     }
 
     @Override
@@ -99,6 +102,7 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         root.addView(title, matchWrap());
 
         editor = new InlineCaptionEditor(context);
+        editor.setId(android.R.id.edit);
         editor.setFocusableInTouchMode(true);
         editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         editor.setPadding(0, dp(3), 0, dp(3));
@@ -130,7 +134,7 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
         editor.setOnFocusChangeListener((view, hasFocus) -> {
             if (!hasFocus) {
                 String text=editor.getText().toString();commitNow(text,true);
-                if(KEY_API_KEY.equals(getKey()) && text.trim().equals(lastCommitted)) editor.setText("");
+                // Do not clear text on transient focus loss from Android action mode / keyboard.
             }
         });
         editor.setOnEditorActionListener((view, actionId, event) -> {
@@ -149,6 +153,7 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
 
             @Override public void onViewDetachedFromWindow(View view) {
                 commitNow(((EditText) view).getText().toString(), false);
+                if(KEY_API_KEY.equals(getKey())){cancelPendingSave();((EditText)view).setText("");cancelPendingSave();}
             }
         });
         return root;
@@ -161,7 +166,7 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
             value.setInputType(CaptionInputPolicy.keyInputType());
             ((InlineCaptionEditor)value).sensitive(true);
             value.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
-            boolean saved = !DeepSeekConfig.load(getContext()).apiKey.isEmpty();
+            boolean saved = SecureApiKey.hasSavedValue(getContext());
             value.setHint(saved ? "已加密保存；输入可替换" : "请输入 API Key");
         } else if (KEY_PROMPT.equals(key)) {
             value.setSingleLine(false);
@@ -184,6 +189,7 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
     }
 
     private String initialValue() {
+        if(KEY_API_KEY.equals(getKey()))return "";
         DeepSeekConfig.Snapshot current = DeepSeekConfig.load(getContext());
         if (KEY_BASE_URL.equals(getKey())) return current.baseUrl;
         if (KEY_PROMPT.equals(getKey())) return current.prompt;
@@ -249,10 +255,9 @@ public final class DeepSeekTextPreference extends android.preference.Preference 
             return;
         }
 
-        DeepSeekConfig.Snapshot current = DeepSeekConfig.load(getContext());
         if (KEY_API_KEY.equals(getKey())) {
-            state.setText(current.apiKey.isEmpty()
-                    ? "编辑时可见；离开后清空，加密保存"
+            state.setText(!SecureApiKey.hasSavedValue(getContext())
+                    ? "编辑时可见；关闭页面清空，加密保存"
                     : (justSaved ? "已自动加密保存" : "已加密保存，不回显原 Key"));
         } else {
             CharSequence summary = getSummary();

@@ -1,3 +1,11 @@
+## [1.0.9](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.8...v1.0.9) (2026-09-14)
+
+### 🐛 Bug Fixes
+
+* apply clause-first segmentation rules from 1.0.7 ([138c078](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/138c07881204f12a82a78be039fe87844f936ae3))
+* restore clause-first subtitle editing from 1.0.7 ([c5d8623](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/c5d862344a81c7ed43028bed590718be6ffe44b7))
+* restore editorial segmentation from 1.0.7 baseline ([436779f](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/436779f2dea8f5c99c3bb316542f2c964704ec12))
+
 ## [1.0.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.7...v1.0.8) (2026-09-14)
 
 ### 🐛 Bug Fixes

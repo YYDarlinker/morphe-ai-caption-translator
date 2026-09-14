@@ -26,6 +26,10 @@ final class PlaybackClockEstimator {
     }
 
     private long lastEstimate;
+    private long confirmedPosition;
+
+    /** Display never advances from wall time: pause without a callback is indistinguishable from silence. */
+    synchronized long confirmedPosition() { return confirmedPosition; }
     private long videoTimeMs;
     private long realtimeMs;
     private float playbackRate = 1f;
@@ -37,10 +41,12 @@ final class PlaybackClockEstimator {
         this.playbackRate = clampRate(initialRate <= 0f ? 1f : initialRate);
         this.stableRateSample = false;
         this.lastEstimate = this.videoTimeMs;
+        this.confirmedPosition = this.videoTimeMs;
     }
 
     synchronized Update update(long newVideoTimeMs, long newRealtimeMs, long seekThresholdMs) {
         long cleanVideo = Math.max(0L, newVideoTimeMs);
+        confirmedPosition = cleanVideo;
         long cleanRealtime = Math.max(0L, newRealtimeMs);
         if (realtimeMs <= 0L || cleanRealtime <= realtimeMs) {
             videoTimeMs = cleanVideo;

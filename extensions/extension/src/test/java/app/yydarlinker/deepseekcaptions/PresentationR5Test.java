@@ -9,8 +9,8 @@ public class PresentationR5Test {
         TranslationUnitTimeline.Result result=AnchoredWindowPlanner.build(new SourceAtomTimeline.Result(a,5,5,0,true,false));
         assertEquals(3,result.units.size());assertFalse(result.units.get(0).sourceText.contains("Why"));
     }
-    @Test public void sevenSecondWindowsStayBounded(){List<SourceAtomTimeline.Atom>a=new ArrayList<>();for(int i=0;i<100;i++)a.add(new SourceAtomTimeline.Atom(i*500,(i+1)*500,"word",i,true));
-        for(TranslationUnitTimeline.Unit u:AnchoredWindowPlanner.build(new SourceAtomTimeline.Result(a,100,100,0,true,false)).units)assertTrue(u.endMs-u.startMs<=7000);}
+    @Test public void transportWindowsStayBounded(){List<SourceAtomTimeline.Atom>a=new ArrayList<>();for(int i=0;i<100;i++)a.add(new SourceAtomTimeline.Atom(i*500,(i+1)*500,"word",i,true));
+        for(TranslationUnitTimeline.Unit u:AnchoredWindowPlanner.build(new SourceAtomTimeline.Result(a,100,100,0,true,false)).units)assertTrue(u.endMs-u.startMs<=12000);}
     @Test public void shortMergeCannotCreateWallOfChinese(){String longText=String.join("",Collections.nCopies(32,"字"));
         List<AnchoredCaptionPlan.Segment> out=ReadableCaptionPlan.merge(Arrays.asList(new AnchoredCaptionPlan.Segment(0,0,0,400,"是的"),new AnchoredCaptionPlan.Segment(1,9,400,4000,longText)));assertEquals(2,out.size());}
     @Test public void chineseVariantsAlwaysAdjacentAtEnd(){List<String> result=LanguageMenuOrder.sorted(Arrays.asList("zh-Hant","ja","zh-Hans","en","ar"),s->s);

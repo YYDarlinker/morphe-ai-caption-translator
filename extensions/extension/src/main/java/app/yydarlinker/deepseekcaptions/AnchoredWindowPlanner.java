@@ -6,8 +6,8 @@ import java.util.List;
 
 /** Bounded transport windows, NOT final subtitles. The model selects clauses inside each window. */
 final class AnchoredWindowPlanner {
-    static final int MAX_ATOMS = 32;
-    static final long MAX_MS = 7_000L;
+    static final int MAX_ATOMS = 48;
+    static final long MAX_MS = 12_000L;
     private AnchoredWindowPlanner() {}
 
     static TranslationUnitTimeline.Result build(SourceAtomTimeline.Result source) {
@@ -30,7 +30,7 @@ final class AnchoredWindowPlanner {
                 if (punctuation || gap) candidate = i;
                 // Do not stop at every YouTube event or every comma. A reasonable lookahead lets
                 // the model recover unpunctuated ASR clauses without an extra segmentation call.
-                if ((punctuation || gap) && span >= 3_000L) break;
+                if ((punctuation || gap) && span >= 6_000L) break;
                 if (gap) break; // Never translate across long silence/speaker breaks.
             }
             if (candidate >= from && end > candidate && candidate-from >= 8) end = candidate;

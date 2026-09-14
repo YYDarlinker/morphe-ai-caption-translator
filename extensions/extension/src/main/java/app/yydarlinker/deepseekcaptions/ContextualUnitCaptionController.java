@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-presentation-r5".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-semantic-asr-r6".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -294,7 +294,7 @@ static void setMainActivity(Activity activity) {
 
         Session session = active;
         if (session == null || session.cancelled) return;
-        session.currentTimeMs = PLAYBACK_CLOCK.estimate(now);
+        session.currentTimeMs = PLAYBACK_CLOCK.confirmedPosition();
         boolean debounceStartupSeek = false;
         boolean logStartupDebounce = false;
         if (seek) {
@@ -385,7 +385,7 @@ static void setMainActivity(Activity activity) {
                 );
             }
             stageStarted = SystemClock.elapsedRealtime();
-            SourceAtomTimeline.Result atomized = SourceAtomTimeline.build(source.body, source.document);
+            SourceAtomTimeline.Result atomized = source.alignedAtoms != null ? source.alignedAtoms : SourceAtomTimeline.build(source.body, source.document);
             if(!session.sourceOnly) atomized=ModelNameProtection.protect(atomized);
             markPreprocessStage(session, "SourceAtomTimeline.build", stageStarted);
             CaptionDiagnostics.mark(session.context, "ANCHORED_TIMING_PROVENANCE",
@@ -419,7 +419,7 @@ static void setMainActivity(Activity activity) {
                 synchronized (session.lock) {
                     if (session.cancelled || active != session) return;
                     session.cacheKey = DiskCaptionCache.key(
-                            cacheIdentity(source.body), session.config, session.targetLanguage.code
+                            cacheIdentity(source.body, timeline.atoms), session.config, session.targetLanguage.code
                     );
                     session.atoms = timeline.atoms;
                     session.units = timeline.units;
@@ -1286,6 +1286,12 @@ static void setMainActivity(Activity activity) {
                                 session.displayPlans[group.firstUnit] = plan;
                             }
                             if (plan == null && !grouped) {
+                                if(session.states[index] == PERMANENT_FAILURE) {
+                                    text = CaptionFailureFallback.text(session.atoms,unit,timeMs);
+                                    selectedBoundaryReason="translation_failed_source_fallback";
+                                    selectedSourceText=unit.sourceText;
+                                    selectedRejectionSummary=session.lastFailureReasons[index];
+                                }
                                 missReason = "unit_state_" + unitStateName(session.states[index]);
                                 selectedRetryCount = session.failureCounts[index];
                                 selectedFailureCategory = session.lastFailureReasons[index] == null
@@ -1575,12 +1581,15 @@ static void setMainActivity(Activity activity) {
     }
 
     private static long estimatedVideoTime(long realtimeMs) {
-        return PLAYBACK_CLOCK.estimate(realtimeMs);
+        return PLAYBACK_CLOCK.confirmedPosition();
     }
 
-    private static byte[] cacheIdentity(byte[] body) {
+    private static byte[] cacheIdentity(byte[] body, List<SourceAtomTimeline.Atom> atoms) {
         byte[] source = body == null ? new byte[0] : body;
-        byte[] result = Arrays.copyOf(source, source.length + CACHE_MARKER.length);
+        byte[] result = Arrays.copyOf(source, source.length + CACHE_MARKER.length + atoms.size()*16);
+        java.nio.ByteBuffer times=java.nio.ByteBuffer.wrap(result);
+        times.position(source.length + CACHE_MARKER.length);
+        for(SourceAtomTimeline.Atom atom:atoms){times.putLong(atom.startMs);times.putLong(atom.endMs);}
         System.arraycopy(CACHE_MARKER, 0, result, source.length, CACHE_MARKER.length);
         return result;
     }

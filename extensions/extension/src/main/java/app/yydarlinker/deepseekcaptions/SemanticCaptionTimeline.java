@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 final class SemanticCaptionTimeline {
-    private static final long PRESENTATION_LEAD_MS = 80L;
+    private static final long PRESENTATION_LEAD_MS = 0L;
 
     private static volatile String currentVideo = "";
     private static volatile String ownerVideo = "";

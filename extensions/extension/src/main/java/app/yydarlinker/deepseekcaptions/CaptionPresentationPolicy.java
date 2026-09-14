@@ -15,10 +15,10 @@ final class CaptionPresentationPolicy {
     }
     static String requestRules(){return "Choose one complete clause or short sentence per subtitle, never combine different speakers. "
         +"Do not cut a sentence merely because a YouTube ASR cue ended: ASR cues are timing atoms, not sentence boundaries. Prefer 1.2-6 seconds; avoid flashes below 0.95s. "
-        +"Chinese: aim for 12-24 visible characters, at most 32 per event (two 16-character lines), and about 9 chars/s. "
-        +"Other languages: at most two 42-character lines, about 17 chars/s. "
+        +"Chinese: prefer at most 32 visible characters per event. Readability goals must not fragment meaning. "
+        +"Other languages: prefer two 42-character lines. Preserve natural target-language grammar over artificial length limits. "
         +"Split only at sentence-final punctuation, a genuine clause boundary, a speaker change, or a clear breath/pause. Never split verb/object, preposition/object, article/noun, model numbers, number/unit, or dependent/main clauses. Attach a short fragment to the nearest clause. Preserve decimal points, versions, initials, URLs and model names such as GPT-5.6 Sol exactly. "
-        +"Timing array is [id,endDeciseconds] relative to window start, approximate when word timing is estimated. "
+        +"timing_ds[id] is the end in deciseconds relative to window start, approximate when word timing is estimated. "
         +"Never invent extra speech or alter the indexed source coverage to meet reading speed.";}
     // Visual line wrap only: no timestamp changes or dictionary-free time splitting.
     static String wrap(String text){

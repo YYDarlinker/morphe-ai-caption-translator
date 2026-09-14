@@ -54,6 +54,7 @@ final class RawCaptionSource {
         String contentType = provider.contentType;
         CaptionDocument.Parsed document = CaptionDocument.parse(body, contentType);
         TrackIdentity identity = classifyTrack(sourceUrl, document);
+        SourceAtomTimeline.Result alignedAtoms = null;
 
         CaptionDiagnostics.mark(
                 context,
@@ -82,6 +83,10 @@ final class RawCaptionSource {
                             "未取得可用的英语（自动生成）时间锚，保持原轨时间"
                     );
                 } else {
+                    SourceAtomTimeline.Result originalAtoms = SourceAtomTimeline.build(body, document);
+                    SourceAtomTimeline.Result referenceAtoms = SourceAtomTimeline.build(anchor.body, anchor.document);
+                    alignedAtoms = AsrLocalTiming.align(originalAtoms, referenceAtoms);
+                    if(alignedAtoms == originalAtoms) alignedAtoms = null;
                     CaptionTimingCalibrator.Calibration calibration =
                             CaptionTimingCalibrator.compare(document, anchor.document);
                     CaptionDiagnostics.mark(
@@ -89,7 +94,10 @@ final class RawCaptionSource {
                             "ASR_TIMING_MATCH",
                             calibration.diagnostic()
                     );
-                    if (calibration.apply) {
+                    if (alignedAtoms != null) {
+                        CaptionDiagnostics.mark(context,"ASR_LOCAL_TIMING_APPLIED",
+                            "保留原轨文本；局部英语自动字幕原生时间锚="+alignedAtoms.nativeTimedAtoms+"；估计="+alignedAtoms.estimatedAtoms);
+                    } else if (calibration.apply) {
                         byte[] shiftedJson3 = CaptionTimingCalibrator.shiftJson3(body, calibration.offsetMs);
                         if (shiftedJson3 != null) {
                             body = shiftedJson3;
@@ -145,7 +153,7 @@ final class RawCaptionSource {
                 "RAW_TIMELINE_READY",
                 "保留 YouTube 原轨 " + document.cues().size() + " 个时间原子；分句译文由模型单次生成，本地保留原词时间锚"
         );
-        return new Source(body, contentType, sourceUrl, document);
+        return new Source(body, contentType, sourceUrl, document, alignedAtoms);
     }
 
     static boolean publishSharedTimeline(
@@ -462,7 +470,12 @@ final class RawCaptionSource {
         final String sourceUrl;
         final CaptionDocument.Parsed document;
 
+        final SourceAtomTimeline.Result alignedAtoms;
         Source(byte[] body, String contentType, String sourceUrl, CaptionDocument.Parsed document) {
+            this(body,contentType,sourceUrl,document,null);
+        }
+        Source(byte[] body, String contentType, String sourceUrl, CaptionDocument.Parsed document, SourceAtomTimeline.Result alignedAtoms) {
+            this.alignedAtoms=alignedAtoms;
             this.body = body;
             this.contentType = contentType;
             this.sourceUrl = sourceUrl;

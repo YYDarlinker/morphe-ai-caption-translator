@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.0...v1.1.1) (2026-09-14)
+
+### 🐛 Bug Fixes
+
+* align translated source phrases and stabilize caption timing ([95b948c](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/95b948c2b2fdfcba4bc3e0ab62e31680ea33eefd))
+
 ## [1.1.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.9...v1.1.0) (2026-09-14)
 
 ### ✨ New Features

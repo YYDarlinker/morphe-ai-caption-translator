@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-09-14T12:17:55",
-  "description": "## [1.1.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.9...v1.1.0) (2026-09-14)\n\n### ✨ New Features\n\n* restore 1.0.8 baseline with semantic captions and guarded playback timing ([d6f79c4](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/d6f79c412ff58a538cf364f1425edcecfd0a34c8))",
-  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.1.0/patches-1.1.0.mpp",
+  "created_at": "2026-09-14T15:04:23",
+  "description": "## [1.1.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.0...v1.1.1) (2026-09-14)\n\n### 🐛 Bug Fixes\n\n* align translated source phrases and stabilize caption timing ([95b948c](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/95b948c2b2fdfcba4bc3e0ab62e31680ea33eefd))",
+  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.1.1/patches-1.1.1.mpp",
   "signature_download_url": "",
-  "version": "1.1.0"
+  "version": "1.1.1"
 }

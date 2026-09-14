@@ -83,6 +83,9 @@ final class ContextualBatchApiClient {
             for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0));
             item.put("timing_ds",times);
             JSONArray pauses=new JSONArray();
+            for(int n=unit.fromAtom+1;n<=unit.toAtom && pauses.length()<8;n++){long gap=atoms.get(n).startMs-atoms.get(n-1).endMs;if(gap>=250)pauses.put(new JSONArray().put(n-unit.fromAtom).put(gap));}
+            if(pauses.length()>0)item.put("pauses_before_ms",pauses);
+            JSONArray pauses=new JSONArray();
             for(int n=unit.fromAtom+1;n<=unit.toAtom;n++){long gap=atoms.get(n).startMs-atoms.get(n-1).endMs;if(gap>=250 && pauses.length()<8)pauses.put(new JSONArray().put(n-unit.fromAtom).put(gap));}
             if(pauses.length()>0)item.put("pauses_before_ms",pauses);
             JSONArray protectedTerms=ModelNameProtection.terms(atoms,unit);

@@ -18,7 +18,7 @@ final class CaptionPresentationPolicy {
         +"Chinese: prefer at most 32 visible characters per event. Readability goals must not fragment meaning. "
         +"Other languages: prefer two 42-character lines. Preserve natural target-language grammar over artificial length limits. "
         +"Split only at sentence-final punctuation, a genuine clause boundary, a speaker change, or a clear breath/pause. Never split verb/object, preposition/object, article/noun, model numbers or number/unit. A long subordinate clause may occupy its own event at a natural boundary; do not stack several clauses merely because they belong to one sentence. Attach a short fragment to the nearest clause. Preserve decimal points, versions, initials, URLs and model names such as GPT-5.6 Sol exactly. "
-        +"pauses_before_ms lists [id,gapMs] from the source, not inferred speakers. Prefer a break at a natural clause around a substantial pause. timing_ds[id] is the end in deciseconds relative to window start, approximate when word timing is estimated. "
+        +"pauses_before_ms lists [id,gapMs] from the source, not inferred speakers. Prefer a break at a natural clause around a substantial pause. pauses_before_ms lists [id,gapMs] from source timing as optional editorial evidence; it does not prove a speaker or scene change. timing_ds[id] is the end in deciseconds relative to window start, approximate when word timing is estimated. "
         +"Never invent extra speech or alter the indexed source coverage to meet reading speed.";}
     // Visual line wrap only: no timestamp changes or dictionary-free time splitting.
     static String wrap(String text){

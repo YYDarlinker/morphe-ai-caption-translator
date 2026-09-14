@@ -1,3 +1,9 @@
+## [1.0.7](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.6...v1.0.7) (2026-09-14)
+
+### 🐛 Bug Fixes
+
+* align captions to ASR and recover missing subtitles ([b0f8d1d](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/b0f8d1d79add38c84849d0a13b2489865070ee2f))
+
 ## [1.0.6](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.5...v1.0.6) (2026-09-14)
 
 ### 🐛 Bug Fixes

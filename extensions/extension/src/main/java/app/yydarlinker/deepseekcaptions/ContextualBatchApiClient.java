@@ -82,11 +82,7 @@ final class ContextualBatchApiClient {
             JSONArray times=new JSONArray();
             for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0));
             item.put("timing_ds",times);
-            JSONArray pauses=new JSONArray();
-            for(int n=unit.fromAtom+1;n<=unit.toAtom && pauses.length()<8;n++){long gap=atoms.get(n).startMs-atoms.get(n-1).endMs;if(gap>=250)pauses.put(new JSONArray().put(n-unit.fromAtom).put(gap));}
-            if(pauses.length()>0)item.put("pauses_before_ms",pauses);
-            JSONArray pauses=new JSONArray();
-            for(int n=unit.fromAtom+1;n<=unit.toAtom;n++){long gap=atoms.get(n).startMs-atoms.get(n-1).endMs;if(gap>=250 && pauses.length()<8)pauses.put(new JSONArray().put(n-unit.fromAtom).put(gap));}
+            JSONArray pauses=EditorialCaptionPlan.pauses(atoms,unit);
             if(pauses.length()>0)item.put("pauses_before_ms",pauses);
             JSONArray protectedTerms=ModelNameProtection.terms(atoms,unit);
             if(protectedTerms.length()>0)item.put("preserve_terms",protectedTerms);
@@ -182,7 +178,7 @@ final class ContextualBatchApiClient {
             if(unit==null) { unknown.add(id); continue; }
             if(!seen.add(id)) { plans.remove(id); texts.remove(id); invalid.add(id); continue; }
             try {
-                AnchoredCaptionPlan plan=AnchoredCaptionPlan.parse(row.optJSONArray("segments"),atoms,unit);
+                AnchoredCaptionPlan plan=AnchoredCaptionPlan.parse(row.optJSONArray("segments"),atoms,unit,row.optJSONArray("join_after"));
                 plans.put(id,plan); texts.put(id,plan.canonical);
             } catch(Exception rejected) { invalid.add(id); reasons.put(id,(rejected.getMessage()==null ? "invalid_structure" : rejected.getMessage())+";last="+(unit.toAtom-unit.fromAtom)+";ends="+safeEnds(row.optJSONArray("segments"))); }
         }

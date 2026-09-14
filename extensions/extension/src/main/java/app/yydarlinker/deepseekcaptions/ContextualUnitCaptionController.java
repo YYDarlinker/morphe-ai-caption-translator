@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-segmentation-surface-r7".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-editorial-baseline107-r9".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -467,7 +467,7 @@ static void setMainActivity(Activity activity) {
             markPreprocessStage(session, "cache restore", stageStarted);
             boolean currentCacheHit;
             synchronized (session.lock) {
-                prepareBoundaryGroupsLocked(session);
+                // Cross-window joins require explicit semantic evidence; not guessed from brief duration.
                 int current = anchor(session.units, session.currentTimeMs);
                 session.firstReady = isReadyLocked(session, current);
                 currentCacheHit = session.firstReady;
@@ -914,7 +914,7 @@ static void setMainActivity(Activity activity) {
                 session.states[request.focus] = PENDING;
                 session.retryAfterMs[request.focus] = 0L;
             }
-            prepareBoundaryGroupsLocked(session);
+            // Keep independently translated windows separate.
             stabilized = resolveStableBridgesLocked(session);
             int current = anchor(session.units, session.currentTimeMs);
             if (isReadyLocked(session, current) && !session.firstReady) {
@@ -1333,9 +1333,6 @@ static void setMainActivity(Activity activity) {
                                 selectedSliceCount = plan.slices.size();
                                 selectedBoundaryReason = plan.boundaryReason;
                                 selectedRejectionSummary = plan.rejectionSummary;
-                                if(selectedSlice>=0){DisplaySlice chosen=plan.slices.get(selectedSlice);
-                                    String issue=CaptionSegmentationPolicy.issue(new AnchoredCaptionPlan.Segment(0,0,chosen.startMs,chosen.endMs,chosen.text));
-                                    if(!issue.isEmpty())selectedRejectionSummary="presentation_warning:"+issue;}
                                 selectedSourceText = plan.sourceText;
                                 selectedCanonicalText = plan.canonicalText;
                                 text = plan.textAt(timeMs);

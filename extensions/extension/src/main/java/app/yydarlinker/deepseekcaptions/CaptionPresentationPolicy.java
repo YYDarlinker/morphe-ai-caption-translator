@@ -13,13 +13,15 @@ final class CaptionPresentationPolicy {
         if(duration<MIN_MS)return "brief_source_interval";
         return "";
     }
-    static String requestRules(){return "Use a consistent hierarchy for EVERY subtitle: (1) preserve meaningful phrase groups, (2) prefer one complete clause or short sentence, (3) combine adjacent clauses only if their combined length and reading duration remain comfortable and no significant pause intervenes. Split long multi-clause sentences at their natural clause boundaries. Never leave modifiers such as 到底/究竟 alone. Keep question phrases such as 到底意味着什么 together. Never combine explicit speaker turns; do not infer a speaker or shot change from an ordinary cue boundary. "
-        +"Do not cut a sentence merely because a YouTube ASR cue ended: ASR cues are timing atoms, not sentence boundaries. Prefer 1.2-6 seconds; avoid flashes below 0.95s. "
-        +"Chinese: prefer at most 32 visible characters per event. Readability goals must not fragment meaning. "
-        +"Other languages: prefer two 42-character lines. Preserve natural target-language grammar over artificial length limits. "
-        +"Split only at sentence-final punctuation, a genuine clause boundary, a speaker change, or a clear breath/pause. Never split verb/object, preposition/object, article/noun, model numbers or number/unit. A long subordinate clause may occupy its own event at a natural boundary; do not stack several clauses merely because they belong to one sentence. Attach a short fragment to the nearest clause. Preserve decimal points, versions, initials, URLs and model names such as GPT-5.6 Sol exactly. "
-        +"pauses_before_ms lists [id,gapMs] from the source, not inferred speakers. Prefer a break at a natural clause around a substantial pause. pauses_before_ms lists [id,gapMs] from source timing as optional editorial evidence; it does not prove a speaker or scene change. timing_ds[id] is the end in deciseconds relative to window start, approximate when word timing is estimated. "
-        +"Never invent extra speech or alter the indexed source coverage to meet reading speed.";}
+    static String requestRules(){return "Translate meaning in context first; then subtitle the translated speech in readable thought groups. "
+        +"Each segment is a display event, not a visual line. A long sentence may use several events at complete clause boundaries; related short clauses may share one. "
+        +"Do not isolate a modifier, connective, negation, article/noun, verb/object, quantity/unit or name. Never cut only because an ASR cue ended or a character limit was reached. "
+        +"Use punctuation, syntax and source timing together: aim for 1.2-6 seconds and one or two lines (Chinese about 32 visible characters; other languages about 84), without deleting meaning to fit. "
+        +"Offer smaller complete thought groups for long explanations, rather than one crowded paragraph; avoid word-by-word flashes. "
+        +"Optionally add join_after:[segmentEndId,...] per translation: only boundaries between two complete adjacent segments that remain natural when their texts are joined unchanged. "
+        +"Never mark a new point, question/answer turn, explicit speaker change or significant pause as joinable. Keep an inseparable phrase in ONE segment, not two joined fragments. "
+        +"No speaker or shot inference without evidence. timing_ds[id] gives source end deciseconds; pauses_before_ms is optional [id,gapMs] source evidence. "
+        +"Preserve source coverage and timing; do not generate extra speech.";}
     // Visual line wrap only: no timestamp changes or dictionary-free time splitting.
     static String wrap(String text){
         if(text==null)return "";String s=text.replace('\n',' ').trim();

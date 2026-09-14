@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.9...v1.1.0) (2026-09-14)
+
+### ✨ New Features
+
+* restore 1.0.8 baseline with semantic captions and guarded playback timing ([d6f79c4](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/d6f79c412ff58a538cf364f1425edcecfd0a34c8))
+
 ## [1.0.9](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.8...v1.0.9) (2026-09-14)
 
 ### 🐛 Bug Fixes

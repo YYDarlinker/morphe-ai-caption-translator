@@ -19,12 +19,14 @@ public final class DeepSeekCaptionHookV2 {
             appContext = activity.getApplicationContext();
             BackgroundPauseGovernor.setContext(appContext);
         }
+        MediaPlaybackClock.activity(activity);
         CaptionMusicSuppressor.setActivity(activity);
         DeepSeekCaptionHook.setMainActivity(activity);
         CaptionMusicSuppressor.kick();
     }
 
     public static void onVideoId(String videoId) {
+        MediaPlaybackClock.video(videoId);
         BackgroundPauseGovernor.onVideoId(videoId);
         // Observe the old video's ON/OFF intent before the stable controller tears down its session.
         CaptionVideoHandoffV2.onVideoId(videoId);
@@ -52,6 +54,7 @@ public final class DeepSeekCaptionHookV2 {
     }
 
     public static void onVideoTime(long timeMs) {
+        MediaPlaybackClock.raw();
         BackgroundPauseGovernor.onVideoTime(timeMs);
         long presentationTimeMs = SemanticCaptionTimeline.presentationTime(timeMs);
         DeepSeekCaptionHook.onVideoTime(presentationTimeMs);

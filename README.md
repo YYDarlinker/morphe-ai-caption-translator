@@ -1,5 +1,10 @@
 # Anchored AI Captions
 
+## Current revision: 1.1.0
+
+This revision restores the published GitHub 1.0.8 runtime baseline, including video-relative comment-panel geometry, and adds semantic event packing, partial ASR anchoring, bounded startup work, guarded media-session timing and simpler protocol recovery. See [research, decisions and verification limits](docs/RELEASE-1.1.0-RESEARCH.md). Historical revision notes below are not a statement of the current baseline.
+
+
 Independent YouTube AI subtitle addon, compatible with Morphe.
 
 This repository is a Morphe custom patch. It routes YouTube automatic-translation selections through a user-provided OpenAI-compatible API and displays the result in a dedicated in-player subtitle box.

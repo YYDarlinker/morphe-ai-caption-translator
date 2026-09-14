@@ -40,7 +40,7 @@ final class AnchoredWindowPlanner {
                     String t=atoms.get(cut).text.trim();
                     if(!t.isEmpty() && SentenceBoundaryUtil.weak(t.charAt(t.length()-1))){end=cut;break;}
                 }
-                while(end>from && atoms.get(end).text.trim().toLowerCase(java.util.Locale.ROOT).matches("and|or|the|a|an|of|to|with|for|as|than"))end--;
+                while(end>from && (atoms.get(end).text.trim().endsWith("-") || atoms.get(end).text.trim().toLowerCase(java.util.Locale.ROOT).matches("and|or|the|a|an|of|to|with|for|as|than")))end--;
             }
             SourceAtomTimeline.Atom first=atoms.get(from), last=atoms.get(end);
             String text=SourceAtomTimeline.join(atoms,from,end);

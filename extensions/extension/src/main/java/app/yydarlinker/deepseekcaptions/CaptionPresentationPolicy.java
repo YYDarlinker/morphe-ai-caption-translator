@@ -4,7 +4,7 @@ import java.util.*;
 final class CaptionPresentationPolicy {
     static final int CJK_LINE=16,CJK_EVENT=32;
     static final long MIN_MS=950,MAX_MS=7000;
-    static boolean cjk(String s){for(int cp:s.codePoints().toArray())if(Character.UnicodeScript.of(cp)==Character.UnicodeScript.HAN)return true;return false;}
+    static boolean cjk(String s){for(int cp:s.codePoints().toArray())if(Character.UnicodeScript.of(cp)==Character.UnicodeScript.HAN||Character.UnicodeScript.of(cp)==Character.UnicodeScript.HIRAGANA||Character.UnicodeScript.of(cp)==Character.UnicodeScript.KATAKANA||Character.UnicodeScript.of(cp)==Character.UnicodeScript.HANGUL)return true;return false;}
     static int visible(String s){return (int)s.codePoints().filter(cp->!Character.isWhitespace(cp)).count();}
     static String issue(String text,long duration){
         int limit=cjk(text)?CJK_EVENT:84;
@@ -13,15 +13,14 @@ final class CaptionPresentationPolicy {
         if(duration<MIN_MS)return "brief_source_interval";
         return "";
     }
-    static String requestRules(){return "Translate meaning in context first; then subtitle the translated speech in readable thought groups. "
-        +"Each segment is a display event, not a visual line. A long sentence may use several events at complete clause boundaries; related short clauses may share one. "
-        +"Do not isolate a modifier, connective, negation, article/noun, verb/object, quantity/unit or name. Never cut only because an ASR cue ended or a character limit was reached. "
-        +"Use punctuation, syntax and source timing together: aim for 1.2-6 seconds and one or two lines (Chinese about 32 visible characters; other languages about 84), without deleting meaning to fit. "
-        +"Offer smaller complete thought groups for long explanations, rather than one crowded paragraph; avoid word-by-word flashes. "
-        +"Optionally add join_after:[segmentEndId,...] per translation: only boundaries between two complete adjacent segments that remain natural when their texts are joined unchanged. "
-        +"Never mark a new point, question/answer turn, explicit speaker change or significant pause as joinable. Keep an inseparable phrase in ONE segment, not two joined fragments. "
-        +"No speaker or shot inference without evidence. timing_ds[id] gives source end deciseconds; pauses_before_ms is optional [id,gapMs] source evidence. "
-        +"Preserve source coverage and timing; do not generate extra speech.";}
+    static String requestRules(){return "Translate the meaning of the entire source_text in context before choosing subtitle events. An event is not a line break. "
+        +"Use complete sense groups: keep a modifier with its noun, a verb with its object, and the premise with the words needed to understand it. Do not isolate fillers, ellipses, 'that kind of', or 到底. "
+        +"Long explanations should use successive coherent clauses, not a paragraph on screen; a short tightly connected cause/effect can share an event when time and length permit. "
+        +"Aim for two lines and 1.2-6 seconds per event, about 32 CJK or 84 other visible characters; use roughly 10 CJK or 20 other characters/second as a warning, never a reason to omit facts or alter source times. "
+        +"Do not break merely at ASR cue edges, hesitations or every comma. Split new arguments and explicit speaker turns; never guess a shot change. "
+        +"Return existing segments over printed token IDs. Optionally supply attach_next:[endId,...] in each translation entry for segments whose wording needs the next segment to finish its sense; preferably put inseparable phrases in one segment initially. "
+        +"timing_ds[id] gives the source end in deciseconds; pauses_before_ms gives up to eight source gaps. Treat estimated word times as approximate. "
+        +"For response_mode=whole_text_recovery, replace only that translations entry with {id,text} translating the complete target; keep the outer translations array. No commentary or extra request.";}
     // Visual line wrap only: no timestamp changes or dictionary-free time splitting.
     static String wrap(String text){
         if(text==null)return "";String s=text.replace('\n',' ').trim();

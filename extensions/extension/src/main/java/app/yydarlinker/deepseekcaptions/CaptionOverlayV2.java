@@ -56,6 +56,7 @@ final class CaptionOverlay {
     private static int lastMaxWidth = -1;
     private static boolean lastStatus;
     private static long lastSurfaceScan;
+    private static long lastGeometryCheck;
     private static boolean wasShorts;
     private static long lastSurfaceDiagnostic;
 
@@ -63,6 +64,12 @@ final class CaptionOverlay {
     private static boolean dragging;
     private static float downRawY;
     private static float dragStartY;
+
+    private static final android.view.ViewTreeObserver.OnPreDrawListener GEOMETRY_DRAW = () -> {
+        long now=android.os.SystemClock.uptimeMillis();
+        if(now-lastGeometryCheck>=80 && !dragging && !suppressed && !guardedExpansion && !pendingText.isEmpty()){lastGeometryCheck=now;syncGeometry();}
+        return true;
+    };
 
     private static final View.OnLayoutChangeListener HOST_LAYOUT =
             (v, l, t, r, b, ol, ot, or, ob) -> {
@@ -96,6 +103,7 @@ final class CaptionOverlay {
         CaptionSurface.refresh();boolean current=CaptionSurface.isShorts();
         if(current!=wasShorts){wasShorts=current;unbindPlayer();resetGeometry();}
         if(current){suppressed=false;guardedExpansion=false;if(!pendingText.isEmpty())render();}
+        else scheduleGeometry();
     });}
 
     static void showCaption(String text) { show(text, false, null); }
@@ -231,6 +239,7 @@ final class CaptionOverlay {
         }
         Rect bounds = resolveBounds(activity);
         if (bounds == null) {
+            hideAnchorOnly();
             MAIN.postDelayed(CaptionOverlay::render, 32L);
             return;
         }
@@ -466,11 +475,21 @@ final class CaptionOverlay {
     private static Rect resolveBounds(Activity activity) {
         FrameLayout host = hostRef.get();
         if (host == null || !host.isAttachedToWindow()) return null;
-        Rect shorts=CaptionSurface.bounds(host);if(shorts!=null)return shorts;
+        Rect shorts=CaptionSurface.bounds(host);if(shorts!=null){Rect video=CaptionSurface.renderedBounds(CaptionSurface.refresh(),host);return video!=null?video:shorts;}
         FrameLayout best = findPlayer(activity, host);
         if (best != null) bindPlayer(best);
         FrameLayout player = playerRef.get();
         if (player == null || !player.isAttachedToWindow()) return null;
+        Rect rendered=CaptionSurface.renderedBounds(player,host);
+        if(rendered!=null)return rendered;
+        // Controls can be siblings of the video surface; inspect other named player containers,
+        // never climb to the entire Activity or scan comment/media previews outside the player.
+        View root=activity.getWindow().getDecorView();
+        for(String name:PLAYER_IDS){int id=activity.getResources().getIdentifier(name,"id",activity.getPackageName());
+            if(id==0)continue;View container=root.findViewById(id);
+            if(container==null || container==host)continue;
+            rendered=CaptionSurface.renderedBounds(container,host);if(rendered!=null)return rendered;
+        }
         Rect hostRect = new Rect();
         Rect playerRect = new Rect();
         if (!host.getGlobalVisibleRect(hostRect) || !player.getGlobalVisibleRect(playerRect)) return null;
@@ -485,9 +504,10 @@ final class CaptionOverlay {
     private static void bindHost(FrameLayout host) {
         FrameLayout old = hostRef.get();
         if (old == host) return;
-        if (old != null) old.removeOnLayoutChangeListener(HOST_LAYOUT);
+        if (old != null) {old.removeOnLayoutChangeListener(HOST_LAYOUT);old.getViewTreeObserver().removeOnPreDrawListener(GEOMETRY_DRAW);}
         hostRef = new WeakReference<>(host);
         host.addOnLayoutChangeListener(HOST_LAYOUT);
+        host.getViewTreeObserver().addOnPreDrawListener(GEOMETRY_DRAW);
         resetGeometry();
     }
 
@@ -525,10 +545,10 @@ final class CaptionOverlay {
         TextView view = textRef.get();
         if (activity == null || anchor == null || view == null) return;
         Rect bounds = resolveBounds(activity);
-        if (bounds == null) return;
+        if (bounds == null) {hideAnchorOnly();return;}
         boolean changed = bounds.left != lastLeft || bounds.top != lastTop ||
                 bounds.width() != lastWidth || bounds.height() != lastHeight;
-        if (!changed) return;
+        if (!changed && anchor.getVisibility()==View.VISIBLE) return;
         configure(anchor, view, activity, bounds);
         anchor.setVisibility(View.VISIBLE);
         anchor.setElevation(dp(activity,32));
@@ -634,7 +654,7 @@ final class CaptionOverlay {
             ((ViewGroup) anchor.getParent()).removeView(anchor);
         }
         FrameLayout host = hostRef.get();
-        if (host != null) host.removeOnLayoutChangeListener(HOST_LAYOUT);
+        if (host != null) {host.removeOnLayoutChangeListener(HOST_LAYOUT);host.getViewTreeObserver().removeOnPreDrawListener(GEOMETRY_DRAW);}
         FrameLayout player = playerRef.get();
         if (player != null) player.removeOnLayoutChangeListener(PLAYER_LAYOUT);
         anchorRef = new WeakReference<>(null);

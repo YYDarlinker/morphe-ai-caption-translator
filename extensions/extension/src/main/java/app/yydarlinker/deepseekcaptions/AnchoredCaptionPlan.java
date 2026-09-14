@@ -12,6 +12,7 @@ final class AnchoredCaptionPlan {
             + "tokens is an ordered array of [id, source text] pairs. Copy the printed IDs; do NOT count words. "
             + "Read source_text as continuous speech, using neighboring targets and read-only context to resolve references, idioms, negation, comparisons and terminology before choosing boundaries. ASR punctuation and hyphenation can be wrong; infer intended syntax without inventing facts. Translate naturally in every target language, not word by word. Keep subordinate clauses with their governing phrase; punctuation supports meaning but does not mandate a split. At a transport edge use context to understand the continuation, but output only the indexed source. "
             + "Return {\"translations\":[{\"id\":\"same id\",\"segments\":[[inclusiveEndIndex,\"translation\"]]}]}. "
+            + "For a whole_text_recovery target, use {id,text} inside the same translations array instead of segments. "
             + "Each segment starts after the previous end (first starts at 0). Ends must strictly increase; "
             + "the last end MUST equal the supplied last_id. Cover every token exactly once, preserve order, "
             + "names, numbers and meaning. No source echo, timestamps, explanations or Markdown. "
@@ -30,7 +31,7 @@ final class AnchoredCaptionPlan {
         return parse(rows,atoms,unit,null);
     }
     static AnchoredCaptionPlan parse(JSONArray rows,List<SourceAtomTimeline.Atom> atoms,
-                                    TranslationUnitTimeline.Unit unit,JSONArray joinAfter) throws Exception {
+                                    TranslationUnitTimeline.Unit unit,JSONArray attachments) throws Exception {
         int count=unit.toAtom-unit.fromAtom+1;
         if (rows==null || rows.length()==0 || rows.length()>count || unit.fromAtom<0
                 || unit.toAtom>=atoms.size()) throw new IllegalArgumentException("invalid segment count/range");
@@ -77,7 +78,8 @@ final class AnchoredCaptionPlan {
             out.add(new Segment(next,end,startMs,endMs,text)); next=end+1;
         }
         if(next!=count) throw new IllegalArgumentException("incomplete token coverage;missing="+next+"-"+(count-1));
-        List<Segment> readable=EditorialCaptionPlan.pack(out,joinAfter);
+        List<Segment> readable=SemanticEventPacking.pack(out,attachments);
+        // Presentation is audited, not rejected: do not spend another request on valid translation.
         StringBuilder canonical=new StringBuilder();
         for(Segment segment:readable){if(canonical.length()>0)canonical.append(' ');canonical.append(segment.text);}
         return new AnchoredCaptionPlan(readable,canonical.toString());

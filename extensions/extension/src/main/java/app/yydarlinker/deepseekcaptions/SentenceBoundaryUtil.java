@@ -27,7 +27,7 @@ final class SentenceBoundaryUtil {
         char before = index > 0 ? text.charAt(index - 1) : 0;
         char after = index + 1 < text.length() ? text.charAt(index + 1) : 0;
         if (Character.isDigit(before) && Character.isDigit(after)) return false;
-        if (after == '.') return false;
+        if (before == '.' || after == '.') return false;
 
         int start = index - 1;
         while (start >= 0 && Character.isLetter(text.charAt(start))) start--;

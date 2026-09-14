@@ -429,6 +429,10 @@ final class SourceAtomTimeline {
             if(c=='.' && i>0 && i+1<text.length() && Character.isDigit(text.charAt(i-1)) && Character.isDigit(text.charAt(i+1))) {
                 current.append(c);continue;
             }
+            if(c=='.' && i+1<text.length() && text.charAt(i+1)=='.'){
+                current.append(c);while(i+1<text.length()&&text.charAt(i+1)=='.')current.append(text.charAt(++i));
+                flush(out,current);cjkRun=0;continue; // Hesitation, not three sentence boundaries.
+            }
             if (isPunctuation(c)) {
                 current.append(c);
                 flush(out, current);

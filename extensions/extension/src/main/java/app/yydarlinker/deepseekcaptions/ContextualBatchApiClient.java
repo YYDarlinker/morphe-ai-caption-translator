@@ -82,11 +82,15 @@ final class ContextualBatchApiClient {
             JSONArray times=new JSONArray();
             for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0));
             item.put("timing_ds",times);
-            JSONArray pauses=EditorialCaptionPlan.pauses(atoms,unit);
+            JSONArray pauses=new JSONArray();
+            for(int n=unit.fromAtom+1;n<=unit.toAtom;n++){long gap=atoms.get(n).startMs-atoms.get(n-1).endMs;if(gap>=250 && pauses.length()<8)pauses.put(new JSONArray().put(n-unit.fromAtom).put(gap));}
             if(pauses.length()>0)item.put("pauses_before_ms",pauses);
             JSONArray protectedTerms=ModelNameProtection.terms(atoms,unit);
             if(protectedTerms.length()>0)item.put("preserve_terms",protectedTerms);
-            if(repair.containsKey(unit.id)) item.put("previous_validation_error",repair.get(unit.id));
+            if(repair.containsKey(unit.id)) {
+                item.put("previous_validation_error",repair.get(unit.id));
+                if(ProtocolRecovery.wholeText(repair.get(unit.id))) item.put("response_mode","whole_text_recovery");
+            }
             targetValues.put(item);
         }
         JSONObject payload = new JSONObject()
@@ -126,7 +130,7 @@ final class ContextualBatchApiClient {
         while(true) {
             ensureActive(deadline,control);
             try {
-                Result result=parseAnchored(post(config,request,deadline,control,audit),targets,atoms);
+                Result result=parseAnchored(post(config,request,deadline,control,audit),targets,atoms,repair);
                 if(negotiated) minimalIdentity=identity(config);
                 TokenCostAudit.recordUnitBatchOutcome(audit,result.validCount());
                 return result;
@@ -158,6 +162,10 @@ final class ContextualBatchApiClient {
 
     static Result parseAnchored(String content, List<TranslationUnitTimeline.Unit> targets,
                                 List<SourceAtomTimeline.Atom> atoms) throws Exception {
+        return parseAnchored(content,targets,atoms,java.util.Collections.emptyMap());
+    }
+    static Result parseAnchored(String content,List<TranslationUnitTimeline.Unit> targets,
+                               List<SourceAtomTimeline.Atom> atoms,Map<String,String> repair) throws Exception {
         validateTargetIds(targets);
         JSONObject root;
         try { root = new JSONObject(stripJsonFence(content)); }
@@ -178,7 +186,10 @@ final class ContextualBatchApiClient {
             if(unit==null) { unknown.add(id); continue; }
             if(!seen.add(id)) { plans.remove(id); texts.remove(id); invalid.add(id); continue; }
             try {
-                AnchoredCaptionPlan plan=AnchoredCaptionPlan.parse(row.optJSONArray("segments"),atoms,unit,row.optJSONArray("join_after"));
+                JSONArray segments=row.optJSONArray("segments");
+                if(segments==null && ProtocolRecovery.wholeText(repair.get(id)) && row.opt("text") instanceof String)
+                    segments=new JSONArray().put(new JSONArray().put(unit.toAtom-unit.fromAtom).put(row.getString("text")));
+                AnchoredCaptionPlan plan=AnchoredCaptionPlan.parse(segments,atoms,unit,row.optJSONArray("attach_next"));
                 plans.put(id,plan); texts.put(id,plan.canonical);
             } catch(Exception rejected) { invalid.add(id); reasons.put(id,(rejected.getMessage()==null ? "invalid_structure" : rejected.getMessage())+";last="+(unit.toAtom-unit.fromAtom)+";ends="+safeEnds(row.optJSONArray("segments"))); }
         }

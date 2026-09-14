@@ -1,47 +1,78 @@
 package app.yydarlinker.deepseekcaptions;
-
 import java.util.*;
-
-/** Local, unique same-language phrase alignment. Never replaces provider wording or calls AI. */
+import java.util.regex.*;
+/** Punctuation-insensitive lexical correspondence; never uses translated text to allocate time. */
 final class AsrLocalTiming {
-    private static final int N = 4;
-    static SourceAtomTimeline.Result align(SourceAtomTimeline.Result source, SourceAtomTimeline.Result asr) {
-        if(source==null || asr==null || asr.nativeTimedAtoms==0 || source.atoms.size()<8)return source;
-        List<SourceAtomTimeline.Atom> p=source.atoms, a=asr.atoms;
-        Map<String,Integer> pi=index(p), ai=index(a);
-        int[] match=new int[p.size()];Arrays.fill(match,-1);
-        int last=-1, matched=0;
-        for(int i=0;i+N<=p.size();i++) {
-            String key=key(p,i);Integer j=ai.get(key);
-            if(j==null || j<0 || pi.get(key)==null || pi.get(key)!=i || j<=last)continue;
-            boolean precise=true;
-            for(int k=0;k<N;k++) if(!a.get(j+k).precise || Math.abs(p.get(i+k).startMs-a.get(j+k).startMs)>12000)precise=false;
-            if(!precise)continue;
+    private static final int N=4;
+    private static final Pattern WORD=Pattern.compile("[\\p{L}\\p{N}]+(?:['’][\\p{L}\\p{N}]+)*");
+    private static final class Word {final String value;final int atom;Word(String v,int a){value=v;atom=a;}}
+    static SourceAtomTimeline.Result align(SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr){
+        if(source==null||asr==null||asr.nativeTimedAtoms==0)return source;
+        List<Word> p=words(source.atoms),a=words(asr.atoms);
+        if(p.size()<8||a.size()<8)return source;
+        Map<String,Integer> unique=index(a),sourceUnique=index(p);
+        int[] match=new int[p.size()];Arrays.fill(match,-1);int last=-1,matched=0;
+        for(int i=0;i+N<=p.size();i++){
+            String key=key(p,i);Integer j=unique.get(key);
+            if(j==null||j<0||sourceUnique.get(key)!=i||j<=last)continue;
+            boolean valid=true;
+            for(int k=0;k<N;k++){
+                SourceAtomTimeline.Atom x=source.atoms.get(p.get(i+k).atom),y=asr.atoms.get(a.get(j+k).atom);
+                if(!y.precise||Math.abs(x.startMs-y.startMs)>12000)valid=false;
+            }
+            if(!valid)continue;
             for(int k=0;k<N;k++)match[i+k]=j+k;
             matched+=N;last=j+N-1;i+=N-1;
         }
-        // Sparse or repetitive evidence cannot establish a track-wide local timing map.
-        if(matched<8 || matched*10<p.size()*7)return source;
-        List<SourceAtomTimeline.Atom> out=new ArrayList<>();int exact=0;
-        for(int i=0;i<p.size();i++) {
-            SourceAtomTimeline.Atom original=p.get(i);long start=original.startMs,end=original.endMs;boolean precise=false;
-            if(match[i]>=0){SourceAtomTimeline.Atom clock=a.get(match[i]);start=clock.startMs;end=clock.endMs;precise=true;}
-            else {
-                int left=i-1,right=i+1;while(left>=0 && match[left]<0)left--;while(right<p.size() && match[right]<0)right++;
-                if(left>=0 && right<p.size()) {
-                    long from=a.get(match[left]).endMs,to=a.get(match[right]).startMs;
-                    long oldFrom=p.get(left).endMs,oldTo=p.get(right).startMs;
-                    if(to<=from || to-from>8000 || oldTo<=oldFrom)return source;
-                    start=from+Math.round((to-from)*((original.startMs-oldFrom)/(double)(oldTo-oldFrom)));
-                    end=from+Math.round((to-from)*((original.endMs-oldFrom)/(double)(oldTo-oldFrom)));
-                }
-                // Unmatched edge atoms keep provider timing, explicitly estimated.
-            }
-            if(start<0 || end<=start || (!out.isEmpty() && start<out.get(out.size()-1).endMs))return source;
-            out.add(new SourceAtomTimeline.Atom(start,end,original.text,original.cueIndex,precise));if(precise)exact++;
+        if(matched<8)return source;
+        int size=source.atoms.size();long[] starts=new long[size],ends=new long[size];boolean[] exact=new boolean[size];
+        int[] total=new int[size],hits=new int[size];
+        Arrays.fill(starts,Long.MAX_VALUE);
+        for(int i=0;i<p.size();i++){
+            int atom=p.get(i).atom;total[atom]++;
+            if(match[i]>=0){SourceAtomTimeline.Atom ref=asr.atoms.get(a.get(match[i]).atom);hits[atom]++;starts[atom]=Math.min(starts[atom],ref.startMs);ends[atom]=Math.max(ends[atom],ref.endMs);}
         }
-        return new SourceAtomTimeline.Result(Collections.unmodifiableList(out),source.rawCueCount,exact,out.size()-exact,source.json3,source.rollupNormalized);
+        for(int i=0;i<size;i++)exact[i]=total[i]>0&&hits[i]==total[i];
+        // Native anchors may only be installed with a monotonic surrounding timeline. A local
+        // conflict removes those anchors, not all valid anchors elsewhere in a long transcript.
+        for(int pass=0;pass<3;pass++){
+            interpolate(source.atoms,starts,ends,exact);
+            boolean conflict=false;
+            for(int i=0;i<size;i++){
+                if(starts[i]<0||ends[i]<=starts[i]||(i>0&&starts[i]<ends[i-1])){
+                    if(exact[i])exact[i]=false;
+                    if(i>0&&exact[i-1])exact[i-1]=false;
+                    conflict=true;
+                }
+            }
+            if(!conflict)break;
+            if(pass==2)return source;
+        }
+        List<SourceAtomTimeline.Atom> out=new ArrayList<>();int count=0;
+        for(int i=0;i<size;i++){SourceAtomTimeline.Atom original=source.atoms.get(i);if(exact[i])count++;out.add(new SourceAtomTimeline.Atom(starts[i],ends[i],original.text,original.cueIndex,exact[i]));}
+        if(count<8)return source;
+        return new SourceAtomTimeline.Result(Collections.unmodifiableList(out),source.rawCueCount,count,size-count,source.json3,source.rollupNormalized);
     }
-    private static Map<String,Integer> index(List<SourceAtomTimeline.Atom> a){Map<String,Integer> out=new HashMap<>();for(int i=0;i+N<=a.size();i++){String k=key(a,i);if(out.containsKey(k))out.put(k,-1);else out.put(k,i);}return out;}
-    private static String key(List<SourceAtomTimeline.Atom> a,int from){StringBuilder b=new StringBuilder();for(int i=0;i<N;i++){String s=a.get(from+i).text.toLowerCase(Locale.ROOT);s.codePoints().filter(Character::isLetterOrDigit).forEach(b::appendCodePoint);b.append('|');}return b.toString();}
+    private static void interpolate(List<SourceAtomTimeline.Atom> p,long[] s,long[] e,boolean[] exact){
+        int[] right=new int[p.size()];int next=-1;
+        for(int i=p.size()-1;i>=0;i--){right[i]=next;if(exact[i])next=i;}
+        int left=-1;
+        for(int i=0;i<p.size();i++){
+            if(exact[i]){left=i;continue;}
+            SourceAtomTimeline.Atom old=p.get(i);s[i]=old.startMs;e[i]=old.endMs;int r=right[i];
+            if(left>=0&&r>=0){
+                long from=p.get(left).endMs,to=p.get(r).startMs,newFrom=e[left],newTo=s[r];
+                if(to>from&&to-from<=8000&&newTo>=newFrom){
+                    s[i]=newFrom+Math.round((newTo-newFrom)*((old.startMs-from)/(double)(to-from)));
+                    e[i]=newFrom+Math.round((newTo-newFrom)*((old.endMs-from)/(double)(to-from)));
+                }
+            }
+            // Edge words remain estimated: borrow only a nearby source-clock offset, not speech.
+            else if(left>=0&&old.endMs-p.get(left).endMs<=2000){long d=e[left]-p.get(left).endMs;s[i]+=Math.round(d*Math.max(0,1-(old.startMs-p.get(left).endMs)/2000.0));e[i]+=Math.round(d*Math.max(0,1-(old.endMs-p.get(left).endMs)/2000.0));}
+            else if(r>=0&&p.get(r).startMs-old.startMs<=2000){long d=s[r]-p.get(r).startMs;s[i]+=Math.round(d*Math.max(0,1-(p.get(r).startMs-old.startMs)/2000.0));e[i]+=Math.round(d*Math.max(0,1-(p.get(r).startMs-old.endMs)/2000.0));}
+        }
+    }
+    private static List<Word> words(List<SourceAtomTimeline.Atom> atoms){List<Word> result=new ArrayList<>();for(int i=0;i<atoms.size();i++){Matcher m=WORD.matcher(atoms.get(i).text.toLowerCase(Locale.ROOT));while(m.find())result.add(new Word(m.group().replace("'","").replace("’",""),i));}return result;}
+    private static Map<String,Integer> index(List<Word>a){Map<String,Integer> result=new HashMap<>();for(int i=0;i+N<=a.size();i++){String k=key(a,i);result.put(k,result.containsKey(k)?-1:i);}return result;}
+    private static String key(List<Word>a,int from){StringBuilder s=new StringBuilder();for(int i=0;i<N;i++)s.append(a.get(from+i).value).append('|');return s.toString();}
 }

@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-editorial-baseline107-r9".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-editorial-110".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -294,7 +294,7 @@ static void setMainActivity(Activity activity) {
 
         Session session = active;
         if (session == null || session.cancelled) return;
-        session.currentTimeMs = PLAYBACK_CLOCK.confirmedPosition();
+        session.currentTimeMs = estimatedVideoTime(now);
         boolean debounceStartupSeek = false;
         boolean logStartupDebounce = false;
         if (seek) {
@@ -349,6 +349,7 @@ static void setMainActivity(Activity activity) {
     }
 
     private static void displayTick() {
+        MediaPlaybackClock.refresh();
         CaptionOverlay.refreshSurface();
         Session session = active;
         if (session == null || session.cancelled) return;
@@ -437,6 +438,7 @@ static void setMainActivity(Activity activity) {
                     session.realtimeRetryAfterMs = new long[count];
                     session.delayedRetryUsed = new boolean[count];
                     session.failureCounts = new int[count];
+                    session.fallbackLogged = new boolean[count];
                     session.retryAfterMs = new long[count];
                     session.lastFailureReasons = new String[count];
                     session.isolatedRetries = new boolean[count];
@@ -467,7 +469,7 @@ static void setMainActivity(Activity activity) {
             markPreprocessStage(session, "cache restore", stageStarted);
             boolean currentCacheHit;
             synchronized (session.lock) {
-                // Cross-window joins require explicit semantic evidence; not guessed from brief duration.
+                // Keep independently translated windows separate; no cross-window semantic evidence.
                 int current = anchor(session.units, session.currentTimeMs);
                 session.firstReady = isReadyLocked(session, current);
                 currentCacheHit = session.firstReady;
@@ -637,6 +639,7 @@ static void setMainActivity(Activity activity) {
                 session.realtimeAttempts[current] > 0 || session.isolatedRetries[current],
                 REALTIME_MAX_UNITS
         );
+        maximum=StartupCaptionPolicy.targetLimit(session.firstReady,maximum); // Current unit first; do not wait for future translations.
         long horizon = session.currentTimeMs + REALTIME_LOOKAHEAD_MS;
         List<Integer> indices = new ArrayList<>();
         for (int i = current; i < session.units.size() && indices.size() < maximum; i++) {
@@ -878,6 +881,8 @@ static void setMainActivity(Activity activity) {
                         String issue=CaptionPresentationPolicy.issue(seg.text,seg.endMs-seg.startMs);
                         if(!issue.isEmpty()) CaptionDiagnostics.mark(session.context,"PRESENTATION_LIMIT", "unit="+index+";reason="+issue+";ms="+(seg.endMs-seg.startMs)+";chars="+CaptionPresentationPolicy.visible(seg.text));
                     }
+                    if(ProtocolRecovery.wholeText(session.lastFailureReasons[index]))
+                        CaptionDiagnostics.mark(session.context,"TRANSLATION_PROTOCOL_RECOVERED","unit="+index+";no_extra_retry_allowance=true");
                     session.translations[index] = text;
                     session.anchoredPlans[index] = result.plansById.get(id);
                     session.states[index] = READY;
@@ -914,7 +919,7 @@ static void setMainActivity(Activity activity) {
                 session.states[request.focus] = PENDING;
                 session.retryAfterMs[request.focus] = 0L;
             }
-            // Keep independently translated windows separate.
+            // No timing-only cross-window merge.
             stabilized = resolveStableBridgesLocked(session);
             int current = anchor(session.units, session.currentTimeMs);
             if (isReadyLocked(session, current) && !session.firstReady) {
@@ -1288,6 +1293,10 @@ static void setMainActivity(Activity activity) {
                             if (plan == null && !grouped) {
                                 if(session.states[index] == PERMANENT_FAILURE) {
                                     text = CaptionFailureFallback.text(session.atoms,unit,timeMs);
+                                    if(!text.isEmpty() && !session.fallbackLogged[index]){
+                                        session.fallbackLogged[index]=true;
+                                        CaptionDiagnostics.mark(session.context,"TRANSLATION_SOURCE_FALLBACK", "unit="+index+";failures="+session.failureCounts[index]+";reason="+session.lastFailureReasons[index]);
+                                    }
                                     selectedBoundaryReason="translation_failed_source_fallback";
                                     selectedSourceText=unit.sourceText;
                                     selectedRejectionSummary=session.lastFailureReasons[index];
@@ -1333,8 +1342,13 @@ static void setMainActivity(Activity activity) {
                                 selectedSliceCount = plan.slices.size();
                                 selectedBoundaryReason = plan.boundaryReason;
                                 selectedRejectionSummary = plan.rejectionSummary;
+                                if(selectedSlice>=0){DisplaySlice chosen=plan.slices.get(selectedSlice);
+                                    String issue=CaptionSegmentationPolicy.issue(new AnchoredCaptionPlan.Segment(0,0,chosen.startMs,chosen.endMs,chosen.text));
+                                    if(!issue.isEmpty())selectedRejectionSummary="presentation_warning:"+issue;}
                                 selectedSourceText = plan.sourceText;
                                 selectedCanonicalText = plan.canonicalText;
+                                if(selectedSlice>=0){DisplaySlice actual=plan.slices.get(selectedSlice);
+                                    selectedBoundaryReason += ";start="+actual.startMs+";end="+actual.endMs+";chars="+CaptionPresentationPolicy.visible(actual.text);}
                                 text = plan.textAt(timeMs);
                                 if(!session.sourceOnly) text=CaptionPresentationPolicy.wrap(text);
                                 if (text == null) text = "";
@@ -1384,7 +1398,7 @@ static void setMainActivity(Activity activity) {
         CaptionDiagnostics.mark(
                 session.context,
                 text.isEmpty() ? "CONTEXTUAL_DISPLAY_MISS" : "CONTEXTUAL_DISPLAY_SELECTED",
-                "unit=" + selectedIndex + ";group=" + selectedGroupFirst + "-" + selectedGroupLast +
+                "mediaSignalPresent="+MediaPlaybackClock.available()+";unit=" + selectedIndex + ";group=" + selectedGroupFirst + "-" + selectedGroupLast +
                         ";slice=" + selectedSlice + ";time=" + timeMs +
                         (text.isEmpty() ? ";reason=" + missReason +
                                 (selectedRetryCount > 0 ? ";retry=" + selectedRetryCount : "") +
@@ -1393,7 +1407,7 @@ static void setMainActivity(Activity activity) {
                                 ";slices=" + selectedSliceCount +
                                         ";boundary=" + selectedBoundaryReason +
                                         (displayTextDebug
-                                                ? ";source=" + diagnosticText(selectedSourceText, 72) +
+                                                ? ";display=" + diagnosticText(text,120) + ";source=" + diagnosticText(selectedSourceText, 72) +
                                                         ";canonical=" + diagnosticText(
                                                                 selectedCanonicalText, 72
                                                         )
@@ -1581,7 +1595,7 @@ static void setMainActivity(Activity activity) {
     }
 
     private static long estimatedVideoTime(long realtimeMs) {
-        return PLAYBACK_CLOCK.confirmedPosition();
+        return MediaPlaybackClock.position(PLAYBACK_CLOCK.confirmedPosition(),realtimeMs);
     }
 
     private static byte[] cacheIdentity(byte[] body, List<SourceAtomTimeline.Atom> atoms) {
@@ -1843,6 +1857,7 @@ static void setMainActivity(Activity activity) {
         volatile int startupAnchorIndex = -1;
         volatile String error = "";
         volatile String cacheKey = "";
+        boolean[] fallbackLogged=new boolean[0];
         volatile String lastRenderSignature = "";
         volatile Future<?> sourceTask;
         volatile Request realtimeRequest;

@@ -1,3 +1,9 @@
+## [1.1.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.2...v1.1.3) (2026-09-14)
+
+### 🐛 Bug Fixes
+
+* restore caption quality, fit backgrounds and use ASR cue timing ([6b0fae9](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/6b0fae996167adb23e13e30ace3388347c1cd535))
+
 ## [1.1.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.1...v1.1.2) (2026-09-14)
 
 ### 🐛 Bug Fixes

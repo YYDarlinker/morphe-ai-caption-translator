@@ -6,7 +6,6 @@ import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Layout;
@@ -615,11 +614,7 @@ final class CaptionOverlay {
     }
 
     private static void applyBackground(TextView view, Activity activity, int opacity) {
-        GradientDrawable bg = new GradientDrawable();
-        int alpha = SubtitleStyleMetrics.alpha(opacity);
-        bg.setColor(Color.argb(alpha, 0, 0, 0));
-        bg.setCornerRadius(dp(activity, 5));
-        view.setBackground(bg);
+        view.setBackground(new CaptionTextBackground(view, opacity, dp(activity, 5)));
     }
 
     private static float scaledTextSize(Activity activity, int configuredSp, Rect bounds) {

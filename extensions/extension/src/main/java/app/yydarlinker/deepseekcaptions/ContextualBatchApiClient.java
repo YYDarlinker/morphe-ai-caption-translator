@@ -82,6 +82,8 @@ final class ContextualBatchApiClient {
             JSONArray times=new JSONArray();
             for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(new JSONArray().put(atoms.get(n).text).put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0)));
             item.put("timed_words",times);
+            int precise=0;for(int n=unit.fromAtom;n<=unit.toAtom;n++)if(atoms.get(n).precise)precise++;
+            item.put("timing_precision",precise==unit.toAtom-unit.fromAtom+1?"native_word":precise==0?"cue_estimated":"mixed");
             JSONArray pauses=new JSONArray();
             for(int n=unit.fromAtom+1;n<=unit.toAtom;n++){long gap=atoms.get(n).startMs-atoms.get(n-1).endMs;if(gap>=250 && pauses.length()<8)pauses.put(new JSONArray().put(n-unit.fromAtom).put(gap));}
             if(pauses.length()>0)item.put("pauses_before_ms",pauses);

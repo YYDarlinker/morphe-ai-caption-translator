@@ -93,19 +93,18 @@ public class DeepSeekTextPreference extends android.preference.Preference {
         root.setTag(getKey());
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
-        root.setPadding(dp(20), dp(10), dp(20), dp(10));
+        CaptionSettingsStyle.row(root);
 
         TextView title = new TextView(context);
         title.setText(getTitle());
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        title.setAlpha(.78f);
+        CaptionSettingsStyle.title(title);
+        title.setPadding(0,0,0,dp(8));
         root.addView(title, matchWrap());
 
         editor = new InlineCaptionEditor(context);
         editor.setId(android.R.id.edit);
         editor.setFocusableInTouchMode(true);
-        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        editor.setPadding(0, dp(3), 0, dp(3));
+        CaptionSettingsStyle.editor(editor);
         configureEditor(editor);
         String initial = initialValue();
         if (!KEY_API_KEY.equals(getKey())) {
@@ -118,8 +117,8 @@ public class DeepSeekTextPreference extends android.preference.Preference {
 
 
         state = new TextView(context);
-        state.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        state.setAlpha(0.72f);
+        CaptionSettingsStyle.caption(state);
+        state.setPadding(0,dp(6),0,0);
         updateState(false, null);
         root.addView(state, matchWrap());
 
@@ -264,7 +263,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
             state.setText(justSaved ? "已自动保存" :
                     (summary == null || summary.length() == 0 ? "修改后自动保存" : summary));
         }
-        state.setAlpha(0.72f);
+        state.setAlpha(1f);
     }
 
     private void cancelPendingSave() {

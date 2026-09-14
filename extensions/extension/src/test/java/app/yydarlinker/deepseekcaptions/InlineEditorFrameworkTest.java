@@ -50,10 +50,10 @@ public class InlineEditorFrameworkTest {
         android.widget.LinearLayout root=(android.widget.LinearLayout)preference.onCreateView(new android.widget.FrameLayout(activity));
         root.measure(View.MeasureSpec.makeMeasureSpec(600,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(1000,View.MeasureSpec.AT_MOST));
         root.layout(0,0,root.getMeasuredWidth(),root.getMeasuredHeight());
-        assertEquals(2,root.getChildCount());
-        SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.getChildAt(0);
+        assertEquals(3,root.getChildCount());
+        SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");
         assertTrue(preview.getLeft()>0);assertTrue(preview.getRight()<root.getWidth());
-        assertEquals(preview.getWidth()*9f/16f,preview.getHeight(),1f);
+        assertEquals(Math.round(SubtitleStylePreview.stageHeight(preview.getWidth(),activity.getResources().getDisplayMetrics().heightPixels,activity.getResources().getDisplayMetrics().density,false)),preview.getHeight());
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,24);
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);
         assertEquals(24,preview.size);assertEquals(35,preview.opacity);
@@ -61,7 +61,7 @@ public class InlineEditorFrameworkTest {
         assertTrue(preview.performClick());assertTrue(preview.portrait);
         assertTrue(preview.getContentDescription().toString().contains("竖屏"));
         preview.measure(View.MeasureSpec.makeMeasureSpec(preview.getWidth(),View.MeasureSpec.EXACTLY),0);
-        assertEquals(height,preview.getMeasuredHeight());assertEquals(24,preview.size);assertEquals(35,preview.opacity);
+        assertTrue(preview.getMeasuredHeight()>height);assertTrue(preview.getMeasuredHeight()-height<=65*activity.getResources().getDisplayMetrics().density);assertEquals(24,preview.size);assertEquals(35,preview.opacity);
         preview.performClick();assertFalse(preview.portrait);activity.finish();
     }
 

@@ -51,7 +51,7 @@ public final class DeepSeekDisplayTextDebugPreference extends AddonSwitchPrefere
 
     private void updateSummary(boolean enabled) {
         setSummary(enabled
-                ? "DISPLAY_SELECTED 附带 source 与 canonical，仅用于人工排查"
-                : "默认关闭；日志不记录字幕原文与规范译文");
+                ? "诊断中记录字幕原文与译文，仅建议排查时开启"
+                : "关闭时不记录字幕原文与译文");
     }
 }

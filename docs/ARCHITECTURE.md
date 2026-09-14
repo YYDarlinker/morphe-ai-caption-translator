@@ -1,6 +1,6 @@
 # Architecture and delivery notes
 
-For the current source-phrase protocol and narrowly scoped refinements, see [1.1.2](RELEASE-1.1.2.md). Older verification records below retain their original scope.
+For the current source-phrase protocol and narrowly scoped refinements, see [1.1.3](RELEASE-1.1.3.md). Older verification records below retain their original scope.
 
 ## What changed
 

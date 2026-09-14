@@ -7,24 +7,35 @@ final class AsrLocalTiming {
     private static final Pattern WORD=Pattern.compile("[\\p{L}\\p{N}]+(?:['’][\\p{L}\\p{N}]+)*");
     private static final class Word {final String value;final int atom;Word(String v,int a){value=v;atom=a;}}
     static SourceAtomTimeline.Result align(SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr){
-        if(source==null||asr==null||asr.nativeTimedAtoms==0)return source;
+        return align(source,asr,false);
+    }
+    static SourceAtomTimeline.Result alignWithCueTiming(SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr){
+        return align(source,asr,true);
+    }
+    private static SourceAtomTimeline.Result align(SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr,boolean allowEstimated){
+        if(source==null||asr==null||asr.atoms.isEmpty()||(!allowEstimated&&asr.nativeTimedAtoms==0))return source;
         List<Word> p=words(source.atoms),a=words(asr.atoms);
-        if(p.size()<8||a.size()<8)return source;
+        if(p.isEmpty()||a.isEmpty())return source;
+        boolean identical=p.size()==a.size();
+        for(int i=0;identical&&i<p.size();i++)identical=compatible(p.get(i),a.get(i),source,asr,allowEstimated);
+        int minimum=identical?Math.min(8,source.atoms.size()):8;
+        if(!identical&&(p.size()<8||a.size()<8))return source;
         Map<String,Integer> unique=index(a),sourceUnique=index(p);
         int[] match=new int[p.size()];Arrays.fill(match,-1);int last=-1,matched=0;
-        for(int i=0;i+N<=p.size();i++){
+        if(identical){for(int i=0;i<p.size();i++)match[i]=i;matched=p.size();}
+        for(int i=0;!identical&&i+N<=p.size();i++){
             String key=key(p,i);Integer j=unique.get(key);
             if(j==null||j<0||sourceUnique.get(key)!=i||j<=last)continue;
             boolean valid=true;
             for(int k=0;k<N;k++){
                 SourceAtomTimeline.Atom x=source.atoms.get(p.get(i+k).atom),y=asr.atoms.get(a.get(j+k).atom);
-                if(!y.precise||Math.abs(x.startMs-y.startMs)>12000)valid=false;
+                if((!allowEstimated&&!y.precise)||Math.abs(x.startMs-y.startMs)>12000)valid=false;
             }
             if(!valid)continue;
             for(int k=0;k<N;k++)match[i+k]=j+k;
             matched+=N;last=j+N-1;i+=N-1;
         }
-        if(matched<8)return source;
+        if(matched<minimum)return source;
         // Extend at most three adjacent identical words around unique 4-word anchors.
         // Never search ahead across a mismatch, reuse a word, or infer translated timing.
         int[] rightMatch=new int[match.length];int nextKnown=-1;
@@ -35,7 +46,7 @@ final class AsrLocalTiming {
             int j=match[i-1]+1;
             if(extended<3 && match[i-1]>=0 && j<a.size()
                     && (rightMatch[i]<0 || j<rightMatch[i])
-                    && compatible(p.get(i),a.get(j),source,asr)){match[i]=j;extended++;}
+                    && compatible(p.get(i),a.get(j),source,asr,allowEstimated)){match[i]=j;extended++;}
         }
         int[] leftMatch=new int[match.length];int previousKnown=-1;
         for(int i=0;i<match.length;i++){leftMatch[i]=previousKnown;if(match[i]>=0)previousKnown=match[i];}
@@ -45,17 +56,18 @@ final class AsrLocalTiming {
             int j=match[i+1]-1;
             if(extended<3 && match[i+1]>0 && j>=0
                     && (leftMatch[i]<0 || j>leftMatch[i])
-                    && compatible(p.get(i),a.get(j),source,asr)){match[i]=j;extended++;}
+                    && compatible(p.get(i),a.get(j),source,asr,allowEstimated)){match[i]=j;extended++;}
         }
         int size=source.atoms.size();long[] starts=new long[size],ends=new long[size];boolean[] exact=new boolean[size];
-        int[] total=new int[size],hits=new int[size];
+        int[] total=new int[size],hits=new int[size],nativeHits=new int[size];
         Arrays.fill(starts,Long.MAX_VALUE);
         for(int i=0;i<p.size();i++){
             int atom=p.get(i).atom;total[atom]++;
-            if(match[i]>=0){SourceAtomTimeline.Atom ref=asr.atoms.get(a.get(match[i]).atom);hits[atom]++;starts[atom]=Math.min(starts[atom],ref.startMs);ends[atom]=Math.max(ends[atom],ref.endMs);}
+            if(match[i]>=0){SourceAtomTimeline.Atom ref=asr.atoms.get(a.get(match[i]).atom);hits[atom]++;if(ref.precise)nativeHits[atom]++;starts[atom]=Math.min(starts[atom],ref.startMs);ends[atom]=Math.max(ends[atom],ref.endMs);}
         }
         for(int i=0;i<size;i++)exact[i]=total[i]>0&&hits[i]==total[i];
-        // Native anchors may only be installed with a monotonic surrounding timeline. A local
+        // Complete lexical coverage above is not necessarily native precision.
+        // Matched ASR anchors may only be installed with a monotonic surrounding timeline. A local
         // conflict removes those anchors, not all valid anchors elsewhere in a long transcript.
         for(int pass=0;pass<3;pass++){
             interpolate(source.atoms,starts,ends,exact);
@@ -70,14 +82,14 @@ final class AsrLocalTiming {
             if(!conflict)break;
             if(pass==2)return source;
         }
-        List<SourceAtomTimeline.Atom> out=new ArrayList<>();int count=0;
-        for(int i=0;i<size;i++){SourceAtomTimeline.Atom original=source.atoms.get(i);if(exact[i])count++;out.add(new SourceAtomTimeline.Atom(starts[i],ends[i],original.text,original.cueIndex,exact[i]));}
-        if(count<8)return source;
-        return new SourceAtomTimeline.Result(Collections.unmodifiableList(out),source.rawCueCount,count,size-count,source.json3,source.rollupNormalized);
+        List<SourceAtomTimeline.Atom> out=new ArrayList<>();int count=0,nativeCount=0;
+        for(int i=0;i<size;i++){SourceAtomTimeline.Atom original=source.atoms.get(i);if(exact[i])count++;boolean precise=exact[i]&&nativeHits[i]==total[i];if(precise)nativeCount++;out.add(new SourceAtomTimeline.Atom(starts[i],ends[i],original.text,original.cueIndex,precise));}
+        if(count<minimum)return source;
+        return new SourceAtomTimeline.Result(Collections.unmodifiableList(out),source.rawCueCount,nativeCount,size-nativeCount,source.json3,source.rollupNormalized,count);
     }
-    private static boolean compatible(Word p,Word a,SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr){
+    private static boolean compatible(Word p,Word a,SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr,boolean allowEstimated){
         SourceAtomTimeline.Atom x=source.atoms.get(p.atom),y=asr.atoms.get(a.atom);
-        return p.value.equals(a.value)&&y.precise&&Math.abs(x.startMs-y.startMs)<=12000;
+        return p.value.equals(a.value)&&(allowEstimated||y.precise)&&Math.abs(x.startMs-y.startMs)<=12000;
     }
     private static void interpolate(List<SourceAtomTimeline.Atom> p,long[] s,long[] e,boolean[] exact){
         int[] right=new int[p.size()];int next=-1;

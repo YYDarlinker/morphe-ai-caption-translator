@@ -41,6 +41,14 @@ final class SourceCaptionCache {
         return hex(digest.digest());
     }
 
+    // Reference provenance must not alias a coarse app response with a differently signed web track.
+    // Only the digest is persisted; the URL/signature is never written to diagnostics or cache metadata.
+    static String referenceKey(String url) throws Exception {
+        MessageDigest digest=MessageDigest.getInstance("SHA-256");
+        digest.update("asr-reference-v1\0".getBytes(StandardCharsets.UTF_8));
+        digest.update(url.getBytes(StandardCharsets.UTF_8));return "ref-"+hex(digest.digest());
+    }
+
     static Entry get(Context context, String key) {
         File bodyFile = new File(directory(context), key + ".source");
         File typeFile = new File(directory(context), key + ".type");

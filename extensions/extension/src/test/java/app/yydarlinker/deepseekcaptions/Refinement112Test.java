@@ -92,8 +92,8 @@ public class Refinement112Test {
         assertSame(a,AsrLocalTiming.align(a,track(11,13000,true,false)));
         assertSame(a,AsrLocalTiming.align(a,track(11,300,false,false)));
     }
-    @Test public void startupIsSmallButSubsequentBatchingUnchanged() {
-        assertEquals(1,StartupCaptionPolicy.targetLimit(false,4));assertEquals(4,StartupCaptionPolicy.targetLimit(true,4));
+    @Test public void startupAndSubsequentBatchingUseSamePolicy() {
+        assertEquals(4,StartupCaptionPolicy.targetLimit(false,4));assertEquals(4,StartupCaptionPolicy.targetLimit(true,4));
         assertEquals(1,StartupCaptionPolicy.targetLimit(true,0));
     }
 }

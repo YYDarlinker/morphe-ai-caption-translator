@@ -1,8 +1,8 @@
 # Anchored AI Captions
 
-## Current revision: 1.1.2
+## Current revision: 1.1.3
 
-A narrow refinement of 1.1.1: current-unit startup with retained context, isolated protocol failures, exact numeric source-phrase handling, adjacent native ASR timing coverage, width-aware single-line-first presentation, and a tap-to-switch style preview. The anchored translation/segmentation architecture and Morphe automated release contract are retained. See [changes, evidence and verification limits](docs/RELEASE-1.1.2.md). Historical revision notes below are not the current baseline.
+Restores the normal startup translation/segmentation strategy, fits the caption background to actual rendered lines, enlarges the portrait preview with a bounded layout shift, and refines native settings. Same-video English auto-generated captions are the preferred timing reference at either word or cue granularity; estimates remain explicitly distinguished from native timestamps. See [design, evidence and verification limits](docs/RELEASE-1.1.3.md). Historical notes below retain their original scope.
 
 Independent YouTube AI subtitle addon, compatible with Morphe.
 
@@ -39,7 +39,7 @@ When enabled, the custom subtitle box displays both modes, but **only Auto-trans
 
 On each new app process, choose a subtitle language once in the player. The process then remembers On/Off, language, and original-versus-translated mode across videos. There is no default-language setting. Closing captions retains the last language for the next On; killing/restarting the app begins a new selection session.
 
-API fields are edited inline with Android EditText selection/Paste. The host breadcrumb-copy handler is bypassed only for the API configuration rows; there is no API-key dialog. Keys are never copied into diagnostics. The style section includes one live preview; tap the frame to switch 16:9 landscape and 9:16 portrait without changing shared size/opacity.
+API fields are edited inline with Android EditText selection/Paste. The host breadcrumb-copy handler is bypassed only for the API configuration rows; there is no API-key dialog. Keys are never copied into diagnostics. The style section includes one live preview; tap the frame to switch 16:9 landscape and 9:16 portrait without changing shared size/opacity. Portrait is larger with at most a 64dp stage-height increase.
 
 Test API now sends the **same anchored protocol** as playback. A rejected optional schema is negotiated once; persistent invalid requests stop at configuration level and display a visible error instead of silently failing every subtitle window. Run Test API after correcting the endpoint/model/key. Network latency and translation quality depend on the provider.
 

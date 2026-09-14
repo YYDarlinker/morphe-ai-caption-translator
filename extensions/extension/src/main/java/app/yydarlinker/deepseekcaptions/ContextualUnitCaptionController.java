@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-source-phrase-112".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-source-phrase-113".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -640,7 +640,7 @@ static void setMainActivity(Activity activity) {
                 session.realtimeAttempts[current] > 0 || session.isolatedRetries[current],
                 REALTIME_MAX_UNITS
         );
-        maximum=StartupCaptionPolicy.targetLimit(session.firstReady,maximum); // Current unit first; do not wait for future translations.
+        maximum=StartupCaptionPolicy.targetLimit(session.firstReady,maximum); // No startup-only reduction of the normal translation batch.
         long horizon = session.currentTimeMs + REALTIME_LOOKAHEAD_MS;
         List<Integer> indices = new ArrayList<>();
         for (int i = current; i < session.units.size() && indices.size() < maximum; i++) {

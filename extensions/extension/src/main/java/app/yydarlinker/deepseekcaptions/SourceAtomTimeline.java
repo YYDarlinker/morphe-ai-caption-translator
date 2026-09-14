@@ -134,12 +134,12 @@ final class SourceAtomTimeline {
                     List<String> lexical = tokenize(segmentText);
                     if (lexical.isEmpty()) lexical = Collections.singletonList(segmentText.trim());
                     int total = 0;
-                    for (String token : lexical) total += Math.max(1, lexicalWeight(token));
+                    for (String token : lexical) total += estimatedWordWeight(token);
                     int consumed = 0;
                     for (String rawToken : lexical) {
                         String token = rawToken.trim();
                         if (token.isEmpty()) continue;
-                        int weight = Math.max(1, lexicalWeight(token));
+                        int weight = estimatedWordWeight(token);
                         long atomStart;
                         long atomEnd;
                         boolean precise = nativeBoundary && lexical.size() == 1;
@@ -178,10 +178,10 @@ final class SourceAtomTimeline {
             long cueEnd = effectiveCueEnd(cues, cueIndex);
             long duration = Math.max(1L, cueEnd - cue.startMs);
             int total = 0;
-            for (String token : tokens) total += Math.max(1, lexicalWeight(token));
+            for (String token : tokens) total += estimatedWordWeight(token);
             int consumed = 0;
             for (String token : tokens) {
-                int weight = Math.max(1, lexicalWeight(token));
+                int weight = estimatedWordWeight(token);
                 long start = cue.startMs + Math.round(duration * (consumed / (double) total));
                 long end = cue.startMs + Math.round(duration * ((consumed + weight) / (double) total));
                 end = Math.max(start + 1L, Math.min(cueEnd, end));
@@ -252,10 +252,10 @@ final class SourceAtomTimeline {
 
             long duration = speechEnd - speechStart;
             int total = 0;
-            for (String token : chunk.tokens) total += Math.max(1, lexicalWeight(token));
+            for (String token : chunk.tokens) total += estimatedWordWeight(token);
             int consumed = 0;
             for (String token : chunk.tokens) {
-                int weight = Math.max(1, lexicalWeight(token));
+                int weight = estimatedWordWeight(token);
                 long start = speechStart + Math.round(duration * (consumed / (double) total));
                 long end = speechStart + Math.round(duration * ((consumed + weight) / (double) total));
                 end = Math.max(start + 1L, Math.min(speechEnd, end));
@@ -485,6 +485,15 @@ final class SourceAtomTimeline {
                 script == Character.UnicodeScript.HANGUL;
     }
 
+    // Fallback only: limit the influence of long English spellings/model names within a known cue.
+    // This is an estimate, not measured speech. Native boundaries and cue duration never change.
+    static int estimatedWordWeight(String token) {
+        if(token!=null && token.matches("[A-Za-z0-9'’.,!?;:-]+")) {
+            int length=SourcePhraseAlignment.canonical(token).length();
+            return Math.max(1,Math.min(5,(length+3)/4));
+        }
+        return Math.max(1,lexicalWeight(token));
+    }
     private static int lexicalWeight(String value) {
         if (value == null || value.isEmpty()) return 0;
         int weight = 0;
@@ -563,6 +572,7 @@ final class SourceAtomTimeline {
         final int estimatedAtoms;
         final boolean json3;
         final boolean rollupNormalized;
+        final int asrMatchedAtoms;
 
         Result(
                 List<Atom> atoms,
@@ -572,6 +582,11 @@ final class SourceAtomTimeline {
                 boolean json3,
                 boolean rollupNormalized
         ) {
+            this(atoms,rawCueCount,nativeTimedAtoms,estimatedAtoms,json3,rollupNormalized,0);
+        }
+
+        Result(List<Atom> atoms,int rawCueCount,int nativeTimedAtoms,int estimatedAtoms,boolean json3,boolean rollupNormalized,int asrMatchedAtoms) {
+            this.asrMatchedAtoms=asrMatchedAtoms;
             this.atoms = atoms;
             this.rawCueCount = rawCueCount;
             this.nativeTimedAtoms = nativeTimedAtoms;

@@ -64,25 +64,25 @@ final class RawCaptionSource {
 
         if(calibrate && identity.englishAsr && SourceAtomTimeline.build(body,document).preciseRatio()<0.8){
             try{
-                TimingAnchor precise=loadPublicWordAnchor(context,sourceUrl);
+                TimingAnchor precise=loadEnglishAsrAnchor(context,sourceUrl);
                 if(precise!=null){
                     SourceAtomTimeline.Result original=SourceAtomTimeline.build(body,document),reference=SourceAtomTimeline.build(precise.body,precise.document);
-                    if(WordTimingReference.sameWords(document,precise.document)){
+                    if(WordTimingReference.sameWords(document,precise.document) && reference.preciseRatio()>=original.preciseRatio()){
                         body=precise.body;contentType=precise.contentType;document=precise.document;
-                        CaptionDiagnostics.mark(context,"ASR_NATIVE_WORD_TIMING_SELECTED","same_source_words=true;native="+reference.nativeTimedAtoms+";estimated="+reference.estimatedAtoms);
+                        CaptionDiagnostics.mark(context,reference.nativeTimedAtoms>0?"ASR_NATIVE_WORD_TIMING_SELECTED":"ASR_CUE_TIMING_BASE","same_source_words=true;native="+reference.nativeTimedAtoms+";estimated="+reference.estimatedAtoms);
                     }else{
                         SourceAtomTimeline.Result matched=AsrLocalTiming.align(original,reference);
                         if(matched!=original){alignedAtoms=matched;CaptionDiagnostics.mark(context,"ASR_NATIVE_WORD_TIMING_ALIGNED","provider_text_preserved;native="+matched.nativeTimedAtoms);}
                         else CaptionDiagnostics.mark(context,"ASR_WORD_TIMING_UNAVAILABLE","reason=unmatched_reference;keeping_estimated_cue_times");
                     }
                 }else CaptionDiagnostics.mark(context,"ASR_WORD_TIMING_UNAVAILABLE","reason=no_native_reference;keeping_estimated_cue_times");
-            }catch(Exception failure){CaptionDiagnostics.mark(context,"ASR_WORD_TIMING_UNAVAILABLE","reason="+failure.getClass().getSimpleName()+";keeping_estimated_cue_times");}
+            }catch(Exception failure){CaptionDiagnostics.mark(context,"ASR_WORD_TIMING_UNAVAILABLE","reason="+timingFailureReason(failure)+";keeping_asr_cue_bounds");}
         }
         if (identity.englishAsr) {
             CaptionDiagnostics.mark(
                     context,
-                    "SOURCE_TIMING_BASE",
-                    "当前底层轨为英语自动生成；native="+SourceAtomTimeline.build(body,document).nativeTimedAtoms+";estimated="+SourceAtomTimeline.build(body,document).estimatedAtoms
+                    SourceAtomTimeline.build(body,document).nativeTimedAtoms>0?"SOURCE_TIMING_BASE":"ASR_CUE_TIMING_BASE",
+                    "当前底层轨为英语自动生成；句段边界保留，内部非原生词时刻为估计；native="+SourceAtomTimeline.build(body,document).nativeTimedAtoms+";estimated="+SourceAtomTimeline.build(body,document).estimatedAtoms
             );
         } else if (calibrate && identity.englishProvider) {
             CaptionDiagnostics.mark(
@@ -101,7 +101,7 @@ final class RawCaptionSource {
                 } else {
                     SourceAtomTimeline.Result originalAtoms = SourceAtomTimeline.build(body, document);
                     SourceAtomTimeline.Result referenceAtoms = SourceAtomTimeline.build(anchor.body, anchor.document);
-                    alignedAtoms = AsrLocalTiming.align(originalAtoms, referenceAtoms);
+                    alignedAtoms = AsrLocalTiming.alignWithCueTiming(originalAtoms, referenceAtoms);
                     if(alignedAtoms == originalAtoms){
                         alignedAtoms=null;
                         CaptionDiagnostics.mark(context,"ASR_LOCAL_TIMING_REJECTED","sourceAtoms="+originalAtoms.atoms.size()+";asrNative="+referenceAtoms.nativeTimedAtoms+";reason=insufficient_unique_monotonic_anchors");
@@ -114,8 +114,8 @@ final class RawCaptionSource {
                             calibration.diagnostic()
                     );
                     if (alignedAtoms != null) {
-                        CaptionDiagnostics.mark(context,"ASR_LOCAL_TIMING_APPLIED",
-                            "保留原轨文本；局部英语自动字幕原生时间锚="+alignedAtoms.nativeTimedAtoms+"；估计="+alignedAtoms.estimatedAtoms);
+                        CaptionDiagnostics.mark(context,alignedAtoms.asrMatchedAtoms>alignedAtoms.nativeTimedAtoms?"ASR_CUE_TIMING_APPLIED":"ASR_LOCAL_TIMING_APPLIED",
+                            "保留原轨文本；ASR 匹配="+alignedAtoms.asrMatchedAtoms+"；原生逐词="+alignedAtoms.nativeTimedAtoms+"；句内估计="+alignedAtoms.estimatedAtoms);
                     } else if (calibration.apply) {
                         byte[] shiftedJson3 = CaptionTimingCalibrator.shiftJson3(body, calibration.offsetMs);
                         if (shiftedJson3 != null) {
@@ -151,7 +151,7 @@ final class RawCaptionSource {
                         context,
                         "SOURCE_TIMING_FALLBACK",
                         "英语（自动生成）时间锚不可用，保持原轨时间：" +
-                                CaptionDiagnostics.errorDetail(failure)
+                                timingFailureReason(failure)
                 );
             }
         } else {
@@ -193,7 +193,7 @@ final class RawCaptionSource {
         return loadTrack(context,url,diagnosticPrefix,cacheAsPrimary,0);
     }
     private static LoadedTrack loadTrack(Context context,String url,String diagnosticPrefix,boolean cacheAsPrimary,int budgetMs) throws Exception {
-        String cacheKey = SourceCaptionCache.key(url);
+        String cacheKey = cacheAsPrimary ? SourceCaptionCache.key(url) : SourceCaptionCache.referenceKey(url);
         SourceCaptionCache.Entry cached = SourceCaptionCache.get(context, cacheKey);
         if (cached != null) {
             CaptionDiagnostics.mark(
@@ -221,38 +221,52 @@ final class RawCaptionSource {
     }
 
     private static final java.util.Map<String,TimingAnchor> WORD_ANCHORS=new java.util.LinkedHashMap<>();
-    private static TimingAnchor loadPublicWordAnchor(Context context,String sourceUrl)throws Exception{
+    private static TimingAnchor loadPublicWordAnchor(Context context,String sourceUrl,int budgetMs)throws Exception{
         String video=PageCaptionController.videoIdFromUrl(sourceUrl);if(!video.matches("[A-Za-z0-9_-]{11}"))return null;
         synchronized(WORD_ANCHORS){TimingAnchor cached=WORD_ANCHORS.get(video);if(cached!=null)return cached;}
-        long deadline=android.os.SystemClock.elapsedRealtime()+6000;
+        long deadline=android.os.SystemClock.elapsedRealtime()+Math.max(1,budgetMs);
         java.net.URL url=new java.net.URL("https://www.youtube.com/watch?v="+video+"&hl=en");
         java.net.HttpURLConnection connection=DeepSeekCaptionHook.openWithYouTubeCronet(url);if(connection==null)connection=(java.net.HttpURLConnection)url.openConnection();
         byte[] page;
         try{
-            connection.setConnectTimeout(2000);connection.setReadTimeout(3000);connection.setInstanceFollowRedirects(false);connection.setRequestProperty("User-Agent","Mozilla/5.0");connection.setRequestProperty("Accept-Encoding","identity");
-            if(connection.getResponseCode()!=200)return null;
+            connection.setConnectTimeout(Math.max(1,Math.min(2000,budgetMs/2)));connection.setReadTimeout(Math.max(1,Math.min(3000,budgetMs/2)));connection.setInstanceFollowRedirects(false);connection.setRequestProperty("User-Agent","Mozilla/5.0");connection.setRequestProperty("Accept-Encoding","identity");
+            int status=connection.getResponseCode();if(status!=200){CaptionDiagnostics.mark(context,"ASR_REFERENCE_FETCH_FAILED","http_"+status);return null;}
             java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();try(InputStream in=connection.getInputStream()){
                 byte[] buffer=new byte[8192];while(true){long remaining=deadline-android.os.SystemClock.elapsedRealtime();if(remaining<=0)throw new java.net.SocketTimeoutException("public ASR lookup budget");connection.setReadTimeout((int)remaining);int n=in.read(buffer);if(n<0)break;if(bytes.size()+n>8*1024*1024)throw new java.io.IOException("public ASR metadata size");bytes.write(buffer,0,n);}
             }page=bytes.toByteArray();
         }finally{connection.disconnect();}
         String track=WordTimingReference.find(new String(page,java.nio.charset.StandardCharsets.UTF_8),video);int remaining=(int)(deadline-android.os.SystemClock.elapsedRealtime());if(track.isEmpty()||remaining<=0)return null;
         LoadedTrack data=loadTrack(context,track,"ASR_WORD_REFERENCE",false,remaining);CaptionDocument.Parsed doc=CaptionDocument.parse(data.body,data.contentType);SourceAtomTimeline.Result atoms=SourceAtomTimeline.build(data.body,doc);
-        if(atoms.preciseRatio()<0.8)return null;
+        if(atoms.atoms.isEmpty())return null; // A valid ASR cue clock is useful even without word offsets.
         TimingAnchor found=new TimingAnchor(data.body,data.contentType,track,doc);synchronized(WORD_ANCHORS){if(WORD_ANCHORS.size()>=4)WORD_ANCHORS.remove(WORD_ANCHORS.keySet().iterator().next());WORD_ANCHORS.put(video,found);}return found;
     }
     private static TimingAnchor loadEnglishAsrAnchor(Context context, String sourceUrl) throws Exception {
-        try {TimingAnchor word=loadPublicWordAnchor(context,sourceUrl);if(word!=null)return word;}catch(Exception ignored){}
+        long deadline=android.os.SystemClock.elapsedRealtime()+8000;
+        TimingAnchor best=null;
+        String video=PageCaptionController.videoIdFromUrl(sourceUrl);
+        String nativeUrl=NativeAsrTrackReference.find(video);
+        if(!nativeUrl.isEmpty())try{
+            LoadedTrack data=loadTrack(context,SourceFormatPolicy.json3(nativeUrl),"ASR_NATIVE_TRACK",false,3000);
+            CaptionDocument.Parsed doc=CaptionDocument.parse(data.body,data.contentType);
+            if(!doc.cues().isEmpty())best=new TimingAnchor(data.body,data.contentType,nativeUrl,doc);
+            if(best!=null && SourceAtomTimeline.build(best.body,best.document).preciseRatio()>=.8)return best;
+        }catch(Exception failure){CaptionDiagnostics.mark(context,"ASR_REFERENCE_FETCH_FAILED","native_track;reason="+timingFailureReason(failure));}
+        int remaining=(int)(deadline-android.os.SystemClock.elapsedRealtime());
+        if(remaining>0)try{
+            TimingAnchor found=loadPublicWordAnchor(context,sourceUrl,Math.min(5000,remaining));
+            if(found!=null && (best==null || SourceAtomTimeline.build(found.body,found.document).preciseRatio()>SourceAtomTimeline.build(best.body,best.document).preciseRatio()))best=found;
+        }catch(Exception failure){CaptionDiagnostics.mark(context,"ASR_REFERENCE_FETCH_FAILED","player_metadata;reason="+timingFailureReason(failure));}
+        if(best!=null)return best;
         List<String> candidates = autoGeneratedEnglishCandidates(sourceUrl);
         Throwable last = null;
-        long deadline=android.os.SystemClock.elapsedRealtime()+2500;
         for (int i = 0; i < candidates.size(); i++) {
-            int remaining=(int)(deadline-android.os.SystemClock.elapsedRealtime());
+            remaining=(int)(deadline-android.os.SystemClock.elapsedRealtime());
             if(remaining<=0)break;
             String candidate = candidates.get(i);
             try {
                 LoadedTrack track = loadTrack(context, candidate, "ASR_TIMING", false,remaining);
                 CaptionDocument.Parsed parsed = CaptionDocument.parse(track.body, track.contentType);
-                if (parsed.cues().size() >= 2) {
+                if (!parsed.cues().isEmpty()) {
                     CaptionDiagnostics.mark(
                             context,
                             "ASR_TIMING_READY",
@@ -273,13 +287,25 @@ final class RawCaptionSource {
                         context,
                         "ASR_TIMING_CANDIDATE_FAILED",
                         "候选 " + (i + 1) + "/" + candidates.size() + "：" +
-                                CaptionDiagnostics.errorDetail(failure)
+                                timingFailureReason(failure)
                 );
             }
         }
         if (last instanceof Exception) throw (Exception) last;
         if (last != null) throw new IllegalStateException(last);
         return null;
+    }
+
+    static String timingFailureReason(Throwable failure) {
+        if(failure==null)return "unavailable";
+        if(failure instanceof java.net.SocketTimeoutException)return "timeout";
+        String message=failure.getMessage();
+        if(message!=null){
+            java.util.regex.Matcher http=java.util.regex.Pattern.compile("HTTP ([0-9]{3})").matcher(message);
+            if(http.find())return "http_"+http.group(1);
+            if(message.contains("响应为空"))return "empty_response";
+        }
+        return failure.getClass().getSimpleName();
     }
 
     /**

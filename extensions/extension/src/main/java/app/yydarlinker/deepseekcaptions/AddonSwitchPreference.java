@@ -15,10 +15,9 @@ public class AddonSwitchPreference extends android.preference.Preference {
     public boolean isChecked(){return checked;}
     @Override protected View onCreateView(ViewGroup parent) {
         LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.CENTER_VERTICAL);
-        int pad=(int)(16*getContext().getResources().getDisplayMetrics().density);
-        row.setPadding(pad,pad,pad,pad);LinearLayout labels=new LinearLayout(getContext());labels.setOrientation(1);
-        TextView title=new TextView(getContext());title.setId(android.R.id.title);title.setTextSize(16);labels.addView(title);
-        TextView summary=new TextView(getContext());summary.setId(android.R.id.summary);summary.setTextSize(14);labels.addView(summary);
+        CaptionSettingsStyle.row(row);row.setMinimumHeight(CaptionSettingsStyle.dp(getContext(),64));LinearLayout labels=new LinearLayout(getContext());labels.setOrientation(1);
+        TextView title=new TextView(getContext());title.setId(android.R.id.title);CaptionSettingsStyle.title(title);labels.addView(title);
+        TextView summary=new TextView(getContext());summary.setId(android.R.id.summary);CaptionSettingsStyle.caption(summary);summary.setPadding(0,CaptionSettingsStyle.dp(getContext(),4),CaptionSettingsStyle.dp(getContext(),12),0);labels.addView(summary);
         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));widget=new Switch(getContext());
         widget.setContentDescription(getTitle());widget.setChecked(checked);
         widget.setOnCheckedChangeListener((b,v)->{if(!binding){if(callChangeListener(v))setChecked(v);else setChecked(checked);}});

@@ -62,7 +62,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         LinearLayout root = new LinearLayout(context);
         root.setTag(getKey());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(10), dp(20), dp(10));
+        CaptionSettingsStyle.row(root);
 
         LinearLayout heading = new LinearLayout(context);
         heading.setOrientation(LinearLayout.HORIZONTAL);
@@ -73,7 +73,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
 
         TextView title = new TextView(context);
         title.setText(getTitle());
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        CaptionSettingsStyle.title(title);
         title.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
         heading.addView(title, new LinearLayout.LayoutParams(
                 0,
@@ -82,13 +82,19 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         ));
 
         TextView valueLabel = new TextView(context);
-        valueLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        CaptionSettingsStyle.caption(valueLabel);
+        valueLabel.setTextSize(14);
+        valueLabel.setTextColor(CaptionSettingsStyle.primary(context));
+        valueLabel.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        valueLabel.setPadding(dp(12),0,0,0);
         heading.addView(valueLabel, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
         SeekBar slider = new SeekBar(context);
+        slider.setMinimumHeight(dp(48));
+        slider.setContentDescription(getTitle());
         int minimum = minimum();
         int maximum = maximum();
         int current = currentValue();
@@ -104,8 +110,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         if (summaryText != null && summaryText.length() > 0) {
             TextView summary = new TextView(context);
             summary.setText(summaryText);
-            summary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-            summary.setAlpha(0.72f);
+            CaptionSettingsStyle.caption(summary);
             root.addView(summary, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -143,7 +148,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     }
 
     private String format(int value) {
-        return KEY_TEXT_SIZE.equals(getKey()) ? value + "（相对字号）" : value + "%";
+        return KEY_TEXT_SIZE.equals(getKey()) ? Integer.toString(value) : value + "%";
     }
 
     private void saveValue(int value) {

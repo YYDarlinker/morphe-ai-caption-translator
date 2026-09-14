@@ -159,7 +159,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                 val screen = document.createElement("PreferenceScreen")
                 screen.setAttribute("android:key", PREF_KEY)
                 screen.setAttribute("android:title", "AI 字幕翻译")
-                screen.setAttribute("android:summary", "跟随原生时间轴实时翻译 · 设置自动保存")
+                screen.setAttribute("android:summary", "翻译、字幕样式与诊断 · 修改后自动保存")
                 icon?.let {
                     screen.setAttribute("android:icon", "@drawable/$it")
                     screen.setAttribute("app:iconSpaceReserved", "true")
@@ -177,7 +177,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         TEXT_PREF_CLASS,
                         "deepseek_caption_base_url",
                         "API 地址",
-                        "停止输入后自动保存",
+                        "填写兼容接口地址，停止输入后自动保存",
                     )
                     addPreference(
                         "app.yydarlinker.deepseekcaptions.ApiKeyPreference",
@@ -188,7 +188,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         MODEL_PREF_CLASS,
                         "deepseek_caption_model",
                         "模型",
-                        "根据 API 地址和 Key 自动获取，也可手动输入",
+                        "自动获取可用模型，也支持手动输入",
                     )
                     addPreference(
                         ACTION_PREF_CLASS,
@@ -209,24 +209,24 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
 
                 screen.addCategory("字幕样式").apply {
                     addPreference("app.yydarlinker.deepseekcaptions.SubtitleStylePreview",
-                        "deepseek_caption_style_preview", "横屏字幕预览")
+                        "deepseek_caption_style_preview", "字幕预览")
                     addPreference(
                         SLIDER_PREF_CLASS,
                         "deepseek_caption_text_size",
                         "字幕大小",
-                        "相对画面比例 12–22，详情页与全屏一致",
+                        "相对字号 12–22，随画面比例缩放",
                     )
                     addPreference(
                         SLIDER_PREF_CLASS,
                         "deepseek_caption_background_opacity",
                         "背景不透明度",
-                        "0–100%，松手即保存",
+                        "0% 为透明，100% 为不透明；松手保存",
                     )
                     addPreference(
                         ACTION_PREF_CLASS,
                         "deepseek_caption_reset_position",
                         "恢复字幕默认位置",
-                        "字幕始终水平居中，只保存竖直位置",
+                        "恢复竖直位置，保留字号和背景设置",
                     )
                 }
 
@@ -245,13 +245,13 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         DISPLAY_TEXT_DEBUG_PREF_CLASS,
                         "deepseek_caption_display_text_debug",
                         "显示文本调试",
-                        "默认关闭；开启后 DISPLAY_SELECTED 附带 source 与 canonical",
+                        "排查时记录字幕原文与译文，默认关闭",
                     )
                     addPreference(
                         DIAGNOSTICS_PREF_CLASS,
                         "deepseek_caption_diagnostics",
-                        "字幕链路诊断（点击复制）",
-                        "点击即可刷新并复制完整诊断",
+                        "字幕诊断",
+                        "展开查看，可手动刷新或复制",
                     )
                     addPreference(
                         ACTION_PREF_CLASS,

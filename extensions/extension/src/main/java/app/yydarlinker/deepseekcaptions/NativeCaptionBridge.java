@@ -57,10 +57,18 @@ public final class NativeCaptionBridge {
         }
     }
     public static void onNativeSelection(Object manager,Object track,Object origin) {
+        rememberAsrTracks(manager);
         if(origin instanceof Enum<?> && "PREFERRED_TRACK".equals(((Enum<?>)origin).name())) applySelection(track,true);
         else if(CaptionChoice.isOn()) applySelection(track,false);
     }
+    private static void rememberAsrTracks(Object manager) {
+        if(!enabled() || manager==null)return;
+        try{List<?> tracks=nativeTracks(manager);if(tracks!=null)for(Object track:tracks)
+            NativeAsrTrackReference.remember(language(track),vss(track),url(track));
+        }catch(Exception ignored){}
+    }
     public static Object resolveRemembered(Object manager) {
+        rememberAsrTracks(manager);
         if(!enabled() || !CaptionChoice.isOn()) return null;
         List<?> list=CaptionChoice.translates() ? translatedTracks(manager) : nativeTracks(manager);
         Object fallback=null;

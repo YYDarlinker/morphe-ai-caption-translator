@@ -132,18 +132,18 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         root.setTag(KEY_MODEL);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
-        root.setPadding(dp(20), dp(10), dp(20), dp(10));
+        CaptionSettingsStyle.row(root);
 
         TextView title = new TextView(context);
         title.setText(getTitle());
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        title.setAlpha(.78f);
+        CaptionSettingsStyle.title(title);
+        title.setPadding(0,0,0,dp(8));
         root.addView(title, matchWrap());
 
         editor = new InlineCaptionEditor(context);
         editor.setSingleLine(true);
         editor.setFocusableInTouchMode(true);
-        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        CaptionSettingsStyle.editor(editor);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         editor.setImeOptions(EditorInfo.IME_ACTION_DONE);
         editor.setHint("可从下方选择，也可手动输入模型 ID");
@@ -155,12 +155,12 @@ public final class DeepSeekModelPreference extends android.preference.Preference
 
         LinearLayout controls = new LinearLayout(context);
         controls.setOrientation(LinearLayout.HORIZONTAL);
-        controls.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        controls.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END);
 
         refresh = new Button(context,null,android.R.attr.borderlessButtonStyle);
-        refresh.setTextSize(13);
+        CaptionSettingsStyle.button(refresh);
         refresh.setMinimumWidth(0);
-        refresh.setMinHeight(dp(36));
+        refresh.setMinHeight(dp(48));
         refresh.setText("刷新");
         refresh.setAllCaps(false);
         refresh.setOnClickListener(view -> fetchModels(true));
@@ -170,8 +170,8 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         ));
 
         state = new TextView(context);
-        state.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        state.setAlpha(0.72f);
+        CaptionSettingsStyle.caption(state);
+        state.setPadding(0,dp(6),0,0);
         state.setPadding(dp(10), 0, 0, 0);
         root.addView(controls, matchWrap());
 
@@ -196,7 +196,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
 
             @Override public void onNothingSelected(AdapterView<?> parentView) {}
         });
-        controls.addView(choices,0,new LinearLayout.LayoutParams(0,dp(44),1f));
+        controls.addView(choices,0,new LinearLayout.LayoutParams(0,dp(48),1f));
         state.setPadding(0,dp(4),0,0);state.setMaxLines(2);
         root.addView(state,matchWrap());
 
@@ -253,7 +253,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
             }
             long age = SystemClockCompat.elapsedRealtime() - lastAttemptAtMs;
             if (fingerprint.equals(lastAttemptFingerprint) && age < RETRY_AUTO_FETCH_AFTER_MS) {
-                setState("可点“获取模型”重试，或直接手动输入", false);
+                setState("可点“刷新”重试，或直接输入模型 ID", false);
                 return;
             }
         }

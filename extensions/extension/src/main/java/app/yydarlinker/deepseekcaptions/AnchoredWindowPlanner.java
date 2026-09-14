@@ -33,7 +33,7 @@ final class AnchoredWindowPlanner {
                 if ((punctuation || gap) && span >= 6_000L) break;
                 if (gap) break; // Never translate across long silence/speaker breaks.
             }
-            if (candidate >= from && end > candidate && candidate-from >= 8) end = candidate;
+            if (candidate >= from && end > candidate && candidate-from >= 3) end = candidate;
             else if(end+1<atoms.size() && candidate<from) {
                 // Hard transport limits prefer a preceding clause, never a dangling connector.
                 for(int cut=end;cut>Math.max(from,end-10);cut--) {

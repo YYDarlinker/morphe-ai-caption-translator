@@ -62,11 +62,27 @@ final class RawCaptionSource {
                 identity.diagnostic()
         );
 
+        if(calibrate && identity.englishAsr && SourceAtomTimeline.build(body,document).preciseRatio()<0.8){
+            try{
+                TimingAnchor precise=loadPublicWordAnchor(context,sourceUrl);
+                if(precise!=null){
+                    SourceAtomTimeline.Result original=SourceAtomTimeline.build(body,document),reference=SourceAtomTimeline.build(precise.body,precise.document);
+                    if(WordTimingReference.sameWords(document,precise.document)){
+                        body=precise.body;contentType=precise.contentType;document=precise.document;
+                        CaptionDiagnostics.mark(context,"ASR_NATIVE_WORD_TIMING_SELECTED","same_source_words=true;native="+reference.nativeTimedAtoms+";estimated="+reference.estimatedAtoms);
+                    }else{
+                        SourceAtomTimeline.Result matched=AsrLocalTiming.align(original,reference);
+                        if(matched!=original){alignedAtoms=matched;CaptionDiagnostics.mark(context,"ASR_NATIVE_WORD_TIMING_ALIGNED","provider_text_preserved;native="+matched.nativeTimedAtoms);}
+                        else CaptionDiagnostics.mark(context,"ASR_WORD_TIMING_UNAVAILABLE","reason=unmatched_reference;keeping_estimated_cue_times");
+                    }
+                }else CaptionDiagnostics.mark(context,"ASR_WORD_TIMING_UNAVAILABLE","reason=no_native_reference;keeping_estimated_cue_times");
+            }catch(Exception failure){CaptionDiagnostics.mark(context,"ASR_WORD_TIMING_UNAVAILABLE","reason="+failure.getClass().getSimpleName()+";keeping_estimated_cue_times");}
+        }
         if (identity.englishAsr) {
             CaptionDiagnostics.mark(
                     context,
                     "SOURCE_TIMING_BASE",
-                    "当前底层轨就是英语（自动生成），直接使用其同步时间轴"
+                    "当前底层轨为英语自动生成；native="+SourceAtomTimeline.build(body,document).nativeTimedAtoms+";estimated="+SourceAtomTimeline.build(body,document).estimatedAtoms
             );
         } else if (calibrate && identity.englishProvider) {
             CaptionDiagnostics.mark(
@@ -204,7 +220,28 @@ final class RawCaptionSource {
         return new LoadedTrack(fetched.body, fetched.contentType, url);
     }
 
+    private static final java.util.Map<String,TimingAnchor> WORD_ANCHORS=new java.util.LinkedHashMap<>();
+    private static TimingAnchor loadPublicWordAnchor(Context context,String sourceUrl)throws Exception{
+        String video=PageCaptionController.videoIdFromUrl(sourceUrl);if(!video.matches("[A-Za-z0-9_-]{11}"))return null;
+        synchronized(WORD_ANCHORS){TimingAnchor cached=WORD_ANCHORS.get(video);if(cached!=null)return cached;}
+        long deadline=android.os.SystemClock.elapsedRealtime()+6000;
+        java.net.URL url=new java.net.URL("https://www.youtube.com/watch?v="+video+"&hl=en");
+        java.net.HttpURLConnection connection=DeepSeekCaptionHook.openWithYouTubeCronet(url);if(connection==null)connection=(java.net.HttpURLConnection)url.openConnection();
+        byte[] page;
+        try{
+            connection.setConnectTimeout(2000);connection.setReadTimeout(3000);connection.setInstanceFollowRedirects(false);connection.setRequestProperty("User-Agent","Mozilla/5.0");connection.setRequestProperty("Accept-Encoding","identity");
+            if(connection.getResponseCode()!=200)return null;
+            java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();try(InputStream in=connection.getInputStream()){
+                byte[] buffer=new byte[8192];while(true){long remaining=deadline-android.os.SystemClock.elapsedRealtime();if(remaining<=0)throw new java.net.SocketTimeoutException("public ASR lookup budget");connection.setReadTimeout((int)remaining);int n=in.read(buffer);if(n<0)break;if(bytes.size()+n>8*1024*1024)throw new java.io.IOException("public ASR metadata size");bytes.write(buffer,0,n);}
+            }page=bytes.toByteArray();
+        }finally{connection.disconnect();}
+        String track=WordTimingReference.find(new String(page,java.nio.charset.StandardCharsets.UTF_8),video);int remaining=(int)(deadline-android.os.SystemClock.elapsedRealtime());if(track.isEmpty()||remaining<=0)return null;
+        LoadedTrack data=loadTrack(context,track,"ASR_WORD_REFERENCE",false,remaining);CaptionDocument.Parsed doc=CaptionDocument.parse(data.body,data.contentType);SourceAtomTimeline.Result atoms=SourceAtomTimeline.build(data.body,doc);
+        if(atoms.preciseRatio()<0.8)return null;
+        TimingAnchor found=new TimingAnchor(data.body,data.contentType,track,doc);synchronized(WORD_ANCHORS){if(WORD_ANCHORS.size()>=4)WORD_ANCHORS.remove(WORD_ANCHORS.keySet().iterator().next());WORD_ANCHORS.put(video,found);}return found;
+    }
     private static TimingAnchor loadEnglishAsrAnchor(Context context, String sourceUrl) throws Exception {
+        try {TimingAnchor word=loadPublicWordAnchor(context,sourceUrl);if(word!=null)return word;}catch(Exception ignored){}
         List<String> candidates = autoGeneratedEnglishCandidates(sourceUrl);
         Throwable last = null;
         long deadline=android.os.SystemClock.elapsedRealtime()+2500;

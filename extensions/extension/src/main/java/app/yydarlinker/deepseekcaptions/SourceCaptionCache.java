@@ -20,7 +20,7 @@ import java.util.concurrent.Executors;
  * before the AI call, without making the first visible translation wait for a filesystem sync.
  */
 final class SourceCaptionCache {
-    private static final String VERSION = "source-caption-v1";
+    private static final String VERSION = "source-caption-v2-word-provenance";
     private static final long MAX_BYTES = 80L * 1024L * 1024L;
     private static final int MAX_FILES = 180;
     private static final long MAX_AGE_MS = 24L * 60L * 60L * 1000L;
@@ -117,7 +117,8 @@ final class SourceCaptionCache {
                         "|lang=" + safe(uri.getQueryParameter("lang")) +
                         "|kind=" + safe(uri.getQueryParameter("kind")) +
                         "|name=" + safe(uri.getQueryParameter("name")) +
-                        "|fmt=" + safe(uri.getQueryParameter("fmt"));
+                        "|fmt=" + safe(uri.getQueryParameter("fmt")) +
+                        "|variant="+safe(uri.getQueryParameter("variant"))+"|exp="+safe(uri.getQueryParameter("exp"));
             }
         } catch (Throwable ignored) {
         }

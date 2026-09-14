@@ -77,11 +77,11 @@ final class ContextualBatchApiClient {
                     unit == null ? "" : unit.sourceText
             );
             sourceChars += text.length();
-            JSONObject item=new JSONObject().put("id",unit.id).put("last_id",unit.toAtom-unit.fromAtom).put("span_ms",unit.endMs-unit.startMs)
-                    .put("tokens",AnchoredCaptionPlan.tokens(atoms,unit)).put("source_text",text);
+            JSONObject item=new JSONObject().put("id",unit.id).put("span_ms",unit.endMs-unit.startMs)
+                    .put("source_text",text);
             JSONArray times=new JSONArray();
-            for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0));
-            item.put("timing_ds",times);
+            for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(new JSONArray().put(atoms.get(n).text).put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0)));
+            item.put("timed_words",times);
             JSONArray pauses=new JSONArray();
             for(int n=unit.fromAtom+1;n<=unit.toAtom;n++){long gap=atoms.get(n).startMs-atoms.get(n-1).endMs;if(gap>=250 && pauses.length()<8)pauses.put(new JSONArray().put(n-unit.fromAtom).put(gap));}
             if(pauses.length()>0)item.put("pauses_before_ms",pauses);

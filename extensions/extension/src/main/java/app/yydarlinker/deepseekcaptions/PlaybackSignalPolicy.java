@@ -7,6 +7,6 @@ final class PlaybackSignalPolicy {
         if(playing&&(!Float.isFinite(speed)||speed<=0||speed>4||now-updated>5000||now-rawAt>2500))return raw;
         long atRaw=position+(playing?Math.round(Math.max(0,rawAt-updated)*speed):0);
         if(Math.abs(atRaw-raw)>1500)return raw; // old video, seek, ad or unrelated player
-        return playing?position+Math.round((now-updated)*speed):position;
+        return playing?raw+Math.round(Math.min(1000,Math.max(0,now-rawAt))*speed):raw;
     }
 }

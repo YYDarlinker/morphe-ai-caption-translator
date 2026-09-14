@@ -13,14 +13,12 @@ final class CaptionPresentationPolicy {
         if(duration<MIN_MS)return "brief_source_interval";
         return "";
     }
-    static String requestRules(){return "Translate the meaning of the entire source_text in context before choosing subtitle events. An event is not a line break. "
-        +"Use complete sense groups: keep a modifier with its noun, a verb with its object, and the premise with the words needed to understand it. Do not isolate fillers, ellipses, 'that kind of', or 到底. "
-        +"Long explanations should use successive coherent clauses, not a paragraph on screen; a short tightly connected cause/effect can share an event when time and length permit. "
-        +"Aim for two lines and 1.2-6 seconds per event, about 32 CJK or 84 other visible characters; use roughly 10 CJK or 20 other characters/second as a warning, never a reason to omit facts or alter source times. "
-        +"Do not break merely at ASR cue edges, hesitations or every comma. Split new arguments and explicit speaker turns; never guess a shot change. "
-        +"Return existing segments over printed token IDs. Optionally supply attach_next:[endId,...] in each translation entry for segments whose wording needs the next segment to finish its sense; preferably put inseparable phrases in one segment initially. "
-        +"timing_ds[id] gives the source end in deciseconds; pauses_before_ms gives up to eight source gaps. Treat estimated word times as approximate. "
-        +"For response_mode=whole_text_recovery, replace only that translations entry with {id,text} translating the complete target; keep the outer translations array. No commentary or extra request.";}
+    static String requestRules(){return "Translate naturally in the target language, not word by word. Then divide speech into readable sense groups, normally a short sentence or coherent clause per subtitle. "
+        +"An event is NOT a visual line. Split multi-sentence explanations instead of placing a paragraph on screen. A transition such as 'So to put it simply' begins its new explanation, not the previous event. "
+        +"A numbered point or a new contrast begins a new event rather than attaching it to the previous claim. Keep names, quantities, modifiers and their nouns, verbs and their objects together. A long sentence may span events, but do not leave an orphaned connector or filler. "
+        +"Aim for 1.5-6 seconds and 10-32 Chinese characters (other languages roughly two 42-character lines); these are goals, not excuses to invent, drop, or prematurely translate future speech. "
+        +"Use timed_words [source text,end deciseconds] and pauses_before_ms as source timing evidence. Never equate every cue edge or pause with a speaker/shot change. "
+        +"Prefer faithful natural technical terms; translate multiplicative comparisons as ratios, not additive increases. Do not include read-only context in output.";}
     // Visual line wrap only: no timestamp changes or dictionary-free time splitting.
     static String wrap(String text){
         if(text==null)return "";String s=text.replace('\n',' ').trim();

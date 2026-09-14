@@ -34,7 +34,7 @@ public class ProviderIntegrationTest {
                     JSONArray targets=payload.getJSONArray("targets"),rows=new JSONArray();
                     for(int i=0;i<targets.length();i++) {JSONObject t=targets.getJSONObject(i);
                         rows.put(new JSONObject().put("id",t.getString("id")).put("segments",new JSONArray()
-                            .put(new JSONArray().put(t.getJSONArray("tokens").length()-1).put("你好，世界。"))));}
+                            .put(new JSONArray().put(t.getString("source_text")).put("你好，世界。"))));}
                     reply=new JSONObject().put("choices",new JSONArray().put(new JSONObject().put("finish_reason","stop")
                         .put("message",new JSONObject().put("content",new JSONObject().put("translations",rows).toString())))).toString();
                 }

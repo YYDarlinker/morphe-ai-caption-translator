@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-editorial-110".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-source-phrase-111".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -291,6 +291,7 @@ static void setMainActivity(Activity activity) {
         long now = SystemClock.elapsedRealtime();
         PlaybackClockEstimator.Update clock = PLAYBACK_CLOCK.update(clean, now, SEEK_THRESHOLD_MS);
         boolean seek = clock.seek;
+        if(seek)MediaPlaybackClock.seek(clean);
 
         Session session = active;
         if (session == null || session.cancelled) return;

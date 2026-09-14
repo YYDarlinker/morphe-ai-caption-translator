@@ -78,3 +78,8 @@ The settings page now uses consistent insets and typography, compact model contr
 
 Local English ASR word anchors now take priority when uniquely matched and validated, with the original calibration fallback retained. Display follows confirmed player positions rather than predicting future speech. Semantic windows, bounded context and labelled original-cue recovery address fragmented and rejected translations without an extra model pass. See docs/SEMANTIC-ASR-R6.md for evidence, cost tradeoffs and verification limits.
 
+
+## Segmentation and viewport r7
+
+Subtitle geometry now prefers the visible video rendering surface and follows resized/moved players. A consistent clause-first prompt, bounded source-pause hints and local dependent-phrase joins improve presentation without a second model pass. Presentation warnings do not trigger paid retries. Speaker/shot changes without source evidence remain unsupported. See docs/SEGMENTATION-SURFACE-R7.md for research, costs and verification limits.
+

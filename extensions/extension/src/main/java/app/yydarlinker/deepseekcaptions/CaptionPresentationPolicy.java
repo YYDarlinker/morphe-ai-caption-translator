@@ -13,12 +13,12 @@ final class CaptionPresentationPolicy {
         if(duration<MIN_MS)return "brief_source_interval";
         return "";
     }
-    static String requestRules(){return "Choose one complete clause or short sentence per subtitle, never combine different speakers. "
+    static String requestRules(){return "Use a consistent hierarchy for EVERY subtitle: (1) preserve meaningful phrase groups, (2) prefer one complete clause or short sentence, (3) combine adjacent clauses only if their combined length and reading duration remain comfortable and no significant pause intervenes. Split long multi-clause sentences at their natural clause boundaries. Never leave modifiers such as 到底/究竟 alone. Keep question phrases such as 到底意味着什么 together. Never combine explicit speaker turns; do not infer a speaker or shot change from an ordinary cue boundary. "
         +"Do not cut a sentence merely because a YouTube ASR cue ended: ASR cues are timing atoms, not sentence boundaries. Prefer 1.2-6 seconds; avoid flashes below 0.95s. "
         +"Chinese: prefer at most 32 visible characters per event. Readability goals must not fragment meaning. "
         +"Other languages: prefer two 42-character lines. Preserve natural target-language grammar over artificial length limits. "
-        +"Split only at sentence-final punctuation, a genuine clause boundary, a speaker change, or a clear breath/pause. Never split verb/object, preposition/object, article/noun, model numbers, number/unit, or dependent/main clauses. Attach a short fragment to the nearest clause. Preserve decimal points, versions, initials, URLs and model names such as GPT-5.6 Sol exactly. "
-        +"timing_ds[id] is the end in deciseconds relative to window start, approximate when word timing is estimated. "
+        +"Split only at sentence-final punctuation, a genuine clause boundary, a speaker change, or a clear breath/pause. Never split verb/object, preposition/object, article/noun, model numbers or number/unit. A long subordinate clause may occupy its own event at a natural boundary; do not stack several clauses merely because they belong to one sentence. Attach a short fragment to the nearest clause. Preserve decimal points, versions, initials, URLs and model names such as GPT-5.6 Sol exactly. "
+        +"pauses_before_ms lists [id,gapMs] from the source, not inferred speakers. Prefer a break at a natural clause around a substantial pause. timing_ds[id] is the end in deciseconds relative to window start, approximate when word timing is estimated. "
         +"Never invent extra speech or alter the indexed source coverage to meet reading speed.";}
     // Visual line wrap only: no timestamp changes or dictionary-free time splitting.
     static String wrap(String text){

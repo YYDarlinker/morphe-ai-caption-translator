@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-semantic-asr-r6".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-segmentation-surface-r7".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -1333,6 +1333,9 @@ static void setMainActivity(Activity activity) {
                                 selectedSliceCount = plan.slices.size();
                                 selectedBoundaryReason = plan.boundaryReason;
                                 selectedRejectionSummary = plan.rejectionSummary;
+                                if(selectedSlice>=0){DisplaySlice chosen=plan.slices.get(selectedSlice);
+                                    String issue=CaptionSegmentationPolicy.issue(new AnchoredCaptionPlan.Segment(0,0,chosen.startMs,chosen.endMs,chosen.text));
+                                    if(!issue.isEmpty())selectedRejectionSummary="presentation_warning:"+issue;}
                                 selectedSourceText = plan.sourceText;
                                 selectedCanonicalText = plan.canonicalText;
                                 text = plan.textAt(timeMs);

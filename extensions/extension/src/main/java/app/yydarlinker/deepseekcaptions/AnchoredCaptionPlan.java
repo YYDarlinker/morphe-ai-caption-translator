@@ -74,6 +74,7 @@ final class AnchoredCaptionPlan {
         }
         if(next!=count) throw new IllegalArgumentException("incomplete token coverage;missing="+next+"-"+(count-1));
         List<Segment> readable=ReadableCaptionPlan.merge(out);
+        // Presentation is audited, not rejected: do not spend another request on valid translation.
         StringBuilder canonical=new StringBuilder();
         for(Segment segment:readable){if(canonical.length()>0)canonical.append(' ');canonical.append(segment.text);}
         return new AnchoredCaptionPlan(readable,canonical.toString());

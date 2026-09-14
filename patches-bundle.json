@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-09-14T08:32:32",
-  "description": "## [1.0.7](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.6...v1.0.7) (2026-09-14)\n\n### 🐛 Bug Fixes\n\n* align captions to ASR and recover missing subtitles ([b0f8d1d](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/b0f8d1d79add38c84849d0a13b2489865070ee2f))",
-  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.0.7/patches-1.0.7.mpp",
+  "created_at": "2026-09-14T09:39:29",
+  "description": "## [1.0.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.7...v1.0.8) (2026-09-14)\n\n### 🐛 Bug Fixes\n\n* follow video viewport and unify cost-bounded subtitle segmentation ([bc991a3](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/bc991a3c87237595607da9f74f923417e6fcf6fc))",
+  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.0.8/patches-1.0.8.mpp",
   "signature_download_url": "",
-  "version": "1.0.7"
+  "version": "1.0.8"
 }

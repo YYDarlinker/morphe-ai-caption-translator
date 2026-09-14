@@ -1,3 +1,9 @@
+## [1.0.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.7...v1.0.8) (2026-09-14)
+
+### 🐛 Bug Fixes
+
+* follow video viewport and unify cost-bounded subtitle segmentation ([bc991a3](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/bc991a3c87237595607da9f74f923417e6fcf6fc))
+
 ## [1.0.7](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.6...v1.0.7) (2026-09-14)
 
 ### 🐛 Bug Fixes

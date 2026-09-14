@@ -1,9 +1,8 @@
 # Anchored AI Captions
 
-## Current revision: 1.1.0
+## Current revision: 1.1.2
 
-This revision restores the published GitHub 1.0.8 runtime baseline, including video-relative comment-panel geometry, and adds semantic event packing, partial ASR anchoring, bounded startup work, guarded media-session timing and simpler protocol recovery. See [research, decisions and verification limits](docs/RELEASE-1.1.0-RESEARCH.md). Historical revision notes below are not a statement of the current baseline.
-
+A narrow refinement of 1.1.1: current-unit startup with retained context, isolated protocol failures, exact numeric source-phrase handling, adjacent native ASR timing coverage, width-aware single-line-first presentation, and a tap-to-switch style preview. The anchored translation/segmentation architecture and Morphe automated release contract are retained. See [changes, evidence and verification limits](docs/RELEASE-1.1.2.md). Historical revision notes below are not the current baseline.
 
 Independent YouTube AI subtitle addon, compatible with Morphe.
 
@@ -14,7 +13,7 @@ This repository is a Morphe custom patch. It routes YouTube automatic-translatio
 The caption engine uses an anchored joint translation plan:
 
 - local code creates bounded source windows, never final subtitles;
-- one API request translates a window and selects sentence ranges over numbered source atoms;
+- one API request translates a window and pairs each translation with its exact contiguous source phrase;
 - local validation requires exact source coverage and strictly increasing ranges;
 - displayed timestamps always come from the original source atoms, never translated-text length;
 - English provider captions can be calibrated against English auto-generated captions as a clock-only reference;
@@ -40,7 +39,7 @@ When enabled, the custom subtitle box displays both modes, but **only Auto-trans
 
 On each new app process, choose a subtitle language once in the player. The process then remembers On/Off, language, and original-versus-translated mode across videos. There is no default-language setting. Closing captions retains the last language for the next On; killing/restarting the app begins a new selection session.
 
-API fields are edited inline with Android EditText selection/Paste. The host breadcrumb-copy handler is bypassed only for the API configuration rows; there is no API-key dialog. Keys are never copied into diagnostics. The style section includes a live 16:9 fullscreen-ratio preview.
+API fields are edited inline with Android EditText selection/Paste. The host breadcrumb-copy handler is bypassed only for the API configuration rows; there is no API-key dialog. Keys are never copied into diagnostics. The style section includes one live preview; tap the frame to switch 16:9 landscape and 9:16 portrait without changing shared size/opacity.
 
 Test API now sends the **same anchored protocol** as playback. A rejected optional schema is negotiated once; persistent invalid requests stop at configuration level and display a visible error instead of silently failing every subtitle window. Run Test API after correcting the endpoint/model/key. Network latency and translation quality depend on the provider.
 

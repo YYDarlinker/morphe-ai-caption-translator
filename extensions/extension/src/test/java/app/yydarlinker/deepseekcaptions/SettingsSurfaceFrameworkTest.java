@@ -26,5 +26,12 @@ public class SettingsSurfaceFrameworkTest {
     shorts.setVisibility(View.GONE);CaptionSurface.discover(host,new HashSet<>(Arrays.asList(40,41)));assertFalse(CaptionSurface.isShorts());a.finish();
  }
  @Test public void diagnosticsHasScrollableFullTextAndExplicitButtons(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();DeepSeekDiagnosticsPreference p=new DeepSeekDiagnosticsPreference(a);LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));assertTrue(root.getChildAt(1) instanceof ScrollView);assertTrue(((ScrollView)root.getChildAt(1)).getChildAt(0) instanceof TextView);assertTrue(root.getChildAt(1).getLayoutParams().height>0);a.finish();}
- @Test public void dualPreviewUsesSameSizeAndOpacity(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();SubtitleStylePreview p=new SubtitleStylePreview(a);LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));LinearLayout pair=(LinearLayout)root.getChildAt(0);assertEquals(2,pair.getChildCount());SubtitleStylePreview.Preview wide=(SubtitleStylePreview.Preview)pair.getChildAt(0),tall=(SubtitleStylePreview.Preview)pair.getChildAt(1);assertFalse(wide.portrait);assertTrue(tall.portrait);SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,20);assertEquals(20,wide.size);assertEquals(20,tall.size);a.finish();}
+ @Test public void singlePreviewSwitchesWithoutChangingSharedStyle(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();SubtitleStylePreview p=new SubtitleStylePreview(a);LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));assertEquals(2,root.getChildCount());SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.getChildAt(0);assertFalse(preview.portrait);SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,20);SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);preview.performClick();assertTrue(preview.portrait);assertEquals(20,preview.size);assertEquals(35,preview.opacity);preview.performClick();assertFalse(preview.portrait);a.finish();}
+ @Test public void protocolEvidenceSurvivesDisplayNoiseAndCanBeCleared(){
+    Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionDiagnostics.clear(a);
+    CaptionDiagnostics.mark(a,"ANCHOR_RESPONSE_REJECTED","unit=12;reason=protocol_json");
+    for(int n=0;n<100;n++)CaptionDiagnostics.mark(a,"CONTEXTUAL_DISPLAY_SELECTED",String.join("",Collections.nCopies(180,"x")));
+    String report=CaptionDiagnostics.uiText(a);assertTrue(report.contains("时间参照与异常"));assertTrue(report.contains("unit=12;reason=protocol_json"));
+    CaptionDiagnostics.clear(a);assertFalse(CaptionDiagnostics.uiText(a).contains("protocol_json"));a.finish();
+ }
 }

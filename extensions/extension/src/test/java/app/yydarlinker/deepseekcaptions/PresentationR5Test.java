@@ -2,7 +2,7 @@ package app.yydarlinker.deepseekcaptions;
 import org.junit.Test;import static org.junit.Assert.*;import java.util.*;import java.nio.charset.StandardCharsets;import java.io.ByteArrayOutputStream;
 public class PresentationR5Test {
     @Test public void profileHasDocumentedBounds(){assertEquals(16,CaptionPresentationPolicy.CJK_LINE);assertEquals(32,CaptionPresentationPolicy.CJK_EVENT);assertEquals(7000,CaptionPresentationPolicy.MAX_MS);}
-    @Test public void wrapNeverChangesCharactersOrTimes(){String s="第一部分是完整语义，而第二部分继续解释原因。";assertEquals(s,CaptionPresentationPolicy.wrap(s).replace("\n",""));assertTrue(CaptionPresentationPolicy.wrap(s).contains("\n"));}
+    @Test public void wrapNeverChangesCharactersOrTimes(){String s="第一部分是完整语义，而第二部分继续解释原因。";assertEquals(s,CaptionPresentationPolicy.wrap(s).replace("\n",""));assertFalse(CaptionPresentationPolicy.wrap(s).contains("\n"));}
     @Test public void speakersAreSeparatedBeforePaidRequests(){
         List<SourceAtomTimeline.Atom> a=new ArrayList<>();String[] words={"Hello",">>","Why",">>","Because"};
         for(int i=0;i<words.length;i++)a.add(new SourceAtomTimeline.Atom(i*700,(i+1)*700,words[i],i,true));

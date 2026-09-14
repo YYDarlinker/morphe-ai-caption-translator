@@ -1,5 +1,7 @@
 # Architecture and delivery notes
 
+For the current source-phrase protocol and narrowly scoped refinements, see [1.1.2](RELEASE-1.1.2.md). Older verification records below retain their original scope.
+
 ## What changed
 
 The old implementation had two competing cores, a model translation boundary, and a second local display-slicing pass. That made a grammatically good translation vulnerable to a later display split and made source timing depend on target-language text length.

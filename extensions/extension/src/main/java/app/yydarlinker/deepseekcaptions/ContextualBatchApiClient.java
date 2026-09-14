@@ -168,10 +168,15 @@ final class ContextualBatchApiClient {
                                List<SourceAtomTimeline.Atom> atoms,Map<String,String> repair) throws Exception {
         validateTargetIds(targets);
         JSONObject root;
-        try { root = new JSONObject(stripJsonFence(content)); }
-        catch (Exception e) { throw new BatchFormatException("invalid anchored JSON", e); }
+        try {
+            org.json.JSONTokener input=new org.json.JSONTokener(stripJsonFence(content));
+            Object value=input.nextValue();
+            if(!(value instanceof JSONObject) || input.nextClean()!=0) throw new IllegalArgumentException("invalid envelope");
+            root=(JSONObject)value;
+        }
+        catch (Exception e) { throw new BatchFormatException("protocol_json", "invalid anchored JSON", e); }
         JSONArray rows = root.optJSONArray("translations");
-        if (rows == null) throw new BatchFormatException("missing translations");
+        if (rows == null) throw new BatchFormatException("protocol_translations", "missing translations");
         Map<String,String> reasons=new HashMap<>();
         Map<String, AnchoredCaptionPlan> plans = new HashMap<>();
         Map<String, String> texts = new HashMap<>();
@@ -179,17 +184,16 @@ final class ContextualBatchApiClient {
         List<String> invalid = new ArrayList<>(), unknown = new ArrayList<>(), missing = new ArrayList<>();
         for (int i=0;i<rows.length();i++) {
             JSONObject row=rows.optJSONObject(i);
-            if(row==null || !(row.opt("id") instanceof String))
-                throw new BatchFormatException("invalid response id");
+            if(row==null || !(row.opt("id") instanceof String)) continue; // Unassignable row must not poison valid siblings.
             String id=row.getString("id");
             TranslationUnitTimeline.Unit unit=targetById(targets,id);
             if(unit==null) { unknown.add(id); continue; }
-            if(!seen.add(id)) { plans.remove(id); texts.remove(id); invalid.add(id); continue; }
+            if(!seen.add(id)) { plans.remove(id); texts.remove(id); invalid.add(id); reasons.put(id,"duplicate_response_id"); continue; }
             try {
                 JSONArray segments=row.optJSONArray("segments");
                 if(segments==null && ProtocolRecovery.wholeText(repair.get(id)) && row.opt("text") instanceof String)
                     segments=new JSONArray().put(new JSONArray().put(unit.toAtom-unit.fromAtom).put(row.getString("text")));
-                AnchoredCaptionPlan plan=AnchoredCaptionPlan.parse(segments,atoms,unit,row.optJSONArray("attach_next"));
+                AnchoredCaptionPlan plan=AnchoredCaptionPlan.parseSourcePhrases(segments,atoms,unit,row.optJSONArray("attach_next"));
                 plans.put(id,plan); texts.put(id,plan.canonical);
             } catch(Exception rejected) { invalid.add(id); reasons.put(id,(rejected.getMessage()==null ? "invalid_structure" : rejected.getMessage())+";last="+(unit.toAtom-unit.fromAtom)+";ends="+safeEnds(row.optJSONArray("segments"))); }
         }
@@ -216,8 +220,15 @@ final class ContextualBatchApiClient {
 
     static String stripJsonFence(String content) {
         String text=content==null ? "" : content.trim();
-        if(text.startsWith("```json\n") || text.startsWith("```\n")) {
-            if(text.endsWith("```")) text=text.substring(text.indexOf('\n')+1,text.length()-3).trim();
+        if(text.startsWith("\uFEFF")) text=text.substring(1).trim();
+        // Only remove a complete, known outer fence. Never salvage truncated JSON or surrounding prose.
+        if(text.startsWith("```") && text.endsWith("```")) {
+            int newline=text.indexOf('\n');
+            if(newline>=3) {
+                String language=text.substring(3,newline).trim();
+                if(language.isEmpty() || language.equalsIgnoreCase("json"))
+                    text=text.substring(newline+1,text.length()-3).trim();
+            }
         }
         return text;
     }

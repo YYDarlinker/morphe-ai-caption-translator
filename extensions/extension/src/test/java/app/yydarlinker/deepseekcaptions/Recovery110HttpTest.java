@@ -18,4 +18,17 @@ public class Recovery110HttpTest {
    assertTrue(request.getInt("max_tokens")<=3072);
   }finally{server.shutdown();ContextualBatchApiClient.resetRejection();}
  }
+ @Test public void currentOnlyRequestKeepsBothReadOnlyContextSides()throws Exception{
+  MockWebServer server=new MockWebServer();server.start();try{
+   ContextualBatchApiClient.resetRejection();
+   String content="{\"translations\":[{\"id\":\"w0\",\"segments\":[[\"Hello world\",\"你好世界\"]]}]}";
+   server.enqueue(new MockResponse().setBody(new JSONObject().put("choices",new JSONArray().put(new JSONObject().put("finish_reason","stop").put("message",new JSONObject().put("content",content)))).toString()));
+   DeepSeekConfig.Snapshot config=new DeepSeekConfig.Snapshot(true,server.url("/").toString(),"deepseek-flash","Faithful",18,70,"FAKE-LOCAL-KEY");
+   List<SourceAtomTimeline.Atom> atoms=Arrays.asList(new SourceAtomTimeline.Atom(0,1000,"Hello",0,true),new SourceAtomTimeline.Atom(1000,2000,"world",0,true));
+   TranslationUnitTimeline.Unit unit=new TranslationUnitTimeline.Unit(0,"w0",0,1,0,0,0,2000,"Hello world",TranslationUnitTimeline.Confidence.HIGH,"test");
+   assertEquals(1,ContextualBatchApiClient.translate(Arrays.asList(unit),atoms,Arrays.asList("Previous context."),Arrays.asList("Following context."),config,TargetLanguage.SIMPLIFIED_CHINESE,null,true).validCount());
+   JSONObject request=new JSONObject(server.takeRequest().getBody().readUtf8());JSONObject payload=new JSONObject(request.getJSONArray("messages").getJSONObject(1).getString("content"));
+   assertEquals(1,payload.getJSONArray("targets").length());assertEquals("Previous context.",payload.getString("context_before"));assertEquals("Following context.",payload.getString("context_after"));assertEquals(1,server.getRequestCount());
+  }finally{server.shutdown();ContextualBatchApiClient.resetRejection();}
+ }
 }

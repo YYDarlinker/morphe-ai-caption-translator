@@ -28,6 +28,14 @@ final class AnchoredCaptionPlan {
     }
     static AnchoredCaptionPlan parse(JSONArray rows,List<SourceAtomTimeline.Atom> atoms,
                                     TranslationUnitTimeline.Unit unit,JSONArray attachments) throws Exception {
+        return parse(rows,atoms,unit,attachments,false);
+    }
+    static AnchoredCaptionPlan parseSourcePhrases(JSONArray rows,List<SourceAtomTimeline.Atom> atoms,
+                                    TranslationUnitTimeline.Unit unit,JSONArray attachments) throws Exception {
+        return parse(rows,atoms,unit,attachments,true);
+    }
+    private static AnchoredCaptionPlan parse(JSONArray rows,List<SourceAtomTimeline.Atom> atoms,
+                                    TranslationUnitTimeline.Unit unit,JSONArray attachments,boolean sourcePhrases) throws Exception {
         int count=unit.toAtom-unit.fromAtom+1;
         if (rows==null || rows.length()==0 || rows.length()>count || unit.fromAtom<0
                 || unit.toAtom>=atoms.size()) throw new IllegalArgumentException("invalid segment count/range");
@@ -52,7 +60,7 @@ final class AnchoredCaptionPlan {
             }
             if(row==null || row.length()!=2) throw new IllegalArgumentException("segment_shape");
             Object raw=row.get(0);
-            long endLong=raw instanceof String && !((String)raw).matches("0|[1-9][0-9]{0,8}")
+            long endLong=raw instanceof String && (sourcePhrases || !((String)raw).matches("0|[1-9][0-9]{0,8}"))
                     ? SourcePhraseAlignment.end((String)raw,atoms,unit.fromAtom+next,unit.toAtom)-unit.fromAtom : exactIndex(raw);
             if(endLong<next || endLong>=count) throw new IllegalArgumentException("overlap or out of range");
             int end=(int)endLong;

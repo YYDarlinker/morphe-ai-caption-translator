@@ -25,6 +25,28 @@ final class AsrLocalTiming {
             matched+=N;last=j+N-1;i+=N-1;
         }
         if(matched<8)return source;
+        // Extend at most three adjacent identical words around unique 4-word anchors.
+        // Never search ahead across a mismatch, reuse a word, or infer translated timing.
+        int[] rightMatch=new int[match.length];int nextKnown=-1;
+        for(int i=match.length-1;i>=0;i--){rightMatch[i]=nextKnown;if(match[i]>=0)nextKnown=match[i];}
+        int extended=0;
+        for(int i=1;i<p.size();i++) {
+            if(match[i]>=0){extended=0;continue;}
+            int j=match[i-1]+1;
+            if(extended<3 && match[i-1]>=0 && j<a.size()
+                    && (rightMatch[i]<0 || j<rightMatch[i])
+                    && compatible(p.get(i),a.get(j),source,asr)){match[i]=j;extended++;}
+        }
+        int[] leftMatch=new int[match.length];int previousKnown=-1;
+        for(int i=0;i<match.length;i++){leftMatch[i]=previousKnown;if(match[i]>=0)previousKnown=match[i];}
+        extended=0;
+        for(int i=p.size()-2;i>=0;i--) {
+            if(match[i]>=0){extended=0;continue;}
+            int j=match[i+1]-1;
+            if(extended<3 && match[i+1]>0 && j>=0
+                    && (leftMatch[i]<0 || j>leftMatch[i])
+                    && compatible(p.get(i),a.get(j),source,asr)){match[i]=j;extended++;}
+        }
         int size=source.atoms.size();long[] starts=new long[size],ends=new long[size];boolean[] exact=new boolean[size];
         int[] total=new int[size],hits=new int[size];
         Arrays.fill(starts,Long.MAX_VALUE);
@@ -52,6 +74,10 @@ final class AsrLocalTiming {
         for(int i=0;i<size;i++){SourceAtomTimeline.Atom original=source.atoms.get(i);if(exact[i])count++;out.add(new SourceAtomTimeline.Atom(starts[i],ends[i],original.text,original.cueIndex,exact[i]));}
         if(count<8)return source;
         return new SourceAtomTimeline.Result(Collections.unmodifiableList(out),source.rawCueCount,count,size-count,source.json3,source.rollupNormalized);
+    }
+    private static boolean compatible(Word p,Word a,SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr){
+        SourceAtomTimeline.Atom x=source.atoms.get(p.atom),y=asr.atoms.get(a.atom);
+        return p.value.equals(a.value)&&y.precise&&Math.abs(x.startMs-y.startMs)<=12000;
     }
     private static void interpolate(List<SourceAtomTimeline.Atom> p,long[] s,long[] e,boolean[] exact){
         int[] right=new int[p.size()];int next=-1;

@@ -9,5 +9,5 @@ public class SourcePhrase111Test {
  @Test public void partialAtomCannotClaimCompleteSource(){try{SourcePhraseAlignment.end("but",atoms(),0,3);fail();}catch(IllegalArgumentException expected){}}
  @Test public void foreignVideoAndHostAreRejected(){assertFalse(WordTimingReference.safe("https://example.com/api/timedtext?v=abcdefghijk","abcdefghijk"));assertFalse(WordTimingReference.safe("https://www.youtube.com/api/timedtext?v=otheridxxxx","abcdefghijk"));assertTrue(WordTimingReference.safe("https://www.youtube.com/api/timedtext?v=abcdefghijk","abcdefghijk"));}
  @Test public void staleMediaOffsetCannotAdvanceByAnExtraSecond(){assertEquals(1200,PlaybackSignalPolicy.position(1000,1000,500,1800,1000,1,true,false,1200));assertEquals(1000,PlaybackSignalPolicy.position(1000,1000,500,1800,1000,0,false,true,9000));}
- @Test public void normalStartupAndRetryBudgetRemainBounded(){assertEquals(4,StartupCaptionPolicy.targetLimit(false,4));assertEquals(3,AnchoredRetryPolicy.MAX_FAILURES);}
+ @Test public void normalStartupAndRetryBudgetRemainBounded(){assertEquals(1,StartupCaptionPolicy.targetLimit(false,4));assertEquals(3,AnchoredRetryPolicy.MAX_FAILURES);}
 }

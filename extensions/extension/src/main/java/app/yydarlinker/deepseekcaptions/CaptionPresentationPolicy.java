@@ -17,23 +17,15 @@ final class CaptionPresentationPolicy {
         +"An event is NOT a visual line. Split multi-sentence explanations instead of placing a paragraph on screen. A transition such as 'So to put it simply' begins its new explanation, not the previous event. "
         +"A numbered point or a new contrast begins a new event rather than attaching it to the previous claim. Keep names, quantities, modifiers and their nouns, verbs and their objects together. A long sentence may span events, but do not leave an orphaned connector or filler. "
         +"Aim for 1.5-6 seconds and 10-32 Chinese characters (other languages roughly two 42-character lines); these are goals, not excuses to invent, drop, or prematurely translate future speech. "
-        +"Use timed_words [source text,end deciseconds] and pauses_before_ms as source timing evidence. Never equate every cue edge or pause with a speaker/shot change. "
+        +"Prefer a single visual line when a complete sense group fits naturally (often 10-20 Chinese characters); use two lines when needed. Never shorten meaning or detach a name, object, modifier, or closing quote just to meet a line target. Avoid unnecessary spaces around Chinese punctuation. Use timed_words [source text,end deciseconds] and pauses_before_ms as source timing evidence. Never equate every cue edge or pause with a speaker/shot change. "
         +"Prefer faithful natural technical terms; translate multiplicative comparisons as ratios, not additive increases. Do not include read-only context in output.";}
-    // Visual line wrap only: no timestamp changes or dictionary-free time splitting.
+    // Do not force a visual break by character count. The renderer knows the actual font and width.
     static String wrap(String text){
-        if(text==null)return "";String s=text.replace('\n',' ').trim();
-        int limit=cjk(s)?16:42;if(s.codePointCount(0,s.length())<=limit)return s;
-        int center=s.offsetByCodePoints(0,s.codePointCount(0,s.length())/2),best=-1;double score=Double.MAX_VALUE;
-        for(int i=1;i<s.length();i++){
-            char left=s.charAt(i-1),right=s.charAt(i);
-            boolean natural=Character.isWhitespace(left)||",;:，；：。！？!?".indexOf(left)>=0;
-            if(!natural || Character.isLowSurrogate(right))continue;
-            if(Character.isDigit(left)&&Character.isDigit(right))continue;
-            int a=s.substring(0,i).codePointCount(0,i),b=s.substring(i).codePointCount(0,s.length()-i);
-            double v=Math.abs(i-center)+Math.max(0,Math.max(a,b)-limit)*10;
-            if(v<score){score=v;best=i;}
-        }
-        if(best<0)return s; // Let the TextView wrap; do not cut an unknown compound just to balance.
-        return s.substring(0,best).trim()+"\n"+s.substring(best).trim();
+        if(text==null)return "";
+        String s=text.replace('\n',' ').trim();
+        if(!cjk(s))return s;
+        return s.replaceAll("\\s+([，。！？；：、）】》”’])", "$1")
+                .replaceAll("([（【《“‘])\\s+", "$1")
+                .replaceAll("([，。！？；：、])\\s+(?=[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}\\p{IsHangul}])", "$1");
     }
 }

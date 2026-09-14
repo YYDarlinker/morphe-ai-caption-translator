@@ -342,6 +342,8 @@ final class CaptionOverlay {
         float minimumSp = scaledTextSize(activity, DeepSeekConfig.MIN_CAPTION_TEXT_SIZE, bounds);
         float finalSp = fittedSize(activity, view, pendingText, preferredSp, minimumSp, anchorWidth);
 
+        view.setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED);
+        view.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
         view.setText(pendingText);
         view.setMaxLines(2);
         view.setSingleLine(false);
@@ -391,8 +393,10 @@ final class CaptionOverlay {
         TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         paint.setTextSize(TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_SP, sp, activity.getResources().getDisplayMetrics()));
-        StaticLayout layout = new StaticLayout(
-                text, paint, Math.max(1, width), Layout.Alignment.ALIGN_CENTER, 1f, 0f, false);
+        StaticLayout layout = StaticLayout.Builder.obtain(text, 0, text.length(), paint, Math.max(1, width))
+                .setAlignment(Layout.Alignment.ALIGN_CENTER).setIncludePad(false)
+                .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
+                .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE).build();
         return layout.getLineCount();
     }
 

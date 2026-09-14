@@ -11,6 +11,7 @@ final class CaptionDiagnostics {
     private static final String TIME = "time";
     private static final String HISTORY = "history";
     private static final int MAX_HISTORY = 8000;
+    private static final String DECISIONS = "timing_and_protocol_decisions";
 
     private CaptionDiagnostics() {}
 
@@ -29,6 +30,13 @@ final class CaptionDiagnostics {
             String line = now + " | " + cleanStage + (cleanDetail.isEmpty() ? "" : " | " + cleanDetail);
             String next = old == null || old.isEmpty() ? line : line + "\n" + old;
             if (next.length() > MAX_HISTORY) next = next.substring(0, MAX_HISTORY);
+            // Keep bounded clock/rejection evidence separate from noisy display selections.
+            if(importantDecision(cleanStage)) {
+                String decisions=p.getString(DECISIONS, "");
+                decisions=line+(decisions.isEmpty()?"":"\n"+decisions);
+                if(decisions.length()>3000)decisions=decisions.substring(0,3000);
+                p.edit().putString(DECISIONS,decisions).apply();
+            }
             p.edit()
                     .putString(STAGE, cleanStage)
                     .putString(DETAIL, cleanDetail)
@@ -52,7 +60,7 @@ final class CaptionDiagnostics {
             String detail = p.getString(DETAIL, "");
             long time = p.getLong(TIME, 0L);
             String audit = TokenCostAudit.uiText(context);
-            String header = "引擎：Anchored / source-phrase-111\n当前模式：" + (CaptionChoice.translates() ? "自动翻译" : "原字幕（零翻译 API）") + "\n显示文本调试：" +
+            String header = "引擎：Anchored / source-phrase-112\n当前模式：" + (CaptionChoice.translates() ? "自动翻译" : "原字幕（零翻译 API）") + "\n显示文本调试：" +
                     (DeepSeekConfig.displayTextDebugEnabled(context) ? "开" : "关");
             if (stage == null || stage.isEmpty()) {
                 String base = "尚未捕获到自动翻译请求。启用并填写 API Key 后，播放视频并从“自动翻译”选择任意目标语言，再回来点“刷新诊断”。";
@@ -69,6 +77,8 @@ final class CaptionDiagnostics {
             if (audit != null && !audit.isEmpty()) {
                 text.append("\n\n").append(audit);
             }
+            String decisions=p.getString(DECISIONS, "");
+            if(!decisions.isEmpty())text.append("\n\n时间参照与异常（独立保留，含时间戳）：\n").append(decisions);
             String history = p.getString(HISTORY, "");
             if (history != null && !history.isEmpty()) {
                 text.append("\n\n最近链路：\n").append(history);
@@ -77,6 +87,14 @@ final class CaptionDiagnostics {
         } catch (Throwable error) {
             return "读取诊断状态失败：" + error.getClass().getSimpleName();
         }
+    }
+
+    private static boolean importantDecision(String stage) {
+        return stage.equals("ANCHOR_RESPONSE_REJECTED") || stage.equals("CONTEXTUAL_BATCH_FAILED")
+                || stage.equals("FIRST_AI_READY") || stage.equals("SOURCE_TIMING_BASE")
+                || stage.equals("ASR_LOCAL_TIMING_APPLIED") || stage.equals("ASR_LOCAL_TIMING_REJECTED")
+                || stage.equals("ASR_NATIVE_WORD_TIMING_SELECTED") || stage.equals("ASR_NATIVE_WORD_TIMING_ALIGNED")
+                || stage.equals("ASR_WORD_TIMING_UNAVAILABLE");
     }
 
     private static String sanitize(String value, int max) {

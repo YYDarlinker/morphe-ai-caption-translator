@@ -73,3 +73,8 @@ Version/model compounds are protected before window boundaries are selected. The
 API fields use the Android floating text action bar and delegate Paste to Android. The key field intentionally uses normal text input, **visible while editing**, not a password input type that invokes OEM secure keyboards. Stored keys are never loaded into the editor; successful input is cleared on focus loss and remains encrypted at rest. No personalized keyboard learning is requested, but this is a keyboard hint, not an OS-wide privacy guarantee. Other keyboard settings are not changed.
 
 The settings page now uses consistent insets and typography, compact model controls, and an inset rounded 16:9 preview. Automated Android-framework tests cover long-touch/Paste and preview geometry; actual OEM keyboard and visual behavior still require device validation.
+
+## Semantic / ASR / pause revision
+
+Local English ASR word anchors now take priority when uniquely matched and validated, with the original calibration fallback retained. Display follows confirmed player positions rather than predicting future speech. Semantic windows, bounded context and labelled original-cue recovery address fragmented and rejected translations without an extra model pass. See docs/SEMANTIC-ASR-R6.md for evidence, cost tradeoffs and verification limits.
+

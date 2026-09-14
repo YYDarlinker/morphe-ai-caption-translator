@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.1...v1.1.2) (2026-09-14)
+
+### 🐛 Bug Fixes
+
+* refine anchored caption startup, recovery and presentation ([9ed211e](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/9ed211e991a86f7a5a6c83279089990c20ea2f89))
+
 ## [1.1.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.0...v1.1.1) (2026-09-14)
 
 ### 🐛 Bug Fixes

@@ -1,3 +1,9 @@
+## [1.0.6](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.5...v1.0.6) (2026-09-14)
+
+### 🐛 Bug Fixes
+
+* restore anchored caption pacing release baseline ([3c4c811](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/3c4c811b0789232051fb8e827e625c2b84dddf1e))
+
 ## [1.0.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.0.4...v1.0.5) (2026-09-13)
 
 ### 🐛 Bug Fixes

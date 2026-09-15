@@ -20,14 +20,14 @@ public final class SubtitleStylePreview extends android.preference.Preference {
     @Override protected View onCreateView(ViewGroup parent){
         Context c=getContext();LinearLayout root=new LinearLayout(c);root.setOrientation(LinearLayout.VERTICAL);CaptionSettingsStyle.row(root);
         LinearLayout heading=new LinearLayout(c);heading.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=new TextView(c);title.setText("字幕预览");CaptionSettingsStyle.title(title);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        TextView title=new TextView(c);title.setText(CaptionStrings.localize(getContext(), "字幕预览"));CaptionSettingsStyle.title(title);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button toggle=new Button(c,null,android.R.attr.borderlessButtonStyle);CaptionSettingsStyle.button(toggle);heading.addView(toggle);
         root.addView(heading,new LinearLayout.LayoutParams(-1,-2));
         Preview preview=new Preview(c);preview.setTag("ai_style_preview_canvas");views.add(preview);
-        Runnable labels=()->toggle.setText(preview.portrait?"切换为横屏":"切换为竖屏");
+        Runnable labels=()->toggle.setText(CaptionStrings.localize(getContext(), preview.portrait?"切换为横屏":"切换为竖屏"));
         preview.onOrientationChanged=labels;labels.run();toggle.setOnClickListener(v->preview.performClick());
         root.addView(preview,new LinearLayout.LayoutParams(-1,-2));
-        TextView hint=new TextView(c);hint.setText("点按画面切换方向 · 字号与背景设置实时预览");CaptionSettingsStyle.caption(hint);hint.setPadding(0,CaptionSettingsStyle.dp(c,8),0,0);
+        TextView hint=new TextView(c);hint.setText(CaptionStrings.localize(getContext(), "点按画面切换方向 · 字号与背景设置实时预览"));CaptionSettingsStyle.caption(hint);hint.setPadding(0,CaptionSettingsStyle.dp(c,8),0,0);
         root.addView(hint);return root;
     }
     static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.size=value;else p.opacity=value;p.invalidate();}}
@@ -40,7 +40,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
         boolean portrait;
         int size,opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);Runnable onOrientationChanged;
         Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);size=s.captionTextSize;opacity=s.backgroundOpacity;setClickable(true);setFocusable(true);describe();}
-        private void describe(){setContentDescription((portrait?"竖屏":"横屏")+"字幕预览，点击切换方向");}
+        private void describe(){setContentDescription(CaptionStrings.localize(getContext(), (portrait?"竖屏":"横屏")+"字幕预览，点击切换方向"));}
         @Override public boolean performClick(){super.performClick();portrait=!portrait;describe();if(onOrientationChanged!=null)onOrientationChanged.run();requestLayout();invalidate();return true;}
         @Override protected void onMeasure(int widthSpec,int heightSpec){
             android.util.DisplayMetrics d=getResources().getDisplayMetrics();int width=MeasureSpec.getSize(widthSpec);
@@ -61,7 +61,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
             float device=Math.max(1,Math.min(d.widthPixels,d.heightPixels));
             float px=SubtitleStyleMetrics.previewTextPx(size,device,d.density,d.scaledDensity,Math.min(w,h));
             paint.setTextSize(px);paint.setTypeface(Typeface.DEFAULT);paint.setTextAlign(Paint.Align.CENTER);
-            String sample=portrait?"竖屏字幕示例":"这是字幕样式预览";float tw=paint.measureText(sample);
+            String sample=CaptionStrings.localize(getContext(),portrait?"竖屏字幕示例":"这是字幕样式预览");float tw=paint.measureText(sample);
             if(tw>w*.86f){px*=w*.86f/tw;paint.setTextSize(px);tw=w*.86f;}
             float bottom=h*(portrait?.72f:.86f),top=bottom-px*1.65f;
             paint.setColor(Color.argb(SubtitleStyleMetrics.alpha(opacity),0,0,0));c.drawRoundRect(w/2-tw/2-px*.45f,top,w/2+tw/2+px*.45f,bottom,px*.2f,px*.2f,paint);

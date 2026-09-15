@@ -166,7 +166,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
             ((InlineCaptionEditor)value).sensitive(true);
             value.setImeOptions(EditorInfo.IME_ACTION_DONE|EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
             boolean saved = SecureApiKey.hasSavedValue(getContext());
-            value.setHint(saved ? "已加密保存；输入可替换" : "请输入 API Key");
+            value.setHint(CaptionStrings.localize(getContext(), saved ? "已加密保存；输入可替换" : "请输入 API Key"));
         } else if (KEY_PROMPT.equals(key)) {
             value.setSingleLine(false);
             value.setMinLines(3);
@@ -211,7 +211,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
         if (value.equals(lastCommitted)) return;
         if (KEY_API_KEY.equals(getKey()) && value.isEmpty()) return;
         if(KEY_API_KEY.equals(getKey()) && (value.contains("\n") || value.contains("\r"))) {
-            if(editor!=null)editor.setError("API Key 应为单行");return;
+            if(editor!=null)editor.setError(CaptionStrings.localize(getContext(), "API Key 应为单行"));return;
         }
 
         try {
@@ -229,7 +229,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
             // During ordinary typing an incomplete URL is expected. Keep the last valid
             // value and show a quiet inline hint; focus loss exposes the field error as well.
             updateState(false, detail);
-            if (reportInvalid && editor != null) editor.setError(detail);
+            if (reportInvalid && editor != null) editor.setError(CaptionStrings.localize(getContext(),detail));
         }
     }
 
@@ -249,19 +249,19 @@ public class DeepSeekTextPreference extends android.preference.Preference {
     private void updateState(boolean justSaved, String error) {
         if (state == null) return;
         if (error != null) {
-            state.setText(error + "；保留上次有效值");
+            state.setText(CaptionStrings.localize(getContext(), error + "；保留上次有效值"));
             state.setAlpha(1f);
             return;
         }
 
         if (KEY_API_KEY.equals(getKey())) {
-            state.setText(!SecureApiKey.hasSavedValue(getContext())
+            state.setText(CaptionStrings.localize(getContext(), !SecureApiKey.hasSavedValue(getContext())
                     ? "编辑时可见；关闭页面清空，加密保存"
-                    : (justSaved ? "已自动加密保存" : "已加密保存，不回显原 Key"));
+                    : (justSaved ? "已自动加密保存" : "已加密保存，不回显原 Key")));
         } else {
             CharSequence summary = getSummary();
-            state.setText(justSaved ? "已自动保存" :
-                    (summary == null || summary.length() == 0 ? "修改后自动保存" : summary));
+            state.setText(CaptionStrings.localize(getContext(), justSaved ? "已自动保存" :
+                    (summary == null || summary.length() == 0 ? "修改后自动保存" : summary)));
         }
         state.setAlpha(1f);
     }

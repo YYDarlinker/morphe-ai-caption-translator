@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cap_ai_title" formatted="false">"Traduction des sous-titres par IA"</string>
+    <string name="cap_enable_ai" formatted="false">"Activer la traduction par IA"</string>
+    <string name="cap_api_config" formatted="false">"Configuration de l’API"</string>
+    <string name="cap_api_address" formatted="false">"Adresse de l’API"</string>
+    <string name="cap_api_key" formatted="false">"Clé API"</string>
+    <string name="cap_model" formatted="false">"Modèle"</string>
+    <string name="cap_test_api" formatted="false">"Tester l’API"</string>
+    <string name="cap_translation" formatted="false">"Traduction"</string>
+    <string name="cap_translation_requirements" formatted="false">"Consignes de traduction"</string>
+    <string name="cap_style" formatted="false">"Style des sous-titres"</string>
+    <string name="cap_size" formatted="false">"Taille des sous-titres"</string>
+    <string name="cap_opacity" formatted="false">"Opacité du fond"</string>
+    <string name="cap_reset_position" formatted="false">"Réinitialiser la position"</string>
+    <string name="cap_cache_diagnostics" formatted="false">"Cache et diagnostic"</string>
+    <string name="cap_clear_cache" formatted="false">"Vider le cache des sous-titres"</string>
+    <string name="cap_delete_key" formatted="false">"Supprimer la clé API"</string>
+    <string name="cap_text_debug" formatted="false">"Débogage du texte"</string>
+    <string name="cap_diagnostics" formatted="false">"Diagnostic des sous-titres"</string>
+    <string name="cap_clear_diagnostics" formatted="false">"Effacer le diagnostic"</string>
+    <string name="cap_preview" formatted="false">"Aperçu des sous-titres"</string>
+    <string name="cap_landscape" formatted="false">"Paysage"</string>
+    <string name="cap_portrait" formatted="false">"Portrait"</string>
+    <string name="cap_to_landscape" formatted="false">"Passer en paysage"</string>
+    <string name="cap_to_portrait" formatted="false">"Passer en portrait"</string>
+    <string name="cap_refresh" formatted="false">"Actualiser"</string>
+    <string name="cap_copy" formatted="false">"Copier"</string>
+    <string name="cap_expand" formatted="false">"Développer"</string>
+    <string name="cap_collapse" formatted="false">"Réduire"</string>
+    <string name="cap_cancel" formatted="false">"Annuler"</string>
+    <string name="cap_delete" formatted="false">"Supprimer"</string>
+    <string name="cap_saved" formatted="false">"Enregistré automatiquement"</string>
+    <string name="cap_autosave" formatted="false">"Les modifications sont enregistrées automatiquement"</string>
+    <string name="cap_enter_key" formatted="false">"Saisissez la clé API"</string>
+    <string name="cap_key_saved" formatted="false">"Stockée chiffrée ; saisir pour remplacer"</string>
+    <string name="cap_model_hint" formatted="false">"Choisissez un modèle ou saisissez son ID"</string>
+    <string name="cap_preview_hint" formatted="false">"Touchez l’image pour changer d’orientation ; aperçu en direct"</string>
+    <string name="cap_size_hint" formatted="false">"Taille relative 12–22, adaptée à la vidéo"</string>
+    <string name="cap_opacity_hint" formatted="false">"0% transparent, 100% opaque ; enregistré au relâchement"</string>
+    <string name="cap_diagnostic_hint" formatted="false">"Développez pour consulter et copier le diagnostic"</string>
+    <string name="cap_use_youtube" formatted="false">"Utiliser YouTube"</string>
+    <string name="cap_use_ai" formatted="false">"Utiliser l’IA"</string>
+    <string name="cap_on" formatted="false">"Activé"</string>
+    <string name="cap_off" formatted="false">"Désactivé"</string>
+    <string name="cap_configure_api" formatted="false">"Configurez l’API avant d’activer la traduction par IA"</string>
+    <string name="cap_switch_failed" formatted="false">"Échec du changement ; mode précédent restauré"</string>
+    <string name="cap_choose_translation" formatted="false">"Choisissez une langue de traduction automatique dans le menu des sous-titres"</string>
+    <string name="cap_message_7b7480271fa5" formatted="false">"Désactivé, YouTube affiche ses propres sous-titres"</string>
+    <string name="cap_message_1cc3c4b0aab0" formatted="false">"Les sous-titres originaux fonctionnent directement ; l’IA nécessite une clé API"</string>
+    <string name="cap_message_2c107e436145" formatted="false">"Activé ; choisissez une langue de traduction automatique pour utiliser l’IA"</string>
+    <string name="cap_message_ea9ebe26591a" formatted="false">"Inclure le texte original et traduit dans le diagnostic, uniquement pour le dépannage"</string>
+    <string name="cap_message_f496dd228d0b" formatted="false">"Ne pas enregistrer le texte original ou traduit"</string>
+    <string name="cap_message_261f1c6f0fde" formatted="false">"Enregistrer le texte pour le dépannage ; désactivé par défaut"</string>
+    <string name="cap_message_92561907fadc" formatted="false">"Tester la connexion avec la configuration enregistrée"</string>
+    <string name="cap_message_33c08bcbc79b" formatted="false">"Seule la traduction automatique utilise l’API ; le texte original n’est pas traduit"</string>
+    <string name="cap_message_fd1ada5395a0" formatted="false">"Réinitialiser la position verticale, conserver taille et fond"</string>
+    <string name="cap_message_10d1b374429d" formatted="false">"Visible pendant la saisie, effacée à la fermeture et stockée chiffrée"</string>
+    <string name="cap_message_7da9039cc193" formatted="false">"La clé API doit tenir sur une seule ligne"</string>
+    <string name="cap_message_bafa7b1ca6cb" formatted="false">"L’adresse API doit commencer par https:// ou http://"</string>
+    <string name="cap_message_bbbcd9c8bf80" formatted="false">"Échec de l’enregistrement automatique"</string>
+    <string name="cap_message_b795d97808e8" formatted="false">"Impossible d’enregistrer le modèle"</string>
+    <string name="cap_message_9a6606c64f5f" formatted="false">"Paramètre inconnu"</string>
+    <string name="cap_message_8500e82ca181" formatted="false">" ; dernière valeur valide conservée"</string>
+    <string name="cap_message_a25bd037963d" formatted="false">"Position réinitialisée"</string>
+    <string name="cap_message_e8b2177e1cd3" formatted="false">"Cache des sous-titres vidé"</string>
+    <string name="cap_message_1f328bc723d4" formatted="false">"Supprimer la clé API ?"</string>
+    <string name="cap_message_6ec744dcc83a" formatted="false">"Supprimer uniquement la clé API chiffrée de cet appareil. Les autres paramètres sont conservés."</string>
+    <string name="cap_message_574dd3f1ccfe" formatted="false">"Clé API supprimée"</string>
+    <string name="cap_message_8bfb437edfc4" formatted="false">"Diagnostic effacé"</string>
+    <string name="cap_message_896c4b51d7e9" formatted="false">"Diagnostic copié"</string>
+    <string name="cap_message_49562bf14c82" formatted="false">"Test en cours…"</string>
+    <string name="cap_message_3a1185c1dc9f" formatted="false">"API disponible : "</string>
+    <string name="cap_message_88ce10e8f20b" formatted="false">"Échec du test API : "</string>
+    <string name="cap_message_ec966cf35a63" formatted="false">"Actualisation des modèles…"</string>
+    <string name="cap_message_462efc3e98ef" formatted="false">"Chargement des modèles…"</string>
+    <string name="cap_message_2d61f9891514" formatted="false">"Impossible de charger les modèles ; saisissez un ID : "</string>
+    <string name="cap_message_17ea5266e7a5" formatted="false">"Liste des modèles actualisée"</string>
+    <string name="cap_message_7e7bfd29c71d" formatted="false">"Aucune demande de traduction. Configurez l’API, choisissez une langue de traduction automatique puis actualisez le diagnostic."</string>
+    <string name="cap_message_dd0fb9f395bc" formatted="false">"Moteur : "</string>
+    <string name="cap_message_8736a99d18f2" formatted="false">"Mode : "</string>
+    <string name="cap_message_0825b4b0cb7d" formatted="false">"Traduction automatique"</string>
+    <string name="cap_message_375e0f929195" formatted="false">"Sous-titres originaux (sans API de traduction)"</string>
+    <string name="cap_message_c46b062d22ba" formatted="false">"Débogage du texte : "</string>
+    <string name="cap_message_44feb4d98d48" formatted="false">"Dernière étape : "</string>
+    <string name="cap_message_dedc85cbb813" formatted="false">"Repères temporels et erreurs (horodatés) : "</string>
+    <string name="cap_message_30070c30d85c" formatted="false">"Événements récents : "</string>
+    <string name="cap_message_75a885d3b526" formatted="false">"Impossible de lire le diagnostic : "</string>
+    <string name="cap_message_c34848823d86" formatted="false">" (il y a environ "</string>
+    <string name="cap_message_33cc168ccb4e" formatted="false">" secondes)"</string>
+</resources>

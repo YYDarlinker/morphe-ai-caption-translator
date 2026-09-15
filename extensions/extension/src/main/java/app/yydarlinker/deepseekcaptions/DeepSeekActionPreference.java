@@ -62,7 +62,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             toast("字幕缓存已清除");
         } else if (KEY_DELETE_KEY.equals(key)) {
             new AlertDialog.Builder(context)
-                    .setTitle("删除 API Key？")
+                    .setTitle(CaptionStrings.localize(getContext(), "删除 API Key？"))
                     .setMessage("只删除本机加密保存的 API Key，不修改其他设置。")
                     .setNegativeButton("取消", null)
                     .setPositiveButton("删除", (dialog, which) -> {
@@ -85,7 +85,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             return;
         }
         setEnabled(false);
-        setSummary("测试中…");
+        setSummary(CaptionStrings.localize(getContext(), "测试中…"));
         new Thread(() -> {
             String result;
             try {
@@ -101,7 +101,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             final String message = result;
             postToUi(() -> {
                 setEnabled(true);
-                setSummary("使用当前已自动保存的配置测试连接");
+                setSummary(CaptionStrings.localize(getContext(), "使用当前已自动保存的配置测试连接"));
                 if(message.startsWith("API 可用：")) DynamicCaptionController.refreshConfiguration(getContext());
                 toast(message);
             });
@@ -114,6 +114,6 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
     }
 
     private void toast(String text) {
-        Toast.makeText(getContext(), text, Toast.LENGTH_LONG).show();
+        Toast.makeText(getContext(), CaptionStrings.localize(getContext(),text), Toast.LENGTH_LONG).show();
     }
 }

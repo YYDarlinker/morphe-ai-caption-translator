@@ -8,25 +8,25 @@ public final class NativeCaptionBridge {
     private static volatile Context context;
     private NativeCaptionBridge() {}
     static void initialize(Context value) { context=value.getApplicationContext(); }
-    static boolean enabled() { return context!=null && DeepSeekConfig.enabled(context); }
+    static boolean enabled() { return CaptionAddonSupport.aiInstalled() && context!=null && DeepSeekConfig.enabled(context); }
 
     public static boolean suppressNativeDraw() {
         return enabled() && DynamicCaptionController.isVisibleActive();
     }
     public static List<?> augmentTranslations(List<?> original) {
-        if(original==null || original.isEmpty()) return original;
+        if(!CaptionAddonSupport.simplifiedInstalled() || original==null || original.isEmpty()) return original;
         try {
             Object prototype=null;
             for(Object track:original) {
                 String code=language(track);
-                if(code!=null && !code.isEmpty() && "zh-Hans".equals(TargetLanguage.fromCode(code).code)) return LanguageMenuOrder.sorted(original,NativeCaptionBridge::language);
+                if(code!=null && !code.isEmpty() && "zh-Hans".equals(TargetLanguage.fromCode(code).code)) return LanguageMenuOrder.insertSimplified(original,NativeCaptionBridge::language,t->displayName(t).toString());
                 if(prototype==null && DeepSeekCaptionHook.isYouTubeTimedTextUrl(url(track))) prototype=track;
             }
             if(prototype==null) return original;
             Object simplified=cloneSimplified(prototype);
             if(simplified==null) return original;
             List<Object> copy=new ArrayList<>(original.size()+1);
-            copy.add(simplified); copy.addAll(original); return LanguageMenuOrder.sorted(copy,NativeCaptionBridge::language);
+            copy.add(simplified); copy.addAll(original); return LanguageMenuOrder.insertSimplified(copy,NativeCaptionBridge::language,t->displayName(t).toString());
         } catch(Exception failed) {
             CaptionDiagnostics.mark(context,"AI_MENU_INSERT_FAILED",failed.getClass().getSimpleName());
             return original;
@@ -34,18 +34,19 @@ public final class NativeCaptionBridge {
     }
     public static void onSelection(Object track) { applySelection(track,true); }
     static void applySelection(Object track,boolean remember) {
-        if(!enabled()) return;
+        if(!CaptionAddonSupport.aiInstalled()) return;
         try {
             String code=track==null ? "DISABLE_CAPTIONS_OPTION" : language(track);
             if("AUTO_TRANSLATE_CAPTIONS_OPTION".equals(code)) return;
             if(track==null || "DISABLE_CAPTIONS_OPTION".equals(code)) {
                 if(remember) CaptionChoice.toggle(false);
-                DynamicCaptionController.deactivateFromNativeCaptionState(); return;
+                if(enabled())DynamicCaptionController.deactivateFromNativeCaptionState(); return;
             }
             String selected=url(track);
             if(!DeepSeekCaptionHook.isYouTubeTimedTextUrl(selected)) return;
             boolean translate=TargetLanguage.fromUrl(selected)!=null;
             if(remember) CaptionChoice.select(code,translate,vss(track).startsWith("a."));
+            if(!enabled())return;
             CaptionButtonController.noteAiTrackSelected();
             if(translate) {
                 CaptionLifecycleRestore.noteAiTarget(selected);
@@ -56,11 +57,43 @@ public final class NativeCaptionBridge {
             CaptionDiagnostics.mark(context,"AI_SELECTION_FAILED",failed.getClass().getSimpleName());
         }
     }
-    public static void onNativeSelection(Object manager,Object track,Object origin) {
-        rememberAsrTracks(manager);
-        if(origin instanceof Enum<?> && "PREFERRED_TRACK".equals(((Enum<?>)origin).name())) applySelection(track,true);
-        else if(CaptionChoice.isOn()) applySelection(track,false);
+    private static java.lang.ref.WeakReference<Object> selectedManager=new java.lang.ref.WeakReference<>(null);
+    private static java.lang.ref.WeakReference<Object> selectedTrack=new java.lang.ref.WeakReference<>(null);
+    private static Object selectedOrigin;
+    private static boolean switching;
+    private static int selectedReason;
+    public static void onNativeSelectionWithReason(Object manager,Object track,Object origin,int reason){
+        selectedReason=reason;onNativeSelection(manager,track,origin);
     }
+    private static String selectedVideo="";
+    public static void onNativeSelection(Object manager,Object track,Object origin) {
+        String incomingVideo=track==null?"":PageCaptionController.videoIdFromUrl(url(track));
+        if(!incomingVideo.isEmpty()&&!incomingVideo.equals(selectedVideo)){
+            if(CaptionAddonSupport.aiInstalled())CaptionChoice.reset();selectedVideo=incomingVideo;
+        }
+        selectedManager=new java.lang.ref.WeakReference<>(manager);selectedTrack=new java.lang.ref.WeakReference<>(track);selectedOrigin=origin;
+        if(switching)return;
+        rememberAsrTracks(manager);
+        boolean explicit=origin instanceof Enum<?> && "PREFERRED_TRACK".equals(((Enum<?>)origin).name());
+        if(explicit && CaptionAddonSupport.memoryInstalled()) {
+            String code=track==null?"DISABLE_CAPTIONS_OPTION":language(track);
+            if(track==null || "DISABLE_CAPTIONS_OPTION".equals(code))RememberedCaptionSelection.off();
+            else if(!code.endsWith("_OPTION"))RememberedCaptionSelection.select(code,TargetLanguage.fromUrl(url(track))!=null,vss(track).startsWith("a."));
+        }
+        // Current-video state is required by AI independently of optional cross-video memory.
+        applySelection(track,explicit || !CaptionChoice.known());
+    }
+    static boolean canReselect(){return selectedManager.get()!=null && selectedOrigin!=null;}
+    static void refreshNativeTrack(){
+        Object manager=selectedManager.get(),track=selectedTrack.get(),origin=selectedOrigin;
+        if(manager==null||origin==null||track==null)return;
+        String video=PageCaptionController.videoIdFromUrl(url(track));
+        String current=PageCaptionController.currentVideoIdSnapshot();
+        if(!current.isEmpty()&&!current.equals(video))throw new IllegalStateException("Stale caption manager");
+        try{switching=true;selectNative(manager,null,origin,selectedReason);selectNative(manager,track,origin,selectedReason);}
+        finally{switching=false;}
+    }
+    public static void selectNative(Object manager,Object track,Object origin,int reason) {} // bound at patch time
     private static void rememberAsrTracks(Object manager) {
         if(!enabled() || manager==null)return;
         try{List<?> tracks=nativeTracks(manager);if(tracks!=null)for(Object track:tracks)
@@ -69,19 +102,16 @@ public final class NativeCaptionBridge {
     }
     public static Object resolveRemembered(Object manager) {
         rememberAsrTracks(manager);
-        if(!enabled() || !CaptionChoice.isOn()) return null;
-        List<?> list=CaptionChoice.translates() ? translatedTracks(manager) : nativeTracks(manager);
+        if(!CaptionAddonSupport.memoryInstalled() || RememberedCaptionSelection.decision()!=1)return null;
+        List<?> list=RememberedCaptionSelection.translated()?translatedTracks(manager):nativeTracks(manager);
         Object fallback=null;
-        if(list!=null) for(Object track:list) {
-            String code=language(track);
-            if(CaptionChoice.language().equals(code)) {
-                if(CaptionChoice.translates() || vss(track).startsWith("a.")==CaptionChoice.asr()) return track;
-                fallback=track;
-            }
+        if(list!=null)for(Object track:list)if(RememberedCaptionSelection.language().equals(language(track))) {
+            if(RememberedCaptionSelection.translated() || vss(track).startsWith("a.")==RememberedCaptionSelection.asr())return track;
+            fallback=track;
         }
         return fallback;
     }
-    public static int restoreDecision() { return !enabled() ? -1 : CaptionChoice.isOn() ? 1 : 0; }
+    public static int restoreDecision() { return !CaptionAddonSupport.memoryInstalled()?-1:RememberedCaptionSelection.decision(); }
     public static List<?> nativeTracks(Object manager) { return null; }
     public static List<?> translatedTracks(Object manager) { return null; }
     public static String simplifiedUrl(String value) { return TargetLanguage.withCode(value,"zh-Hans"); }
@@ -91,6 +121,7 @@ public final class NativeCaptionBridge {
         return "tzh-Hans"+(separator<0 ? "" : value.substring(separator));
     }
     public static Object augmentMetadata(Object metadata) { return metadata; }
+    public static CharSequence displayName(Object track) { return ""; }
     public static String language(Object track) { return ""; } // replaced at patch time
     public static String vss(Object track) { return ""; }
     public static String url(Object track) { return ""; }

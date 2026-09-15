@@ -71,6 +71,8 @@ public final class DeepSeekCaptionHook {
             // Fall through to the ordinary caption path rather than breaking YouTube captions.
         }
 
+        if(initialContext==null || !DeepSeekConfig.enabled(initialContext))return originalUrl;
+
         if(initialContext!=null && DeepSeekConfig.enabled(initialContext) &&
                 isYouTubeTimedTextUrl(originalUrl) && TargetLanguage.fromUrl(originalUrl)!=null &&
                 !CaptionModePolicy.mayTranslateSelection(CaptionChoice.known(),CaptionChoice.isOn(),CaptionChoice.translates())) {

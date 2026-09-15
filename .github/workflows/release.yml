@@ -33,6 +33,9 @@ jobs:
       - name: Test release metadata rejection paths
         run: python3 .github/scripts/test_release_contract.py
 
+      - name: Validate addon localization resources
+        run: python3 tools/check_localization.py
+
       - name: Reject stale release checkout
         run: |
           set -euo pipefail

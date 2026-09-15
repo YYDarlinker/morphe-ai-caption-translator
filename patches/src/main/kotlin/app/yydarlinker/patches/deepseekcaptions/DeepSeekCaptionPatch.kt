@@ -25,10 +25,10 @@ val deepSeekChineseCaptionsPatch = bytecodePatch(
     default = false,
 ) {
     compatibleWith(YOUTUBE)
-    dependsOn(deepSeekCaptionResourcePatch, captionResourceMappingPatch)
-    extendWith("extensions/extension.mpe")
+    dependsOn(captionSupportPatch, deepSeekCaptionResourcePatch, captionResourceMappingPatch)
 
     execute {
+        CaptionFeatures.ai=true
         // Keep a reference to the real YouTube Activity. The extension resolves YouTube's own
         // inset player overlay by resource name at runtime, so no layout resource is replaced.
         YouTubeActivityOnCreateFingerprint.method.addInstruction(
@@ -114,6 +114,6 @@ val deepSeekChineseCaptionsPatch = bytecodePatch(
             )
         }
     }
-    finalize { installNativeCaptionBridge() }
+
 
 }

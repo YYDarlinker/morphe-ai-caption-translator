@@ -38,7 +38,14 @@ private fun <T> Iterable<T>.unique(role: String): T {
 }
 
 /** Bind once after all bundles execute; no copied official extension or cross-bundle dependency. */
-internal fun BytecodePatchContext.installNativeCaptionBridge() {
+internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplified:Boolean, memory:Boolean) {
+    val featureRuntime=mutableClassDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
+    for((name,enabled) in listOf("aiInstalled" to ai,"simplifiedInstalled" to simplified,"memoryInstalled" to memory)) {
+        val stub=featureRuntime.methods.single { it.name==name }
+        val replacement=ImmutableMethod(featureRuntime.type,name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,MutableMethodImplementation(1)).toMutable()
+        replacement.addInstructions(0,"const/4 v0, ${if(enabled) "0x1" else "0x0"}\nreturn v0")
+        featureRuntime.methods.remove(stub);featureRuntime.methods.add(replacement)
+    }
     val track=getAllClassesWithString("AUTO_TRANSLATE_CAPTIONS_OPTION").map { classDefBy(it.type) }
         .filter { "Landroid/os/Parcelable;" in it.interfaces }.unique("caption model")
     val sentinel=track.methods.filter { it.returnType=="Z" && it.hasText("AUTO_TRANSLATE_CAPTIONS_OPTION") }
@@ -96,13 +103,16 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
     bind("language","check-cast p0, ${track.type}\niget-object v0, p0, ${language.id()}\nreturn-object v0")
     bind("vss","check-cast p0, ${track.type}\niget-object v0, p0, ${vss.id()}\nreturn-object v0")
     bind("url","check-cast p0, ${track.type}\niget-object v0, p0, ${url.id()}\nreturn-object v0")
+    bind("displayName","check-cast p0, ${track.type}\niget-object v0, p0, ${display.id()}\nreturn-object v0")
+    if(simplified) {
     bind("cloneSimplified", """
         check-cast p0, ${track.type}
         new-instance v0, ${builder.type}
         invoke-direct {v0, p0}, ${copy.id()}
         const-string v1, "zh-Hans"
         invoke-virtual {v0, v1}, ${languageSetter.id()}
-        const-string v1, "中文（简体）"
+        invoke-static {}, Lapp/yydarlinker/deepseekcaptions/LanguageMenuOrder;->simplifiedLabel()$STRING
+        move-result-object v1
         iput-object v1, v0, ${builderDisplay.id()}
         iget-object v1, p0, ${url.id()}
         invoke-static {v1}, $BRIDGE->simplifiedUrl($STRING)$STRING
@@ -125,7 +135,23 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
             addInstructions(i+1,"move-result-object v$r\nreturn-object v$r")
         }
     }
-    mutable(selector).addInstructions(0,"invoke-static/range {p0 .. p2}, $BRIDGE->onNativeSelection($OBJECT$OBJECT$OBJECT)V")
+    } // optional simplified language menu
+    if(selector.returnType!="V" || selector.parameterTypes.size !in 2..3 ||
+        (selector.parameterTypes.size==3 && selector.parameterTypes[2]!="I"))throw PatchException("Caption selector signature changed")
+    if(selector.parameterTypes.size==3)mutable(selector).addInstructions(0,"invoke-static/range {p0 .. p3}, $BRIDGE->onNativeSelectionWithReason($OBJECT$OBJECT${OBJECT}I)V")
+    else mutable(selector).addInstructions(0,"invoke-static/range {p0 .. p2}, $BRIDGE->onNativeSelection($OBJECT$OBJECT$OBJECT)V")
+    if(ai) {
+        val stub=runtime.methods.single { it.name=="selectNative" }
+        val m=ImmutableMethod(BRIDGE,stub.name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,MutableMethodImplementation(4)).toMutable()
+        m.addInstructions(0,"""
+            check-cast p0, ${selector.definingClass}
+            check-cast p1, ${track.type}
+            check-cast p2, ${selector.parameterTypes[1]}
+            ${if(selector.parameterTypes.size==3) "invoke-virtual/range {p0 .. p3}" else "invoke-virtual {p0, p1, p2}"}, ${selector.id()}
+            return-void
+        """.trimIndent())
+        runtime.methods.remove(stub);runtime.methods.add(m)
+    }
     // Global per-launch memory uses fresh native tracks; never carries old-video URLs.
     val owner=classDefBy(selector.definingClass)
     val defaultTrack=owner.methods.filter { it.parameterTypes.isEmpty() && it.returnType==track.type }.unique("native default selector")
@@ -143,6 +169,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
         return-object v0
     """
     bind("nativeTracks",listAccessor(nativeList));bind("translatedTracks",listAccessor(listMethod))
+    if(memory) {
     mutable(defaultTrack).apply {
         if(implementation!!.registerCount < 2) throw PatchException("AI memory: no scratch register")
         addInstructionsWithLabels(0,"""
@@ -151,7 +178,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
             if-nez v0, :remembered_track
             invoke-static {}, $BRIDGE->restoreDecision()I
             move-result v0
-            if-ltz v0, :original_default
+            if-nez v0, :original_default
             const/4 v0, 0x0
             return-object v0
             :remembered_track
@@ -194,6 +221,9 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
         """.trimIndent(),ExternalLabel("remembered_on",on),ExternalLabel("off_event",off))
     }
 
+    } // optional cross-video memory
+
+    if(simplified) {
     // Both modern protobuf settings and legacy CC rows consume this shared metadata field.
     val metadataField=listCode.mapNotNull { it.field() }.first { it.definingClass==listMethod.definingClass && it.type.startsWith("L") }
     val metadata=classDefBy(metadataField.type)
@@ -255,6 +285,9 @@ internal fun BytecodePatchContext.installNativeCaptionBridge() {
         }
     }
     java.util.logging.Logger.getLogger("AI captions").info("Shared translation metadata readers hooked: ${reads.size}; mode-aware memory ready")
+    } // optional metadata augmentation
+    if(!ai)return
+    installCaptionQuickToggle()
     val renderer=mutableClassDefBy("Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;")
     if(renderer.methods.any { it.name=="draw" && it.parameterTypes.toList()==listOf("Landroid/graphics/Canvas;") })
         throw PatchException("AI captions: native draw override already exists")

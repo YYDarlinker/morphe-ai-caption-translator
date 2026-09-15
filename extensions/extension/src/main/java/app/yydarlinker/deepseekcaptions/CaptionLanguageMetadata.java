@@ -14,13 +14,18 @@ public final class CaptionLanguageMetadata {
             if(prototype==null)return original;
             if(!hasHans){ByteArrayOutputStream entry=new ByteArrayOutputStream();
                 write(entry,1,"zh-Hans".getBytes(StandardCharsets.UTF_8));ByteArrayOutputStream label=new ByteArrayOutputStream();
-                write(label,4,"中文（简体）".getBytes(StandardCharsets.UTF_8));write(entry,2,label.toByteArray());
+                write(label,4,LanguageMenuOrder.simplifiedLabel().getBytes(StandardCharsets.UTF_8));write(entry,2,label.toByteArray());
                 for(Field f:fields(prototype))if(f.number!=1&&f.number!=2)entry.write(f.raw);languages.add(entry.toByteArray());}
-            languages.sort((a,b)->LanguageMenuOrder.compare(code(a),code(b)));
+            languages=LanguageMenuOrder.insertSimplified(languages,CaptionLanguageMetadata::code,CaptionLanguageMetadata::label);
             ByteArrayOutputStream out=new ByteArrayOutputStream();boolean wrote=false;
             for(Field f:root){if(f.number==3&&f.wire==2){if(!wrote){for(byte[] item:languages)write(out,3,item);wrote=true;}}else out.write(f.raw);}
             byte[] result=out.toByteArray();return Arrays.equals(original,result)?original:result;
         } catch(Exception malformed) { return original; }
+    }
+    private static String label(byte[] bytes){
+        for(Field f:fields(bytes))if(f.number==2&&f.wire==2)for(Field name:fields(f.value))
+            if(name.number==4&&name.wire==2)return new String(name.value,StandardCharsets.UTF_8);
+        return LanguageMenuOrder.label(code(bytes));
     }
     private static String code(byte[] bytes){for(Field f:fields(bytes))if(f.number==1&&f.wire==2)return new String(f.value,StandardCharsets.UTF_8);return "";}
     static void write(ByteArrayOutputStream out,int number,byte[] value) {

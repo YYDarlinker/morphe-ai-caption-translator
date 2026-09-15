@@ -13,13 +13,13 @@ public class PresentationR5Test {
         for(TranslationUnitTimeline.Unit u:AnchoredWindowPlanner.build(new SourceAtomTimeline.Result(a,100,100,0,true,false)).units)assertTrue(u.endMs-u.startMs<=12000);}
     @Test public void shortMergeCannotCreateWallOfChinese(){String longText=String.join("",Collections.nCopies(32,"字"));
         List<AnchoredCaptionPlan.Segment> out=ReadableCaptionPlan.merge(Arrays.asList(new AnchoredCaptionPlan.Segment(0,0,0,400,"是的"),new AnchoredCaptionPlan.Segment(1,9,400,4000,longText)));assertEquals(2,out.size());}
-    @Test public void chineseVariantsAlwaysAdjacentAtEnd(){List<String> result=LanguageMenuOrder.sorted(Arrays.asList("zh-Hant","ja","zh-Hans","en","ar"),s->s);
-        assertEquals("zh-Hans",result.get(3));assertEquals("zh-Hant",result.get(4));assertTrue(result.indexOf("ar")<result.indexOf("ja"));}
+    @Test public void languageInsertionPreservesOtherNativeOrder(){List<String> result=LanguageMenuOrder.sorted(Arrays.asList("ar","en","ja","zh-Hant","zh-Hans"),v->v);
+        List<String> others=new ArrayList<>(result);others.remove("zh-Hans");assertEquals(Arrays.asList("ar","en","ja","zh-Hant"),others);assertEquals(1,Collections.frequency(result,"zh-Hans"));}
     @Test public void sortingMetadataPreservesUnknownFields()throws Exception{
         ByteArrayOutputStream root=new ByteArrayOutputStream();for(String code:Arrays.asList("zh-Hant","en","ja")) {ByteArrayOutputStream e=new ByteArrayOutputStream();CaptionLanguageMetadata.write(e,1,code.getBytes(StandardCharsets.UTF_8));CaptionLanguageMetadata.write(root,3,e.toByteArray());}
         CaptionLanguageMetadata.write(root,99,new byte[]{7,8});byte[] next=CaptionLanguageMetadata.addSimplified(root.toByteArray());List<String> codes=new ArrayList<>();boolean unknown=false;
         for(CaptionLanguageMetadata.Field f:CaptionLanguageMetadata.fields(next)){if(f.number==99){assertArrayEquals(new byte[]{7,8},f.value);unknown=true;}if(f.number==3)for(CaptionLanguageMetadata.Field v:CaptionLanguageMetadata.fields(f.value))if(v.number==1)codes.add(new String(v.value,StandardCharsets.UTF_8));}
-        assertTrue(unknown);assertEquals(Arrays.asList("ja","en","zh-Hans","zh-Hant"),codes);assertArrayEquals(next,CaptionLanguageMetadata.addSimplified(next));
+        assertTrue(unknown);assertTrue(codes.containsAll(Arrays.asList("ja","en","zh-Hans","zh-Hant")));assertTrue(codes.indexOf("ja")>codes.indexOf("en"));assertArrayEquals(next,CaptionLanguageMetadata.addSimplified(next));
     }
     @Test public void fullWidthMusicIsNotTranslated(){assertEquals("这是 EOS",ContextualCaptionTextPolicy.translationForDisplay("这是［音乐］ EOS"));}
     @Test public void sizeRangeIsClamped(){assertEquals(22,DeepSeekConfig.MAX_CAPTION_TEXT_SIZE);assertTrue(SubtitleStyleMetrics.scaledSp(22,1000)<=39.6f+.001f);}

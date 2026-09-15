@@ -123,15 +123,15 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
         ): Element {
             val preference = ownerDocument.createElement(tag)
             preference.setAttribute("android:key", key)
-            preference.setAttribute("android:title", title)
-            summary?.let { preference.setAttribute("android:summary", it) }
+            preference.setAttribute("android:title", captionResourceTitle(title))
+            summary?.let { preference.setAttribute("android:summary", captionResourceTitle(it)) }
             appendChild(preference)
             return preference
         }
 
         fun Element.addCategory(title: String): Element {
             val category = ownerDocument.createElement("PreferenceCategory")
-            category.setAttribute("android:title", title)
+            category.setAttribute("android:title", captionResourceTitle(title))
             appendChild(category)
             return category
         }
@@ -158,8 +158,8 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
 
                 val screen = document.createElement("PreferenceScreen")
                 screen.setAttribute("android:key", PREF_KEY)
-                screen.setAttribute("android:title", "AI 字幕翻译")
-                screen.setAttribute("android:summary", "翻译、字幕样式与诊断 · 修改后自动保存")
+                screen.setAttribute("android:title", "@string/cap_ai_title")
+                screen.setAttribute("android:summary", "@string/cap_autosave")
                 icon?.let {
                     screen.setAttribute("android:icon", "@drawable/$it")
                     screen.setAttribute("app:iconSpaceReserved", "true")

@@ -32,7 +32,7 @@ final class CaptionVideoHandoffV2 {
         // Native/source-track choices are video-local. A native track selected on the old video
         // must not suppress the configured AI default on the new video; only caption ON/OFF intent
         // crosses the boundary.
-        if (CaptionChoice.isOn()) {
+        if (CaptionAddonSupport.memoryInstalled() && CaptionChoice.isOn()) {
             arm(next);
         } else {
             clearPending();

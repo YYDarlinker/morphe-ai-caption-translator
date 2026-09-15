@@ -59,7 +59,7 @@ public class InlineEditorFrameworkTest {
         assertEquals(24,preview.size);assertEquals(35,preview.opacity);
         int height=preview.getMeasuredHeight();assertFalse(preview.portrait);
         assertTrue(preview.performClick());assertTrue(preview.portrait);
-        assertTrue(preview.getContentDescription().toString().contains("竖屏"));
+        assertTrue(preview.getContentDescription().toString().contains(CaptionStrings.localize(activity,"竖屏")));
         preview.measure(View.MeasureSpec.makeMeasureSpec(preview.getWidth(),View.MeasureSpec.EXACTLY),0);
         assertTrue(preview.getMeasuredHeight()>height);assertTrue(preview.getMeasuredHeight()-height<=65*activity.getResources().getDisplayMetrics().density);assertEquals(24,preview.size);assertEquals(35,preview.opacity);
         preview.performClick();assertFalse(preview.portrait);activity.finish();

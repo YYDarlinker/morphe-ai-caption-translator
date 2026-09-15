@@ -31,7 +31,7 @@ public class SettingsSurfaceFrameworkTest {
     Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionDiagnostics.clear(a);
     CaptionDiagnostics.mark(a,"ANCHOR_RESPONSE_REJECTED","unit=12;reason=protocol_json");
     for(int n=0;n<100;n++)CaptionDiagnostics.mark(a,"CONTEXTUAL_DISPLAY_SELECTED",String.join("",Collections.nCopies(180,"x")));
-    String report=CaptionDiagnostics.uiText(a);assertTrue(report.contains("时间参照与异常"));assertTrue(report.contains("unit=12;reason=protocol_json"));
+    String report=CaptionDiagnostics.uiText(a);assertTrue(report.contains("Timing references"));assertTrue(report.contains("unit=12;reason=protocol_json"));
     CaptionDiagnostics.clear(a);assertFalse(CaptionDiagnostics.uiText(a).contains("protocol_json"));a.finish();
  }
 }

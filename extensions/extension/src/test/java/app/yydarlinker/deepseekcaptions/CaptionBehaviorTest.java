@@ -50,10 +50,11 @@ public class CaptionBehaviorTest {
         byte[] original=metadata("zh-Hant");byte[] next=CaptionLanguageMetadata.addSimplified(original);
         List<CaptionLanguageMetadata.Field> f=CaptionLanguageMetadata.fields(next);
         assertEquals(3,f.size());assertEquals(3,f.get(0).number);assertEquals(3,f.get(1).number);
-        assertEquals("zh-Hans",new String(CaptionLanguageMetadata.fields(f.get(0).value).get(0).value,StandardCharsets.UTF_8));
-        assertArrayEquals(original,Arrays.copyOfRange(next,next.length-original.length,next.length));
+        Set<String> codes=new HashSet<>();for(CaptionLanguageMetadata.Field field:f)if(field.number==3)codes.add(new String(CaptionLanguageMetadata.fields(field.value).get(0).value,StandardCharsets.UTF_8));
+        assertEquals(new HashSet<>(Arrays.asList("zh-Hans","zh-Hant")),codes);
+        assertArrayEquals(new byte[]{8,9},f.get(2).value);
         assertArrayEquals(next,CaptionLanguageMetadata.addSimplified(next));
-        assertTrue(new String(next,StandardCharsets.UTF_8).contains("中文（简体）"));
+        assertTrue(new String(next,StandardCharsets.UTF_8).contains(LanguageMenuOrder.simplifiedLabel()));
     }
     @Test public void noDuplicateAndNoInventedEmptyTrack()throws Exception {
         byte[] original=metadata("zh-Hans");assertSame(original,CaptionLanguageMetadata.addSimplified(original));

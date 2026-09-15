@@ -146,7 +146,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.editor(editor);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         editor.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        editor.setHint("可从下方选择，也可手动输入模型 ID");
+        editor.setHint(CaptionStrings.localize(getContext(), "可从下方选择，也可手动输入模型 ID"));
         String initial = DeepSeekConfig.load(context).model;
         editor.setText(initial);
         editor.setSelection(initial.length());
@@ -161,7 +161,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.button(refresh);
         refresh.setMinimumWidth(0);
         refresh.setMinHeight(dp(48));
-        refresh.setText("刷新");
+        refresh.setText(CaptionStrings.localize(getContext(), "刷新"));
         refresh.setAllCaps(false);
         refresh.setOnClickListener(view -> fetchModels(true));
         controls.addView(refresh, new LinearLayout.LayoutParams(
@@ -287,7 +287,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
                     if (generation != fetchGeneration) return;
                     if (refresh != null) {
                         refresh.setEnabled(true);
-                        refresh.setText("重新获取");
+                        refresh.setText(CaptionStrings.localize(getContext(), "重新获取"));
                     }
                     showModels(models, true);
                 });
@@ -309,7 +309,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     private void showModels(List<String> models, boolean newlyFetched) {
         if (choices == null) return;
         List<String> entries = new ArrayList<>(models.size() + 1);
-        entries.add("选择模型（" + models.size() + "）");
+        entries.add(CaptionStrings.localize(getContext(),"模型")+" ("+models.size()+")");
         entries.addAll(models);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 getContext(),
@@ -365,13 +365,13 @@ public final class DeepSeekModelPreference extends android.preference.Preference
             String detail = error.getMessage();
             if (detail == null || detail.trim().isEmpty()) detail = "模型自动保存失败";
             setState(detail + "；保留上次有效值", true);
-            if (reportInvalid && editor != null) editor.setError(detail);
+            if (reportInvalid && editor != null) editor.setError(CaptionStrings.localize(getContext(),detail));
         }
     }
 
     private void setState(String text, boolean important) {
         if (state == null) return;
-        state.setText(text);
+        state.setText(CaptionStrings.localize(getContext(),text));
         state.setAlpha(important ? 1f : 0.72f);
     }
 

@@ -1,8 +1,8 @@
 # Anchored AI Captions
 
-## Current revision: 1.1.3
+## Current revision: 1.2.0
 
-Restores the normal startup translation/segmentation strategy, fits the caption background to actual rendered lines, enlarges the portrait preview with a bounded layout shift, and refines native settings. Same-video English auto-generated captions are the preferred timing reference at either word or cue granularity; estimates remain explicitly distinguished from native timestamps. See [design, evidence and verification limits](docs/RELEASE-1.1.3.md). Historical notes below retain their original scope.
+Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
 
 Independent YouTube AI subtitle addon, compatible with Morphe.
 
@@ -18,14 +18,14 @@ The caption engine uses an anchored joint translation plan:
 - displayed timestamps always come from the original source atoms, never translated-text length;
 - English provider captions can be calibrated against English auto-generated captions as a clock-only reference;
 - YouTube's native subtitle renderer is suppressed while the AI overlay owns captions;
-- the CC/settings automatic-translation list receives a real `中文（简体）` entry;
+- the optional Simplified Chinese patch adds a localized, locale-ordered `zh-Hans` entry;
 - every automatic-translation language selected through the native menu uses the configured API.
 
 Detailed design and verification limits are in `docs/ARCHITECTURE.md`.
 
 ## Import into Morphe
 
-Use Expert mode, keep the official YouTube `Captions` patch selected, and additionally select `AI caption translator` from this repository. The tested original package is YouTube `21.07.247`; the patch fails closed for incompatible host structures.
+Use Expert mode. For AI, keep the compatible official default patch set (including `Captions` and player-flyout/settings support), then select `AI caption translator`. Optionally select `Add Simplified Chinese to auto-translate` and/or `Remember caption selection`. Those two optional patches also work without selecting AI. To retain the former all-in-one feature set, select all three. The tested original package is YouTube `21.07.247`; incompatible structural bindings fail closed.
 
 Release source: `https://github.com/YYDarlinker/morphe-ai-caption-translator`
 
@@ -37,7 +37,7 @@ Open YouTube → Settings → Morphe → AI caption translator. Configure the Op
 
 When enabled, the custom subtitle box displays both modes, but **only Auto-translate selections call the API**. Original/manual/English auto-generated tracks display their original text and cue times without translation API requests or calibration probing.
 
-On each new app process, choose a subtitle language once in the player. The process then remembers On/Off, language, and original-versus-translated mode across videos. There is no default-language setting. Closing captions retains the last language for the next On; killing/restarting the app begins a new selection session.
+When `Remember caption selection` is selected, explicit caption choices are remembered across videos for this application process, regardless of whether AI is enabled. Without that patch, the addon does not impose cross-video language restoration. A full process restart resets this optional memory. The in-player AI/YouTube choice shares the existing global AI switch and does not erase language memory.
 
 API fields are edited inline with Android EditText selection/Paste. The host breadcrumb-copy handler is bypassed only for the API configuration rows; there is no API-key dialog. Keys are never copied into diagnostics. The style section includes one live preview; tap the frame to switch 16:9 landscape and 9:16 portrait without changing shared size/opacity. Portrait is larger with at most a 64dp stage-height increase.
 
@@ -58,7 +58,7 @@ This project's regular release channel is for normal source installation; it doe
 
 The release pipeline uses Morphe's changelog generator and semantic-release, builds the Android MPP and extension, executes tests, validates the generated manifest, and checks root DEX / extension / version / repository identity before uploading. No more in-place replacement of published assets.
 
-This addon now owns its subtitle language/state memory and Simplified Chinese menu entry. Do not simultaneously select another AI translator, HansFix language remapping, or the separate Remember subtitle language patch; keep the official Captions patch selected. Installed sources may remain; this restriction concerns selected overlapping patches.
+Optional feature ownership is now explicit. Do not select another AI translator with the AI root, another Simplified Chinese remapping/insertion patch with the language root, or another subtitle-memory patch with the memory root. Installed sources may remain; this restriction concerns selected overlapping functionality.
 
 ## Continuity revision (explicit-anchors-r3)
 

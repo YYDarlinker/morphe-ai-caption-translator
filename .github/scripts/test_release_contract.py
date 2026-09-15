@@ -17,6 +17,10 @@ class ReleaseContractTest(unittest.TestCase):
             env=dict(os.environ,GITHUB_REPOSITORY="YYDarlinker/morphe-ai-caption-translator")
             return subprocess.run([sys.executable,str(SCRIPT),version],cwd=dst,env=env,capture_output=True).returncode
     def test_current_contract(self): self.assertEqual(0,self.validate())
+    def test_reject_duplicate_patch_names(self):
+        def duplicate(dst):
+            p=dst/"patches-list.json";data=json.loads(p.read_text(encoding="utf-8"));data["patches"].append(data["patches"][0]);p.write_text(json.dumps(data),encoding="utf-8")
+        self.assertNotEqual(0,self.validate(mutate_files=duplicate))
     def test_reject_utc_suffix(self): self.assertNotEqual(0,self.validate(lambda d:d.update(created_at=d["created_at"]+"Z")))
     def test_reject_old_repository(self): self.assertNotEqual(0,self.validate(lambda d:d.update(download_url=d["download_url"].replace("morphe-ai-caption-translator","youtube-ai-caption-translator"))))
     def test_reject_mismatched_version(self): self.assertNotEqual(0,self.validate(lambda d:d.update(version="9.9.9")))

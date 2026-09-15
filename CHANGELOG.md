@@ -1,3 +1,9 @@
+## [1.2.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.0...v1.2.1) (2026-09-15)
+
+### 🐛 Bug Fixes
+
+* integrate player toggle and prioritize multilingual ASR timing ([c8a91a4](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/c8a91a41ce2b3023e6fcc5cde50c2a6b1fa5d4fa))
+
 ## [1.2.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.3...v1.2.0) (2026-09-15)
 
 ### ✨ New Features

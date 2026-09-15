@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.3...v1.2.0) (2026-09-15)
+
+### ✨ New Features
+
+* split caption patches, localize settings and add player toggle ([8d5fad6](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/8d5fad690e7328ae315e4cb1cf1f8130e953012e))
+
 ## [1.1.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.1.2...v1.1.3) (2026-09-14)
 
 ### 🐛 Bug Fixes

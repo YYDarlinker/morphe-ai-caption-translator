@@ -1,8 +1,10 @@
 # Anchored AI Captions
 
-## Current revision: 1.2.0
+## Current revision: 1.2.4
 
 Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
+
+Version 1.2.4 addresses foreground Shorts ownership, direct engine takeover, avoidable timing-reference startup waits, and the Android two-line reset. See [changes, measurable goals, cost tradeoffs and validation limits](docs/CAPTIONS-1.2.4.md).
 
 Version 1.2.3 fixes Shorts engine switches getting stuck after video changes: global OFF no longer rolls back because native state is stale, and per-video snapshots keep prefetch callbacks separate. See [switch-state recovery and validation boundaries](docs/CAPTIONS-1.2.3.md).
 

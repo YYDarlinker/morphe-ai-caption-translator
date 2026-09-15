@@ -218,6 +218,12 @@ static void setMainActivity(Activity activity) {
 
         final Session session;
         synchronized (ACTIVE_LOCK) {
+            // Recheck ownership atomically with session creation. A Shorts swipe can happen
+            // after URL/config parsing but before this lock; no half-started old session survives.
+            if (!currentVideoId.isEmpty() && !videoId.equals(currentVideoId)) {
+                CaptionDiagnostics.mark(app,"BACKGROUND_ACTIVATION_IGNORED","foreground_owner_preserved");
+                return;
+            }
             Session current = active;
             if (current != null && !current.cancelled && current.requestKey.equals(requestKey) &&
                     sameTranslationConfig(current.config, config)) {
@@ -956,7 +962,8 @@ static void setMainActivity(Activity activity) {
                 "接受 " + applied + "/" + request.indices.size() +
                         (stabilized > 0 ? "；稳定 bridge=" + stabilized : "") +
                         " units；retry=" + retryable + "；permanent=" + permanent +
-                        "；用时 " + took + " ms；前方库存 " + buffer + " ms"
+                        "；用时 " + took + " ms；前方库存 " + buffer + " ms" +
+                        (firstReadyNow ? ";startup_total_ms=" + Math.max(0L,SystemClock.elapsedRealtime()-session.createdAtMs) : "")
         );
         render(session, session.currentTimeMs);
         if (applied > 0 || stabilized > 0) persistCacheAsync(session);
@@ -1829,6 +1836,7 @@ static void setMainActivity(Activity activity) {
 
     private static final class Session {
         final long id;
+        final long createdAtMs = SystemClock.elapsedRealtime();
         final Context context;
         final String translatedUrl;
         final String requestKey;

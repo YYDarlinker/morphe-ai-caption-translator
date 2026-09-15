@@ -45,7 +45,7 @@ public final class CaptionQuickToggle {
         try{refreshed=NativeCaptionBridge.refreshNativeTrack();}
         catch(Exception failed){CaptionDiagnostics.mark(context,"ENGINE_NATIVE_REFRESH_DEFERRED",failed.getClass().getSimpleName());}
         CaptionMusicSuppressor.forceNativeRendererScan();CaptionMusicSuppressor.kick();
-        CaptionDiagnostics.mark(context,"ENGINE_MODE_SAVED","enabled="+enabled+";native="+refreshed.name());
+        CaptionDiagnostics.mark(context,"ENGINE_MODE_SAVED","enabled="+enabled+";native="+refreshed.name()+";session="+DynamicCaptionController.isVisibleActive()+";choice_known="+CaptionChoice.known());
         if(previous!=enabled&&refreshed==NativeCaptionBridge.Refresh.DEFERRED)
             Toast.makeText(context,CaptionStrings.get(context,enabled?"mode_pending":"mode_off_pending"),Toast.LENGTH_LONG).show();
         else if(enabled&&CaptionChoice.isOn()&&!CaptionChoice.translates())

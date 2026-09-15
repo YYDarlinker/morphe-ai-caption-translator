@@ -91,7 +91,7 @@ final class ContextualBatchApiClient {
             if(protectedTerms.length()>0)item.put("preserve_terms",protectedTerms);
             if(repair.containsKey(unit.id)) {
                 item.put("previous_validation_error",repair.get(unit.id));
-                if(ProtocolRecovery.wholeText(repair.get(unit.id))) item.put("response_mode","whole_text_recovery");
+                if(ProtocolRecovery.wholeText(repair.get(unit.id),unit)) item.put("response_mode","whole_text_recovery");
             }
             targetValues.put(item);
         }
@@ -193,7 +193,7 @@ final class ContextualBatchApiClient {
             if(!seen.add(id)) { plans.remove(id); texts.remove(id); invalid.add(id); reasons.put(id,"duplicate_response_id"); continue; }
             try {
                 JSONArray segments=row.optJSONArray("segments");
-                if(segments==null && ProtocolRecovery.wholeText(repair.get(id)) && row.opt("text") instanceof String)
+                if(segments==null && ProtocolRecovery.wholeText(repair.get(id),unit) && row.opt("text") instanceof String)
                     segments=new JSONArray().put(new JSONArray().put(unit.toAtom-unit.fromAtom).put(row.getString("text")));
                 AnchoredCaptionPlan plan=AnchoredCaptionPlan.parseSourcePhrases(segments,atoms,unit,row.optJSONArray("attach_next"));
                 plans.put(id,plan); texts.put(id,plan.canonical);

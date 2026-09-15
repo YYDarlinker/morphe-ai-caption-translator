@@ -73,6 +73,14 @@ public final class DeepSeekCaptionHook {
 
         if(initialContext==null || !DeepSeekConfig.enabled(initialContext))return originalUrl;
 
+        // Prefetched/departed Shorts requests are not selections of the foreground video.
+        // Never replace the visible session (or its overlay) with another video's source URL.
+        String requestedVideo = PageCaptionController.videoIdFromUrl(originalUrl);
+        String foregroundVideo = PageCaptionController.currentVideoIdSnapshot();
+        if (isYouTubeTimedTextUrl(originalUrl) && !requestedVideo.isEmpty() &&
+                !foregroundVideo.isEmpty() && !foregroundVideo.equals(requestedVideo)) return originalUrl;
+
+
         if(initialContext!=null && DeepSeekConfig.enabled(initialContext) &&
                 isYouTubeTimedTextUrl(originalUrl) && TargetLanguage.fromUrl(originalUrl)!=null &&
                 !CaptionModePolicy.mayTranslateSelection(CaptionChoice.known(),CaptionChoice.isOn(),CaptionChoice.translates())) {

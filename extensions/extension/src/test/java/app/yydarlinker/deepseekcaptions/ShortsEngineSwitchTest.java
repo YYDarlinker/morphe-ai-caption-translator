@@ -14,16 +14,17 @@ public class ShortsEngineSwitchTest {
     static final String A="aaaaaaaaaaa",B="bbbbbbbbbbb",C="ccccccccccc";
     enum Origin {PREFERRED_TRACK,DEFAULT}
     static final class Track {
-        final String video,language; final boolean translated;
+        final String video,language; final boolean translated; String suffix="";
         Track(String video,String language){this(video,language,true);}
         Track(String video,String language,boolean translated){this.video=video;this.language=language;this.translated=translated;}
-        String url(){return "https://www.youtube.com/api/timedtext?v="+video+"&lang=en"+(translated?"&tlang="+language:"");}
+        String url(){return "https://www.youtube.com/api/timedtext?v="+video+"&lang=en"+(translated?"&tlang="+language:"")+suffix;}
     }
     static final class Manager {List<Track> tracks=new ArrayList<>();boolean fail,failOnTrack;String switchVideo="";Manager(Track track){tracks.add(track);}}
     static final List<Object> calls=new ArrayList<>();
     static final List<Boolean> refreshModes=new ArrayList<>();
     static final List<Integer> reasons=new ArrayList<>();
     static final List<String> activations=new ArrayList<>();
+    static final List<String> activationUrls=new ArrayList<>();
     @Implements(CaptionAddonSupport.class) public static class Flags {
         @Implementation public static boolean aiInstalled(){return true;}
         @Implementation public static boolean memoryInstalled(){return true;}
@@ -41,13 +42,13 @@ public class ShortsEngineSwitchTest {
         }
     }
     @Implements(DynamicCaptionController.class) public static class Core {
-        @Implementation public static void activate(Context c,String url){activations.add(PageCaptionController.videoIdFromUrl(url));}
+        @Implementation public static void activate(Context c,String url){activations.add(PageCaptionController.videoIdFromUrl(url));activationUrls.add(url);}
         @Implementation public static void refreshConfiguration(Context c){refreshModes.add(DeepSeekConfig.enabled(c));}
     }
     Activity activity;
     @Before public void setup()throws Exception{
         activity=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(activity);
-        PageCaptionController.onVideoId("");java.lang.reflect.Field entries=NativeCaptionBridge.class.getDeclaredField("selections");entries.setAccessible(true);((Map<?,?>)entries.get(null)).clear();CaptionChoice.reset();RememberedCaptionSelection.reset();calls.clear();reasons.clear();refreshModes.clear();activations.clear();DeepSeekConfig.saveEnabled(activity,false);
+        PageCaptionController.onVideoId("");java.lang.reflect.Field entries=NativeCaptionBridge.class.getDeclaredField("selections");entries.setAccessible(true);((Map<?,?>)entries.get(null)).clear();CaptionChoice.reset();RememberedCaptionSelection.reset();calls.clear();reasons.clear();refreshModes.clear();activations.clear();activationUrls.clear();DeepSeekConfig.saveEnabled(activity,false);
     }
     @After public void finish(){activity.finish();}
     void select(Manager m,Track t,Origin origin){NativeCaptionBridge.onNativeSelectionWithReason(m,t,origin,17);}
@@ -104,7 +105,7 @@ public class ShortsEngineSwitchTest {
         DeepSeekConfig.saveEnabled(activity,true);clearWeak(A,"manager");
         assertTrue(CaptionQuickToggle.setEngine(activity,false));assertFalse(DeepSeekConfig.enabled(activity));assertTrue(calls.isEmpty());
         assertTrue(CaptionQuickToggle.setEngine(activity,true));assertTrue(DeepSeekConfig.enabled(activity));assertTrue(calls.isEmpty());
-        assertEquals(CaptionStrings.get(activity,"mode_pending"),org.robolectric.shadows.ShadowToast.getTextOfLatestToast());
+        assertTrue("Saved same-video descriptor starts without a native manager",activations.contains(A));
         Manager fresh=new Manager(t);select(fresh,t,Origin.DEFAULT);assertTrue(activations.contains(A));
     }
     @Test public void reusedManagerNeverReceivesAnOldVideosTrack(){
@@ -151,9 +152,34 @@ public class ShortsEngineSwitchTest {
     }
     @Test public void failureAfterInternalNullDoesNotLoseTheSelectedTrack(){
         Track t=new Track(A,"fr");Manager manager=new Manager(t);PageCaptionController.onVideoId(A);select(manager,t,Origin.PREFERRED_TRACK);
-        manager.failOnTrack=true;assertTrue(CaptionQuickToggle.setEngine(activity,true));assertTrue(DeepSeekConfig.enabled(activity));
+        manager.failOnTrack=true;assertTrue(CaptionQuickToggle.setEngine(activity,true));assertTrue("Start AI before native reselect can fail",activations.contains(A));assertTrue(DeepSeekConfig.enabled(activity));
         assertEquals(Arrays.asList(null,t),calls);assertTrue(CaptionChoice.isOn());assertEquals("fr",RememberedCaptionSelection.language());
         manager.failOnTrack=false;calls.clear();assertTrue(CaptionQuickToggle.setEngine(activity,false));assertEquals(Arrays.asList(null,t),calls);
         assertFalse(DeepSeekConfig.enabled(activity));assertEquals("fr",RememberedCaptionSelection.language());
     }
+    @Test public void missingNativeOriginDoesNotPreventDirectAiTakeover(){
+        Track t=new Track(A,"fr");Manager manager=new Manager(t);PageCaptionController.onVideoId(A);
+        select(manager,t,null);assertTrue(CaptionQuickToggle.setEngine(activity,true));
+        assertTrue(activations.contains(A));assertTrue("Do not invoke native selector without its origin",calls.isEmpty());
+    }
+    @Test public void prefetchedDescriptorSurvivesManagerCollectionBeforeForeground()throws Exception{
+        Track a=new Track(A,"fr"),b=new Track(B,"de");Manager ma=new Manager(a),mb=new Manager(b);
+        PageCaptionController.onVideoId(A);select(ma,a,Origin.PREFERRED_TRACK);select(mb,b,Origin.DEFAULT);
+        clearWeak(B,"manager");clearWeak(B,"track");DeepSeekConfig.saveEnabled(activity,true);
+        PageCaptionController.onVideoId(B);assertEquals("de",CaptionChoice.language());assertTrue(activations.contains(B));
+        assertEquals("fr",RememberedCaptionSelection.language());
+    }
+    @Test public void emptyNativeModelAndExpiredTrackCanUseSameVideoDescriptor()throws Exception{
+        Track a=new Track(A,"fr");Manager manager=new Manager(a);PageCaptionController.onVideoId(A);select(manager,a,Origin.PREFERRED_TRACK);
+        clearWeak(A,"track");manager.tracks=Collections.emptyList();
+        assertTrue(CaptionQuickToggle.setEngine(activity,true));assertTrue(activations.contains(A));assertTrue(calls.isEmpty());
+    }
+
+    @Test public void directStartupUsesFreshSignedUrlRatherThanCapturedExpiredDescriptor(){
+        Track old=new Track(A,"fr"),fresh=new Track(A,"fr");old.suffix="&sig=old-test";fresh.suffix="&sig=fresh-test";
+        Manager manager=new Manager(old);PageCaptionController.onVideoId(A);select(manager,old,Origin.PREFERRED_TRACK);
+        manager.tracks=Collections.singletonList(fresh);assertTrue(CaptionQuickToggle.setEngine(activity,true));
+        assertFalse(activationUrls.isEmpty());for(String url:activationUrls)assertEquals(fresh.url(),url);
+    }
+
 }

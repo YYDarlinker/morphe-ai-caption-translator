@@ -58,6 +58,8 @@ final class CaptionOverlay {
     private static long lastGeometryCheck;
     private static boolean wasShorts;
     private static long lastSurfaceDiagnostic;
+    private static String lastOverflowText="";
+    private static int lastOverflowWidth;
 
     private static Runnable armDrag;
     private static boolean dragging;
@@ -316,8 +318,8 @@ final class CaptionOverlay {
         int v = dp(activity, 5);
         text.setPadding(h, v, h, v);
         text.setElevation(dp(activity, 16));
-        text.setMaxLines(2);
         text.setSingleLine(false);
+        text.setMaxLines(2);
         text.setClickable(false);
         text.setOnTouchListener(CaptionOverlay::touch);
         anchor.addView(text, new FrameLayout.LayoutParams(
@@ -344,8 +346,8 @@ final class CaptionOverlay {
         view.setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED);
         view.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
         view.setText(pendingText);
-        view.setMaxLines(2);
         view.setSingleLine(false);
+        view.setMaxLines(2); // setSingleLine(false) resets maxLines on Android.
         try { view.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE); }
         catch (Throwable ignored) {}
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, finalSp);
@@ -383,6 +385,22 @@ final class CaptionOverlay {
         float size = Math.max(minimum, preferred);
         while (size > minimum + 0.24f && lineCount(activity, text, size, available) > 2) {
             size = Math.max(minimum, size - 0.5f);
+        }
+        if (lineCount(activity,text,size,available)>2) {
+            // A valid older cached plan or provider can still return a paragraph. Do not silently
+            // crop its tail at maxLines=2, invent timing, or buy another model pass. Fit the whole
+            // event as an explicitly degraded last resort; normal clauses keep the chosen style.
+            float low=Math.max(0.1f,Math.min(size,preferred)/64f), high=size;
+            for(int i=0;i<12;i++){
+                float mid=(low+high)/2f;
+                if(lineCount(activity,text,mid,available)<=2)low=mid;else high=mid;
+            }
+            size=low;
+            if(!text.equals(lastOverflowText)||lastOverflowWidth!=available){
+                lastOverflowText=text;lastOverflowWidth=available;
+                CaptionDiagnostics.mark(activity,"OVERLAY_READABILITY_DEGRADED",
+                        "two_line_fit=true;chars="+text.length()+";sp="+size+";preferred_min_sp="+minimum);
+            }
         }
         return size;
     }

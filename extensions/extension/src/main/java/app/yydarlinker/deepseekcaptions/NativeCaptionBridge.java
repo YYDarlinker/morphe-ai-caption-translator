@@ -65,16 +65,16 @@ public final class NativeCaptionBridge {
     private static final java.util.LinkedHashMap<String,Selection> selections=new java.util.LinkedHashMap<>();
     private static String visibleVideo="";
     private static Object switchingManager;
-    enum Refresh { APPLIED, CAPTIONS_OFF, DEFERRED }
+    enum Refresh { APPLIED, AI_STARTED, CAPTIONS_OFF, DEFERRED }
     /** Per-video weak references, not one process-wide "last callback" slot. */
     private static final class Selection {
-        final String video,language;final boolean off,translated,asr;
+        final String video,language,selectedUrl;final boolean off,translated,asr;
         final java.lang.ref.WeakReference<Object> manager,track;
         final Object origin;final int reason;
         Selection(String video,Object manager,Object track,Object origin,int reason){
             this.video=video;this.manager=new java.lang.ref.WeakReference<>(manager);this.track=new java.lang.ref.WeakReference<>(track);
             this.origin=origin;this.reason=reason;off=track==null||"DISABLE_CAPTIONS_OPTION".equals(language(track));
-            language=off?"":language(track);translated=!off&&TargetLanguage.fromUrl(url(track))!=null;asr=!off&&vss(track).startsWith("a.");
+            selectedUrl=off?"":url(track);language=off?"":language(track);translated=!off&&TargetLanguage.fromUrl(url(track))!=null;asr=!off&&vss(track).startsWith("a.");
         }
     }
     public static void onNativeSelectionWithReason(Object manager,Object track,Object origin,int reason){
@@ -116,10 +116,11 @@ public final class NativeCaptionBridge {
             visibleVideo=video;CaptionChoice.reset();
             if(video.isEmpty())return;
             Selection value=selections.get(video);
-            if(value==null||!ownsManager(value))return;
+            if(value==null)return;
             if(value.off){CaptionChoice.toggle(false);return;}
             Object track=currentTrack(value);
             if(track!=null)applySelection(track,true);
+            else if(canActivateSnapshot(value))activateSnapshot(value,true);
         }
     }
     private static Selection currentSelection(){
@@ -131,7 +132,7 @@ public final class NativeCaptionBridge {
         return found;
     }
     private static boolean ownsManager(Selection value){
-        Object manager=value.manager.get();if(manager==null||value.origin==null)return false;
+        Object manager=value.manager.get();if(manager==null)return false;
         Selection owner=latestForManager(manager);if(owner!=null&&!owner.video.equals(value.video))return false;
         String model=modelVideo(manager);return model.isEmpty()||model.equals(value.video);
     }
@@ -156,11 +157,43 @@ public final class NativeCaptionBridge {
         }catch(Exception unavailable){return null;}
         Object track=value.track.get();return track!=null&&value.video.equals(PageCaptionController.videoIdFromUrl(url(track)))?track:null;
     }
+    /** Native managers may be collected after Shorts prefetch. Keep only the selected descriptor,
+     * not strong player objects; never use a descriptor contradicted by a surviving native model. */
+    private static boolean canActivateSnapshot(Selection value){
+        if(value.off || !value.video.equals(PageCaptionController.currentVideoIdSnapshot()) ||
+                !value.video.equals(PageCaptionController.videoIdFromUrl(value.selectedUrl)))return false;
+        Object manager=value.manager.get();
+        if(manager==null)return true;
+        if(!ownsManager(value))return false;
+        try{
+            List<?> tracks=value.translated?translatedTracks(manager):nativeTracks(manager);
+            return tracks==null || tracks.isEmpty() || currentTrack(value)!=null;
+        }catch(Exception unavailable){return false;}
+    }
+    private static void activateSnapshot(Selection value,boolean updateChoice){
+        if(updateChoice)CaptionChoice.select(value.language,value.translated,value.asr);
+        if(!enabled())return;
+        rememberAsrTracks(value.manager.get()); // Publish references before the source worker starts.
+        Object fresh=currentTrack(value);
+        String selected=fresh==null?value.selectedUrl:url(fresh);
+        CaptionButtonController.noteAiTrackSelected();
+        if(value.translated){CaptionLifecycleRestore.noteAiTarget(selected);DynamicCaptionController.activate(context,selected);}
+        else ContextualUnitCaptionController.activateSource(context,selected);
+        CaptionMusicSuppressor.forceNativeRendererScan();CaptionMusicSuppressor.kick();
+        CaptionDiagnostics.mark(context,"ENGINE_SNAPSHOT_ACTIVATED","same_video=true;source_only="+!value.translated);
+    }
     static Refresh refreshNativeTrack(){
         synchronized(SELECTION_LOCK){
             if(CaptionChoice.known()&&!CaptionChoice.isOn())return Refresh.CAPTIONS_OFF;
             Selection value=currentSelection();
-            if(value==null||!ownsManager(value))return Refresh.DEFERRED;
+            if(value==null)return Refresh.DEFERRED;
+            // AI startup must not wait for (or depend on) native null/reselect callbacks.
+            // This also recovers a collected Shorts manager without waiting for another network fetch.
+            if(enabled() && canActivateSnapshot(value)){
+                activateSnapshot(value,!CaptionChoice.known());
+                if(!ownsManager(value)||value.origin==null||currentTrack(value)==null)return Refresh.AI_STARTED;
+            }
+            if(!ownsManager(value)||value.origin==null)return Refresh.DEFERRED;
             if(value.off)return Refresh.CAPTIONS_OFF;
             Object track=currentTrack(value),manager=value.manager.get();
             if(track==null||manager==null)return Refresh.DEFERRED;

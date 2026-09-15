@@ -25,7 +25,7 @@ public class AsrLoader113Test {
             RawCaptionSource.Source result=RawCaptionSource.load(a,"https://www.youtube.com/api/timedtext?v="+VIDEO+"&lang=en&tlang=zh-Hans",false,true);
             assertNotNull(result.alignedAtoms);assertEquals(0,result.alignedAtoms.nativeTimedAtoms);assertEquals(9,result.alignedAtoms.asrMatchedAtoms);assertEquals(4000,result.alignedAtoms.atoms.get(0).startMs);
             assertTrue(CaptionDiagnostics.uiText(a).contains("ASR_CUE_TIMING_APPLIED"));
-            if(nativeTrack)assertTrue(fake.calls.get(1).contains("sig=valid-native"));
+            if(nativeTrack){assertTrue(fake.calls.get(1).contains("sig=valid-native"));assertEquals("Usable native reference must not trigger watch-page probing",2,fake.calls.size());}
             assertFalse(SourceCaptionCache.key(fake.calls.get(0)).equals(SourceCaptionCache.referenceKey(fake.calls.get(0))));
         }finally{field.set(null,previous);NativeAsrTrackReference.clear();((Map<?,?>)anchors.get(null)).clear();a.finish();}
     }

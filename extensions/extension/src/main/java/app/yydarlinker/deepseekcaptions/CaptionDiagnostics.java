@@ -60,7 +60,7 @@ final class CaptionDiagnostics {
             String detail = p.getString(DETAIL, "");
             long time = p.getLong(TIME, 0L);
             String audit = TokenCostAudit.uiText(context);
-            String header = "引擎：Anchored / source-phrase-113\n当前模式：" + (CaptionChoice.translates() ? "自动翻译" : "原字幕（零翻译 API）") + "\n显示文本调试：" +
+            String header = "引擎：Anchored / source-phrase-124\n当前模式：" + (CaptionChoice.translates() ? "自动翻译" : "原字幕（零翻译 API）") + "\n显示文本调试：" +
                     CaptionStrings.localize(context,DeepSeekConfig.displayTextDebugEnabled(context) ? "开" : "关");
             if (stage == null || stage.isEmpty()) {
                 String base = "尚未捕获到自动翻译请求。启用并填写 API Key 后，播放视频并从“自动翻译”选择任意目标语言，再回来点“刷新诊断”。";
@@ -97,7 +97,8 @@ final class CaptionDiagnostics {
                 || stage.equals("FIRST_AI_READY") || stage.equals("SOURCE_TIMING_BASE")
                 || stage.equals("ASR_LOCAL_TIMING_APPLIED") || stage.equals("ASR_LOCAL_TIMING_REJECTED")
                 || stage.equals("ASR_NATIVE_WORD_TIMING_SELECTED") || stage.equals("ASR_NATIVE_WORD_TIMING_ALIGNED")
-                || stage.equals("ASR_WORD_TIMING_UNAVAILABLE");
+                || stage.equals("ASR_WORD_TIMING_UNAVAILABLE") || stage.equals("ENGINE_MODE_SAVED")
+                || stage.equals("OVERLAY_READABILITY_DEGRADED") || stage.equals("ENGINE_SNAPSHOT_ACTIVATED") || stage.equals("BACKGROUND_ACTIVATION_IGNORED");
     }
 
     private static String sanitize(String value, int max) {

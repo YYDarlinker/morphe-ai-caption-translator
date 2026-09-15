@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-09-15T07:07:27",
-  "description": "## [1.2.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.2...v1.2.3) (2026-09-15)\n\n### 🐛 Bug Fixes\n\n* recover Shorts AI engine switching after video changes ([0394b86](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/0394b869e54a3b77ad1a5caf0aac3140dc7685b1))",
-  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.2.3/patches-1.2.3.mpp",
+  "created_at": "2026-09-15T17:08:06",
+  "description": "## [1.2.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.3...v1.2.4) (2026-09-15)\n\n### 🐛 Bug Fixes\n\n* make caption takeover atomic and restore two-line startup ([ed4fae5](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/ed4fae5564acb677867666665f077a2b28ae16d7))",
+  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.2.4/patches-1.2.4.mpp",
   "signature_download_url": "",
-  "version": "1.2.3"
+  "version": "1.2.4"
 }

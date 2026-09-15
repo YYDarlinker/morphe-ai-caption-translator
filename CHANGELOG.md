@@ -1,3 +1,9 @@
+## [1.2.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.3...v1.2.4) (2026-09-15)
+
+### 🐛 Bug Fixes
+
+* make caption takeover atomic and restore two-line startup ([ed4fae5](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/ed4fae5564acb677867666665f077a2b28ae16d7))
+
 ## [1.2.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.2...v1.2.3) (2026-09-15)
 
 ### 🐛 Bug Fixes

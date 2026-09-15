@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"Не удалось прочитать диагностику: "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (около "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" секунд назад)"</string>
+    <string name="cap_mode_pending" formatted="false">"Режим сохранён. Он применится, когда субтитры этого видео будут готовы."</string>
+    <string name="cap_mode_off_pending" formatted="false">"ИИ выключен. Субтитры YouTube возобновятся, когда исходная дорожка будет готова."</string>
 </resources>

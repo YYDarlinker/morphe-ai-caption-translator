@@ -162,10 +162,12 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     fun listAccessor(m:Method) = """
         check-cast p0, ${owner.type}
         iget-object v0, p0, ${modelField.id()}
-        if-eqz v0, :done
+        if-nez v0, :model_ready
+        const/4 v0, 0x0
+        return-object v0
+        :model_ready
         invoke-virtual {v0}, ${m.id()}
         move-result-object v0
-        :done
         return-object v0
     """
     bind("nativeTracks",listAccessor(nativeList));bind("translatedTracks",listAccessor(listMethod))

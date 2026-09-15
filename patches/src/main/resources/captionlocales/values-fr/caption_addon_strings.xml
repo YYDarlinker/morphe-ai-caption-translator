@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"Impossible de lire le diagnostic : "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (il y a environ "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" secondes)"</string>
+    <string name="cap_mode_pending" formatted="false">"Mode enregistré. Il sera appliqué lorsque les sous-titres de cette vidéo seront prêts."</string>
+    <string name="cap_mode_off_pending" formatted="false">"IA désactivée. Les sous-titres YouTube reprendront lorsque la piste sera prête."</string>
 </resources>

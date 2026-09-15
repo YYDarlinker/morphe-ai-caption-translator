@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"Không thể đọc chẩn đoán: "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (khoảng "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" giây trước)"</string>
+    <string name="cap_mode_pending" formatted="false">"Đã lưu chế độ. Chế độ sẽ được áp dụng khi phụ đề của video này sẵn sàng."</string>
+    <string name="cap_mode_off_pending" formatted="false">"Đã tắt AI. Phụ đề YouTube sẽ tiếp tục khi bản phụ đề gốc sẵn sàng."</string>
 </resources>

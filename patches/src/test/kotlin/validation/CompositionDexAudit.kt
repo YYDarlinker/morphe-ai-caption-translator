@@ -18,6 +18,12 @@ fun main(args:Array<String>){
     println("FEATURES=$flags")
     if(flags["aiInstalled"]==1L){
         val bridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")
+        for(name in listOf("nativeTracks","translatedTracks")){
+            val code=bridge.methods.single { it.name==name }.implementation!!.instructions.toList()
+            val exits=code.indices.filter { code[it].opcode==com.android.tools.smali.dexlib2.Opcode.RETURN_OBJECT }
+            check(exits.size==2&&((code[exits.first()-1] as? WideLiteralInstruction)?.wideLiteral==0L)){"Untyped null model return in $name"}
+        }
+        println("NATIVE_MODEL_ACCESSORS_TYPED=true")
         val reselect=bridge.methods.single { it.name=="selectNative" }
         val call=reselect.implementation!!.instructions.single { (it as? ReferenceInstruction)?.reference is MethodReference }
         val target=reselect.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? MethodReference }.single()

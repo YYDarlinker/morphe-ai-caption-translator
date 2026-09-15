@@ -36,12 +36,20 @@ public final class CaptionQuickToggle {
     public static android.widget.LinearLayout nativeContainer(Object panel){return null;}
     static boolean setEngine(Context context,boolean enabled){
         if(enabled && DeepSeekConfig.load(context).apiKey.isEmpty()){Toast.makeText(context,CaptionStrings.get(context,"configure_api"),Toast.LENGTH_LONG).show();return false;}
-        boolean previous=DeepSeekConfig.enabled(context);if(previous==enabled)return true;
-        if(CaptionChoice.isOn()&&!NativeCaptionBridge.canReselect()){Toast.makeText(context,CaptionStrings.get(context,"switch_failed"),Toast.LENGTH_LONG).show();return false;}
-        DeepSeekConfig.saveEnabled(context,enabled);DynamicCaptionController.refreshConfiguration(context);
-        try{NativeCaptionBridge.refreshNativeTrack();CaptionMusicSuppressor.kick();}
-        catch(Exception failed){DeepSeekConfig.saveEnabled(context,previous);DynamicCaptionController.refreshConfiguration(context);Toast.makeText(context,CaptionStrings.get(context,"switch_failed"),Toast.LENGTH_LONG).show();return false;}
-        if(enabled&&CaptionChoice.isOn()&&!CaptionChoice.translates())Toast.makeText(context,CaptionStrings.get(context,"choose_translation"),Toast.LENGTH_LONG).show();
+        boolean previous=DeepSeekConfig.enabled(context);
+        // Saving the user's mode is independent of an ephemeral native player/track reference.
+        // In particular, OFF must never be rolled back to ON by a stale Shorts manager.
+        DeepSeekConfig.saveEnabled(context,enabled);
+        DynamicCaptionController.refreshConfiguration(context);
+        NativeCaptionBridge.Refresh refreshed=NativeCaptionBridge.Refresh.DEFERRED;
+        try{refreshed=NativeCaptionBridge.refreshNativeTrack();}
+        catch(Exception failed){CaptionDiagnostics.mark(context,"ENGINE_NATIVE_REFRESH_DEFERRED",failed.getClass().getSimpleName());}
+        CaptionMusicSuppressor.forceNativeRendererScan();CaptionMusicSuppressor.kick();
+        CaptionDiagnostics.mark(context,"ENGINE_MODE_SAVED","enabled="+enabled+";native="+refreshed.name());
+        if(previous!=enabled&&refreshed==NativeCaptionBridge.Refresh.DEFERRED)
+            Toast.makeText(context,CaptionStrings.get(context,enabled?"mode_pending":"mode_off_pending"),Toast.LENGTH_LONG).show();
+        else if(enabled&&CaptionChoice.isOn()&&!CaptionChoice.translates())
+            Toast.makeText(context,CaptionStrings.get(context,"choose_translation"),Toast.LENGTH_LONG).show();
         return true;
     }
     public static boolean shortsOpen(){return false;}

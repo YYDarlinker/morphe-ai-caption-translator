@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"진단을 읽지 못했습니다: "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (약 "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">"초 전)"</string>
+    <string name="cap_mode_pending" formatted="false">"모드가 저장되었습니다. 이 동영상의 자막이 준비되면 적용됩니다."</string>
+    <string name="cap_mode_off_pending" formatted="false">"AI가 꺼졌습니다. 기본 자막 트랙이 준비되면 YouTube 자막이 다시 표시됩니다."</string>
 </resources>

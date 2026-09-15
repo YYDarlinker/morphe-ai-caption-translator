@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"無法讀取診斷："</string>
     <string name="cap_message_c34848823d86" formatted="false">"（約 "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" 秒前）"</string>
+    <string name="cap_mode_pending" formatted="false">"已儲存模式，將在目前影片字幕就緒後生效。"</string>
+    <string name="cap_mode_off_pending" formatted="false">"AI 已關閉，原生字幕將在軌道就緒後恢復。"</string>
 </resources>

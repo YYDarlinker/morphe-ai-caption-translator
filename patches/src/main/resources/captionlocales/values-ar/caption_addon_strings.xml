@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"تعذّرت قراءة التشخيص: "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (منذ نحو "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" ثانية)"</string>
+    <string name="cap_mode_pending" formatted="false">"تم حفظ الوضع. سيُطبّق عندما تصبح ترجمة هذا الفيديو جاهزة."</string>
+    <string name="cap_mode_off_pending" formatted="false">"تم إيقاف الذكاء الاصطناعي. ستُستأنف ترجمة YouTube عندما يصبح المسار الأصلي جاهزًا."</string>
 </resources>

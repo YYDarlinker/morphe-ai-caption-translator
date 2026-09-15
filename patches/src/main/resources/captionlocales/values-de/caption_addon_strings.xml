@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"Diagnose konnte nicht gelesen werden: "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (vor etwa "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" Sekunden)"</string>
+    <string name="cap_mode_pending" formatted="false">"Modus gespeichert. Er wird angewendet, sobald die Untertitel dieses Videos bereit sind."</string>
+    <string name="cap_mode_off_pending" formatted="false">"KI ist aus. YouTube-Untertitel werden fortgesetzt, sobald die native Spur bereit ist."</string>
 </resources>

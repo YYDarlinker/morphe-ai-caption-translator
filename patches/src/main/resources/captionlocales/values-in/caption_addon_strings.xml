@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"Gagal membaca diagnostik: "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (sekitar "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" detik lalu)"</string>
+    <string name="cap_mode_pending" formatted="false">"Mode disimpan. Akan diterapkan saat subtitel video ini siap."</string>
+    <string name="cap_mode_off_pending" formatted="false">"AI dinonaktifkan. Subtitel YouTube akan dilanjutkan saat trek aslinya siap."</string>
 </resources>

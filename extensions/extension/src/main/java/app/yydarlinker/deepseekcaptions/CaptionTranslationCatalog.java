@@ -209,6 +209,8 @@ static final String[][] ENGLISH={
 {"message_30070c30d85c","Recent events: "},
 {"message_75a885d3b526","Could not read diagnostics: "},
 {"message_c34848823d86"," (about "},
-{"message_33cc168ccb4e"," seconds ago)"}
+{"message_33cc168ccb4e"," seconds ago)"},
+{"mode_pending","Mode saved. It will apply when this video's captions are ready."},
+{"mode_off_pending","AI is off. YouTube captions will resume when the native track is ready."}
 };
 }

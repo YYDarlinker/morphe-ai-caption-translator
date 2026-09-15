@@ -45,7 +45,9 @@
     "off",
     "configure_api",
     "switch_failed",
-    "choose_translation"
+    "choose_translation",
+    "mode_pending",
+    "mode_off_pending"
   ],
   "languages": {
     "en": {
@@ -136,7 +138,9 @@
       "message_30070c30d85c": "Recent events: ",
       "message_75a885d3b526": "Could not read diagnostics: ",
       "message_c34848823d86": " (about ",
-      "message_33cc168ccb4e": " seconds ago)"
+      "message_33cc168ccb4e": " seconds ago)",
+      "mode_pending": "Mode saved. It will apply when this video's captions are ready.",
+      "mode_off_pending": "AI is off. YouTube captions will resume when the native track is ready."
     },
     "zh-rCN": {
       "ai_title": "AI 字幕翻译",
@@ -226,7 +230,9 @@
       "message_30070c30d85c": "最近链路：",
       "message_75a885d3b526": "读取诊断状态失败：",
       "message_c34848823d86": "（约 ",
-      "message_33cc168ccb4e": " 秒前）"
+      "message_33cc168ccb4e": " 秒前）",
+      "mode_pending": "已保存模式，将在当前视频字幕就绪后生效。",
+      "mode_off_pending": "AI 已关闭，原生字幕将在轨道就绪后恢复。"
     },
     "zh-rTW": {
       "ai_title": "AI 字幕翻譯",
@@ -316,7 +322,9 @@
       "message_30070c30d85c": "最近事件：",
       "message_75a885d3b526": "無法讀取診斷：",
       "message_c34848823d86": "（約 ",
-      "message_33cc168ccb4e": " 秒前）"
+      "message_33cc168ccb4e": " 秒前）",
+      "mode_pending": "已儲存模式，將在目前影片字幕就緒後生效。",
+      "mode_off_pending": "AI 已關閉，原生字幕將在軌道就緒後恢復。"
     },
     "es": {
       "ai_title": "Traducción de subtítulos con IA",
@@ -406,7 +414,9 @@
       "message_30070c30d85c": "Eventos recientes: ",
       "message_75a885d3b526": "No se pudo leer el diagnóstico: ",
       "message_c34848823d86": " (hace unos ",
-      "message_33cc168ccb4e": " segundos)"
+      "message_33cc168ccb4e": " segundos)",
+      "mode_pending": "Modo guardado. Se aplicará cuando estén listos los subtítulos de este vídeo.",
+      "mode_off_pending": "IA desactivada. Los subtítulos de YouTube se reanudarán cuando la pista esté lista."
     },
     "fr": {
       "ai_title": "Traduction des sous-titres par IA",
@@ -496,7 +506,9 @@
       "message_30070c30d85c": "Événements récents : ",
       "message_75a885d3b526": "Impossible de lire le diagnostic : ",
       "message_c34848823d86": " (il y a environ ",
-      "message_33cc168ccb4e": " secondes)"
+      "message_33cc168ccb4e": " secondes)",
+      "mode_pending": "Mode enregistré. Il sera appliqué lorsque les sous-titres de cette vidéo seront prêts.",
+      "mode_off_pending": "IA désactivée. Les sous-titres YouTube reprendront lorsque la piste sera prête."
     },
     "de": {
       "ai_title": "KI-Untertitelübersetzung",
@@ -586,7 +598,9 @@
       "message_30070c30d85c": "Letzte Ereignisse: ",
       "message_75a885d3b526": "Diagnose konnte nicht gelesen werden: ",
       "message_c34848823d86": " (vor etwa ",
-      "message_33cc168ccb4e": " Sekunden)"
+      "message_33cc168ccb4e": " Sekunden)",
+      "mode_pending": "Modus gespeichert. Er wird angewendet, sobald die Untertitel dieses Videos bereit sind.",
+      "mode_off_pending": "KI ist aus. YouTube-Untertitel werden fortgesetzt, sobald die native Spur bereit ist."
     },
     "pt": {
       "ai_title": "Tradução de legendas com IA",
@@ -676,7 +690,9 @@
       "message_30070c30d85c": "Eventos recentes: ",
       "message_75a885d3b526": "Não foi possível ler o diagnóstico: ",
       "message_c34848823d86": " (há cerca de ",
-      "message_33cc168ccb4e": " segundos)"
+      "message_33cc168ccb4e": " segundos)",
+      "mode_pending": "Modo salvo. Será aplicado quando as legendas deste vídeo estiverem prontas.",
+      "mode_off_pending": "IA desativada. As legendas do YouTube voltarão quando a faixa estiver pronta."
     },
     "ru": {
       "ai_title": "Перевод субтитров с ИИ",
@@ -766,7 +782,9 @@
       "message_30070c30d85c": "Последние события: ",
       "message_75a885d3b526": "Не удалось прочитать диагностику: ",
       "message_c34848823d86": " (около ",
-      "message_33cc168ccb4e": " секунд назад)"
+      "message_33cc168ccb4e": " секунд назад)",
+      "mode_pending": "Режим сохранён. Он применится, когда субтитры этого видео будут готовы.",
+      "mode_off_pending": "ИИ выключен. Субтитры YouTube возобновятся, когда исходная дорожка будет готова."
     },
     "ja": {
       "ai_title": "AI 字幕翻訳",
@@ -856,7 +874,9 @@
       "message_30070c30d85c": "最近のイベント：",
       "message_75a885d3b526": "診断を読み取れません：",
       "message_c34848823d86": "（約 ",
-      "message_33cc168ccb4e": " 秒前）"
+      "message_33cc168ccb4e": " 秒前）",
+      "mode_pending": "モードを保存しました。この動画の字幕の準備ができ次第、適用されます。",
+      "mode_off_pending": "AI をオフにしました。元の字幕トラックの準備ができ次第、YouTube の字幕が再開されます。"
     },
     "ko": {
       "ai_title": "AI 자막 번역",
@@ -946,7 +966,9 @@
       "message_30070c30d85c": "최근 이벤트: ",
       "message_75a885d3b526": "진단을 읽지 못했습니다: ",
       "message_c34848823d86": " (약 ",
-      "message_33cc168ccb4e": "초 전)"
+      "message_33cc168ccb4e": "초 전)",
+      "mode_pending": "모드가 저장되었습니다. 이 동영상의 자막이 준비되면 적용됩니다.",
+      "mode_off_pending": "AI가 꺼졌습니다. 기본 자막 트랙이 준비되면 YouTube 자막이 다시 표시됩니다."
     },
     "ar": {
       "ai_title": "ترجمة الترجمة النصية بالذكاء الاصطناعي",
@@ -1036,7 +1058,9 @@
       "message_30070c30d85c": "الأحداث الأخيرة: ",
       "message_75a885d3b526": "تعذّرت قراءة التشخيص: ",
       "message_c34848823d86": " (منذ نحو ",
-      "message_33cc168ccb4e": " ثانية)"
+      "message_33cc168ccb4e": " ثانية)",
+      "mode_pending": "تم حفظ الوضع. سيُطبّق عندما تصبح ترجمة هذا الفيديو جاهزة.",
+      "mode_off_pending": "تم إيقاف الذكاء الاصطناعي. ستُستأنف ترجمة YouTube عندما يصبح المسار الأصلي جاهزًا."
     },
     "hi": {
       "ai_title": "AI उपशीर्षक अनुवाद",
@@ -1126,7 +1150,9 @@
       "message_30070c30d85c": "हाल की घटनाएँ: ",
       "message_75a885d3b526": "निदान पढ़ नहीं सके: ",
       "message_c34848823d86": " (लगभग ",
-      "message_33cc168ccb4e": " सेकंड पहले)"
+      "message_33cc168ccb4e": " सेकंड पहले)",
+      "mode_pending": "मोड सहेजा गया। इस वीडियो के उपशीर्षक तैयार होने पर यह लागू होगा।",
+      "mode_off_pending": "AI बंद है। मूल ट्रैक तैयार होने पर YouTube के उपशीर्षक फिर से दिखेंगे।"
     },
     "id": {
       "ai_title": "Terjemahan subtitel AI",
@@ -1216,7 +1242,9 @@
       "message_30070c30d85c": "Kejadian terbaru: ",
       "message_75a885d3b526": "Gagal membaca diagnostik: ",
       "message_c34848823d86": " (sekitar ",
-      "message_33cc168ccb4e": " detik lalu)"
+      "message_33cc168ccb4e": " detik lalu)",
+      "mode_pending": "Mode disimpan. Akan diterapkan saat subtitel video ini siap.",
+      "mode_off_pending": "AI dinonaktifkan. Subtitel YouTube akan dilanjutkan saat trek aslinya siap."
     },
     "vi": {
       "ai_title": "Dịch phụ đề bằng AI",
@@ -1306,7 +1334,9 @@
       "message_30070c30d85c": "Sự kiện gần đây: ",
       "message_75a885d3b526": "Không thể đọc chẩn đoán: ",
       "message_c34848823d86": " (khoảng ",
-      "message_33cc168ccb4e": " giây trước)"
+      "message_33cc168ccb4e": " giây trước)",
+      "mode_pending": "Đã lưu chế độ. Chế độ sẽ được áp dụng khi phụ đề của video này sẵn sàng.",
+      "mode_off_pending": "Đã tắt AI. Phụ đề YouTube sẽ tiếp tục khi bản phụ đề gốc sẵn sàng."
     }
   },
   "source_keys": {

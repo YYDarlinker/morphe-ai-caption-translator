@@ -88,4 +88,6 @@
     <string name="cap_message_75a885d3b526" formatted="false">"Não foi possível ler o diagnóstico: "</string>
     <string name="cap_message_c34848823d86" formatted="false">" (há cerca de "</string>
     <string name="cap_message_33cc168ccb4e" formatted="false">" segundos)"</string>
+    <string name="cap_mode_pending" formatted="false">"Modo salvo. Será aplicado quando as legendas deste vídeo estiverem prontas."</string>
+    <string name="cap_mode_off_pending" formatted="false">"IA desativada. As legendas do YouTube voltarão quando a faixa estiver pronta."</string>
 </resources>

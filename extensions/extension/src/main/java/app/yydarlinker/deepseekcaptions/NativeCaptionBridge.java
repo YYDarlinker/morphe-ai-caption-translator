@@ -19,7 +19,11 @@ public final class NativeCaptionBridge {
             Object prototype=null;
             for(Object track:original) {
                 String code=language(track);
-                if(code!=null && !code.isEmpty() && "zh-Hans".equals(TargetLanguage.fromCode(code).code)) return LanguageMenuOrder.insertSimplified(original,NativeCaptionBridge::language,t->displayName(t).toString());
+                if(LanguageMenuOrder.rank(code)==1){
+                    Object corrected=cloneSimplified(track);if(corrected==null)return original;
+                    List<Object> copy=new ArrayList<>(original);copy.set(copy.indexOf(track),corrected);
+                    return LanguageMenuOrder.insertSimplified(copy,NativeCaptionBridge::language,t->displayName(t).toString());
+                }
                 if(prototype==null && DeepSeekCaptionHook.isYouTubeTimedTextUrl(url(track))) prototype=track;
             }
             if(prototype==null) return original;

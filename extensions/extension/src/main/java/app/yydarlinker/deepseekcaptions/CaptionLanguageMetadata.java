@@ -16,6 +16,13 @@ public final class CaptionLanguageMetadata {
                 write(entry,1,"zh-Hans".getBytes(StandardCharsets.UTF_8));ByteArrayOutputStream label=new ByteArrayOutputStream();
                 write(label,4,LanguageMenuOrder.simplifiedLabel().getBytes(StandardCharsets.UTF_8));write(entry,2,label.toByteArray());
                 for(Field f:fields(prototype))if(f.number!=1&&f.number!=2)entry.write(f.raw);languages.add(entry.toByteArray());}
+            for(int i=0;i<languages.size();i++)if(LanguageMenuOrder.rank(code(languages.get(i)))==1){
+                ByteArrayOutputStream corrected=new ByteArrayOutputStream(),name=new ByteArrayOutputStream();
+                write(name,4,LanguageMenuOrder.simplifiedLabel().getBytes(StandardCharsets.UTF_8));
+                boolean wroteName=false;
+                for(Field field:fields(languages.get(i))){if(field.number==2&&field.wire==2){if(!wroteName){write(corrected,2,name.toByteArray());wroteName=true;}}else corrected.write(field.raw);}
+                if(!wroteName)write(corrected,2,name.toByteArray());languages.set(i,corrected.toByteArray());
+            }
             languages=LanguageMenuOrder.insertSimplified(languages,CaptionLanguageMetadata::code,CaptionLanguageMetadata::label);
             ByteArrayOutputStream out=new ByteArrayOutputStream();boolean wrote=false;
             for(Field f:root){if(f.number==3&&f.wire==2){if(!wrote){for(byte[] item:languages)write(out,3,item);wrote=true;}}else out.write(f.raw);}

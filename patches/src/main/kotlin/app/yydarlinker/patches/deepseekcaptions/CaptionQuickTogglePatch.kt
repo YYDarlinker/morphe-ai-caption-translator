@@ -1,8 +1,16 @@
 package app.yydarlinker.patches.deepseekcaptions
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.builder.BuilderOffsetInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
@@ -33,7 +41,23 @@ internal fun BytecodePatchContext.installCaptionQuickToggle(){
     if(shorts.methods.none { it.name=="isOpen" && AccessFlags.STATIC.isSet(it.accessFlags) })throw PatchException("AI quick toggle: Shorts state unavailable")
     bind("shortsOpen","invoke-static {}, ${shorts.type}->isOpen()Z\nmove-result v0\nreturn v0",1)
     bind("dismissNative","invoke-static {}, ${utils.type}->dismissFlyout()V\nreturn-void",0)
-    entry.addInstructions(0,"invoke-static/range {p0 .. p0}, ${runtime.type}->onMenu(Ljava/lang/Object;)V")
+    // Insert at the shared group's boundary, BEFORE its conditional divider and signal reset.
+    // The index is the official inflater's next insertion position (dialog vs popup differ).
+    val instructions=entry.implementation!!.instructions
+    val dividerCall=instructions.indexOfFirst { ins ->
+        ((ins as? ReferenceInstruction)?.reference as? MethodReference)?.name=="addDivider"
+    }
+    if(dividerCall<1)throw PatchException("AI quick toggle: shared divider boundary unavailable")
+    val guard=(dividerCall-1 downTo 0).firstOrNull { instructions[it].opcode==Opcode.IF_LEZ }
+        ?:throw PatchException("AI quick toggle: shared divider guard unavailable")
+    val indexRegister=(instructions[guard] as OneRegisterInstruction).registerA
+    val afterDivider=(instructions[guard] as BuilderOffsetInstruction).target.location.instruction!!
+    // Retain incoming branch labels on the hook: zero/hidden official buttons must also reach it.
+    entry.replaceInstruction(guard,"invoke-static {p0, v$indexRegister}, ${runtime.type}->onMenu(Ljava/lang/Object;I)I")
+    entry.addInstructionsWithLabels(guard+1,"move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",ExternalLabel("after_divider",afterDivider))
+    val info=utils.methods.single { it.name=="getFlyoutMenuInfo" }
+    info.accessFlags=(info.accessFlags and AccessFlags.PRIVATE.value.inv()) or AccessFlags.PUBLIC.value
+    bind("nativeContainer","const/4 v0, 0x0\ninvoke-static {p0, v0}, ${utils.type}->getFlyoutMenuInfo(Ljava/lang/Object;I)${info.returnType}\nmove-result-object v0\nif-eqz v0, :done\ninvoke-virtual {v0}, ${info.returnType}->menuContainer()Landroid/widget/LinearLayout;\nmove-result-object v0\n:done\nreturn-object v0",2)
     val detector=filter.methods.single { it.name=="isFiltered" }
     val params=detector.parameterTypes.map { it.toString() }
     val bytes=params.indexOf("[B")

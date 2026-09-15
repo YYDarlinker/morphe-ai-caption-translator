@@ -1,5 +1,7 @@
 # Modular captions (1.2.0)
 
+> Historical 1.2.0 behavior. For the direct toggle, shared menu divider and multilingual timing changes, see `CAPTIONS-1.2.1.md`.
+
 ## Three public patches
 
 All three roots are opt-in (`default=false`). Shared initialization, resource installation and structural bindings are internal dependencies, not extra user-facing choices.

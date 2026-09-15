@@ -4,7 +4,7 @@ import org.junit.*;import org.junit.runner.RunWith;import org.robolectric.*;impo
 import java.util.*;import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class) @Config(sdk=28,shadows={QuickCaptionToggleTest.Flags.class,QuickCaptionToggleTest.TrackAccess.class,QuickCaptionToggleTest.Keys.class,QuickCaptionToggleTest.Menu.class})
 public class QuickCaptionToggleTest {
-    private static boolean installed,top,shorts,validKey;private static int rows;private static final List<Object> selections=new ArrayList<>();
+    private static boolean installed,top,shorts,validKey;private static View.OnClickListener listener;private static int rows;private static final List<Object> selections=new ArrayList<>();
     enum Origin { PREFERRED_TRACK }
     static class Track {}
     @Implements(CaptionAddonSupport.class) public static class Flags {@Implementation public static boolean aiInstalled(){return installed;} @Implementation public static boolean memoryInstalled(){return true;}}
@@ -18,7 +18,7 @@ public class QuickCaptionToggleTest {
     @Implements(CaptionQuickToggle.class) public static class Menu {
         @Implementation public static boolean topMenu(){return top;}
         @Implementation public static boolean shortsOpen(){return shorts;}
-        @Implementation public static int addNativeRow(Object p,Drawable d,String label,View.OnClickListener click,int index){rows++;assertFalse(label.isEmpty());return index;}
+        @Implementation public static int addNativeRow(Object p,Drawable d,String label,View.OnClickListener click,int index){rows++;listener=click;assertEquals(3,index);assertFalse(label.isEmpty());return index+1;}
     }
     @Before public void reset(){installed=true;top=false;shorts=false;validKey=true;rows=0;selections.clear();CaptionChoice.reset();RememberedCaptionSelection.reset();}
     @Test public void switchesReselectSameTrackAndKeepLanguageMemory(){
@@ -27,6 +27,13 @@ public class QuickCaptionToggleTest {
         assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));assertTrue(DeepSeekConfig.enabled(a));assertEquals(Arrays.asList(null,track),selections);
         assertEquals("fr",RememberedCaptionSelection.language());selections.clear();
         assertTrue(CaptionQuickToggle.setEngine(a,false));assertFalse(DeepSeekConfig.enabled(a));assertEquals(Arrays.asList(null,track),selections);assertEquals("fr",RememberedCaptionSelection.language());a.finish();
+    }
+    @Test public void menuClickTogglesDirectlyWithoutDialog(){
+        Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);DeepSeekConfig.saveEnabled(a,false);top=true;
+        NativeCaptionBridge.onNativeSelection(new Object(),null,Origin.PREFERRED_TRACK);
+        CaptionQuickToggle.onMenu(new Object(),3);listener.onClick(new View(a));assertTrue(DeepSeekConfig.enabled(a));
+        listener.onClick(new View(a));assertFalse(DeepSeekConfig.enabled(a));
+        assertNull(org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog());a.finish();
     }
     @Test public void missingKeyDoesNotTurnOffNativeCaptions(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();DeepSeekConfig.saveEnabled(a,false);validKey=false;
@@ -38,11 +45,11 @@ public class QuickCaptionToggleTest {
     }
     @Test public void onlyRecognizedPlayerMenusReceiveAnEntry(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);Object panel=new Object();
-        CaptionQuickToggle.onMenu(panel);assertEquals(0,rows);top=true;CaptionQuickToggle.onMenu(panel);assertEquals(1,rows);
-        installed=false;CaptionQuickToggle.onMenu(panel);assertEquals(1,rows);
+        CaptionQuickToggle.onMenu(panel,3);assertEquals(0,rows);top=true;CaptionQuickToggle.onMenu(panel,3);assertEquals(1,rows);
+        installed=false;CaptionQuickToggle.onMenu(panel,3);assertEquals(1,rows);
         installed=true;top=false;shorts=true;
-        CaptionQuickToggle.observeMenuPath("captions_sheet_content.e",new byte[]{1});CaptionQuickToggle.onMenu(panel);assertEquals(1,rows);
-        CaptionQuickToggle.observeMenuPath("overflow_menu_item.e", "yt_outline_closed_caption_".getBytes(java.nio.charset.StandardCharsets.US_ASCII));CaptionQuickToggle.onMenu(panel);assertEquals(2,rows);
-        CaptionQuickToggle.onMenu(panel);assertEquals(2,rows);a.finish();
+        CaptionQuickToggle.observeMenuPath("captions_sheet_content.e",new byte[]{1});CaptionQuickToggle.onMenu(panel,3);assertEquals(1,rows);
+        CaptionQuickToggle.observeMenuPath("overflow_menu_item.e", "yt_outline_closed_caption_".getBytes(java.nio.charset.StandardCharsets.US_ASCII));CaptionQuickToggle.onMenu(panel,3);assertEquals(2,rows);
+        CaptionQuickToggle.onMenu(panel,3);assertEquals(2,rows);a.finish();
     }
 }

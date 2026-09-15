@@ -56,8 +56,18 @@ public class CaptionBehaviorTest {
         assertArrayEquals(next,CaptionLanguageMetadata.addSimplified(next));
         assertTrue(new String(next,StandardCharsets.UTF_8).contains(LanguageMenuOrder.simplifiedLabel()));
     }
+    @Test public void existingMalformedSimplifiedNameIsCorrectedWithoutDroppingOtherFields()throws Exception {
+        ByteArrayOutputStream entry=new ByteArrayOutputStream(),name=new ByteArrayOutputStream(),root=new ByteArrayOutputStream();
+        CaptionLanguageMetadata.write(entry,1,"zh-Hans".getBytes(StandardCharsets.UTF_8));
+        CaptionLanguageMetadata.write(name,4,"中文（简体中文）".getBytes(StandardCharsets.UTF_8));CaptionLanguageMetadata.write(entry,2,name.toByteArray());
+        CaptionLanguageMetadata.write(entry,7,new byte[]{7,9});CaptionLanguageMetadata.write(root,3,entry.toByteArray());CaptionLanguageMetadata.write(root,99,new byte[]{8,9});
+        byte[] result=CaptionLanguageMetadata.addSimplified(root.toByteArray());String readable=new String(result,StandardCharsets.UTF_8);
+        assertFalse(readable.contains("简体中文"));assertTrue(readable.contains(LanguageMenuOrder.simplifiedLabel()));
+        List<CaptionLanguageMetadata.Field> fields=CaptionLanguageMetadata.fields(result);assertEquals(2,fields.size());assertArrayEquals(new byte[]{8,9},fields.get(1).value);
+        assertTrue(CaptionLanguageMetadata.fields(fields.get(0).value).stream().anyMatch(f->f.number==7&&Arrays.equals(new byte[]{7,9},f.value)));
+    }
     @Test public void noDuplicateAndNoInventedEmptyTrack()throws Exception {
-        byte[] original=metadata("zh-Hans");assertSame(original,CaptionLanguageMetadata.addSimplified(original));
+        byte[] original=metadata("zh-Hans");byte[] corrected=CaptionLanguageMetadata.addSimplified(original);assertArrayEquals(corrected,CaptionLanguageMetadata.addSimplified(corrected));assertTrue(new String(corrected,StandardCharsets.UTF_8).contains(LanguageMenuOrder.simplifiedLabel()));
         byte[] bad={26,127};assertSame(bad,CaptionLanguageMetadata.addSimplified(bad));
         byte[] empty={};assertSame(empty,CaptionLanguageMetadata.addSimplified(empty));
     }

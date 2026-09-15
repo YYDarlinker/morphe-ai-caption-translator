@@ -1,10 +1,8 @@
 package app.yydarlinker.deepseekcaptions;
 import java.util.*;
-import java.util.regex.*;
 /** Punctuation-insensitive lexical correspondence; never uses translated text to allocate time. */
 final class AsrLocalTiming {
     private static final int N=4;
-    private static final Pattern WORD=Pattern.compile("[\\p{L}\\p{N}]+(?:['’][\\p{L}\\p{N}]+)*");
     private static final class Word {final String value;final int atom;Word(String v,int a){value=v;atom=a;}}
     static SourceAtomTimeline.Result align(SourceAtomTimeline.Result source,SourceAtomTimeline.Result asr){
         return align(source,asr,false);
@@ -18,7 +16,9 @@ final class AsrLocalTiming {
         if(p.isEmpty()||a.isEmpty())return source;
         boolean identical=p.size()==a.size();
         for(int i=0;identical&&i<p.size();i++)identical=compatible(p.get(i),a.get(i),source,asr,allowEstimated);
-        int minimum=identical?Math.min(8,source.atoms.size()):8;
+        // Punctuation-only atoms have no lexical anchor and must not make complete text fail.
+        int lexicalAtoms=0,previousAtom=-1;for(Word word:p)if(word.atom!=previousAtom){lexicalAtoms++;previousAtom=word.atom;}
+        int minimum=identical?Math.min(8,lexicalAtoms):8;
         if(!identical&&(p.size()<8||a.size()<8))return source;
         Map<String,Integer> unique=index(a),sourceUnique=index(p);
         int[] match=new int[p.size()];Arrays.fill(match,-1);int last=-1,matched=0;
@@ -98,7 +98,15 @@ final class AsrLocalTiming {
         for(int i=0;i<p.size();i++){
             if(exact[i]){left=i;continue;}
             SourceAtomTimeline.Atom old=p.get(i);s[i]=old.startMs;e[i]=old.endMs;int r=right[i];
-            if(left>=0&&r>=0){
+            // A punctuation-only tail carries no speech anchor. Keep its duration and borrow
+            // the adjacent same-cue offset uniformly; fading each edge can invert a short tail.
+            if(TimingTokens.words(old.text).isEmpty()&&left>=0&&old.cueIndex==p.get(left).cueIndex&&old.endMs-p.get(left).endMs<=2000){
+                long delta=e[left]-p.get(left).endMs;s[i]+=delta;e[i]+=delta;
+            }
+            else if(TimingTokens.words(old.text).isEmpty()&&r>=0&&old.cueIndex==p.get(r).cueIndex&&p.get(r).startMs-old.startMs<=2000){
+                long delta=s[r]-p.get(r).startMs;s[i]+=delta;e[i]+=delta;
+            }
+            else if(left>=0&&r>=0){
                 long from=p.get(left).endMs,to=p.get(r).startMs,newFrom=e[left],newTo=s[r];
                 if(to>from&&to-from<=8000&&newTo>=newFrom){
                     s[i]=newFrom+Math.round((newTo-newFrom)*((old.startMs-from)/(double)(to-from)));
@@ -110,7 +118,7 @@ final class AsrLocalTiming {
             else if(r>=0&&p.get(r).startMs-old.startMs<=2000){long d=s[r]-p.get(r).startMs;s[i]+=Math.round(d*Math.max(0,1-(p.get(r).startMs-old.startMs)/2000.0));e[i]+=Math.round(d*Math.max(0,1-(p.get(r).startMs-old.endMs)/2000.0));}
         }
     }
-    private static List<Word> words(List<SourceAtomTimeline.Atom> atoms){List<Word> result=new ArrayList<>();for(int i=0;i<atoms.size();i++){Matcher m=WORD.matcher(atoms.get(i).text.toLowerCase(Locale.ROOT));while(m.find())result.add(new Word(m.group().replace("'","").replace("’",""),i));}return result;}
+    private static List<Word> words(List<SourceAtomTimeline.Atom> atoms){List<Word> result=new ArrayList<>();for(int i=0;i<atoms.size();i++)for(String word:TimingTokens.words(atoms.get(i).text))result.add(new Word(word,i));return result;}
     private static Map<String,Integer> index(List<Word>a){Map<String,Integer> result=new HashMap<>();for(int i=0;i+N<=a.size();i++){String k=key(a,i);result.put(k,result.containsKey(k)?-1:i);}return result;}
     private static String key(List<Word>a,int from){StringBuilder s=new StringBuilder();for(int i=0;i<N;i++)s.append(a.get(from+i).value).append('|');return s.toString();}
 }

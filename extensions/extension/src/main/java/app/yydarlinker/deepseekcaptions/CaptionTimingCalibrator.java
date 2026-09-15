@@ -12,7 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Calibrates a high-quality provider caption track against YouTube's synchronized English ASR track.
+ * Calibrates a high-quality provider caption track against YouTube's synchronized source-language ASR track.
  *
  * <p>The provider track remains the only text/semantic source. ASR is used only as a clock reference.
  * Whether correction is applied is decided here from real matching text anchors; no upstream
@@ -223,37 +223,7 @@ final class CaptionTimingCalibrator {
         return out;
     }
 
-    private static List<String> words(String text) {
-        if (text == null || text.trim().isEmpty()) return Collections.emptyList();
-        List<String> out = new ArrayList<>();
-        String lower = text.toLowerCase(Locale.ROOT);
-        StringBuilder current = new StringBuilder();
-        for (int i = 0; i < lower.length(); i++) {
-            char c = lower.charAt(i);
-            if (Character.isLetterOrDigit(c)) {
-                current.append(c);
-            } else if ((c == '\'' || c == '’') && current.length() > 0 &&
-                    i + 1 < lower.length() && Character.isLetterOrDigit(lower.charAt(i + 1))) {
-                current.append(c);
-            } else {
-                flushWord(out, current);
-            }
-        }
-        flushWord(out, current);
-        return out;
-    }
-
-    private static void flushWord(List<String> out, StringBuilder current) {
-        if (current.length() == 0) return;
-        String raw = current.toString();
-        StringBuilder canonical = new StringBuilder(raw.length());
-        for (int i = 0; i < raw.length(); i++) {
-            char c = raw.charAt(i);
-            if (Character.isLetterOrDigit(c)) canonical.append(c);
-        }
-        if (canonical.length() > 0) out.add(canonical.toString());
-        current.setLength(0);
-    }
+    private static List<String> words(String text) {return TimingTokens.words(text);}
 
     private static int suffixPrefixOverlap(List<String> previous, List<String> current) {
         int max = Math.min(previous.size(), current.size());

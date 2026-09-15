@@ -33,7 +33,32 @@ fun main(args:Array<String>){
         check(AccessFlags.PUBLIC.isSet(method.accessFlags)){"Native selector is not public: $target flags=${method.accessFlags}"}
         println("NATIVE_RESELECT_PUBLIC=$target")
         val menu=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionQuickToggle;")
-        for(name in listOf("addNativeRow","topMenu","shortsOpen","dismissNative"))check(menu.methods.single { it.name==name }.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().any())
+        for(name in listOf("addNativeRow","topMenu","shortsOpen","dismissNative","nativeContainer"))check(menu.methods.single { it.name==name }.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().any())
+        for(ins in menu.methods.single { it.name=="nativeContainer" }.implementation!!.instructions){
+            val ref=(ins as? ReferenceInstruction)?.reference as? MethodReference?:continue
+            val owner=classes.getValue(ref.definingClass)
+            val targetMethod=owner.methods.single { it.name==ref.name&&it.parameterTypes==ref.parameterTypes&&it.returnType==ref.returnType }
+            check(AccessFlags.PUBLIC.isSet(owner.accessFlags)&&AccessFlags.PUBLIC.isSet(targetMethod.accessFlags)){"Inaccessible native menu-container bridge: $ref"}
+        }
+        val utils=classes.getValue("Lapp/morphe/extension/youtube/patches/utils/FlyoutUtils;")
+        check(AccessFlags.PUBLIC.isSet(utils.methods.single { it.name=="getFlyoutMenuInfo" }.accessFlags))
+        val instructions=utils.methods.single { it.name=="addFlyoutElements" }.implementation!!.instructions.toList()
+        fun called(i:Int)=((instructions[i] as? ReferenceInstruction)?.reference as? MethodReference)?.name
+        val hook=instructions.indices.single { called(it)=="onMenu" }
+        val divider=instructions.indices.single { called(it)=="addDivider" }
+        val reset=instructions.indices.single { called(it)=="resetTopFlyoutMenuVisible" }
+        check(hook<divider&&divider<reset){"AI toggle must precede shared divider and signal reset"}
+        check(instructions[hook+1].opcode==com.android.tools.smali.dexlib2.Opcode.MOVE_RESULT)
+        check(instructions[hook+2].opcode==com.android.tools.smali.dexlib2.Opcode.IF_LEZ)
+        val positions=IntArray(instructions.size);var position=0
+        instructions.forEachIndexed { i,ins->positions[i]=position;position+=ins.codeUnits }
+        for(i in 0 until hook){
+            val offset=instructions[i] as? com.android.tools.smali.dexlib2.iface.instruction.OffsetInstruction?:continue
+            val targetPosition=positions[i]+offset.codeOffset
+            check(targetPosition<=positions[hook]){"Branch bypasses toggle before divider: $i -> $targetPosition"}
+        }
+        check(menu.methods.none { it.name=="show" }){"Obsolete second-level engine dialog remains"}
+        println("QUICK_MENU_SHARED_DIVIDER=true; ALL_INCOMING_BRANCHES_REACH_TOGGLE=true; DIRECT_TOGGLE=true")
         println("QUICK_MENU_BOUND=true")
     }
     println("DEX_AUDIT_PASS classes=${classes.size}")

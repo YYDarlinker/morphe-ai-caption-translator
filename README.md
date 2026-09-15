@@ -4,6 +4,8 @@
 
 Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
 
+The 1.2.1 refinement uses a direct one-tap AI toggle inside the shared Morphe menu group, removes redundant list spacing, corrects the Simplified Chinese label and prioritizes usable auto-generated timing in every source language. See [1.2.1 behavior and safety boundaries](docs/CAPTIONS-1.2.1.md).
+
 Independent YouTube AI subtitle addon, compatible with Morphe.
 
 This repository is a Morphe custom patch. It routes YouTube automatic-translation selections through a user-provided OpenAI-compatible API and displays the result in a dedicated in-player subtitle box.

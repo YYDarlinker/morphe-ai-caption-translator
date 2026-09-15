@@ -1,8 +1,11 @@
 package app.yydarlinker.deepseekcaptions;
 import org.json.*;import java.net.URI;import java.net.URLDecoder;import java.nio.charset.StandardCharsets;
-/** Only extracts this video's public English ASR track; never executes page scripts. */
+/** Only extracts this video's public ASR track; never executes page scripts. */
 final class WordTimingReference {
- static String find(String html,String videoId)throws Exception{
+ static String find(String html,String videoId)throws Exception{java.util.List<String> all=findAll(html,videoId,"");return all.isEmpty()?"":all.get(0);}
+ static boolean sameLanguage(String a,String b){return a!=null&&b!=null&&!a.isEmpty()&&!b.isEmpty()&&a.split("-")[0].equalsIgnoreCase(b.split("-")[0]);}
+ static java.util.List<String> findAll(String html,String videoId,String language)throws Exception{
+  java.util.List<String> preferred=new java.util.ArrayList<>(),other=new java.util.ArrayList<>();
   String marker="ytInitialPlayerResponse";int from=0;
   while((from=html.indexOf(marker,from))>=0){int eq=html.indexOf('=',from+marker.length());if(eq<0)break;int start=eq+1;while(start<html.length()&&Character.isWhitespace(html.charAt(start)))start++;from=start;
    if(start>=html.length()||html.charAt(start)!='{')continue;
@@ -11,8 +14,11 @@ final class WordTimingReference {
     else if(c=='"')string=true;else if(c=='{')depth++;else if(c=='}'&&--depth==0){end=i+1;break;}}
    if(end<0)continue;from=end;JSONObject root=new JSONObject(html.substring(start,end));JSONObject details=root.optJSONObject("videoDetails");if(details==null||!videoId.equals(details.optString("videoId")))continue;
    JSONObject captions=root.optJSONObject("captions");if(captions==null)continue;JSONObject list=captions.optJSONObject("playerCaptionsTracklistRenderer");if(list==null)continue;JSONArray tracks=list.optJSONArray("captionTracks");if(tracks==null)continue;
-   for(int i=0;i<tracks.length();i++){JSONObject t=tracks.optJSONObject(i);if(t==null||!("en".equals(t.optString("languageCode"))||t.optString("languageCode").startsWith("en-"))||!"asr".equals(t.optString("kind")))continue;String url=t.optString("baseUrl");if(safe(url,videoId))return SourceFormatPolicy.json3(url);}
-  }return "";
+   for(int i=0;i<tracks.length();i++){JSONObject t=tracks.optJSONObject(i);if(t==null||!"asr".equals(t.optString("kind")))continue;String url=t.optString("baseUrl");if(safe(url,videoId)){
+    java.util.List<String> target=sameLanguage(language,t.optString("languageCode"))?preferred:other;
+    String formatted=SourceFormatPolicy.json3(url);if(!target.contains(formatted)&&target.size()<16)target.add(formatted);
+   }}
+  }for(String url:other)if(!preferred.contains(url))preferred.add(url);return preferred;
  }
  static boolean safe(String url,String video){try{
   if(video==null||!video.matches("[A-Za-z0-9_-]{11}"))return false;

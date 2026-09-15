@@ -40,6 +40,15 @@ fun main(args:Array<String>){
             val targetMethod=owner.methods.single { it.name==ref.name&&it.parameterTypes==ref.parameterTypes&&it.returnType==ref.returnType }
             check(AccessFlags.PUBLIC.isSet(owner.accessFlags)&&AccessFlags.PUBLIC.isSet(targetMethod.accessFlags)){"Inaccessible native menu-container bridge: $ref"}
         }
+        val containerCode=menu.methods.single { it.name=="nativeContainer" }.implementation!!.instructions.toList()
+        val returns=containerCode.indices.filter { containerCode[it].opcode==com.android.tools.smali.dexlib2.Opcode.RETURN_OBJECT }
+        check(returns.size==2){"Container bridge must have independent null and LinearLayout returns (ART type safety)"}
+        val nullValue=containerCode[returns[0]-1] as? WideLiteralInstruction
+        check(nullValue?.wideLiteral==0L){"Null return must explicitly clear the reference register"}
+        check(containerCode[returns[1]-1].opcode==com.android.tools.smali.dexlib2.Opcode.MOVE_RESULT_OBJECT)
+        val accessor=(containerCode[returns[1]-2] as? ReferenceInstruction)?.reference as? MethodReference
+        check(accessor?.name=="menuContainer"&&accessor.returnType=="Landroid/widget/LinearLayout;")
+        println("NATIVE_CONTAINER_TYPED_RETURNS=true")
         val utils=classes.getValue("Lapp/morphe/extension/youtube/patches/utils/FlyoutUtils;")
         check(AccessFlags.PUBLIC.isSet(utils.methods.single { it.name=="getFlyoutMenuInfo" }.accessFlags))
         val instructions=utils.methods.single { it.name=="addFlyoutElements" }.implementation!!.instructions.toList()

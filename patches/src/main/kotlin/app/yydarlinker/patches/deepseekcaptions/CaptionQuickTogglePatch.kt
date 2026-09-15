@@ -57,7 +57,10 @@ internal fun BytecodePatchContext.installCaptionQuickToggle(){
     entry.addInstructionsWithLabels(guard+1,"move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",ExternalLabel("after_divider",afterDivider))
     val info=utils.methods.single { it.name=="getFlyoutMenuInfo" }
     info.accessFlags=(info.accessFlags and AccessFlags.PRIVATE.value.inv()) or AccessFlags.PUBLIC.value
-    bind("nativeContainer","const/4 v0, 0x0\ninvoke-static {p0, v0}, ${utils.type}->getFlyoutMenuInfo(Ljava/lang/Object;I)${info.returnType}\nmove-result-object v0\nif-eqz v0, :done\ninvoke-virtual {v0}, ${info.returnType}->menuContainer()Landroid/widget/LinearLayout;\nmove-result-object v0\n:done\nreturn-object v0",2)
+    // ART does not narrow the null branch's reference register to a null type.
+    // Do not merge FlyoutMenuInfo and LinearLayout at one return: that becomes Object
+    // and rejects the entire CaptionQuickToggle class. Each path returns its own type.
+    bind("nativeContainer","const/4 v0, 0x0\ninvoke-static {p0, v0}, ${utils.type}->getFlyoutMenuInfo(Ljava/lang/Object;I)${info.returnType}\nmove-result-object v0\nif-nez v0, :container\nconst/4 v0, 0x0\nreturn-object v0\n:container\ninvoke-virtual {v0}, ${info.returnType}->menuContainer()Landroid/widget/LinearLayout;\nmove-result-object v0\nreturn-object v0",2)
     val detector=filter.methods.single { it.name=="isFiltered" }
     val params=detector.parameterTypes.map { it.toString() }
     val bytes=params.indexOf("[B")

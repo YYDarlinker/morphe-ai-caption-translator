@@ -4,6 +4,8 @@
 
 Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
 
+Version 1.2.2 fixes an Android ART verification error that could crash both player menus in 1.2.1. See [the reproduced cause and runtime regression check](docs/CAPTIONS-1.2.2.md).
+
 The 1.2.1 refinement uses a direct one-tap AI toggle inside the shared Morphe menu group, removes redundant list spacing, corrects the Simplified Chinese label and prioritizes usable auto-generated timing in every source language. See [1.2.1 behavior and safety boundaries](docs/CAPTIONS-1.2.1.md).
 
 Independent YouTube AI subtitle addon, compatible with Morphe.

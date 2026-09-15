@@ -1,3 +1,9 @@
+## [1.2.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.1...v1.2.2) (2026-09-15)
+
+### 🐛 Bug Fixes
+
+* correct ART return types in caption menu bridge ([5e4ed0f](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/5e4ed0ffe07c22ea62b6ec918f4751299f3f7059))
+
 ## [1.2.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.0...v1.2.1) (2026-09-15)
 
 ### 🐛 Bug Fixes

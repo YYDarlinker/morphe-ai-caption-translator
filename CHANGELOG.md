@@ -1,3 +1,9 @@
+## [1.2.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.2...v1.2.3) (2026-09-15)
+
+### 🐛 Bug Fixes
+
+* recover Shorts AI engine switching after video changes ([0394b86](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/0394b869e54a3b77ad1a5caf0aac3140dc7685b1))
+
 ## [1.2.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.1...v1.2.2) (2026-09-15)
 
 ### 🐛 Bug Fixes

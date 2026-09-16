@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" giây trước)"</string>
     <string name="cap_mode_pending" formatted="false">"Đã lưu chế độ. Chế độ sẽ được áp dụng khi phụ đề của video này sẵn sàng."</string>
     <string name="cap_mode_off_pending" formatted="false">"Đã tắt AI. Phụ đề YouTube sẽ tiếp tục khi bản phụ đề gốc sẵn sàng."</string>
+    <string name="cap_flyout_title" formatted="false">"Công tắc phụ đề AI trong menu video thường"</string>
+    <string name="cap_flyout_summary" formatted="false">"Hiện lối tắt trong menu trình phát. Ẩn lối tắt không tắt phụ đề AI; có hiệu lực khi mở lại menu."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Công tắc phụ đề AI trong menu Shorts"</string>
 </resources>

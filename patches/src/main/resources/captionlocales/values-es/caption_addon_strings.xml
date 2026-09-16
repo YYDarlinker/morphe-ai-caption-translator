@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" segundos)"</string>
     <string name="cap_mode_pending" formatted="false">"Modo guardado. Se aplicará cuando estén listos los subtítulos de este vídeo."</string>
     <string name="cap_mode_off_pending" formatted="false">"IA desactivada. Los subtítulos de YouTube se reanudarán cuando la pista esté lista."</string>
+    <string name="cap_flyout_title" formatted="false">"Interruptor de subtítulos IA en vídeos normales"</string>
+    <string name="cap_flyout_summary" formatted="false">"Muestra el acceso rápido en el menú del reproductor. Ocultarlo no desactiva los subtítulos IA; se aplica al reabrir el menú."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Interruptor de subtítulos IA en el menú de Shorts"</string>
 </resources>

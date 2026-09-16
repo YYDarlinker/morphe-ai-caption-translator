@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" секунд назад)"</string>
     <string name="cap_mode_pending" formatted="false">"Режим сохранён. Он применится, когда субтитры этого видео будут готовы."</string>
     <string name="cap_mode_off_pending" formatted="false">"ИИ выключен. Субтитры YouTube возобновятся, когда исходная дорожка будет готова."</string>
+    <string name="cap_flyout_title" formatted="false">"Переключатель ИИ-субтитров в меню обычных видео"</string>
+    <string name="cap_flyout_summary" formatted="false">"Показывать переключатель в меню плеера. Скрытие не отключает ИИ-субтитры; изменение действует при повторном открытии меню."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Переключатель ИИ-субтитров в меню Shorts"</string>
 </resources>

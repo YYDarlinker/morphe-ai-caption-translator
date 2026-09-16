@@ -12,7 +12,12 @@ public final class CaptionQuickToggle {
     }
     public static int onMenu(Object panel,int index){
         Activity a=CaptionAddonSupport.activity();if(a==null||!CaptionAddonSupport.aiInstalled())return index;
-        boolean shorts=shortsMenuAt>0&&shortsOpen()&&android.os.SystemClock.uptimeMillis()-shortsMenuAt<1500&&shortsVideo.equals(PageCaptionController.currentVideoIdSnapshot());
+        // Choose the setting by player state, not by the broad top-menu signal:
+        // Shorts can also report topMenu=true. A disabled Shorts row must not leak through it.
+        boolean inShorts=shortsOpen();
+        boolean visible=inShorts?DeepSeekConfig.shortsFlyoutMenuEnabled(a):DeepSeekConfig.flyoutMenuEnabled(a);
+        if(!visible){shortsMenuAt=0;shortsVideo="";return index;}
+        boolean shorts=shortsMenuAt>0&&inShorts&&android.os.SystemClock.uptimeMillis()-shortsMenuAt<1500&&shortsVideo.equals(PageCaptionController.currentVideoIdSnapshot());
         if(!topMenu()&&!shorts)return index;shortsMenuAt=0;
         String text=CaptionStrings.get(a,"ai_title")+" · "+CaptionStrings.get(a,DeepSeekConfig.enabled(a)?"on":"off");
         int id=a.getResources().getIdentifier("deepseek_caption_settings","drawable",a.getPackageName());Drawable icon=id==0?null:a.getDrawable(id);

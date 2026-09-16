@@ -1,6 +1,6 @@
 # Anchored AI Captions
 
-## Current revision: 1.2.6
+## Current revision: 1.2.7
 
 Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
 
@@ -46,6 +46,8 @@ Release source: `https://github.com/YYDarlinker/morphe-ai-caption-translator`
 Open YouTube → Settings → Morphe → AI caption translator. Configure the OpenAI-compatible API endpoint, model, API key and translation preferences. Keys are stored in Android Keystore-backed storage and are not bundled into this repository.
 
 ## Important behavior
+
+The AI settings page includes **AI captions toggle in regular video menu** and **AI captions toggle in Shorts menu**, adjacent below the engine switch. These independently reclaim menu space without turning AI captions off. Changes apply on the next menu opening; both default to enabled to preserve existing behavior. See [official precedent and behavior](docs/FLYOUT-VISIBILITY.md).
 
 When enabled, the custom subtitle box displays both modes, but **only Auto-translate selections call the API**. Original/manual/English auto-generated tracks display their original text and cue times without translation API requests or calibration probing.
 

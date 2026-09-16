@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" सेकंड पहले)"</string>
     <string name="cap_mode_pending" formatted="false">"मोड सहेजा गया। इस वीडियो के उपशीर्षक तैयार होने पर यह लागू होगा।"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI बंद है। मूल ट्रैक तैयार होने पर YouTube के उपशीर्षक फिर से दिखेंगे।"</string>
+    <string name="cap_flyout_title" formatted="false">"सामान्य वीडियो मेन्यू में AI उपशीर्षक स्विच"</string>
+    <string name="cap_flyout_summary" formatted="false">"प्लेयर मेन्यू में शॉर्टकट दिखाएँ। छिपाने से AI उपशीर्षक बंद नहीं होते; मेन्यू दोबारा खोलने पर लागू होगा।"</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Shorts मेन्यू में AI उपशीर्षक स्विच"</string>
 </resources>

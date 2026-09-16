@@ -36,6 +36,11 @@ final class DeepSeekConfig {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+    // Preserve the existing entry on upgrade; visibility is independent of the caption engine.
+    static boolean shortsFlyoutMenuEnabled(Context context) { return prefs(context).getBoolean("shorts_flyout_menu",true); }
+    static void saveShortsFlyoutMenuEnabled(Context context, boolean visible) { prefs(context).edit().putBoolean("shorts_flyout_menu",visible).apply(); }
+    static boolean flyoutMenuEnabled(Context context) { return prefs(context).getBoolean("flyout_menu",true); }
+    static void saveFlyoutMenuEnabled(Context context, boolean visible) { prefs(context).edit().putBoolean("flyout_menu",visible).apply(); }
     static boolean enabled(Context context) { return prefs(context).getBoolean(ENABLED,false); }
     static Snapshot displayStyle(Context context) {
         SharedPreferences p=prefs(context);

@@ -3,6 +3,7 @@ package app.yydarlinker.deepseekcaptions;
 final class CaptionTranslationCatalog {
 static final String[][] SOURCES={
 {"尚未捕获到自动翻译请求。启用并填写 API Key 后，播放视频并从“自动翻译”选择任意目标语言，再回来点“刷新诊断”。","message_7e7bfd29c71d"},
+{"在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效","flyout_summary"},
 {"填写 API 地址和 API Key 后会自动获取；仍可手动输入","model_hint"},
 {"API 地址必须以 https:// 或 http:// 开头","message_bafa7b1ca6cb"},
 {"只删除本机加密保存的 API Key，不修改其他设置。","message_6ec744dcc83a"},
@@ -15,6 +16,7 @@ static final String[][] SOURCES={
 {"请先填写 API Key；模型也可手动输入","configure_api"},
 {"诊断中记录字幕原文与译文，仅建议排查时开启","message_ea9ebe26591a"},
 {"仅自动翻译模式调用 API；原字幕原文显示","message_33c08bcbc79b"},
+{"Shorts 弹出菜单中的 AI 字幕开关","shorts_flyout_title"},
 {"翻译、字幕样式与诊断 · 修改后自动保存","autosave"},
 {"关闭后使用 YouTube 原生字幕显示","message_7b7480271fa5"},
 {"可点“刷新”重试，或直接输入模型 ID","model_hint"},
@@ -23,6 +25,7 @@ static final String[][] SOURCES={
 {"请先配置 API，再启用 AI 翻译","configure_api"},
 {"可从下方选择，也可手动输入模型 ID","model_hint"},
 {"填写兼容接口地址，停止输入后自动保存","autosave"},
+{"普通视频弹出菜单中的 AI 字幕开关","flyout_title"},
 {"排查时记录字幕原文与译文，默认关闭","message_261f1c6f0fde"},
 {"编辑时可见；关闭页面清空，加密保存","message_10d1b374429d"},
 {"自动获取可用模型，也支持手动输入","model_hint"},
@@ -211,6 +214,9 @@ static final String[][] ENGLISH={
 {"message_c34848823d86"," (about "},
 {"message_33cc168ccb4e"," seconds ago)"},
 {"mode_pending","Mode saved. It will apply when this video's captions are ready."},
-{"mode_off_pending","AI is off. YouTube captions will resume when the native track is ready."}
+{"mode_off_pending","AI is off. YouTube captions will resume when the native track is ready."},
+{"flyout_title","AI captions toggle in regular video menu"},
+{"flyout_summary","Show the shortcut in the player flyout menu. Hiding it does not disable AI captions; applies when the menu is reopened."},
+{"shorts_flyout_title","AI captions toggle in Shorts menu"}
 };
 }

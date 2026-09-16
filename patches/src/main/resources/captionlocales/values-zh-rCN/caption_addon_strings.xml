@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" 秒前）"</string>
     <string name="cap_mode_pending" formatted="false">"已保存模式，将在当前视频字幕就绪后生效。"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI 已关闭，原生字幕将在轨道就绪后恢复。"</string>
+    <string name="cap_flyout_title" formatted="false">"普通视频弹出菜单中的 AI 字幕开关"</string>
+    <string name="cap_flyout_summary" formatted="false">"在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效"</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Shorts 弹出菜单中的 AI 字幕开关"</string>
 </resources>

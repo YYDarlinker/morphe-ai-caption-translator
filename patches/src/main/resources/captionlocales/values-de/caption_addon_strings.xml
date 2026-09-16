@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" Sekunden)"</string>
     <string name="cap_mode_pending" formatted="false">"Modus gespeichert. Er wird angewendet, sobald die Untertitel dieses Videos bereit sind."</string>
     <string name="cap_mode_off_pending" formatted="false">"KI ist aus. YouTube-Untertitel werden fortgesetzt, sobald die native Spur bereit ist."</string>
+    <string name="cap_flyout_title" formatted="false">"KI-Untertitelschalter im Menü normaler Videos"</string>
+    <string name="cap_flyout_summary" formatted="false">"Zeigt den Schnellschalter im Wiedergabemenü. Ausblenden deaktiviert KI-Untertitel nicht; gilt beim erneuten Öffnen des Menüs."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"KI-Untertitelschalter im Shorts-Menü"</string>
 </resources>

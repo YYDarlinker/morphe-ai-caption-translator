@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" detik lalu)"</string>
     <string name="cap_mode_pending" formatted="false">"Mode disimpan. Akan diterapkan saat subtitel video ini siap."</string>
     <string name="cap_mode_off_pending" formatted="false">"AI dinonaktifkan. Subtitel YouTube akan dilanjutkan saat trek aslinya siap."</string>
+    <string name="cap_flyout_title" formatted="false">"Sakelar subtitel AI di menu video biasa"</string>
+    <string name="cap_flyout_summary" formatted="false">"Tampilkan pintasan di menu pemutar. Menyembunyikannya tidak mematikan subtitel AI; berlaku saat menu dibuka kembali."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Sakelar subtitel AI di menu Shorts"</string>
 </resources>

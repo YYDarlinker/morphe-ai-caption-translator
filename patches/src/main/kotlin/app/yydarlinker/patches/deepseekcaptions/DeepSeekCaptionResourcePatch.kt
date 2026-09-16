@@ -172,6 +172,20 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                     "启用 AI 字幕翻译",
                 )
 
+                screen.addPreference(
+                    "app.yydarlinker.deepseekcaptions.CaptionFlyoutPreference",
+                    "deepseek_caption_flyout_menu",
+                    "普通视频弹出菜单中的 AI 字幕开关",
+                    "在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效",
+                )
+
+                screen.addPreference(
+                    "app.yydarlinker.deepseekcaptions.CaptionShortsFlyoutPreference",
+                    "deepseek_caption_shorts_flyout_menu",
+                    "Shorts 弹出菜单中的 AI 字幕开关",
+                    "在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效",
+                )
+
                 screen.addCategory("API 配置").apply {
                     addPreference(
                         TEXT_PREF_CLASS,

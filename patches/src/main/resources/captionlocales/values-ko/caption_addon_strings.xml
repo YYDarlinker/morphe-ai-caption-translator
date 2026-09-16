@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">"초 전)"</string>
     <string name="cap_mode_pending" formatted="false">"모드가 저장되었습니다. 이 동영상의 자막이 준비되면 적용됩니다."</string>
     <string name="cap_mode_off_pending" formatted="false">"AI가 꺼졌습니다. 기본 자막 트랙이 준비되면 YouTube 자막이 다시 표시됩니다."</string>
+    <string name="cap_flyout_title" formatted="false">"일반 동영상 메뉴의 AI 자막 스위치"</string>
+    <string name="cap_flyout_summary" formatted="false">"플레이어 메뉴에 바로가기를 표시합니다. 숨겨도 AI 자막은 꺼지지 않으며 메뉴를 다시 열면 적용됩니다."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Shorts 메뉴의 AI 자막 스위치"</string>
 </resources>

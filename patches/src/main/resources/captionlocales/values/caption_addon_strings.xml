@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" seconds ago)"</string>
     <string name="cap_mode_pending" formatted="false">"Mode saved. It will apply when this video\'s captions are ready."</string>
     <string name="cap_mode_off_pending" formatted="false">"AI is off. YouTube captions will resume when the native track is ready."</string>
+    <string name="cap_flyout_title" formatted="false">"AI captions toggle in regular video menu"</string>
+    <string name="cap_flyout_summary" formatted="false">"Show the shortcut in the player flyout menu. Hiding it does not disable AI captions; applies when the menu is reopened."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"AI captions toggle in Shorts menu"</string>
 </resources>

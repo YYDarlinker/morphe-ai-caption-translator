@@ -116,3 +116,6 @@ API 测试失败：	cap_message_88ce10e8f20b
  秒前）	cap_message_33cc168ccb4e
 可选择模型或直接输入 ID	cap_model_hint
 选择模型（	cap_model
+在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效	cap_flyout_summary
+普通视频弹出菜单中的 AI 字幕开关	cap_flyout_title
+Shorts 弹出菜单中的 AI 字幕开关	cap_shorts_flyout_title

@@ -47,7 +47,10 @@
     "switch_failed",
     "choose_translation",
     "mode_pending",
-    "mode_off_pending"
+    "mode_off_pending",
+    "flyout_title",
+    "flyout_summary",
+    "shorts_flyout_title"
   ],
   "languages": {
     "en": {
@@ -140,7 +143,10 @@
       "message_c34848823d86": " (about ",
       "message_33cc168ccb4e": " seconds ago)",
       "mode_pending": "Mode saved. It will apply when this video's captions are ready.",
-      "mode_off_pending": "AI is off. YouTube captions will resume when the native track is ready."
+      "mode_off_pending": "AI is off. YouTube captions will resume when the native track is ready.",
+      "flyout_title": "AI captions toggle in regular video menu",
+      "flyout_summary": "Show the shortcut in the player flyout menu. Hiding it does not disable AI captions; applies when the menu is reopened.",
+      "shorts_flyout_title": "AI captions toggle in Shorts menu"
     },
     "zh-rCN": {
       "ai_title": "AI 字幕翻译",
@@ -232,7 +238,10 @@
       "message_c34848823d86": "（约 ",
       "message_33cc168ccb4e": " 秒前）",
       "mode_pending": "已保存模式，将在当前视频字幕就绪后生效。",
-      "mode_off_pending": "AI 已关闭，原生字幕将在轨道就绪后恢复。"
+      "mode_off_pending": "AI 已关闭，原生字幕将在轨道就绪后恢复。",
+      "flyout_title": "普通视频弹出菜单中的 AI 字幕开关",
+      "flyout_summary": "在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效",
+      "shorts_flyout_title": "Shorts 弹出菜单中的 AI 字幕开关"
     },
     "zh-rTW": {
       "ai_title": "AI 字幕翻譯",
@@ -324,7 +333,10 @@
       "message_c34848823d86": "（約 ",
       "message_33cc168ccb4e": " 秒前）",
       "mode_pending": "已儲存模式，將在目前影片字幕就緒後生效。",
-      "mode_off_pending": "AI 已關閉，原生字幕將在軌道就緒後恢復。"
+      "mode_off_pending": "AI 已關閉，原生字幕將在軌道就緒後恢復。",
+      "flyout_title": "一般影片彈出選單中的 AI 字幕開關",
+      "flyout_summary": "在播放器彈出選單中顯示快捷開關；隱藏不會關閉 AI 字幕，下次開啟選單時生效",
+      "shorts_flyout_title": "Shorts 彈出選單中的 AI 字幕開關"
     },
     "es": {
       "ai_title": "Traducción de subtítulos con IA",
@@ -416,7 +428,10 @@
       "message_c34848823d86": " (hace unos ",
       "message_33cc168ccb4e": " segundos)",
       "mode_pending": "Modo guardado. Se aplicará cuando estén listos los subtítulos de este vídeo.",
-      "mode_off_pending": "IA desactivada. Los subtítulos de YouTube se reanudarán cuando la pista esté lista."
+      "mode_off_pending": "IA desactivada. Los subtítulos de YouTube se reanudarán cuando la pista esté lista.",
+      "flyout_title": "Interruptor de subtítulos IA en vídeos normales",
+      "flyout_summary": "Muestra el acceso rápido en el menú del reproductor. Ocultarlo no desactiva los subtítulos IA; se aplica al reabrir el menú.",
+      "shorts_flyout_title": "Interruptor de subtítulos IA en el menú de Shorts"
     },
     "fr": {
       "ai_title": "Traduction des sous-titres par IA",
@@ -508,7 +523,10 @@
       "message_c34848823d86": " (il y a environ ",
       "message_33cc168ccb4e": " secondes)",
       "mode_pending": "Mode enregistré. Il sera appliqué lorsque les sous-titres de cette vidéo seront prêts.",
-      "mode_off_pending": "IA désactivée. Les sous-titres YouTube reprendront lorsque la piste sera prête."
+      "mode_off_pending": "IA désactivée. Les sous-titres YouTube reprendront lorsque la piste sera prête.",
+      "flyout_title": "Bouton des sous-titres IA dans le menu des vidéos classiques",
+      "flyout_summary": "Afficher le raccourci dans le menu du lecteur. Le masquer ne désactive pas les sous-titres IA ; effet à la réouverture du menu.",
+      "shorts_flyout_title": "Bouton des sous-titres IA dans le menu Shorts"
     },
     "de": {
       "ai_title": "KI-Untertitelübersetzung",
@@ -600,7 +618,10 @@
       "message_c34848823d86": " (vor etwa ",
       "message_33cc168ccb4e": " Sekunden)",
       "mode_pending": "Modus gespeichert. Er wird angewendet, sobald die Untertitel dieses Videos bereit sind.",
-      "mode_off_pending": "KI ist aus. YouTube-Untertitel werden fortgesetzt, sobald die native Spur bereit ist."
+      "mode_off_pending": "KI ist aus. YouTube-Untertitel werden fortgesetzt, sobald die native Spur bereit ist.",
+      "flyout_title": "KI-Untertitelschalter im Menü normaler Videos",
+      "flyout_summary": "Zeigt den Schnellschalter im Wiedergabemenü. Ausblenden deaktiviert KI-Untertitel nicht; gilt beim erneuten Öffnen des Menüs.",
+      "shorts_flyout_title": "KI-Untertitelschalter im Shorts-Menü"
     },
     "pt": {
       "ai_title": "Tradução de legendas com IA",
@@ -692,7 +713,10 @@
       "message_c34848823d86": " (há cerca de ",
       "message_33cc168ccb4e": " segundos)",
       "mode_pending": "Modo salvo. Será aplicado quando as legendas deste vídeo estiverem prontas.",
-      "mode_off_pending": "IA desativada. As legendas do YouTube voltarão quando a faixa estiver pronta."
+      "mode_off_pending": "IA desativada. As legendas do YouTube voltarão quando a faixa estiver pronta.",
+      "flyout_title": "Botão de legendas IA no menu de vídeos normais",
+      "flyout_summary": "Mostra o atalho no menu do leitor. Ocultá-lo não desativa as legendas IA; aplica-se ao reabrir o menu.",
+      "shorts_flyout_title": "Botão de legendas IA no menu de Shorts"
     },
     "ru": {
       "ai_title": "Перевод субтитров с ИИ",
@@ -784,7 +808,10 @@
       "message_c34848823d86": " (около ",
       "message_33cc168ccb4e": " секунд назад)",
       "mode_pending": "Режим сохранён. Он применится, когда субтитры этого видео будут готовы.",
-      "mode_off_pending": "ИИ выключен. Субтитры YouTube возобновятся, когда исходная дорожка будет готова."
+      "mode_off_pending": "ИИ выключен. Субтитры YouTube возобновятся, когда исходная дорожка будет готова.",
+      "flyout_title": "Переключатель ИИ-субтитров в меню обычных видео",
+      "flyout_summary": "Показывать переключатель в меню плеера. Скрытие не отключает ИИ-субтитры; изменение действует при повторном открытии меню.",
+      "shorts_flyout_title": "Переключатель ИИ-субтитров в меню Shorts"
     },
     "ja": {
       "ai_title": "AI 字幕翻訳",
@@ -876,7 +903,10 @@
       "message_c34848823d86": "（約 ",
       "message_33cc168ccb4e": " 秒前）",
       "mode_pending": "モードを保存しました。この動画の字幕の準備ができ次第、適用されます。",
-      "mode_off_pending": "AI をオフにしました。元の字幕トラックの準備ができ次第、YouTube の字幕が再開されます。"
+      "mode_off_pending": "AI をオフにしました。元の字幕トラックの準備ができ次第、YouTube の字幕が再開されます。",
+      "flyout_title": "通常動画メニューの AI 字幕スイッチ",
+      "flyout_summary": "プレーヤーメニューに切替スイッチを表示します。非表示にしても AI 字幕は無効になりません。次にメニューを開くと反映されます。",
+      "shorts_flyout_title": "Shorts メニューの AI 字幕スイッチ"
     },
     "ko": {
       "ai_title": "AI 자막 번역",
@@ -968,7 +998,10 @@
       "message_c34848823d86": " (약 ",
       "message_33cc168ccb4e": "초 전)",
       "mode_pending": "모드가 저장되었습니다. 이 동영상의 자막이 준비되면 적용됩니다.",
-      "mode_off_pending": "AI가 꺼졌습니다. 기본 자막 트랙이 준비되면 YouTube 자막이 다시 표시됩니다."
+      "mode_off_pending": "AI가 꺼졌습니다. 기본 자막 트랙이 준비되면 YouTube 자막이 다시 표시됩니다.",
+      "flyout_title": "일반 동영상 메뉴의 AI 자막 스위치",
+      "flyout_summary": "플레이어 메뉴에 바로가기를 표시합니다. 숨겨도 AI 자막은 꺼지지 않으며 메뉴를 다시 열면 적용됩니다.",
+      "shorts_flyout_title": "Shorts 메뉴의 AI 자막 스위치"
     },
     "ar": {
       "ai_title": "ترجمة الترجمة النصية بالذكاء الاصطناعي",
@@ -1060,7 +1093,10 @@
       "message_c34848823d86": " (منذ نحو ",
       "message_33cc168ccb4e": " ثانية)",
       "mode_pending": "تم حفظ الوضع. سيُطبّق عندما تصبح ترجمة هذا الفيديو جاهزة.",
-      "mode_off_pending": "تم إيقاف الذكاء الاصطناعي. ستُستأنف ترجمة YouTube عندما يصبح المسار الأصلي جاهزًا."
+      "mode_off_pending": "تم إيقاف الذكاء الاصطناعي. ستُستأنف ترجمة YouTube عندما يصبح المسار الأصلي جاهزًا.",
+      "flyout_title": "مفتاح ترجمة الذكاء الاصطناعي في قائمة الفيديوهات العادية",
+      "flyout_summary": "إظهار الاختصار في قائمة المشغل. إخفاؤه لا يوقف ترجمة الذكاء الاصطناعي؛ يسري عند إعادة فتح القائمة.",
+      "shorts_flyout_title": "مفتاح ترجمة الذكاء الاصطناعي في قائمة Shorts"
     },
     "hi": {
       "ai_title": "AI उपशीर्षक अनुवाद",
@@ -1152,7 +1188,10 @@
       "message_c34848823d86": " (लगभग ",
       "message_33cc168ccb4e": " सेकंड पहले)",
       "mode_pending": "मोड सहेजा गया। इस वीडियो के उपशीर्षक तैयार होने पर यह लागू होगा।",
-      "mode_off_pending": "AI बंद है। मूल ट्रैक तैयार होने पर YouTube के उपशीर्षक फिर से दिखेंगे।"
+      "mode_off_pending": "AI बंद है। मूल ट्रैक तैयार होने पर YouTube के उपशीर्षक फिर से दिखेंगे।",
+      "flyout_title": "सामान्य वीडियो मेन्यू में AI उपशीर्षक स्विच",
+      "flyout_summary": "प्लेयर मेन्यू में शॉर्टकट दिखाएँ। छिपाने से AI उपशीर्षक बंद नहीं होते; मेन्यू दोबारा खोलने पर लागू होगा।",
+      "shorts_flyout_title": "Shorts मेन्यू में AI उपशीर्षक स्विच"
     },
     "id": {
       "ai_title": "Terjemahan subtitel AI",
@@ -1244,7 +1283,10 @@
       "message_c34848823d86": " (sekitar ",
       "message_33cc168ccb4e": " detik lalu)",
       "mode_pending": "Mode disimpan. Akan diterapkan saat subtitel video ini siap.",
-      "mode_off_pending": "AI dinonaktifkan. Subtitel YouTube akan dilanjutkan saat trek aslinya siap."
+      "mode_off_pending": "AI dinonaktifkan. Subtitel YouTube akan dilanjutkan saat trek aslinya siap.",
+      "flyout_title": "Sakelar subtitel AI di menu video biasa",
+      "flyout_summary": "Tampilkan pintasan di menu pemutar. Menyembunyikannya tidak mematikan subtitel AI; berlaku saat menu dibuka kembali.",
+      "shorts_flyout_title": "Sakelar subtitel AI di menu Shorts"
     },
     "vi": {
       "ai_title": "Dịch phụ đề bằng AI",
@@ -1336,7 +1378,10 @@
       "message_c34848823d86": " (khoảng ",
       "message_33cc168ccb4e": " giây trước)",
       "mode_pending": "Đã lưu chế độ. Chế độ sẽ được áp dụng khi phụ đề của video này sẵn sàng.",
-      "mode_off_pending": "Đã tắt AI. Phụ đề YouTube sẽ tiếp tục khi bản phụ đề gốc sẵn sàng."
+      "mode_off_pending": "Đã tắt AI. Phụ đề YouTube sẽ tiếp tục khi bản phụ đề gốc sẵn sàng.",
+      "flyout_title": "Công tắc phụ đề AI trong menu video thường",
+      "flyout_summary": "Hiện lối tắt trong menu trình phát. Ẩn lối tắt không tắt phụ đề AI; có hiệu lực khi mở lại menu.",
+      "shorts_flyout_title": "Công tắc phụ đề AI trong menu Shorts"
     }
   },
   "source_keys": {
@@ -1457,6 +1502,9 @@
     "（约 ": "message_c34848823d86",
     " 秒前）": "message_33cc168ccb4e",
     "可选择模型或直接输入 ID": "model_hint",
-    "选择模型（": "model"
+    "选择模型（": "model",
+    "在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效": "flyout_summary",
+    "普通视频弹出菜单中的 AI 字幕开关": "flyout_title",
+    "Shorts 弹出菜单中的 AI 字幕开关": "shorts_flyout_title"
   }
 }

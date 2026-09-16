@@ -90,4 +90,7 @@
     <string name="cap_message_33cc168ccb4e" formatted="false">" secondes)"</string>
     <string name="cap_mode_pending" formatted="false">"Mode enregistré. Il sera appliqué lorsque les sous-titres de cette vidéo seront prêts."</string>
     <string name="cap_mode_off_pending" formatted="false">"IA désactivée. Les sous-titres YouTube reprendront lorsque la piste sera prête."</string>
+    <string name="cap_flyout_title" formatted="false">"Bouton des sous-titres IA dans le menu des vidéos classiques"</string>
+    <string name="cap_flyout_summary" formatted="false">"Afficher le raccourci dans le menu du lecteur. Le masquer ne désactive pas les sous-titres IA ; effet à la réouverture du menu."</string>
+    <string name="cap_shorts_flyout_title" formatted="false">"Bouton des sous-titres IA dans le menu Shorts"</string>
 </resources>

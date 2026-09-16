@@ -152,6 +152,20 @@ fun main(args:Array<String>){
 
 
         val menu=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionQuickToggle;")
+        val menuCode=menu.methods.single { it.name=="onMenu" }.implementation!!.instructions.toList()
+        fun menuCall(i:Int)=((menuCode[i] as? ReferenceInstruction)?.reference as? MethodReference)?.name
+        val addRow=menuCode.indices.single { menuCall(it)=="addNativeRow" }
+        for(setting in listOf("flyoutMenuEnabled","shortsFlyoutMenuEnabled")){
+            val checkIndex=menuCode.indices.single { menuCall(it)==setting }
+            check(checkIndex<addRow){"Visibility setting must be read before menu insertion"}
+        }
+        for(preference in listOf("CaptionFlyoutPreference","CaptionShortsFlyoutPreference")){
+            val cls=classes.getValue("Lapp/yydarlinker/deepseekcaptions/$preference;")
+            check(AccessFlags.PUBLIC.isSet(cls.accessFlags))
+            check(cls.methods.any { it.name=="<init>"&&it.parameterTypes.map { t->t.toString() }==listOf("Landroid/content/Context;","Landroid/util/AttributeSet;") })
+        }
+        println("INDEPENDENT_FLYOUT_SETTINGS_PASS regular=true shorts=true xml_constructors=true")
+
         for(name in listOf("addNativeRow","topMenu","shortsOpen","dismissNative","nativeContainer"))check(menu.methods.single { it.name==name }.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().any())
         for(ins in menu.methods.single { it.name=="nativeContainer" }.implementation!!.instructions){
             val ref=(ins as? ReferenceInstruction)?.reference as? MethodReference?:continue

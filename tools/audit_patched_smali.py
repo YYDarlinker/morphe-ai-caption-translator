@@ -23,7 +23,8 @@ for i,line in enumerate(code):
 manager=instructions(read("anws"))
 assert sum("->restoreDecision()I" in x for x in manager)==2 # model-ready gate plus missing-language guard
 assert sum("->resolveRemembered(" in x for x in manager)==1
-assert sum("->onNativeSelection(" in x for x in manager)==1
+assert sum("->onNativeTrackApplied(" in x for x in manager)==1
+assert not any("->onNativeSelection(" in x or "->onNativeSelectionWithReason(" in x for x in manager)
 window=read("com/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView")
 assert "->suppressNativeDraw()Z" in window
 editor=read("app/yydarlinker/deepseekcaptions/DeepSeekTextPreference")

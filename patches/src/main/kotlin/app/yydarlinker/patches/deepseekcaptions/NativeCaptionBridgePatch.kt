@@ -11,6 +11,7 @@ import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
@@ -138,8 +139,66 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     } // optional simplified language menu
     if(selector.returnType!="V" || selector.parameterTypes.size !in 2..3 ||
         (selector.parameterTypes.size==3 && selector.parameterTypes[2]!="I"))throw PatchException("Caption selector signature changed")
-    if(selector.parameterTypes.size==3)mutable(selector).addInstructions(0,"invoke-static/range {p0 .. p3}, $BRIDGE->onNativeSelectionWithReason($OBJECT$OBJECT${OBJECT}I)V")
-    else mutable(selector).addInstructions(0,"invoke-static/range {p0 .. p2}, $BRIDGE->onNativeSelection($OBJECT$OBJECT$OBJECT)V")
+    // setSubtitleTrack is a USER entry point, not the automatic new-video path. Its final
+    // event dispatcher is shared with model-ready/default restoration. Capture the COMMITTED
+    // track there (after Off/auto-caption/forced-track filtering), before renderer I/O starts.
+    val dispatcherRef=selector.code().mapNotNull { it.call() }.filter {
+        it.definingClass==selector.definingClass && it.returnType=="V" && it.parameterTypes.size==1 &&
+            it.parameterTypes[0].toString().startsWith("L")
+    }.distinctBy { it.id() }.unique("shared caption event dispatcher")
+    val dispatcher=classDefBy(dispatcherRef.definingClass).methods.filter { it.id()==dispatcherRef.id() }
+        .unique("caption event method")
+    val event=classDefBy(dispatcher.parameterTypes.single().toString())
+    fun eventField(type:String)=event.fields.filter { it.type==type && !AccessFlags.STATIC.isSet(it.accessFlags) && AccessFlags.PUBLIC.isSet(it.accessFlags) }
+        .unique("caption event field $type")
+    val eventRequested=eventField(track.type)
+    val eventOrigin=eventField(selector.parameterTypes[1].toString())
+    val eventReason=eventField("I")
+    val eventVideo=eventField(STRING)
+    val committed=dispatcher.code().filter { it.opcode==Opcode.IPUT_OBJECT }.mapNotNull { it.field() }
+        .filter { it.definingClass==selector.definingClass && it.type==track.type }
+        .distinctBy { it.id() }.unique("committed caption track")
+    if(!AccessFlags.PUBLIC.isSet(classDefBy(selector.definingClass).fields.single { it.name==committed.name }.accessFlags))
+        throw PatchException("AI captions: committed track is not accessible")
+    val rendererIndex=dispatcher.code().indices.filter { index ->
+        val call=dispatcher.code()[index].call()
+        call?.definingClass==selector.definingClass && call.returnType=="V" &&
+            call.parameterTypes.map { it.toString() }==listOf(track.type,"Z")
+    }.unique("caption renderer update")
+    if(dispatcher.code().drop(rendererIndex).any { it.opcode==Opcode.IPUT_OBJECT && it.field()?.id()==committed.id() })
+        throw PatchException("AI captions: track mutates after renderer update")
+    val sharedCallers=classDefBy(selector.definingClass).methods.filter { m -> m.code().any { it.call()?.id()==dispatcherRef.id() } }
+    if(sharedCallers.none { it.id()!=selector.id() && it.parameterTypes.size==2 })
+        throw PatchException("AI captions: automatic model initializer does not share the dispatcher")
+    val appliedStub=runtime.methods.single { it.name=="onNativeTrackApplied" }
+    val applied=ImmutableMethod(BRIDGE,appliedStub.name,appliedStub.parameters,appliedStub.returnType,appliedStub.accessFlags,
+        appliedStub.annotations,null,MutableMethodImplementation(8)).toMutable()
+    applied.addInstructionsWithLabels(0,"""
+        if-eqz p0, :done
+        if-eqz p1, :done
+        check-cast p0, ${selector.definingClass}
+        check-cast p1, ${event.type}
+        move-object v0, p0
+        iget-object v1, p0, ${committed.id()}
+        iget-object v2, p1, ${eventRequested.id()}
+        iget-object v3, p1, ${eventOrigin.id()}
+        iget v4, p1, ${eventReason.id()}
+        iget-object v5, p1, ${eventVideo.id()}
+        invoke-static/range {v0 .. v5}, $BRIDGE->onNativeAppliedEvent($OBJECT$OBJECT$OBJECT${OBJECT}I$STRING)V
+        :done
+        return-void
+    """.trimIndent())
+    runtime.methods.remove(appliedStub);runtime.methods.add(applied)
+    mutable(dispatcher).apply {
+        val renderer=dispatcher.code()[rendererIndex]
+        val registers=renderer as? FiveRegisterInstruction ?: throw PatchException("AI captions: renderer invoke changed")
+        if(renderer.opcode!=Opcode.INVOKE_VIRTUAL || registers.registerCount!=3)
+            throw PatchException("AI captions: unexpected renderer update signature")
+        // Replace the labeled instruction so every incoming native branch executes capture.
+        replaceInstruction(rendererIndex,"invoke-static/range {p0 .. p1}, $BRIDGE->onNativeTrackApplied($OBJECT$OBJECT)V")
+        addInstructions(rendererIndex+1,"invoke-virtual {v${registers.registerC}, v${registers.registerD}, v${registers.registerE}}, ${renderer.call()!!.id()}")
+    }
+
     if(ai) {
         val stub=runtime.methods.single { it.name=="selectNative" }
         val m=ImmutableMethod(BRIDGE,stub.name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,MutableMethodImplementation(4)).toMutable()

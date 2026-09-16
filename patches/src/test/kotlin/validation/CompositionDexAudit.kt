@@ -38,6 +38,46 @@ fun main(args:Array<String>){
         check(AccessFlags.PUBLIC.isSet(classes.getValue(target.definingClass).accessFlags)){"Native selector owner not public"}
         check(AccessFlags.PUBLIC.isSet(method.accessFlags)){"Native selector is not public: $target flags=${method.accessFlags}"}
         println("NATIVE_RESELECT_PUBLIC=$target")
+        // The menu selector is NOT used by automatic new-video restoration. Check the actual
+        // generated host call graph rather than only counting that some selection hook exists.
+        val selectorCode=method.implementation!!.instructions.toList()
+        val dispatchRef=selectorCode.filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? MethodReference }
+            .last { it.definingClass==target.definingClass && it.returnType=="V" && it.parameterTypes.size==1 }
+        val dispatcher=classes.getValue(dispatchRef.definingClass).methods.single { it.name==dispatchRef.name && it.parameterTypes==dispatchRef.parameterTypes }
+        val dispatchCode=dispatcher.implementation!!.instructions.toList()
+        val applied=dispatchCode.indices.filter { i ->
+            val r=(dispatchCode[i] as? ReferenceInstruction)?.reference as? MethodReference
+            r?.definingClass==bridge.type && r.name=="onNativeTrackApplied"
+        }
+        check(applied.size==1){"Automatic new-video captions bypass addon capture: shared dispatcher has no applied-track hook"}
+        val rendererIndex=dispatchCode.indexOfFirst {
+            val r=(it as? ReferenceInstruction)?.reference as? MethodReference
+            r?.definingClass==target.definingClass && r.returnType=="V" && r.parameterTypes.map { t->t.toString() }==listOf(target.parameterTypes[0].toString(),"Z")
+        }
+        check(rendererIndex>applied.single()){"Track must be captured before renderer/network starts"}
+        val directCallers=classes.getValue(target.definingClass).methods.filter { m ->
+            m.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.any { it.reference.toString()==dispatchRef.toString() }==true
+        }
+        check(directCallers.any { it.name!=method.name && it.parameterTypes.size==2 }){"Automatic model initializer must share the hooked dispatcher"}
+        check(selectorCode.filterIsInstance<ReferenceInstruction>().none { (it.reference as? MethodReference)?.definingClass==bridge.type }){"Do not double-capture the menu-only path"}
+        println("NATIVE_APPLIED_PATH_PASS dispatcher=$dispatchRef callers=${directCallers.map { it.name }} before_renderer=true")
+        val appliedBridge=bridge.methods.single { it.name=="onNativeTrackApplied" }
+        val appliedCode=appliedBridge.implementation!!.instructions.toList()
+        val committedFields=dispatchCode.filter { it.opcode==com.android.tools.smali.dexlib2.Opcode.IPUT_OBJECT }
+            .filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? com.android.tools.smali.dexlib2.iface.reference.FieldReference }
+            .filter { it.definingClass==target.definingClass && it.type==target.parameterTypes[0].toString() }.distinctBy { it.toString() }
+        check(committedFields.size==1)
+        check(appliedCode.filterIsInstance<ReferenceInstruction>().any { it.reference.toString()==committedFields.single().toString() }){"Applied bridge must read final committed track, not raw requested track"}
+        val positionsApplied=IntArray(dispatchCode.size);var addressApplied=0
+        dispatchCode.forEachIndexed { i,ins->positionsApplied[i]=addressApplied;addressApplied+=ins.codeUnits }
+        dispatchCode.forEach { ins ->
+            val index=dispatchCode.indexOf(ins)
+            val offset=ins as? com.android.tools.smali.dexlib2.iface.instruction.OffsetInstruction
+            if(offset!=null)check(positionsApplied[index]+offset.codeOffset!=positionsApplied[rendererIndex]){"Branch skips capture and enters renderer"}
+        }
+        println("NATIVE_APPLIED_FINAL_FIELD=true; RENDERER_BRANCHES_GUARDED=true")
+
+
         val menu=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionQuickToggle;")
         for(name in listOf("addNativeRow","topMenu","shortsOpen","dismissNative","nativeContainer"))check(menu.methods.single { it.name==name }.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().any())
         for(ins in menu.methods.single { it.name=="nativeContainer" }.implementation!!.instructions){

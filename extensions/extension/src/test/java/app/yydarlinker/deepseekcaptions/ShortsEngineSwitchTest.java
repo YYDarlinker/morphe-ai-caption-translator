@@ -182,4 +182,54 @@ public class ShortsEngineSwitchTest {
         assertFalse(activationUrls.isEmpty());for(String url:activationUrls)assertEquals(fresh.url(),url);
     }
 
+
+    @Test public void twentyDefaultAppliedTranslationsCanTakeOverWithoutAnyMenuSelection(){
+        for(int i=1;i<=20;i++){
+            String video=String.format(Locale.ROOT,"%011d",i);
+            Track track=new Track(video,"fr");Manager manager=new Manager(track);
+            PageCaptionController.onVideoId(video);
+            NativeCaptionBridge.onNativeSelectionApplied(manager,track,Origin.DEFAULT,2,video);
+            calls.clear();assertTrue(CaptionQuickToggle.setEngine(activity,true));
+            assertEquals(Arrays.asList(null,track),calls);assertTrue(activations.contains(video));
+            calls.clear();assertTrue(CaptionQuickToggle.setEngine(activity,false));
+            assertEquals(Arrays.asList(null,track),calls);
+        }
+    }
+    @Test public void appliedPrefetchThenForegroundWorksWithoutMenuAndLateOldEventCannotSteal(){
+        Track a=new Track(A,"fr"),b=new Track(B,"de");Manager ma=new Manager(a),mb=new Manager(b);
+        PageCaptionController.onVideoId(A);
+        NativeCaptionBridge.onNativeSelectionApplied(ma,a,Origin.DEFAULT,2,A);
+        NativeCaptionBridge.onNativeSelectionApplied(mb,b,Origin.DEFAULT,2,B);
+        assertEquals("fr",CaptionChoice.language());DeepSeekConfig.saveEnabled(activity,true);
+        PageCaptionController.onVideoId(B);
+        NativeCaptionBridge.onNativeSelectionApplied(ma,a,Origin.DEFAULT,2,A);
+        assertEquals("de",CaptionChoice.language());calls.clear();
+        assertEquals(NativeCaptionBridge.Refresh.APPLIED,NativeCaptionBridge.refreshNativeTrack());
+        assertEquals(Arrays.asList(null,b),calls);assertTrue(activations.contains(B));assertFalse(activations.contains(A));
+    }
+    @Test public void ownerlessAutomaticResetDoesNotOverwriteThePreviousSelection(){
+        Track a=new Track(A,"fr");Manager manager=new Manager(a);PageCaptionController.onVideoId(A);
+        NativeCaptionBridge.onNativeSelectionApplied(manager,a,Origin.DEFAULT,2,A);
+        NativeCaptionBridge.onNativeSelectionApplied(manager,null,Origin.DEFAULT,0,"");
+        assertTrue(CaptionChoice.isOn());
+        assertEquals(NativeCaptionBridge.Refresh.APPLIED,NativeCaptionBridge.refreshNativeTrack());
+        assertEquals(Arrays.asList(null,a),calls);
+    }
+    @Test public void appliedOffRemainsOffAndMismatchCannotStartTranslation(){
+        Track a=new Track(A,"fr");Manager manager=new Manager(a);PageCaptionController.onVideoId(A);
+        NativeCaptionBridge.onNativeSelectionApplied(manager,a,Origin.DEFAULT,2,B);
+        assertFalse(CaptionChoice.known());assertEquals(NativeCaptionBridge.Refresh.DEFERRED,NativeCaptionBridge.refreshNativeTrack());
+        NativeCaptionBridge.onNativeSelectionApplied(manager,a,Origin.DEFAULT,2,A);
+        NativeCaptionBridge.onNativeSelectionApplied(manager,null,Origin.PREFERRED_TRACK,0,A);
+        assertEquals(NativeCaptionBridge.Refresh.CAPTIONS_OFF,NativeCaptionBridge.refreshNativeTrack());assertTrue(calls.isEmpty());
+    }
+
+    @Test public void explicitOffWinsOverForcedTrackButAutomaticFallbackUsesCommittedTrack(){
+        Track a=new Track(A,"fr");Manager manager=new Manager(a);PageCaptionController.onVideoId(A);
+        NativeCaptionBridge.onNativeAppliedEvent(manager,a,null,Origin.DEFAULT,2,A);
+        assertTrue(CaptionChoice.isOn());assertEquals("fr",CaptionChoice.language());
+        NativeCaptionBridge.onNativeAppliedEvent(manager,a,null,Origin.PREFERRED_TRACK,0,A);
+        assertFalse(CaptionChoice.isOn());assertEquals(NativeCaptionBridge.Refresh.CAPTIONS_OFF,NativeCaptionBridge.refreshNativeTrack());
+        assertEquals(0,RememberedCaptionSelection.decision());
+    }
 }

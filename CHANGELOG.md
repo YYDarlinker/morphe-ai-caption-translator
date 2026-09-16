@@ -1,3 +1,9 @@
+## [1.2.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.4...v1.2.5) (2026-09-16)
+
+### 🐛 Bug Fixes
+
+* capture automatic caption tracks across every video transition ([ece6a73](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/ece6a73f7d1cad8a94ae734992f9dc583475697c))
+
 ## [1.2.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.3...v1.2.4) (2026-09-15)
 
 ### 🐛 Bug Fixes

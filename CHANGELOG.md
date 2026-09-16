@@ -1,3 +1,9 @@
+## [1.2.7](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.6...v1.2.7) (2026-09-16)
+
+### 🐛 Bug Fixes
+
+* make regular and Shorts caption flyout entries independently optional ([f8e9fde](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/f8e9fdea09437b7a8e764afa169844d92f3d8c04))
+
 ## [1.2.6](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.5...v1.2.6) (2026-09-16)
 
 ### 🐛 Bug Fixes

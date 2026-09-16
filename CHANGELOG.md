@@ -1,3 +1,9 @@
+## [1.2.6](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.5...v1.2.6) (2026-09-16)
+
+### 🐛 Bug Fixes
+
+* distinguish caption model video ownership from playback nonce ([512e57e](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/512e57e36c0573480caf0624fdf32b53d5ef4cb7))
+
 ## [1.2.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.4...v1.2.5) (2026-09-16)
 
 ### 🐛 Bug Fixes

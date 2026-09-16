@@ -84,39 +84,41 @@ public final class NativeCaptionBridge {
     /** Bound to the shared native dispatcher, after native track filtering, before loading text.
      * Both the manual menu and automatic model initialization flow through this point. */
     public static void onNativeTrackApplied(Object manager,Object event) {} // bound at patch time
-    public static void onNativeAppliedEvent(Object manager,Object committed,Object requested,Object origin,int reason,String eventVideo){
+    /** modelOwner is the caption model's videoId, NOT the event's playback nonce (CPN). */
+    public static void onNativeAppliedEvent(Object manager,Object committed,Object requested,Object origin,int reason,String modelOwner){
         // Forced-caption fallback can make the committed track non-null even after explicit Off.
         // Preserve that user intent; automatic null/default events still use the actual track.
         boolean explicit=origin instanceof Enum<?> && "PREFERRED_TRACK".equals(((Enum<?>)origin).name());
         Object selected=explicit && (requested==null || "DISABLE_CAPTIONS_OPTION".equals(language(requested)))?null:committed;
-        onNativeSelectionApplied(manager,selected,origin,reason,eventVideo);
+        onNativeSelectionApplied(manager,selected,origin,reason,modelOwner);
     }
-    public static void onNativeSelectionApplied(Object manager,Object track,Object origin,int reason,String eventVideo){
-        try { captureSelection(manager,track,origin,reason,eventVideo==null?"":eventVideo.trim()); }
+    public static void onNativeSelectionApplied(Object manager,Object track,Object origin,int reason,String modelOwner){
+        try { captureSelection(manager,track,origin,reason,modelOwner==null?"":modelOwner.trim()); }
         catch(Exception failed){CaptionDiagnostics.mark(context,"NATIVE_APPLIED_CAPTURE_FAILED",failed.getClass().getSimpleName());}
     }
-    private static void captureSelection(Object manager,Object track,Object origin,int reason,String eventVideo){
+    private static void captureSelection(Object manager,Object track,Object origin,int reason,String modelOwner){
         synchronized(SELECTION_LOCK){
             // Internal null/reselect callbacks must not erase the snapshot or change memory.
             if(manager!=null&&manager==switchingManager)return;
             String code=track==null?"DISABLE_CAPTIONS_OPTION":language(track);
             if("AUTO_TRANSLATE_CAPTIONS_OPTION".equals(code))return;
             boolean off=track==null||"DISABLE_CAPTIONS_OPTION".equals(code);
-            String video=off?(eventVideo==null?modelVideo(manager):eventVideo):PageCaptionController.videoIdFromUrl(url(track));
+            String video=off?(modelOwner==null?modelVideo(manager):modelOwner):PageCaptionController.videoIdFromUrl(url(track));
             String current=PageCaptionController.currentVideoIdSnapshot();
-            // A reset with no model emits a null event, not an explicit Off on the departed
+            // A reset with no model emits a null selection, not an explicit Off on the departed
             // video. Never infer its owner from a reused manager's previous selection.
-            if(eventVideo!=null && off && video.isEmpty())return;
-            if(eventVideo!=null && !eventVideo.isEmpty() && !off && !eventVideo.equals(video)){
-                CaptionDiagnostics.mark(context,"NATIVE_APPLIED_OWNER_REJECTED","event_track_mismatch");return;
+            if(modelOwner!=null && off && video.isEmpty())return;
+            if(modelOwner!=null && !modelOwner.isEmpty() && !off && !modelOwner.equals(video)){
+                CaptionDiagnostics.mark(context,"NATIVE_APPLIED_OWNER_REJECTED","model_track_mismatch;model_foreground="+
+                        modelOwner.equals(current)+";track_foreground="+video.equals(current));return;
             }
             if(video.isEmpty()&&off){Selection owner=latestForManager(manager);if(owner!=null)video=owner.video;}
             // An unidentified background null callback is not evidence that the visible CC is off.
             if(video.isEmpty()&&!current.isEmpty())return;
             if(!off&&!DeepSeekCaptionHook.isYouTubeTimedTextUrl(url(track)))return;
             Selection value=new Selection(video,manager,track,origin,reason);
-            if(eventVideo!=null)CaptionDiagnostics.mark(context,"NATIVE_TRACK_APPLIED",
-                    "foreground="+video.equals(current)+";off="+off+";translated="+value.translated+";reason="+reason);
+            if(modelOwner!=null)CaptionDiagnostics.mark(context,"NATIVE_TRACK_APPLIED",
+                    "owner=caption_model;foreground="+video.equals(current)+";off="+off+";translated="+value.translated+";reason="+reason);
             selections.remove(video);selections.put(video,value);
             while(selections.size()>6)selections.remove(selections.keySet().iterator().next());
             if(!current.isEmpty()&&!current.equals(video)){
@@ -160,7 +162,8 @@ public final class NativeCaptionBridge {
     }
     private static String modelVideo(Object manager){
         if(manager==null)return "";
-        try{List<?> tracks=nativeTracks(manager);if(tracks==null)return "";String owner="";
+        try{String bound=nativeModelVideo(manager);if(bound!=null&&!bound.isEmpty())return bound;
+            List<?> tracks=nativeTracks(manager);if(tracks==null)return "";String owner="";
             for(Object track:tracks){String video=PageCaptionController.videoIdFromUrl(url(track));if(video.isEmpty())continue;
                 if(!owner.isEmpty()&&!owner.equals(video))return "mixed_model";owner=video;}
             return owner;
@@ -255,6 +258,8 @@ public final class NativeCaptionBridge {
         return fallback;
     }
     public static int restoreDecision() { return !CaptionAddonSupport.memoryInstalled()?-1:RememberedCaptionSelection.decision(); }
+    /** Real caption model videoId; never the unrelated caption event playback identifier. */
+    public static String nativeModelVideo(Object manager) { return ""; } // bound at patch time
     public static List<?> nativeTracks(Object manager) { return null; }
     public static List<?> translatedTracks(Object manager) { return null; }
     public static String simplifiedUrl(String value) { return TargetLanguage.withCode(value,"zh-Hans"); }

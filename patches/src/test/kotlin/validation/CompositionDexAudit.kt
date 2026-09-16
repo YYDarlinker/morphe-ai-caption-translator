@@ -16,6 +16,79 @@ fun main(args:Array<String>){
     val support=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
     val flags=support.methods.filter { it.name.endsWith("Installed") }.associate { method -> method.name to method.implementation!!.instructions.filterIsInstance<WideLiteralInstruction>().single().wideLiteral }
     println("FEATURES=$flags")
+    // Type matching alone accepted amof.a in 1.2.5. Trace the value to the host's
+    // named videoId builder property instead, including memory-only compositions.
+    val nativeBridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")
+    val appliedInstructions=nativeBridge.methods.single { it.name=="onNativeTrackApplied" }.implementation!!.instructions.toList()
+    val appliedRefs=appliedInstructions.filterIsInstance<ReferenceInstruction>().map { it.reference }.toList()
+    check(appliedRefs.filterIsInstance<MethodReference>().any { it.definingClass==nativeBridge.type && it.name=="nativeModelVideo" }){
+        "Caption ownership must come from the model videoId, not the event playback identifier"
+    }
+    check(appliedRefs.filterIsInstance<com.android.tools.smali.dexlib2.iface.reference.FieldReference>().none { it.type=="Ljava/lang/String;" }){
+        "Applied bridge must not read the unverified event String"
+    }
+    val accessorCall=appliedInstructions.indexOfFirst {
+        ((it as? ReferenceInstruction)?.reference as? MethodReference)?.name=="nativeModelVideo"
+    }
+    check(appliedInstructions[accessorCall+1].opcode==com.android.tools.smali.dexlib2.Opcode.MOVE_RESULT_OBJECT)
+    val resultRegister=(appliedInstructions[accessorCall+1] as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+    val runtimeCall=appliedInstructions[accessorCall+2] as com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
+    check(((runtimeCall as ReferenceInstruction).reference as MethodReference).name=="onNativeAppliedEvent")
+    check(runtimeCall.registerCount==6&&runtimeCall.startRegister+5==resultRegister){"Model getter result must be the runtime owner argument"}
+    // Shared host hook is required even when only language memory is installed.
+    val sharedDispatchers=classes.values.filterNot { it.type.startsWith("Lapp/yydarlinker/") }.flatMap { it.methods.toList() }.filter { m ->
+        m.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.any {
+            val r=it.reference as? MethodReference;r?.definingClass==nativeBridge.type&&r.name=="onNativeTrackApplied"
+        }==true
+    }
+    check(sharedDispatchers.size==1){"Every composition needs exactly one shared applied-track dispatcher"}
+    val shared=sharedDispatchers.single();val sharedCode=shared.implementation!!.instructions.toList()
+    val captureIndex=sharedCode.indexOfFirst { ((it as? ReferenceInstruction)?.reference as? MethodReference)?.name=="onNativeTrackApplied" }
+    val nextCall=(sharedCode[captureIndex+1] as? ReferenceInstruction)?.reference as? MethodReference
+    check(nextCall?.definingClass==shared.definingClass&&nextCall.returnType=="V"&&nextCall.parameterTypes.last().toString()=="Z")
+    val committed=sharedCode.filter { it.opcode==com.android.tools.smali.dexlib2.Opcode.IPUT_OBJECT }
+        .filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? com.android.tools.smali.dexlib2.iface.reference.FieldReference }
+        .filter { it.definingClass==shared.definingClass&&it.type==nextCall!!.parameterTypes.first().toString() }.distinctBy { it.toString() }.single()
+    check(appliedRefs.any { it.toString()==committed.toString() })
+    val sharedCallers=classes.getValue(shared.definingClass).methods.filter { m->
+        m.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.any { it.reference.toString()==shared.toString() }==true
+    }
+    check(sharedCallers.any { it.parameterTypes.size==2 }&&sharedCallers.any { it.parameterTypes.size==3 })
+    val offsets=IntArray(sharedCode.size);var positionShared=0
+    sharedCode.forEachIndexed { i,ins->offsets[i]=positionShared;positionShared+=ins.codeUnits }
+    sharedCode.forEachIndexed { i,ins->
+        val branch=ins as? com.android.tools.smali.dexlib2.iface.instruction.OffsetInstruction
+        if(branch!=null)check(offsets[i]+branch.codeOffset!=offsets[captureIndex+1]){"Shared branch bypasses caption capture"}
+    }
+    println("SHARED_APPLIED_DISPATCH_PASS ai=${flags["aiInstalled"]} memory=${flags["memoryInstalled"]}")
+    val modelAccessor=nativeBridge.methods.single { it.name=="nativeModelVideo" }.implementation!!.instructions
+        .filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? MethodReference }.single()
+    val model=classes.getValue(modelAccessor.definingClass)
+    val getter=model.methods.single { it.name==modelAccessor.name }
+    check(AccessFlags.PUBLIC.isSet(getter.accessFlags)&&AccessFlags.PUBLIC.isSet(model.accessFlags))
+    val getterCode=getter.implementation!!.instructions.toList()
+    check(getterCode.size==2&&getterCode[0].opcode==com.android.tools.smali.dexlib2.Opcode.IGET_OBJECT&&getterCode[1].opcode==com.android.tools.smali.dexlib2.Opcode.RETURN_OBJECT)
+    check((getterCode[0] as com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction).registerA==
+        (getterCode[1] as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA)
+    val ownerField=getter.implementation!!.instructions.filterIsInstance<ReferenceInstruction>()
+        .mapNotNull { it.reference as? com.android.tools.smali.dexlib2.iface.reference.FieldReference }.single()
+    val feedsVideoId=model.methods.any { method ->
+        val code=method.implementation?.instructions?.toList()?:emptyList()
+        code.indices.any { i ->
+            if((code[i] as? ReferenceInstruction)?.reference?.toString()!=ownerField.toString())false else {
+                val setter=(code.getOrNull(i+1) as? ReferenceInstruction)?.reference as? MethodReference
+                val target=setter?.let { r->classes[r.definingClass]?.methods?.singleOrNull { it.name==r.name && it.parameterTypes==r.parameterTypes } }
+                val read=code[i] as? com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+                val call=code.getOrNull(i+1) as? com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+                read!=null&&call!=null&&call.registerCount==2&&read.registerA==call.registerD&&
+                target?.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.any {
+                    (it.reference as? com.android.tools.smali.dexlib2.iface.reference.StringReference)?.string=="Null videoId"
+                }==true
+            }
+        }
+    }
+    check(feedsVideoId){"Model owner does not feed the named native videoId property"}
+    println("NATIVE_VIDEO_OWNER_PROVENANCE_PASS field=$ownerField event_string_unused=true")
     if(flags["aiInstalled"]==1L){
         val bridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")
         for(name in listOf("nativeTracks","translatedTracks")){

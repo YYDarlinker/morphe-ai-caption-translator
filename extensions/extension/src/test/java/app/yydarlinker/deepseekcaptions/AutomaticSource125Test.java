@@ -17,14 +17,20 @@ import static org.junit.Assert.*;
         AutomaticSource125Test.Access.class,SourceMode124Test.NoPaidApi.class})
 public class AutomaticSource125Test {
     enum Origin { DEFAULT, PREFERRED_TRACK }
-    static class Manager { final String video,track; String current; int refreshes;
-        Manager(String video){this.video=video;track="https://www.youtube.com/api/timedtext?v="+video+"&lang=en";}
-        void apply(String value,Object origin,int reason){current=value;NativeCaptionBridge.onNativeSelectionApplied(this,current,origin,reason,video);}
+    static class Manager { final String modelOwner,track; String current; int refreshes;
+        Manager(String video){modelOwner=video;track="https://www.youtube.com/api/timedtext?v="+video+"&lang=en";}
+        void apply(String value,Object origin,int reason){
+            current=value;
+            // Mirror the patched dispatcher: ownership comes from the manager's caption model,
+            // not the unrelated playback identifier on the native event.
+            NativeCaptionBridge.onNativeAppliedEvent(this,current,value,origin,reason,NativeCaptionBridge.nativeModelVideo(this));
+        }
     }
     @Implements(NativeCaptionBridge.class) public static class Access {
         @Implementation public static String language(Object t){return "en";}
         @Implementation public static String vss(Object t){return ".en";}
         @Implementation public static String url(Object t){return (String)t;}
+        @Implementation public static String nativeModelVideo(Object m){return ((Manager)m).modelOwner;}
         @Implementation public static List<?> nativeTracks(Object m){return Collections.singletonList(((Manager)m).track);}
         @Implementation public static void selectNative(Object m,Object t,Object o,int reason){Manager manager=(Manager)m;manager.refreshes++;manager.apply((String)t,o,reason);}
     }

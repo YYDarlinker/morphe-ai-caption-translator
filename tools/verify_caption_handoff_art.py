@@ -1,4 +1,4 @@
-"""Compare the old and fixed actual YouTube dispatcher on a disposable Android emulator.
+"""Reproduce the 1.2.5 CPN/videoId regression and verify the fixed YouTube dispatcher.
 Build ArtCaptionHandoffProbe.java (+ Android android.jar) and d8 first. This is a
 constructor-free host-method test stopped at the renderer boundary, NOT video playback.
 """
@@ -25,7 +25,8 @@ for label,apk in [('before',a.before_apk),('after',a.after_apk)]:
     else:assert run.returncode==0 and 'ART_AUTOMATIC_HANDOFF_PASS videos=20' in log,log
 report={'sdk':adb('shell','getprop','ro.build.version.sdk').stdout.strip(),
         'abi':adb('shell','getprop','ro.product.cpu.abi').stdout.strip(),
-        'old_missing_hook_reproduced':True,'new_20_automatic_dispatches_passed':True,
+        'old_cpn_owner_regression_reproduced':True,'new_20_automatic_dispatches_passed':True,
+        'cpn_distinct_from_video':True,'native_model_factory_and_default_memory_restore':True,
         'host_renderer_boundary_reached':True,'real_video_playback_tested':False,'network_or_paid_api_used':False,'results':results}
 (out/'report.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
 print(json.dumps(report,indent=2))

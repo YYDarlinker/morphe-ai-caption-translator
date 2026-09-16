@@ -154,7 +154,30 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     val eventRequested=eventField(track.type)
     val eventOrigin=eventField(selector.parameterTypes[1].toString())
     val eventReason=eventField("I")
-    val eventVideo=eventField(STRING)
+    // The event's String is a playback identifier (manager.c -> player.ap), NOT a
+    // video ID. Resolve ownership from the model field that feeds the builder's
+    // explicitly named videoId property. Never infer semantics from a field type.
+    val videoSetter=builder.methods.filter { it.parameterTypes.toList()==listOf(STRING) &&
+        it.returnType=="V" && it.hasText("Null videoId") }.unique("videoId builder setter")
+    val model=classDefBy(listMethod.definingClass)
+    val modelVideoField=model.methods.flatMap { m ->
+        val code=m.code()
+        code.mapIndexedNotNull { i,ins ->
+            if(ins.call()?.id()!=videoSetter.id()) return@mapIndexedNotNull null
+            val read=code.getOrNull(i-1) as? TwoRegisterInstruction ?: return@mapIndexedNotNull null
+            val call=ins as? FiveRegisterInstruction ?: return@mapIndexedNotNull null
+            val field=code[i-1].field()
+            if(code[i-1].opcode==Opcode.IGET_OBJECT && call.registerCount==2 &&
+                read.registerA==call.registerD && field?.definingClass==model.type && field.type==STRING) field else null
+        }
+    }.distinctBy { it.id() }.unique("caption model videoId provenance")
+    val modelGetterName="captionAddonVideoId"
+    val mutableModel=mutableClassDefBy(model.type)
+    if(mutableModel.methods.any { it.name==modelGetterName })throw PatchException("Caption model getter already exists")
+    val modelGetter=ImmutableMethod(model.type,modelGetterName,emptyList(),STRING,
+        AccessFlags.PUBLIC.value or AccessFlags.FINAL.value,null,null,MutableMethodImplementation(2)).toMutable()
+    modelGetter.addInstructions(0,"iget-object v0, p0, ${modelVideoField.id()}\nreturn-object v0")
+    mutableModel.methods.add(modelGetter)
     val committed=dispatcher.code().filter { it.opcode==Opcode.IPUT_OBJECT }.mapNotNull { it.field() }
         .filter { it.definingClass==selector.definingClass && it.type==track.type }
         .distinctBy { it.id() }.unique("committed caption track")
@@ -183,7 +206,8 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
         iget-object v2, p1, ${eventRequested.id()}
         iget-object v3, p1, ${eventOrigin.id()}
         iget v4, p1, ${eventReason.id()}
-        iget-object v5, p1, ${eventVideo.id()}
+        invoke-static {p0}, $BRIDGE->nativeModelVideo($OBJECT)$STRING
+        move-result-object v5
         invoke-static/range {v0 .. v5}, $BRIDGE->onNativeAppliedEvent($OBJECT$OBJECT$OBJECT${OBJECT}I$STRING)V
         :done
         return-void
@@ -215,6 +239,18 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     val owner=classDefBy(selector.definingClass)
     val defaultTrack=owner.methods.filter { it.parameterTypes.isEmpty() && it.returnType==track.type }.unique("native default selector")
     val modelField=defaultTrack.code().mapNotNull { it.field() }.first { it.definingClass==owner.type && it.type==listMethod.definingClass }
+    bind("nativeModelVideo", """
+        check-cast p0, ${owner.type}
+        if-eqz p0, :no_model
+        iget-object v0, p0, ${modelField.id()}
+        if-eqz v0, :no_model
+        invoke-virtual {v0}, ${modelGetter.id()}
+        move-result-object v0
+        return-object v0
+        :no_model
+        const-string v0, ""
+        return-object v0
+    """)
     val nativeList=classDefBy(listMethod.definingClass).methods.filter {
         it.parameterTypes.isEmpty() && it.returnType=="Ljava/util/List;" && it.name!=listMethod.name
     }.unique("native original track list")

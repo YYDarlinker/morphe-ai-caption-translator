@@ -1,5 +1,10 @@
 # 1.2.5 — automatic video-to-video caption handoff
 
+> Superseded by [1.2.6](CAPTIONS-1.2.6.md). The shared hook addressed a genuine missing
+> lifecycle path, but this version incorrectly treated the event CPN as a video ID.
+> Its fixtures supplied identical values and missed the resulting rejection of real
+> selections. The switching claims below are historical intent, not device-proven behavior.
+
 ## Confirmed defect
 
 The 1.2.4 native bridge was injected into the user-facing `setSubtitleTrack` method.

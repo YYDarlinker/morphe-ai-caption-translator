@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"Chỉ xóa khóa đã lưu và phần nhập khóa chưa lưu của hồ sơ này. Giữ địa chỉ, mô hình, hướng dẫn và các hồ sơ khác. Không thu hồi khóa ở phía nhà cung cấp."</string>
     <string name="cap_prompt_summary" formatted="false">"Lưu cho hồ sơ này. Để trống để khôi phục hướng dẫn mặc định theo ngôn ngữ giao diện. Nội dung bạn sửa được giữ nguyên."</string>
     <string name="cap_default_prompt" formatted="false">"Dịch trung thực, tự nhiên và súc tích sang ngôn ngữ đích bằng cách diễn đạt bản ngữ. Giữ nguyên tên, thuật ngữ, số liệu, giọng điệu và dấu câu cần thiết. Không thêm giải thích không có trong bản gốc."</string>
+    <string name="cap_profile_more" formatted="false">"Thao tác hồ sơ"</string>
+    <string name="cap_profile_collapse" formatted="false">"Thu gọn thao tác"</string>
+    <string name="cap_profile_finish_name" formatted="false">"Hãy lưu hoặc hủy thay đổi tên trước."</string>
+    <string name="cap_profile_delete_inline" formatted="false">"Xóa hồ sơ này và khóa đã lưu khỏi thiết bị? Các hồ sơ khác được giữ lại. Không thể hoàn tác."</string>
+    <string name="cap_profile_delete_switch" formatted="false">"Sau khi xóa, kích hoạt:"</string>
+    <string name="cap_profile_keep" formatted="false">"Giữ hồ sơ"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"Xác nhận xóa"</string>
 </resources>

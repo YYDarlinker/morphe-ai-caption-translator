@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"Efface uniquement la clé enregistrée et la saisie de clé non enregistrée de ce profil. L’adresse, le modèle et les consignes restent inchangés, ainsi que les autres profils. La clé n’est pas révoquée auprès du fournisseur."</string>
     <string name="cap_prompt_summary" formatted="false">"Enregistré pour ce profil. Videz pour rétablir les consignes par défaut dans la langue de l’interface. Vos modifications sont conservées."</string>
     <string name="cap_default_prompt" formatted="false">"Traduis fidèlement, naturellement et avec concision dans la langue cible, avec des tournures idiomatiques. Préserve les noms, la terminologie, les nombres, le ton et la ponctuation nécessaire. N’ajoute pas d’explications absentes du texte source."</string>
+    <string name="cap_profile_more" formatted="false">"Actions du profil"</string>
+    <string name="cap_profile_collapse" formatted="false">"Replier les actions"</string>
+    <string name="cap_profile_finish_name" formatted="false">"Enregistrez ou annulez d’abord la modification du nom."</string>
+    <string name="cap_profile_delete_inline" formatted="false">"Supprimer ce profil et sa clé enregistrée sur cet appareil ? Les autres profils sont conservés. Cette action est irréversible."</string>
+    <string name="cap_profile_delete_switch" formatted="false">"Après suppression, activer :"</string>
+    <string name="cap_profile_keep" formatted="false">"Conserver le profil"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"Confirmer la suppression"</string>
 </resources>

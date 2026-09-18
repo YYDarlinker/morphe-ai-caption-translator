@@ -57,12 +57,12 @@ public class ProfileUiRegressionTest {
         assertEquals("旅行字幕",ApiProfiles.list(a).get(b));
         open();label(tree(),"    "+ApiProfiles.list(a).get("default")).performClick();idle();assertEquals("default",ApiProfiles.active(a));
         open();label(tree(),"    旅行字幕").performClick();idle();assertEquals(b,ApiProfiles.active(a));
-        open();manage();click("profile_delete");click("profile_delete");
+        open();manage();click("profile_delete");click("profile_confirm_delete");
         assertFalse(ApiProfiles.list(a).containsKey(b));assertEquals("default",ApiProfiles.active(a));
     }
     @Test public void cancelledDeleteRetainsEverythingAndLastProfileCannotBeDeleted(){
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
-        open();manage();click("profile_delete");click("cancel");assertTrue(ApiProfiles.list(a).containsKey(b));
+        open();manage();click("profile_delete");click("profile_keep");assertTrue(ApiProfiles.list(a).containsKey(b));
         ApiProfiles.delete(a,b);open();manage();assertNull(label(tree(),text("profile_delete")));
         try{ApiProfiles.delete(a,"default");fail();}catch(IllegalStateException expected){}
     }
@@ -70,7 +70,7 @@ public class ProfileUiRegressionTest {
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
         DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);
         EditText input=p.getView(null,new LinearLayout(a)).findViewById(android.R.id.edit);input.setText("unfinished address");
-        open();manage();click("profile_delete");click("profile_delete");
+        open();manage();click("profile_delete");click("profile_confirm_delete");
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));
         assertEquals("default",ApiProfiles.active(a));assertFalse(ApiProfiles.list(a).containsKey(b));assertTrue(ApiProfiles.values(a,b).getAll().isEmpty());
     }

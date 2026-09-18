@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"Löscht nur den gespeicherten Schlüssel und die ungespeicherte Schlüsseleingabe dieses Profils. Adresse, Modell und Vorgaben sowie andere Profile bleiben erhalten. Der Schlüssel wird beim Anbieter nicht widerrufen."</string>
     <string name="cap_prompt_summary" formatted="false">"Für dieses Profil gespeichert. Leeren stellt die Vorgaben in der Sprache der Oberfläche wieder her. Eigene Texte bleiben unverändert."</string>
     <string name="cap_default_prompt" formatted="false">"Übersetze sinngenau, natürlich und prägnant in die Zielsprache mit muttersprachlichen Formulierungen. Bewahre Namen, Fachbegriffe, Zahlen, Tonfall und erforderliche Satzzeichen. Ergänze keine im Ausgangstext fehlenden Erklärungen."</string>
+    <string name="cap_profile_more" formatted="false">"Profilaktionen"</string>
+    <string name="cap_profile_collapse" formatted="false">"Aktionen einklappen"</string>
+    <string name="cap_profile_finish_name" formatted="false">"Namensänderung zuerst speichern oder abbrechen."</string>
+    <string name="cap_profile_delete_inline" formatted="false">"Dieses Profil und seinen gespeicherten Schlüssel vom Gerät löschen? Andere Profile bleiben erhalten. Dies lässt sich nicht rückgängig machen."</string>
+    <string name="cap_profile_delete_switch" formatted="false">"Nach dem Löschen aktivieren:"</string>
+    <string name="cap_profile_keep" formatted="false">"Profil behalten"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"Löschen bestätigen"</string>
 </resources>

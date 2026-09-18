@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"僅清除此方案已儲存及尚未儲存的金鑰輸入，保留網址、模型與翻譯要求；其他方案不受影響。此操作不會向供應商註銷金鑰。"</string>
     <string name="cap_prompt_summary" formatted="false">"僅用於目前方案。清空後恢復預設要求；預設文字隨介面語言切換，自訂內容保持不變。"</string>
     <string name="cap_default_prompt" formatted="false">"忠實、自然、簡潔地翻譯為目標語言，符合母語表達習慣；保留人名、專有名詞、數字、語氣與必要標點；不添加原文沒有的解釋。"</string>
+    <string name="cap_profile_more" formatted="false">"方案操作"</string>
+    <string name="cap_profile_collapse" formatted="false">"收起操作"</string>
+    <string name="cap_profile_finish_name" formatted="false">"請先儲存或取消名稱修改。"</string>
+    <string name="cap_profile_delete_inline" formatted="false">"刪除此方案及其儲存在本機的金鑰？其他方案不受影響，此操作無法復原。"</string>
+    <string name="cap_profile_delete_switch" formatted="false">"刪除後將啟用："</string>
+    <string name="cap_profile_keep" formatted="false">"保留方案"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"確認刪除"</string>
 </resources>

@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"يمسح المفتاح المحفوظ وإدخال المفتاح غير المحفوظ لهذا الملف فقط. يبقي العنوان والنموذج والتعليمات والملفات الأخرى. لا يلغي المفتاح لدى المزوّد."</string>
     <string name="cap_prompt_summary" formatted="false">"تُحفظ لهذا الملف. امسح لاستعادة التعليمات الافتراضية بلغة الواجهة. يبقى النص المخصص دون تغيير."</string>
     <string name="cap_default_prompt" formatted="false">"ترجم بأمانة وبأسلوب طبيعي وموجز إلى اللغة المستهدفة وبصياغة مألوفة لأهلها. حافظ على الأسماء والمصطلحات والأرقام والنبرة وعلامات الترقيم اللازمة. لا تضف شروحًا غير موجودة في المصدر."</string>
+    <string name="cap_profile_more" formatted="false">"إجراءات الملف"</string>
+    <string name="cap_profile_collapse" formatted="false">"طي الإجراءات"</string>
+    <string name="cap_profile_finish_name" formatted="false">"احفظ تعديل الاسم أو ألغِه أولاً."</string>
+    <string name="cap_profile_delete_inline" formatted="false">"هل تريد حذف هذا الملف ومفتاحه المحفوظ من الجهاز؟ تبقى الملفات الأخرى. لا يمكن التراجع."</string>
+    <string name="cap_profile_delete_switch" formatted="false">"بعد الحذف، تفعيل:"</string>
+    <string name="cap_profile_keep" formatted="false">"الإبقاء على الملف"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"تأكيد الحذف"</string>
 </resources>

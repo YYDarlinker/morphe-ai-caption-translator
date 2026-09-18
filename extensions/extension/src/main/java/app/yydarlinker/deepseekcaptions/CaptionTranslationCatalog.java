@@ -251,6 +251,13 @@ static final String[][] ENGLISH={
 {"profile_delete_summary","Delete this profile’s address, model, translation requirements and encrypted key from this device. Other profiles and subtitle settings are kept. If active, the first remaining profile becomes active. This cannot be undone."},
 {"profile_clear_key_summary","Clear only this profile’s saved key and any unsaved key entry. Keep its address, model and translation requirements. Other profiles are unchanged. This does not revoke the key with the provider."},
 {"prompt_summary","Saved for this profile. Clear to restore defaults. Default wording follows the interface language; your edits stay unchanged."},
-{"default_prompt","Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source."}
+{"default_prompt","Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source."},
+{"profile_more","Profile actions"},
+{"profile_collapse","Collapse actions"},
+{"profile_finish_name","Save or cancel the name edit first."},
+{"profile_delete_inline","Delete this profile and its saved key from this device? Other profiles are kept. This cannot be undone."},
+{"profile_delete_switch","After deletion, activate:"},
+{"profile_keep","Keep profile"},
+{"profile_confirm_delete","Confirm deletion"}
 };
 }

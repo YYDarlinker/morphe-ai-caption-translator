@@ -44,13 +44,15 @@ Release source: `https://github.com/YYDarlinker/morphe-ai-caption-translator`
 ## Configuration
 
 API profiles occupy one ordinary settings row showing the active name. Tap it to switch or add
-a named profile with an editable default name. Long-press a profile to rename or delete it.
+a named profile with an editable default name. Tap the row-end more button (or long-press)
+to expand rename/delete actions in place. Name editing and deletion confirmation stay in the list.
 The scoped clear-key action is below Test API.
 Address, key, model and translation requirements remain inline on the original settings page.
 At least one profile is retained; deleting the active one selects the first remaining profile.
 New profiles have localized default translation requirements, no copied key and an empty model.
 Defaults follow the interface language; custom requirements are preserved verbatim.
-See [interaction and keyboard fixes](docs/SETTINGS-INTERACTION-1.3.2.md),
+See [local API configuration scheme B](docs/PROFILE-INLINE-LOCAL.md),
+[interaction and keyboard fixes](docs/SETTINGS-INTERACTION-1.3.2.md),
 [compact settings](docs/API-PROFILES-UI-1.3.1.md), and
 [provider compatibility and key isolation](docs/API-PROFILES-1.3.0.md).
 

@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"Clear only this profile’s saved key and any unsaved key entry. Keep its address, model and translation requirements. Other profiles are unchanged. This does not revoke the key with the provider."</string>
     <string name="cap_prompt_summary" formatted="false">"Saved for this profile. Clear to restore defaults. Default wording follows the interface language; your edits stay unchanged."</string>
     <string name="cap_default_prompt" formatted="false">"Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source."</string>
+    <string name="cap_profile_more" formatted="false">"Profile actions"</string>
+    <string name="cap_profile_collapse" formatted="false">"Collapse actions"</string>
+    <string name="cap_profile_finish_name" formatted="false">"Save or cancel the name edit first."</string>
+    <string name="cap_profile_delete_inline" formatted="false">"Delete this profile and its saved key from this device? Other profiles are kept. This cannot be undone."</string>
+    <string name="cap_profile_delete_switch" formatted="false">"After deletion, activate:"</string>
+    <string name="cap_profile_keep" formatted="false">"Keep profile"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"Confirm deletion"</string>
 </resources>

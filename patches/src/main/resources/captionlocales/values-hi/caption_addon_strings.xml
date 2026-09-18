@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"केवल इस प्रोफ़ाइल की सहेजी कुंजी और बिना सहेजी कुंजी प्रविष्टि साफ़ करता है। पता, मॉडल, निर्देश और अन्य प्रोफ़ाइल बने रहते हैं। प्रदाता की ओर से कुंजी रद्द नहीं होती।"</string>
     <string name="cap_prompt_summary" formatted="false">"इस प्रोफ़ाइल में सहेजा जाता है। खाली करने पर इंटरफ़ेस की भाषा में डिफ़ॉल्ट निर्देश लौटेंगे। आपके बदलाव सुरक्षित रहेंगे।"</string>
     <string name="cap_default_prompt" formatted="false">"लक्षित भाषा में स्वाभाविक अभिव्यक्ति के साथ निष्ठापूर्वक और संक्षेप में अनुवाद करें। नाम, शब्दावली, संख्याएँ, लहजा और आवश्यक विराम चिह्न सुरक्षित रखें। मूल में न दी गई व्याख्याएँ न जोड़ें।"</string>
+    <string name="cap_profile_more" formatted="false">"प्रोफ़ाइल विकल्प"</string>
+    <string name="cap_profile_collapse" formatted="false">"विकल्प समेटें"</string>
+    <string name="cap_profile_finish_name" formatted="false">"पहले नाम का बदलाव सहेजें या रद्द करें।"</string>
+    <string name="cap_profile_delete_inline" formatted="false">"इस प्रोफ़ाइल और डिवाइस पर सहेजी कुंजी को मिटाएँ? अन्य प्रोफ़ाइल सुरक्षित रहेंगी। यह वापस नहीं हो सकता।"</string>
+    <string name="cap_profile_delete_switch" formatted="false">"मिटाने के बाद सक्रिय करें:"</string>
+    <string name="cap_profile_keep" formatted="false">"प्रोफ़ाइल रखें"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"मिटाने की पुष्टि करें"</string>
 </resources>

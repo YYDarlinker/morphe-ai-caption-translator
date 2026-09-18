@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"このプロファイルの保存済みキーと未保存のキー入力のみ消去します。アドレス、モデル、翻訳指示、他のプロファイルは保持します。提供元でキーを失効させる操作ではありません。"</string>
     <string name="cap_prompt_summary" formatted="false">"このプロファイルに保存します。空にすると既定の指示に戻ります。既定の文は画面言語に従い、独自の内容は変更しません。"</string>
     <string name="cap_default_prompt" formatted="false">"対象言語の自然な表現を使い、忠実かつ簡潔に翻訳してください。人名、専門用語、数字、語調、必要な句読点を保持し、原文にない説明を追加しないでください。"</string>
+    <string name="cap_profile_more" formatted="false">"プロファイルの操作"</string>
+    <string name="cap_profile_collapse" formatted="false">"操作を折りたたむ"</string>
+    <string name="cap_profile_finish_name" formatted="false">"先に名前の変更を保存またはキャンセルしてください。"</string>
+    <string name="cap_profile_delete_inline" formatted="false">"このプロファイルと端末に保存されたキーを削除しますか？他のプロファイルは保持されます。元に戻せません。"</string>
+    <string name="cap_profile_delete_switch" formatted="false">"削除後に有効にするプロファイル："</string>
+    <string name="cap_profile_keep" formatted="false">"プロファイルを残す"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"削除を確定"</string>
 </resources>

@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"Borra solo la clave guardada y la entrada de clave sin guardar de este perfil. Conserva la dirección, el modelo y las instrucciones. No afecta a otros perfiles ni revoca la clave en el proveedor."</string>
     <string name="cap_prompt_summary" formatted="false">"Se guarda en este perfil. Vacíe para restaurar los valores predeterminados, que siguen el idioma de la interfaz. Sus cambios se conservan."</string>
     <string name="cap_default_prompt" formatted="false">"Traduce de forma fiel, natural y concisa al idioma de destino, con expresiones propias de hablantes nativos. Conserva nombres, términos, números, tono y puntuación necesaria. No añadas explicaciones ausentes del original."</string>
+    <string name="cap_profile_more" formatted="false">"Acciones del perfil"</string>
+    <string name="cap_profile_collapse" formatted="false">"Contraer acciones"</string>
+    <string name="cap_profile_finish_name" formatted="false">"Guarde o cancele el cambio de nombre primero."</string>
+    <string name="cap_profile_delete_inline" formatted="false">"¿Eliminar este perfil y su clave guardada del dispositivo? Se conservan los demás perfiles. No se puede deshacer."</string>
+    <string name="cap_profile_delete_switch" formatted="false">"Tras eliminar, activar:"</string>
+    <string name="cap_profile_keep" formatted="false">"Conservar perfil"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"Confirmar eliminación"</string>
 </resources>

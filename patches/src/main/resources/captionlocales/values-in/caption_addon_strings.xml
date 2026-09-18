@@ -115,4 +115,11 @@
     <string name="cap_profile_clear_key_summary" formatted="false">"Hanya menghapus kunci tersimpan dan masukan kunci yang belum disimpan pada profil ini. Alamat, model, instruksi, dan profil lain tetap ada. Kunci tidak dicabut di penyedia."</string>
     <string name="cap_prompt_summary" formatted="false">"Disimpan untuk profil ini. Kosongkan untuk memulihkan instruksi bawaan sesuai bahasa antarmuka. Teks Anda tetap sama."</string>
     <string name="cap_default_prompt" formatted="false">"Terjemahkan secara setia, alami, dan ringkas ke bahasa tujuan dengan ungkapan penutur asli. Pertahankan nama, istilah, angka, nada, dan tanda baca yang diperlukan. Jangan tambahkan penjelasan yang tidak ada dalam sumber."</string>
+    <string name="cap_profile_more" formatted="false">"Tindakan profil"</string>
+    <string name="cap_profile_collapse" formatted="false">"Tutup tindakan"</string>
+    <string name="cap_profile_finish_name" formatted="false">"Simpan atau batalkan perubahan nama terlebih dahulu."</string>
+    <string name="cap_profile_delete_inline" formatted="false">"Hapus profil ini dan kunci tersimpannya dari perangkat? Profil lain tetap ada. Tidak dapat dibatalkan."</string>
+    <string name="cap_profile_delete_switch" formatted="false">"Setelah dihapus, aktifkan:"</string>
+    <string name="cap_profile_keep" formatted="false">"Pertahankan profil"</string>
+    <string name="cap_profile_confirm_delete" formatted="false">"Konfirmasi hapus"</string>
 </resources>

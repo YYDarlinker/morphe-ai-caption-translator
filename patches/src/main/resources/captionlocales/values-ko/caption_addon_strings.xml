@@ -113,6 +113,6 @@
     <string name="cap_profile_new_summary" formatted="false">"새 프로필에는 기본 번역 지침이 포함되며 키와 모델은 복사하지 않습니다. 만든 후 설정 화면에서 입력하세요."</string>
     <string name="cap_profile_delete_summary" formatted="false">"이 프로필의 주소, 모델, 번역 지침, 암호화된 키를 기기에서 삭제합니다. 다른 프로필과 자막 설정은 유지됩니다. 활성 프로필이면 남은 첫 프로필을 활성화합니다. 되돌릴 수 없습니다."</string>
     <string name="cap_profile_clear_key_summary" formatted="false">"이 프로필의 저장된 키와 저장하지 않은 키 입력만 지웁니다. 주소, 모델, 번역 지침과 다른 프로필은 유지됩니다. 제공업체에서 키를 폐기하는 것은 아닙니다."</string>
-    <string name="cap_prompt_summary" formatted="false">"프로필별로 저장합니다. 비우면 화면 언어에 따른 기본 지침으로 돌아갑니다. 사용자 지정 지침은 자동 번역하지 않습니다."</string>
+    <string name="cap_prompt_summary" formatted="false">"현재 프로필에 저장합니다. 비우면 기본 지침으로 돌아갑니다. 기본 문구는 화면 언어를 따르며 직접 입력한 내용은 유지됩니다."</string>
     <string name="cap_default_prompt" formatted="false">"대상 언어의 자연스러운 표현으로 충실하고 간결하게 번역하세요. 이름, 전문 용어, 숫자, 어조와 필요한 문장 부호를 유지하고 원문에 없는 설명을 추가하지 마세요."</string>
 </resources>

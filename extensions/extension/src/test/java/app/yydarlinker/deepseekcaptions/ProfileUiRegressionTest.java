@@ -34,6 +34,7 @@ public class ProfileUiRegressionTest {
             TextView r=label(((ViewGroup)v).getChildAt(i),text);if(r!=null)return r;
         }return null;
     }
+    private void manage(){TextView row=label(tree(),"✓  "+ApiProfiles.list(a).get(ApiProfiles.active(a)));assertNotNull(row);assertTrue(row.performLongClick());idle();}
     private void click(String key){TextView row=label(tree(),text(key));assertNotNull(key,row);row.performClick();idle();}
     private ApiProfilesPreference open(){ApiProfilesPreference p=new ApiProfilesPreference(a);p.showProfiles();idle();return p;}
 
@@ -49,34 +50,34 @@ public class ProfileUiRegressionTest {
     }
     @Test public void actualDialogCanAddRenameSelectAndDelete(){
         open();click("profile_add");EditText name=first(tree(),EditText.class);assertNotNull(name);
-        click("profile_save");assertNotNull(name.getError());assertEquals(1,ApiProfiles.list(a).size());
+        assertFalse(name.getText().toString().isEmpty());assertEquals(1,ApiProfiles.list(a).size());
         name.setText("Bailian 北京");click("profile_save");String b=ApiProfiles.active(a);assertNotEquals("default",b);
         assertEquals("Bailian 北京",ApiProfiles.list(a).get(b));assertFalse(DeepSeekConfig.load(a).prompt.isEmpty());
-        open();click("profile_manage");click("profile_rename");first(tree(),EditText.class).setText("旅行字幕");click("profile_save");
+        open();manage();click("profile_rename");first(tree(),EditText.class).setText("旅行字幕");click("profile_save");
         assertEquals("旅行字幕",ApiProfiles.list(a).get(b));
         open();label(tree(),"    "+ApiProfiles.list(a).get("default")).performClick();idle();assertEquals("default",ApiProfiles.active(a));
         open();label(tree(),"    旅行字幕").performClick();idle();assertEquals(b,ApiProfiles.active(a));
-        open();click("profile_manage");click("profile_delete");click("profile_delete");
+        open();manage();click("profile_delete");click("profile_delete");
         assertFalse(ApiProfiles.list(a).containsKey(b));assertEquals("default",ApiProfiles.active(a));
     }
     @Test public void cancelledDeleteRetainsEverythingAndLastProfileCannotBeDeleted(){
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
-        open();click("profile_manage");click("profile_delete");click("cancel");assertTrue(ApiProfiles.list(a).containsKey(b));
-        ApiProfiles.delete(a,b);open();click("profile_manage");assertNull(label(tree(),text("profile_delete")));
+        open();manage();click("profile_delete");click("cancel");assertTrue(ApiProfiles.list(a).containsKey(b));
+        ApiProfiles.delete(a,b);open();manage();assertNull(label(tree(),text("profile_delete")));
         try{ApiProfiles.delete(a,"default");fail();}catch(IllegalStateException expected){}
     }
     @Test public void confirmedDeleteDiscardsInvalidPendingEditsInsteadOfTrappingTheUser(){
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
         DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);
         EditText input=p.getView(null,new LinearLayout(a)).findViewById(android.R.id.edit);input.setText("unfinished address");
-        open();click("profile_manage");click("profile_delete");click("profile_delete");
+        open();manage();click("profile_delete");click("profile_delete");
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));
         assertEquals("default",ApiProfiles.active(a));assertFalse(ApiProfiles.list(a).containsKey(b));assertTrue(ApiProfiles.values(a,b).getAll().isEmpty());
     }
     @Test public void keyConfirmationTargetsCapturedProfileNotLaterSelection(){
         String b=ApiProfiles.create(a,"B","https://b.example");
         a.getSharedPreferences("deepseek_caption_secret",0).edit().putString("api_key_ciphertext","A").putString("api_key_ciphertext_"+b,"B").apply();
-        open();click("profile_manage");click("profile_clear_key");
+        new ApiProfilesPreference(a).clearCurrentKey();idle();
         ApiProfiles.select(a,b);click("profile_clear_key");
         assertEquals("B",a.getSharedPreferences("deepseek_caption_secret",0).getString("api_key_ciphertext_"+b,""));
         assertFalse(a.getSharedPreferences("deepseek_caption_secret",0).contains("api_key_ciphertext"));assertEquals(b,ApiProfiles.active(a));
@@ -163,5 +164,38 @@ public class ProfileUiRegressionTest {
         View fresh=p.getView(old,parent);assertNotSame(old,fresh);
         assertEquals(DeepSeekConfig.defaultPrompt(a),((EditText)fresh.findViewById(android.R.id.edit)).getText().toString());
         assertFalse(ApiProfiles.values(a).contains("prompt"));
+    }
+
+    @Test public void selectorHasOnlyProfilesAddAndCancelAndLongPressDoesNotSwitch(){
+        String b=ApiProfiles.create(a,"B","https://b.example");open();
+        assertNull(label(tree(),text("profile_manage")));assertNull(label(tree(),text("profile_close")));
+        assertNotNull(label(tree(),text("cancel")));assertNotNull(label(tree(),text("profile_add")));
+        assertTrue(label(tree(),"    B").performLongClick());idle();assertEquals("default",ApiProfiles.active(a));
+        click("profile_rename");first(tree(),EditText.class).setText("renamed B");click("profile_save");
+        assertEquals("renamed B",ApiProfiles.list(a).get(b));assertEquals("default",ApiProfiles.active(a));
+    }
+    @Test public void newProfileCanSaveDefaultOrEmptyNameAndAvoidsExistingNames(){
+        ApiProfiles.rename(a,"default","API 1");open();click("profile_add");
+        assertEquals("API 2",first(tree(),EditText.class).getText().toString());click("profile_save");
+        assertEquals("API 2",ApiProfiles.list(a).get(ApiProfiles.active(a)));
+        open();click("profile_add");first(tree(),EditText.class).setText("");click("profile_save");
+        assertEquals("API 3",ApiProfiles.list(a).get(ApiProfiles.active(a)));
+    }
+    @Test public void resolvedChineseSummaryIsNotTranslatedTwice(){
+        Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.SIMPLIFIED_CHINESE));
+        a.getResources().updateConfiguration(config,a.getResources().getDisplayMetrics());
+        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
+        String summary=CaptionStrings.settings(a,"prompt_summary");p.setSummary(summary);
+        LinearLayout root=(LinearLayout)p.getView(null,new LinearLayout(a));
+        assertEquals(summary,((TextView)root.getChildAt(2)).getText().toString());
+    }
+    @Test public void keyboardRelayoutPreservesFocusedEditorEvenWithoutConvertView(){
+        LinearLayout parent=new LinearLayout(a);DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
+        View row=p.getView(null,parent);parent.addView(row);a.setContentView(parent);
+        EditText editor=row.findViewById(android.R.id.edit);editor.requestFocus();editor.setSelection(3);idle();
+        View rebound=p.getView(null,parent);assertSame(row,rebound);assertSame(editor,rebound.findViewById(android.R.id.edit));
+        assertTrue(editor.hasFocus());assertEquals(3,editor.getSelectionStart());
+        DeepSeekModelPreference model=new DeepSeekModelPreference(a);model.setKey(DeepSeekModelPreference.KEY_MODEL);
+        View modelRow=model.getView(null,parent);assertSame(modelRow,model.getView(null,parent));
     }
 }

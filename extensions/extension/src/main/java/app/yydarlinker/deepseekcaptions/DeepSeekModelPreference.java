@@ -116,8 +116,8 @@ public final class DeepSeekModelPreference extends android.preference.Preference
 
     @Override
     public View getView(View convertView, ViewGroup parent) {
-        View safe = convertView != null && convertView == boundView && boundRevision==ApiProfiles.revision() && boundProfile.equals(ApiProfiles.active(getContext())) && (KEY_MODEL+boundProfile).equals(convertView.getTag())
-                ? convertView
+        View safe = boundView != null && (boundView.getParent()==null || boundView.getParent()==parent) && boundRevision==ApiProfiles.revision() && boundProfile.equals(ApiProfiles.active(getContext())) && (KEY_MODEL+boundProfile).equals(boundView.getTag())
+                ? boundView
                 : null;
         return super.getView(safe, parent);
     }

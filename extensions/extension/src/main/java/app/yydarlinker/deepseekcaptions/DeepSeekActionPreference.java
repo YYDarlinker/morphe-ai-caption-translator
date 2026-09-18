@@ -61,7 +61,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             SourceCaptionCache.clear(context);
             toast("字幕缓存已清除");
         } else if (KEY_DELETE_KEY.equals(key)) {
-            new ApiProfilesPreference(context).showProfiles();
+            new ApiProfilesPreference(context).clearCurrentKey();
         } else if (KEY_CLEAR_DIAGNOSTICS.equals(key)) {
             CaptionDiagnostics.clear(context);
             toast("诊断记录已清空");

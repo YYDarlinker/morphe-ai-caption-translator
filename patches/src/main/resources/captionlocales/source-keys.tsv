@@ -130,3 +130,4 @@ API 配置方案	cap_profiles_title
 请先修正当前未完成的输入，再切换方案	cap_profile_invalid_edits
 无法新增方案，请检查输入及 30 套方案上限。	cap_profile_add_failed
 各方案独立保存；清空恢复随界面语言变化的默认要求	cap_prompt_summary
+清除本方案的 API Key	cap_profile_clear_key

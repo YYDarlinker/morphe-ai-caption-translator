@@ -55,9 +55,14 @@ final class ApiProfiles {
     private static List<Editor> liveEditors(){
         List<Editor> live=new ArrayList<>();synchronized(LOCK){for(WeakReference<Editor> ref:editors){Editor e=ref.get();if(e!=null && usable(e))live.add(e);}}return live;
     }
-    static boolean flushCurrent(){
+    static boolean flushCurrent(){return flushCurrent(false);}
+    static boolean flushExceptKey(){return flushCurrent(true);}
+    private static boolean flushCurrent(boolean skipKey){
         flushing=true;
-        try{for(Editor e:liveEditors())if(!e.flushProfile())return false;return true;}finally{flushing=false;}
+        try{for(Editor e:liveEditors()){
+            if(skipKey && e instanceof android.preference.Preference && DeepSeekTextPreference.KEY_API_KEY.equals(((android.preference.Preference)e).getKey()))continue;
+            if(!e.flushProfile())return false;
+        }return true;}finally{flushing=false;}
     }
     static boolean select(Context c,String id){
         synchronized(LOCK){if(!list(c).containsKey(id))throw new IllegalArgumentException("Unknown API profile");if(id.equals(active(c)))return true;}

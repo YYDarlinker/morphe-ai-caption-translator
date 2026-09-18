@@ -9,7 +9,7 @@ import android.widget.ListView;
 import java.util.WeakHashMap;
 
 /** Scoped IME handling for inline editors in Activity OR nested PreferenceScreen dialog windows. */
-final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutListener {
+final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutListener, ViewTreeObserver.OnPreDrawListener {
     private static final WeakHashMap<View,WindowLease> windows=new WeakHashMap<>();
     private static final class WindowLease {
         int users;
@@ -22,6 +22,7 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
     private int originalBottom;
     private int appliedBottom;
     private int lastBottom=-1,lastHeight=-1;
+    private int visibleBottom;
     private boolean queued;
     CaptionEditorViewport(EditText editor){this.editor=editor;}
 
@@ -41,6 +42,7 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
         }
         lease.users++;
         root.getViewTreeObserver().addOnGlobalLayoutListener(this);
+        root.getViewTreeObserver().addOnPreDrawListener(this);
     }
     private static boolean adjust(View root,int adjustment){
         if(!(root.getLayoutParams() instanceof WindowManager.LayoutParams))return false;
@@ -54,7 +56,7 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
     void detach(){
         restorePadding();
         if(root==null)return;
-        if(root.getViewTreeObserver().isAlive())root.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+        if(root.getViewTreeObserver().isAlive()){root.getViewTreeObserver().removeOnGlobalLayoutListener(this);root.getViewTreeObserver().removeOnPreDrawListener(this);}
         WindowLease lease=windows.get(root);
         if(lease!=null && --lease.users==0){
             if(lease.changed)adjust(root,lease.originalAdjustment);
@@ -63,6 +65,8 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
         root=null;
     }
     void focus(boolean focused){if(focused)reveal();else restorePadding();}
+    // IME inset animations need not trigger layout on an edge-to-edge window.
+    @Override public boolean onPreDraw(){onGlobalLayout();return true;}
     @Override public void onGlobalLayout(){
         if(root==null||!editor.hasFocus())return;
         Rect visible=new Rect();root.getWindowVisibleDisplayFrame(visible);
@@ -76,6 +80,7 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
                 bottom=Math.min(bottom,windowBottom-insets.getInsets(WindowInsets.Type.ime()).bottom);
             }
         }
+        visibleBottom=bottom;
         // On edge-to-edge hosts which ignore adjustResize, give the ListView only the missing
         // scroll range. Never add the full IME height on top of an already resized viewport.
         if(list==null){
@@ -104,13 +109,26 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
             if(editor.getLayout()!=null)y=editor.getLayout().getLineTop(editor.getLayout().getLineForOffset(caret));
             int top=Math.max(0,y+editor.getTotalPaddingTop()-editor.getScrollY());
             int margin=CaptionSettingsStyle.dp(editor.getContext(),12);
-            editor.requestRectangleOnScreen(new Rect(0,Math.max(0,top-margin),editor.getWidth(),
-                    top+editor.getLineHeight()+margin),true);
+            // Prefer the entire field if it fits, otherwise keep the insertion line visible.
+            int[] screen=new int[2];editor.getLocationOnScreen(screen);
+            int targetBottom=top+editor.getLineHeight()+margin;
+            if(list!=null && visibleBottom>0){
+                int[] listScreen=new int[2];list.getLocationOnScreen(listScreen);
+                int available=visibleBottom-listScreen[1]-list.getPaddingTop()-margin;
+                if(editor.getHeight()<=available)targetBottom=editor.getHeight()+margin;
+            }
+            editor.requestRectangleOnScreen(new Rect(0,Math.max(0,top-margin),editor.getWidth(),targetBottom),true);
+            // ListView may consider a child visible behind an IME: explicitly correct screen-space overlap.
+            if(list!=null && visibleBottom>0){
+                editor.getLocationOnScreen(screen);
+                int overlap=screen[1]+targetBottom-visibleBottom;
+                if(overlap>0)list.scrollListBy(overlap);
+            }
         });
     }
     private void restorePadding(){
         if(list!=null && list.getPaddingBottom()==appliedBottom)
             list.setPadding(list.getPaddingLeft(),list.getPaddingTop(),list.getPaddingRight(),originalBottom);
-        list=null;lastBottom=-1;lastHeight=-1;
+        list=null;lastBottom=-1;lastHeight=-1;visibleBottom=0;
     }
 }

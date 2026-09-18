@@ -77,8 +77,8 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
         // Android groups rows of the same Preference subclass into one recycle pool. These rows
         // contain different editors (URL/key/prompt), so only reuse this exact field's view.
         String key = getKey();
-        View safeView = convertView != null && convertView == boundView && boundRevision==ApiProfiles.revision() && (!KEY_PROMPT.equals(key) || boundDefaultPrompt.equals(DeepSeekConfig.defaultPrompt(getContext()))) && boundProfile.equals(ApiProfiles.active(getContext())) && key != null && (key+boundProfile).equals(convertView.getTag())
-                ? convertView
+        View safeView = boundView != null && (boundView.getParent()==null || boundView.getParent()==parent) && boundRevision==ApiProfiles.revision() && (!KEY_PROMPT.equals(key) || boundDefaultPrompt.equals(DeepSeekConfig.defaultPrompt(getContext()))) && boundProfile.equals(ApiProfiles.active(getContext())) && key != null && (key+boundProfile).equals(boundView.getTag())
+                ? boundView
                 : null;
         View bound=super.getView(safeView,parent);
         if(editor!=null){editor.setEnabled(true);editor.setFocusable(true);editor.setFocusableInTouchMode(true);editor.setClickable(true);editor.setLongClickable(true);editor.setCursorVisible(true);}
@@ -283,8 +283,9 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
                     : (justSaved ? "已自动加密保存" : "已加密保存，不回显原 Key")));
         } else {
             CharSequence summary = getSummary();
-            state.setText(CaptionStrings.localize(getContext(), justSaved ? "已自动保存" :
-                    (summary == null || summary.length() == 0 ? "修改后自动保存" : summary)));
+            // XML summaries are already localized. Re-translating their Chinese prefixes duplicates text.
+            state.setText(justSaved ? CaptionStrings.localize(getContext(), "已自动保存") :
+                    (summary == null || summary.length() == 0 ? CaptionStrings.localize(getContext(),"修改后自动保存") : summary));
         }
         state.setAlpha(1f);
     }

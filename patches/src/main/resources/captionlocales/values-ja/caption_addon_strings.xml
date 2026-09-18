@@ -113,6 +113,6 @@
     <string name="cap_profile_new_summary" formatted="false">"新規プロファイルには既定の翻訳指示が含まれます。キーやモデルはコピーしません。作成後に設定画面で入力してください。"</string>
     <string name="cap_profile_delete_summary" formatted="false">"このプロファイルのアドレス、モデル、翻訳指示、暗号化キーを端末から削除します。他のプロファイルと字幕設定は保持します。使用中の場合は残った最初のプロファイルが有効になります。元に戻せません。"</string>
     <string name="cap_profile_clear_key_summary" formatted="false">"このプロファイルの保存済みキーと未保存のキー入力のみ消去します。アドレス、モデル、翻訳指示、他のプロファイルは保持します。提供元でキーを失効させる操作ではありません。"</string>
-    <string name="cap_prompt_summary" formatted="false">"プロファイルごとに保存します。空にすると画面言語に応じた既定の指示に戻ります。独自の指示は自動翻訳しません。"</string>
+    <string name="cap_prompt_summary" formatted="false">"このプロファイルに保存します。空にすると既定の指示に戻ります。既定の文は画面言語に従い、独自の内容は変更しません。"</string>
     <string name="cap_default_prompt" formatted="false">"対象言語の自然な表現を使い、忠実かつ簡潔に翻訳してください。人名、専門用語、数字、語調、必要な句読点を保持し、原文にない説明を追加しないでください。"</string>
 </resources>

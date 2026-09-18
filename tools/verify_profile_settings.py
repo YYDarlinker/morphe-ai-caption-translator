@@ -16,7 +16,9 @@ for p in root.rglob("*.xml"):
   assert row.tag=="app.yydarlinker.deepseekcaptions.ApiProfilesPreference"
   assert row.get(a+"title")=="@string/cap_profiles_title"
   assert row.get(a+"dependency") is None
-  assert not any(n.get(a+"key")=="deepseek_caption_delete_key" for n in r.iter()),"Unscoped key deletion must not appear in diagnostics"
+  assert keys[5]=="deepseek_caption_delete_key", "Scoped key clearing belongs directly after API test"
+  assert children[5].get(a+"title")=="@string/cap_profile_clear_key"
+  assert sum(n.get(a+"key")=="deepseek_caption_delete_key" for n in r.iter())==1
   prompt=[n for n in r.iter() if n.get(a+"key")=="deepseek_caption_prompt"]
   assert len(prompt)==1 and prompt[0].get(a+"summary")=="@string/cap_prompt_summary"
   found.append(str(p))

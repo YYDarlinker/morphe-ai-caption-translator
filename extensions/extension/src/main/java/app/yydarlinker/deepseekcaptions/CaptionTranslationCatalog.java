@@ -41,6 +41,7 @@ static final String[][] SOURCES={
 {"已加密保存，不回显原 Key","key_saved"},
 {"字幕已恢复水平居中的默认位置","message_a25bd037963d"},
 {"最多可保存 30 套配置方案","profile_limit"},
+{"清除本方案的 API Key","profile_clear_key"},
 {"切换失败，已恢复原来的模式","switch_failed"},
 {"展开查看，可手动刷新或复制","diagnostic_hint"},
 {"关闭时不记录字幕原文与译文","message_f496dd228d0b"},
@@ -249,7 +250,7 @@ static final String[][] ENGLISH={
 {"profile_new_summary","New profiles use default translation requirements and have no API key or model. Complete the fields on the settings page."},
 {"profile_delete_summary","Delete this profile’s address, model, translation requirements and encrypted key from this device. Other profiles and subtitle settings are kept. If active, the first remaining profile becomes active. This cannot be undone."},
 {"profile_clear_key_summary","Clear only this profile’s saved key and any unsaved key entry. Keep its address, model and translation requirements. Other profiles are unchanged. This does not revoke the key with the provider."},
-{"prompt_summary","Saved per profile. Clear to restore defaults that follow the interface language. Custom requirements are never translated automatically."},
+{"prompt_summary","Saved for this profile. Clear to restore defaults. Default wording follows the interface language; your edits stay unchanged."},
 {"default_prompt","Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source."}
 };
 }

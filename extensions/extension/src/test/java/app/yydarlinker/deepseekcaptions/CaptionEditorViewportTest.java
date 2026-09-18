@@ -70,4 +70,54 @@ public class CaptionEditorViewportTest {
         assertNotEquals(0,info.imeOptions & android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         assertNotEquals(0,info.imeOptions & android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
     }
+
+    @Test public void firstTapRequestsImeWithoutSecondTap(){
+        LinearLayout parent=new LinearLayout(a);parent.setFocusableInTouchMode(true);
+        InlineCaptionEditor input=new InlineCaptionEditor(a);parent.addView(input);a.setContentView(parent);
+        parent.requestFocus();idle();
+        android.view.inputmethod.InputMethodManager ime=(android.view.inputmethod.InputMethodManager)a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        ime.hideSoftInputFromWindow(input.getWindowToken(),0);
+        input.layout(0,0,300,80);
+        long t=android.os.SystemClock.uptimeMillis();
+        input.dispatchTouchEvent(MotionEvent.obtain(t,t,MotionEvent.ACTION_DOWN,30,30,0));
+        input.dispatchTouchEvent(MotionEvent.obtain(t,t+30,MotionEvent.ACTION_UP,30,30,0));idle();
+        assertTrue(input.hasFocus());assertTrue(Shadows.shadowOf(ime).isSoftInputVisible());
+    }
+    @Test public void predrawDetectsOcclusionWithoutLayoutEvent(){
+        class VisibleFrame extends FrameLayout {
+            int bottom=700;VisibleFrame(){super(a);}
+            @Override public void getWindowVisibleDisplayFrame(Rect out){out.set(0,0,320,bottom);}
+        }
+        VisibleFrame root=new VisibleFrame();ListView list=new ListView(a);list.setItemsCanFocus(true);
+        EditText editor=new EditText(a);editor.setFocusableInTouchMode(true);
+        list.setAdapter(new BaseAdapter(){
+            public int getCount(){return 1;}public Object getItem(int p){return p;}public long getItemId(int p){return p;}
+            public View getView(int p,View v,ViewGroup g){return editor;}
+        });root.addView(list);
+        root.measure(View.MeasureSpec.makeMeasureSpec(320,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(700,View.MeasureSpec.EXACTLY));root.layout(0,0,320,700);
+        editor.requestFocus();CaptionEditorViewport viewport=new CaptionEditorViewport(editor);viewport.attach();
+        root.bottom=380;assertTrue(viewport.onPreDraw());assertEquals(320,list.getPaddingBottom());
+        viewport.detach();assertEquals(0,list.getPaddingBottom());
+    }
+
+    @Test public void listActuallyScrollsWhenRectangleRequestClaimsOccludedEditorIsVisible(){
+        Rect frame=new Rect();a.getWindow().getDecorView().getWindowVisibleDisplayFrame(frame);
+        final int below=frame.bottom+40;
+        class TrackingList extends ListView {
+            int delta;TrackingList(){super(a);}
+            @Override public void scrollListBy(int y){delta+=y;}
+        }
+        TrackingList list=new TrackingList();list.setItemsCanFocus(true);
+        EditText editor=new EditText(a){
+            @Override public void getLocationOnScreen(int[] out){out[0]=0;out[1]=below;}
+            @Override public boolean requestRectangleOnScreen(Rect rect,boolean now){return true;}
+        };
+        editor.setFocusableInTouchMode(true);editor.setText("below keyboard");
+        list.setAdapter(new BaseAdapter(){
+            public int getCount(){return 1;}public Object getItem(int p){return p;}public long getItemId(int p){return p;}
+            public View getView(int p,View v,ViewGroup g){return editor;}
+        });a.setContentView(list);idle();editor.requestFocus();
+        CaptionEditorViewport viewport=new CaptionEditorViewport(editor);viewport.attach();viewport.onGlobalLayout();idle();
+        assertTrue("Must move the actual list, not just request a rectangle",list.delta>0);viewport.detach();
+    }
 }

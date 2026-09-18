@@ -1,5 +1,7 @@
 # API profile settings — 1.3.1
 
+> Historical UI: see [1.3.2 interaction refinements](SETTINGS-INTERACTION-1.3.2.md) for the current profile actions and keyboard handling.
+
 ## Design
 
 The main settings page retains the inline-field structure of 1.2.6, with one additional

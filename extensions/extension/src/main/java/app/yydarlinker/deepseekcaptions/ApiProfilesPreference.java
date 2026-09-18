@@ -61,32 +61,47 @@ public final class ApiProfilesPreference extends android.preference.Preference {
             TextView row=action(body,(selected?"✓  ":"    ")+entry.getValue(),()->{
                 if(ApiProfiles.select(getContext(),id))close();else error("profile_invalid_edits");
             });
+            row.setOnLongClickListener(v->{showManage(id);return true;});
+            row.setAccessibilityDelegate(new View.AccessibilityDelegate(){
+                @Override public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){
+                    super.onInitializeAccessibilityNodeInfo(host,info);
+                    info.addAction(new android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction(
+                        android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK,text("profile_rename")+" / "+text("profile_delete")));
+                }
+            });
             row.setSelected(selected);
             row.setContentDescription(entry.getValue()+(selected?", "+text("profile_current"):""));
         }
         View divider=new View(getContext());divider.setBackgroundColor(CaptionSettingsStyle.tint(CaptionSettingsStyle.primary(getContext()),24));
         body.addView(divider,new LinearLayout.LayoutParams(-1,CaptionSettingsStyle.dp(getContext(),1)));
         action(body,text("profile_add"),()->{if(flush())editName(null);});
-        action(body,text("profile_manage"),()->showManage(ApiProfiles.active(getContext())));
-        show(text("profiles_title"),body,"profile_close");
+        show(text("profiles_title"),body,"cancel");
     }
     private void showManage(String id){
         String name=ApiProfiles.list(getContext()).get(id);if(name==null)return;
         LinearLayout body=column();
         action(body,text("profile_rename"),()->editName(id));
-        action(body,text("profile_clear_key"),()->{if(flush())confirm(id,false);});
         if(ApiProfiles.list(getContext()).size()>1)action(body,text("profile_delete"),()->confirm(id,true));
         else message(body,text("profile_keep_one"));
-        show(name,body,"profile_close");
+        show(name,body,"cancel");
+    }
+    private String defaultName(){
+        Collection<String> names=ApiProfiles.list(getContext()).values();
+        for(int n=1;;n++)if(!names.contains("API "+n))return "API "+n;
+    }
+    void clearCurrentKey(){
+        if(!ApiProfiles.flushExceptKey()){error("profile_invalid_edits");return;}
+        confirm(ApiProfiles.active(getContext()),false);
     }
     private void editName(String id){
         LinearLayout body=column();EditText name=new InlineCaptionEditor(getContext());
         CaptionSettingsStyle.editor(name);name.setSingleLine(true);name.setHint(text("profile_name"));
         name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(60)});
-        name.setText(id==null?"":ApiProfiles.list(getContext()).get(id));body.addView(name,new LinearLayout.LayoutParams(-1,-2));
+        name.setText(id==null?defaultName():ApiProfiles.list(getContext()).get(id));body.addView(name,new LinearLayout.LayoutParams(-1,-2));
         if(id==null)message(body,text("profile_new_summary"));
         action(body,text("profile_save"),()->{
             String value=name.getText().toString().trim();
+            if(value.isEmpty() && id==null)value=defaultName();
             if(value.isEmpty()){name.setError(text("profile_name_error"));name.requestFocus();return;}
             try{
                 if(id==null){

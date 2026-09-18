@@ -212,6 +212,11 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         "测试 API",
                         "使用当前已自动保存的配置测试连接",
                     )
+                    addPreference(
+                        ACTION_PREF_CLASS,
+                        "deepseek_caption_delete_key",
+                        "清除本方案的 API Key",
+                    )
                 }
 
                 screen.addCategory("翻译").apply {

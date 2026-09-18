@@ -113,6 +113,6 @@
     <string name="cap_profile_new_summary" formatted="false">"New profiles use default translation requirements and have no API key or model. Complete the fields on the settings page."</string>
     <string name="cap_profile_delete_summary" formatted="false">"Delete this profile’s address, model, translation requirements and encrypted key from this device. Other profiles and subtitle settings are kept. If active, the first remaining profile becomes active. This cannot be undone."</string>
     <string name="cap_profile_clear_key_summary" formatted="false">"Clear only this profile’s saved key and any unsaved key entry. Keep its address, model and translation requirements. Other profiles are unchanged. This does not revoke the key with the provider."</string>
-    <string name="cap_prompt_summary" formatted="false">"Saved per profile. Clear to restore defaults that follow the interface language. Custom requirements are never translated automatically."</string>
+    <string name="cap_prompt_summary" formatted="false">"Saved for this profile. Clear to restore defaults. Default wording follows the interface language; your edits stay unchanged."</string>
     <string name="cap_default_prompt" formatted="false">"Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source."</string>
 </resources>

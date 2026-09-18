@@ -6,6 +6,8 @@ import android.widget.EditText;
 /** Inline Android floating text actions, independent of the preference row's long-click handling. */
 public final class InlineCaptionEditor extends EditText {
     private CaptionEditorViewport viewport;
+    private boolean pendingKeyboard;
+    private boolean dragged;
     private ActionMode actions;private boolean sensitive;private float downX,downY;
     public InlineCaptionEditor(Context c){super(c);setFocusable(true);setFocusableInTouchMode(true);setLongClickable(true);setCursorVisible(true);
         setShowSoftInputOnFocus(true);setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);}
@@ -16,14 +18,37 @@ public final class InlineCaptionEditor extends EditText {
     }
     public void sensitive(boolean value){sensitive=value;}
     @Override public boolean onTouchEvent(android.view.MotionEvent e){
-        if(e.getActionMasked()==MotionEvent.ACTION_UP){
-            performClick();requestFocus();android.view.inputmethod.InputMethodManager ime=(android.view.inputmethod.InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if(ime!=null)post(()->{ime.showSoftInput(this,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);if(viewport!=null)viewport.reveal();});
+        int action=e.getActionMasked();
+        if(action==MotionEvent.ACTION_DOWN){
+            downX=e.getX();downY=e.getY();dragged=false;
+            if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);
         }
-        if(e.getActionMasked()==MotionEvent.ACTION_DOWN){downX=e.getX();downY=e.getY();requestFocus();if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);}
-        if(e.getActionMasked()==MotionEvent.ACTION_MOVE && Math.abs(e.getY()-downY)>ViewConfiguration.get(getContext()).getScaledTouchSlop()
-            && Math.abs(e.getY()-downY)>Math.abs(e.getX()-downX) && actions==null){if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);}
-        return super.onTouchEvent(e);
+        if(action==MotionEvent.ACTION_MOVE && Math.abs(e.getY()-downY)>ViewConfiguration.get(getContext()).getScaledTouchSlop()
+                && Math.abs(e.getY()-downY)>Math.abs(e.getX()-downX)){
+            dragged=true;if(actions==null && getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);
+        }
+        // Let TextView establish the cursor and input connection before requesting the IME.
+        boolean handled=super.onTouchEvent(e);
+        if(action==MotionEvent.ACTION_UP && !dragged){
+            requestFocus();pendingKeyboard=true;post(this::showKeyboardWhenReady);
+        }
+        if(action==MotionEvent.ACTION_CANCEL)pendingKeyboard=false;
+        return handled;
+    }
+    private void showKeyboardWhenReady(){
+        if(!pendingKeyboard || !isAttachedToWindow() || !hasFocus() || !hasWindowFocus())return;
+        pendingKeyboard=false;
+        android.view.inputmethod.InputMethodManager ime=(android.view.inputmethod.InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if(ime!=null){
+            if(!ime.isActive(this))ime.restartInput(this);
+            ime.showSoftInput(this,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        }
+        if(android.os.Build.VERSION.SDK_INT>=30 && getWindowInsetsController()!=null)
+            getWindowInsetsController().show(WindowInsets.Type.ime());
+        if(viewport!=null){viewport.onGlobalLayout();viewport.reveal();}
+    }
+    @Override public void onWindowFocusChanged(boolean focused){
+        super.onWindowFocusChanged(focused);if(focused && pendingKeyboard)post(this::showKeyboardWhenReady);
     }
     @Override public boolean performLongClick(){
         requestFocus();if(getSelectionStart()<0)setSelection(length());
@@ -54,6 +79,7 @@ public final class InlineCaptionEditor extends EditText {
         super.onSelectionChanged(start,end);if(viewport!=null)viewport.reveal();
     }
     @Override protected void onDetachedFromWindow(){
+        pendingKeyboard=false;
         if(viewport!=null){viewport.detach();viewport=null;}
         if(actions!=null)actions.finish();super.onDetachedFromWindow();
     }

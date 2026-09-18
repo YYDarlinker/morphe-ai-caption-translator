@@ -113,6 +113,6 @@
     <string name="cap_profile_new_summary" formatted="false">"Profil baru berisi instruksi terjemahan bawaan, tanpa kunci atau model. Lengkapi kolom pada halaman pengaturan."</string>
     <string name="cap_profile_delete_summary" formatted="false">"Menghapus alamat, model, instruksi terjemahan, dan kunci terenkripsi profil ini dari perangkat. Profil lain dan pengaturan subtitle tetap ada. Jika aktif, profil pertama yang tersisa akan diaktifkan. Tidak dapat dibatalkan."</string>
     <string name="cap_profile_clear_key_summary" formatted="false">"Hanya menghapus kunci tersimpan dan masukan kunci yang belum disimpan pada profil ini. Alamat, model, instruksi, dan profil lain tetap ada. Kunci tidak dicabut di penyedia."</string>
-    <string name="cap_prompt_summary" formatted="false">"Disimpan per profil. Kosongkan untuk memulihkan instruksi bawaan sesuai bahasa antarmuka. Instruksi khusus tidak diterjemahkan otomatis."</string>
+    <string name="cap_prompt_summary" formatted="false">"Disimpan untuk profil ini. Kosongkan untuk memulihkan instruksi bawaan sesuai bahasa antarmuka. Teks Anda tetap sama."</string>
     <string name="cap_default_prompt" formatted="false">"Terjemahkan secara setia, alami, dan ringkas ke bahasa tujuan dengan ungkapan penutur asli. Pertahankan nama, istilah, angka, nada, dan tanda baca yang diperlukan. Jangan tambahkan penjelasan yang tidak ada dalam sumber."</string>
 </resources>

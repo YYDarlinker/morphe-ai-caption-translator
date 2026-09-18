@@ -113,6 +113,6 @@
     <string name="cap_profile_new_summary" formatted="false">"新方案自带默认翻译要求，不复制密钥和模型。创建后在设置页面补全相关字段。"</string>
     <string name="cap_profile_delete_summary" formatted="false">"从本机删除此方案的地址、模型、翻译要求和加密密钥，保留其他方案及字幕设置。若删除当前方案，将启用剩余的第一套方案。此操作无法撤销。"</string>
     <string name="cap_profile_clear_key_summary" formatted="false">"仅清除此方案已保存及尚未保存的密钥输入，保留地址、模型和翻译要求；其他方案不受影响。此操作不会在服务商处注销密钥。"</string>
-    <string name="cap_prompt_summary" formatted="false">"各方案独立保存；清空恢复随界面语言变化的默认要求。自定义要求不会被自动翻译。"</string>
+    <string name="cap_prompt_summary" formatted="false">"仅用于当前方案。清空后恢复默认要求；默认文本随界面语言切换，自定义内容保持不变。"</string>
     <string name="cap_default_prompt" formatted="false">"忠实、自然、简洁；优先符合目标语言的母语表达习惯；保留人名、专有名词、数字、语气和必要的标点；不要增加原文没有的解释。"</string>
 </resources>

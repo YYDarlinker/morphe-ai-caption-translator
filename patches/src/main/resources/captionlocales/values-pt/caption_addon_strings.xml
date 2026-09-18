@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"Botão de legendas IA no menu de vídeos normais"</string>
     <string name="cap_flyout_summary" formatted="false">"Mostra o atalho no menu do leitor. Ocultá-lo não desativa as legendas IA; aplica-se ao reabrir o menu."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Botão de legendas IA no menu de Shorts"</string>
+    <string name="cap_profiles_title" formatted="false">"Perfis de API"</string>
+    <string name="cap_profile_default" formatted="false">"Configuração original"</string>
+    <string name="cap_profile_name" formatted="false">"Nome do perfil"</string>
+    <string name="cap_profile_rename" formatted="false">"Renomear"</string>
+    <string name="cap_profile_add" formatted="false">"Adicionar perfil"</string>
+    <string name="cap_profiles_summary" formatted="false">"Selecione um perfil para ativar e editar abaixo. Os outros são mantidos. Configure o endereço, a chave e o modelo do novo perfil."</string>
+    <string name="cap_profile_name_error" formatted="false">"Introduza um nome de 1 a 60 caracteres"</string>
+    <string name="cap_profile_limit" formatted="false">"É possível guardar até 30 perfis"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"Corrija os campos incompletos antes de mudar de perfil"</string>
+    <string name="cap_profile_add_failed" formatted="false">"Não foi possível adicionar o perfil. Verifique os campos e o limite de 30 perfis."</string>
 </resources>

@@ -49,21 +49,24 @@ final class DeepSeekConfig {
             clampOpacity(p.getInt(BACKGROUND_OPACITY,DEFAULT_BACKGROUND_OPACITY)),"");
     }
     static Snapshot load(Context context) {
-        SharedPreferences p = prefs(context);
+        synchronized(ApiProfiles.LOCK) {
+        SharedPreferences p = ApiProfiles.values(context);
+        SharedPreferences global = prefs(context);
         String prompt = safe(p.getString(PROMPT, DEFAULT_PROMPT), DEFAULT_PROMPT);
         if (LEGACY_CHINESE_PROMPT.equals(prompt)) {
             prompt = DEFAULT_PROMPT;
             p.edit().putString(PROMPT, DEFAULT_PROMPT).apply();
         }
         return new Snapshot(
-                p.getBoolean(ENABLED, false),
+                global.getBoolean(ENABLED, false),
                 safe(p.getString(BASE_URL, DEFAULT_BASE_URL), DEFAULT_BASE_URL),
-                safe(p.getString(MODEL, DEFAULT_MODEL), DEFAULT_MODEL),
+                p.getString(MODEL, DEFAULT_MODEL),
                 prompt,
-                clampTextSize(p.getInt(CAPTION_TEXT_SIZE, DEFAULT_CAPTION_TEXT_SIZE)),
-                clampOpacity(p.getInt(BACKGROUND_OPACITY, DEFAULT_BACKGROUND_OPACITY)),
+                clampTextSize(global.getInt(CAPTION_TEXT_SIZE, DEFAULT_CAPTION_TEXT_SIZE)),
+                clampOpacity(global.getInt(BACKGROUND_OPACITY, DEFAULT_BACKGROUND_OPACITY)),
                 SecureApiKey.load(context)
         );
+        }
     }
 
     static void saveEnabled(Context context, boolean enabled) {
@@ -91,20 +94,20 @@ final class DeepSeekConfig {
         if (!(clean.startsWith("https://") || clean.startsWith("http://"))) {
             throw new IllegalArgumentException("API 地址必须以 https:// 或 http:// 开头");
         }
-        prefs(context).edit().putString(BASE_URL, clean).apply();
+        synchronized(ApiProfiles.LOCK){String endpoint=ProviderEndpoint.validate(clean);SecureApiKey.bindLegacyOrigin(context);ApiProfiles.values(context).edit().putString(BASE_URL, endpoint).apply();}
     }
 
     static void saveModel(Context context, String value) {
         String clean = value == null ? "" : value.trim();
         if (clean.isEmpty()) throw new IllegalArgumentException("模型不能为空");
-        prefs(context).edit().putString(MODEL, clean).apply();
+        synchronized(ApiProfiles.LOCK){ApiProfiles.values(context).edit().putString(MODEL, clean).apply();}
     }
 
     static void savePrompt(Context context, String value) {
         String clean = value == null ? "" : value.trim();
-        prefs(context).edit()
+        synchronized(ApiProfiles.LOCK){ApiProfiles.values(context).edit()
                 .putString(PROMPT, clean.isEmpty() ? DEFAULT_PROMPT : clean)
-                .apply();
+                .apply();}
     }
 
     static void saveCaptionTextSize(Context context, int value) {
@@ -121,7 +124,7 @@ final class DeepSeekConfig {
 
     static boolean isReady(Context context) {
         Snapshot snapshot = load(context);
-        return snapshot.enabled && !snapshot.apiKey.isEmpty();
+        return snapshot.ready();
     }
 
     static String statusSummary(Context context) {
@@ -205,7 +208,7 @@ final class DeepSeekConfig {
         }
 
         boolean ready() {
-            return enabled && !apiKey.isEmpty();
+            return enabled && !apiKey.isEmpty() && model!=null && !model.trim().isEmpty();
         }
 
         String fingerprint() {

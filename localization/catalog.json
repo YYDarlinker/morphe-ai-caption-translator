@@ -50,7 +50,17 @@
     "mode_off_pending",
     "flyout_title",
     "flyout_summary",
-    "shorts_flyout_title"
+    "shorts_flyout_title",
+    "profiles_title",
+    "profile_default",
+    "profile_name",
+    "profile_rename",
+    "profile_add",
+    "profiles_summary",
+    "profile_name_error",
+    "profile_limit",
+    "profile_invalid_edits",
+    "profile_add_failed"
   ],
   "languages": {
     "en": {
@@ -146,7 +156,17 @@
       "mode_off_pending": "AI is off. YouTube captions will resume when the native track is ready.",
       "flyout_title": "AI captions toggle in regular video menu",
       "flyout_summary": "Show the shortcut in the player flyout menu. Hiding it does not disable AI captions; applies when the menu is reopened.",
-      "shorts_flyout_title": "AI captions toggle in Shorts menu"
+      "shorts_flyout_title": "AI captions toggle in Shorts menu",
+      "profiles_title": "API profiles",
+      "profile_default": "Original configuration",
+      "profile_name": "Profile name",
+      "profile_rename": "Rename",
+      "profile_add": "Add profile",
+      "profiles_summary": "Select a profile to activate and edit it below. Other profiles are retained. New profiles have no key; configure the address, key and model before playback.",
+      "profile_name_error": "Enter a name of 1–60 characters",
+      "profile_limit": "Up to 30 profiles can be saved",
+      "profile_invalid_edits": "Correct the current unfinished fields before switching profiles",
+      "profile_add_failed": "Unable to add profile. Check the fields and the 30-profile limit."
     },
     "zh-rCN": {
       "ai_title": "AI 字幕翻译",
@@ -241,7 +261,17 @@
       "mode_off_pending": "AI 已关闭，原生字幕将在轨道就绪后恢复。",
       "flyout_title": "普通视频弹出菜单中的 AI 字幕开关",
       "flyout_summary": "在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效",
-      "shorts_flyout_title": "Shorts 弹出菜单中的 AI 字幕开关"
+      "shorts_flyout_title": "Shorts 弹出菜单中的 AI 字幕开关",
+      "profiles_title": "API 配置方案",
+      "profile_default": "原有配置",
+      "profile_name": "方案名称",
+      "profile_rename": "重命名",
+      "profile_add": "新增方案",
+      "profiles_summary": "选择方案后立即生效，可在下方编辑；其他方案保留。新方案不复制密钥，请先填写地址、密钥和模型。",
+      "profile_name_error": "请输入 1–60 个字符的方案名称",
+      "profile_limit": "最多可保存 30 套配置方案",
+      "profile_invalid_edits": "请先修正当前未完成的输入，再切换方案",
+      "profile_add_failed": "无法新增方案，请检查输入及 30 套方案上限。"
     },
     "zh-rTW": {
       "ai_title": "AI 字幕翻譯",
@@ -336,7 +366,17 @@
       "mode_off_pending": "AI 已關閉，原生字幕將在軌道就緒後恢復。",
       "flyout_title": "一般影片彈出選單中的 AI 字幕開關",
       "flyout_summary": "在播放器彈出選單中顯示快捷開關；隱藏不會關閉 AI 字幕，下次開啟選單時生效",
-      "shorts_flyout_title": "Shorts 彈出選單中的 AI 字幕開關"
+      "shorts_flyout_title": "Shorts 彈出選單中的 AI 字幕開關",
+      "profiles_title": "API 設定方案",
+      "profile_default": "原有設定",
+      "profile_name": "方案名稱",
+      "profile_rename": "重新命名",
+      "profile_add": "新增方案",
+      "profiles_summary": "選取方案後立即生效，可在下方編輯；其他方案保留。新方案不會複製金鑰，請先填寫網址、金鑰與模型。",
+      "profile_name_error": "請輸入 1–60 個字元的方案名稱",
+      "profile_limit": "最多可儲存 30 套設定方案",
+      "profile_invalid_edits": "請先修正目前未完成的輸入，再切換方案",
+      "profile_add_failed": "無法新增方案，請檢查輸入及 30 套方案上限。"
     },
     "es": {
       "ai_title": "Traducción de subtítulos con IA",
@@ -431,7 +471,17 @@
       "mode_off_pending": "IA desactivada. Los subtítulos de YouTube se reanudarán cuando la pista esté lista.",
       "flyout_title": "Interruptor de subtítulos IA en vídeos normales",
       "flyout_summary": "Muestra el acceso rápido en el menú del reproductor. Ocultarlo no desactiva los subtítulos IA; se aplica al reabrir el menú.",
-      "shorts_flyout_title": "Interruptor de subtítulos IA en el menú de Shorts"
+      "shorts_flyout_title": "Interruptor de subtítulos IA en el menú de Shorts",
+      "profiles_title": "Perfiles de API",
+      "profile_default": "Configuración original",
+      "profile_name": "Nombre del perfil",
+      "profile_rename": "Renombrar",
+      "profile_add": "Añadir perfil",
+      "profiles_summary": "Seleccione un perfil para activarlo y editarlo abajo. Los demás se conservan. Configure la dirección, clave y modelo del nuevo perfil.",
+      "profile_name_error": "Introduzca un nombre de 1 a 60 caracteres",
+      "profile_limit": "Se pueden guardar hasta 30 perfiles",
+      "profile_invalid_edits": "Corrija los campos incompletos antes de cambiar de perfil",
+      "profile_add_failed": "No se pudo añadir el perfil. Revise los campos y el límite de 30 perfiles."
     },
     "fr": {
       "ai_title": "Traduction des sous-titres par IA",
@@ -526,7 +576,17 @@
       "mode_off_pending": "IA désactivée. Les sous-titres YouTube reprendront lorsque la piste sera prête.",
       "flyout_title": "Bouton des sous-titres IA dans le menu des vidéos classiques",
       "flyout_summary": "Afficher le raccourci dans le menu du lecteur. Le masquer ne désactive pas les sous-titres IA ; effet à la réouverture du menu.",
-      "shorts_flyout_title": "Bouton des sous-titres IA dans le menu Shorts"
+      "shorts_flyout_title": "Bouton des sous-titres IA dans le menu Shorts",
+      "profiles_title": "Profils API",
+      "profile_default": "Configuration existante",
+      "profile_name": "Nom du profil",
+      "profile_rename": "Renommer",
+      "profile_add": "Ajouter un profil",
+      "profiles_summary": "Sélectionnez un profil pour l’activer et le modifier ci-dessous. Les autres sont conservés. Configurez l’adresse, la clé et le modèle du nouveau profil.",
+      "profile_name_error": "Saisissez un nom de 1 à 60 caractères",
+      "profile_limit": "Vous pouvez enregistrer jusqu’à 30 profils",
+      "profile_invalid_edits": "Corrigez les champs incomplets avant de changer de profil",
+      "profile_add_failed": "Impossible d’ajouter un profil. Vérifiez les champs et la limite de 30 profils."
     },
     "de": {
       "ai_title": "KI-Untertitelübersetzung",
@@ -621,7 +681,17 @@
       "mode_off_pending": "KI ist aus. YouTube-Untertitel werden fortgesetzt, sobald die native Spur bereit ist.",
       "flyout_title": "KI-Untertitelschalter im Menü normaler Videos",
       "flyout_summary": "Zeigt den Schnellschalter im Wiedergabemenü. Ausblenden deaktiviert KI-Untertitel nicht; gilt beim erneuten Öffnen des Menüs.",
-      "shorts_flyout_title": "KI-Untertitelschalter im Shorts-Menü"
+      "shorts_flyout_title": "KI-Untertitelschalter im Shorts-Menü",
+      "profiles_title": "API-Profile",
+      "profile_default": "Bisherige Konfiguration",
+      "profile_name": "Profilname",
+      "profile_rename": "Umbenennen",
+      "profile_add": "Profil hinzufügen",
+      "profiles_summary": "Profil zum Aktivieren und Bearbeiten auswählen. Andere Profile bleiben erhalten. Neue Profile benötigen Adresse, Schlüssel und Modell.",
+      "profile_name_error": "Name mit 1–60 Zeichen eingeben",
+      "profile_limit": "Bis zu 30 Profile speicherbar",
+      "profile_invalid_edits": "Unvollständige Eingaben vor dem Profilwechsel korrigieren",
+      "profile_add_failed": "Profil konnte nicht hinzugefügt werden. Eingaben und Grenze von 30 Profilen prüfen."
     },
     "pt": {
       "ai_title": "Tradução de legendas com IA",
@@ -716,7 +786,17 @@
       "mode_off_pending": "IA desativada. As legendas do YouTube voltarão quando a faixa estiver pronta.",
       "flyout_title": "Botão de legendas IA no menu de vídeos normais",
       "flyout_summary": "Mostra o atalho no menu do leitor. Ocultá-lo não desativa as legendas IA; aplica-se ao reabrir o menu.",
-      "shorts_flyout_title": "Botão de legendas IA no menu de Shorts"
+      "shorts_flyout_title": "Botão de legendas IA no menu de Shorts",
+      "profiles_title": "Perfis de API",
+      "profile_default": "Configuração original",
+      "profile_name": "Nome do perfil",
+      "profile_rename": "Renomear",
+      "profile_add": "Adicionar perfil",
+      "profiles_summary": "Selecione um perfil para ativar e editar abaixo. Os outros são mantidos. Configure o endereço, a chave e o modelo do novo perfil.",
+      "profile_name_error": "Introduza um nome de 1 a 60 caracteres",
+      "profile_limit": "É possível guardar até 30 perfis",
+      "profile_invalid_edits": "Corrija os campos incompletos antes de mudar de perfil",
+      "profile_add_failed": "Não foi possível adicionar o perfil. Verifique os campos e o limite de 30 perfis."
     },
     "ru": {
       "ai_title": "Перевод субтитров с ИИ",
@@ -811,7 +891,17 @@
       "mode_off_pending": "ИИ выключен. Субтитры YouTube возобновятся, когда исходная дорожка будет готова.",
       "flyout_title": "Переключатель ИИ-субтитров в меню обычных видео",
       "flyout_summary": "Показывать переключатель в меню плеера. Скрытие не отключает ИИ-субтитры; изменение действует при повторном открытии меню.",
-      "shorts_flyout_title": "Переключатель ИИ-субтитров в меню Shorts"
+      "shorts_flyout_title": "Переключатель ИИ-субтитров в меню Shorts",
+      "profiles_title": "Профили API",
+      "profile_default": "Исходная конфигурация",
+      "profile_name": "Название профиля",
+      "profile_rename": "Переименовать",
+      "profile_add": "Добавить профиль",
+      "profiles_summary": "Выберите профиль для активации и редактирования ниже. Другие профили сохраняются. Для нового профиля укажите адрес, ключ и модель.",
+      "profile_name_error": "Введите название длиной 1–60 символов",
+      "profile_limit": "Можно сохранить до 30 профилей",
+      "profile_invalid_edits": "Исправьте незавершённые поля перед сменой профиля",
+      "profile_add_failed": "Не удалось добавить профиль. Проверьте поля и ограничение в 30 профилей."
     },
     "ja": {
       "ai_title": "AI 字幕翻訳",
@@ -906,7 +996,17 @@
       "mode_off_pending": "AI をオフにしました。元の字幕トラックの準備ができ次第、YouTube の字幕が再開されます。",
       "flyout_title": "通常動画メニューの AI 字幕スイッチ",
       "flyout_summary": "プレーヤーメニューに切替スイッチを表示します。非表示にしても AI 字幕は無効になりません。次にメニューを開くと反映されます。",
-      "shorts_flyout_title": "Shorts メニューの AI 字幕スイッチ"
+      "shorts_flyout_title": "Shorts メニューの AI 字幕スイッチ",
+      "profiles_title": "API プロファイル",
+      "profile_default": "既存の設定",
+      "profile_name": "プロファイル名",
+      "profile_rename": "名前を変更",
+      "profile_add": "プロファイルを追加",
+      "profiles_summary": "選択したプロファイルが有効になり、下で編集できます。他の設定は保持されます。新規設定にはアドレス、キー、モデルを入力してください。",
+      "profile_name_error": "1～60 文字の名前を入力してください",
+      "profile_limit": "最大 30 件のプロファイルを保存できます",
+      "profile_invalid_edits": "切り替える前に未完了の入力を修正してください",
+      "profile_add_failed": "追加できません。入力内容と 30 件の上限を確認してください。"
     },
     "ko": {
       "ai_title": "AI 자막 번역",
@@ -1001,7 +1101,17 @@
       "mode_off_pending": "AI가 꺼졌습니다. 기본 자막 트랙이 준비되면 YouTube 자막이 다시 표시됩니다.",
       "flyout_title": "일반 동영상 메뉴의 AI 자막 스위치",
       "flyout_summary": "플레이어 메뉴에 바로가기를 표시합니다. 숨겨도 AI 자막은 꺼지지 않으며 메뉴를 다시 열면 적용됩니다.",
-      "shorts_flyout_title": "Shorts 메뉴의 AI 자막 스위치"
+      "shorts_flyout_title": "Shorts 메뉴의 AI 자막 스위치",
+      "profiles_title": "API 프로필",
+      "profile_default": "기존 설정",
+      "profile_name": "프로필 이름",
+      "profile_rename": "이름 변경",
+      "profile_add": "프로필 추가",
+      "profiles_summary": "프로필을 선택하면 활성화되며 아래에서 편집할 수 있습니다. 다른 프로필은 유지됩니다. 새 프로필의 주소, 키, 모델을 입력하세요.",
+      "profile_name_error": "1~60자의 이름을 입력하세요",
+      "profile_limit": "최대 30개의 프로필을 저장할 수 있습니다",
+      "profile_invalid_edits": "전환하기 전에 완료되지 않은 입력을 수정하세요",
+      "profile_add_failed": "프로필을 추가할 수 없습니다. 입력 내용과 30개 한도를 확인하세요."
     },
     "ar": {
       "ai_title": "ترجمة الترجمة النصية بالذكاء الاصطناعي",
@@ -1096,7 +1206,17 @@
       "mode_off_pending": "تم إيقاف الذكاء الاصطناعي. ستُستأنف ترجمة YouTube عندما يصبح المسار الأصلي جاهزًا.",
       "flyout_title": "مفتاح ترجمة الذكاء الاصطناعي في قائمة الفيديوهات العادية",
       "flyout_summary": "إظهار الاختصار في قائمة المشغل. إخفاؤه لا يوقف ترجمة الذكاء الاصطناعي؛ يسري عند إعادة فتح القائمة.",
-      "shorts_flyout_title": "مفتاح ترجمة الذكاء الاصطناعي في قائمة Shorts"
+      "shorts_flyout_title": "مفتاح ترجمة الذكاء الاصطناعي في قائمة Shorts",
+      "profiles_title": "ملفات إعداد API",
+      "profile_default": "الإعداد الأصلي",
+      "profile_name": "اسم الملف",
+      "profile_rename": "إعادة تسمية",
+      "profile_add": "إضافة ملف",
+      "profiles_summary": "اختر ملفًا لتفعيله وتعديله أدناه. تبقى الملفات الأخرى محفوظة. أدخل العنوان والمفتاح والنموذج للملف الجديد.",
+      "profile_name_error": "أدخل اسمًا من 1 إلى 60 حرفًا",
+      "profile_limit": "يمكن حفظ 30 ملفًا كحد أقصى",
+      "profile_invalid_edits": "صحح الحقول غير المكتملة قبل تبديل الملف",
+      "profile_add_failed": "تعذرت الإضافة. تحقق من الحقول وحد 30 ملفًا."
     },
     "hi": {
       "ai_title": "AI उपशीर्षक अनुवाद",
@@ -1191,7 +1311,17 @@
       "mode_off_pending": "AI बंद है। मूल ट्रैक तैयार होने पर YouTube के उपशीर्षक फिर से दिखेंगे।",
       "flyout_title": "सामान्य वीडियो मेन्यू में AI उपशीर्षक स्विच",
       "flyout_summary": "प्लेयर मेन्यू में शॉर्टकट दिखाएँ। छिपाने से AI उपशीर्षक बंद नहीं होते; मेन्यू दोबारा खोलने पर लागू होगा।",
-      "shorts_flyout_title": "Shorts मेन्यू में AI उपशीर्षक स्विच"
+      "shorts_flyout_title": "Shorts मेन्यू में AI उपशीर्षक स्विच",
+      "profiles_title": "API प्रोफ़ाइल",
+      "profile_default": "मूल कॉन्फ़िगरेशन",
+      "profile_name": "प्रोफ़ाइल नाम",
+      "profile_rename": "नाम बदलें",
+      "profile_add": "प्रोफ़ाइल जोड़ें",
+      "profiles_summary": "सक्रिय करने और नीचे संपादित करने के लिए प्रोफ़ाइल चुनें। अन्य प्रोफ़ाइल सुरक्षित रहती हैं। नई प्रोफ़ाइल में पता, कुंजी और मॉडल भरें।",
+      "profile_name_error": "1–60 अक्षरों का नाम दर्ज करें",
+      "profile_limit": "अधिकतम 30 प्रोफ़ाइल सहेजी जा सकती हैं",
+      "profile_invalid_edits": "प्रोफ़ाइल बदलने से पहले अधूरे फ़ील्ड सुधारें",
+      "profile_add_failed": "प्रोफ़ाइल नहीं जुड़ सकी। फ़ील्ड और 30 प्रोफ़ाइल की सीमा जाँचें।"
     },
     "id": {
       "ai_title": "Terjemahan subtitel AI",
@@ -1286,7 +1416,17 @@
       "mode_off_pending": "AI dinonaktifkan. Subtitel YouTube akan dilanjutkan saat trek aslinya siap.",
       "flyout_title": "Sakelar subtitel AI di menu video biasa",
       "flyout_summary": "Tampilkan pintasan di menu pemutar. Menyembunyikannya tidak mematikan subtitel AI; berlaku saat menu dibuka kembali.",
-      "shorts_flyout_title": "Sakelar subtitel AI di menu Shorts"
+      "shorts_flyout_title": "Sakelar subtitel AI di menu Shorts",
+      "profiles_title": "Profil API",
+      "profile_default": "Konfigurasi awal",
+      "profile_name": "Nama profil",
+      "profile_rename": "Ubah nama",
+      "profile_add": "Tambah profil",
+      "profiles_summary": "Pilih profil untuk mengaktifkan dan mengeditnya di bawah. Profil lain tetap tersimpan. Isi alamat, kunci, dan model untuk profil baru.",
+      "profile_name_error": "Masukkan nama sepanjang 1–60 karakter",
+      "profile_limit": "Maksimal 30 profil dapat disimpan",
+      "profile_invalid_edits": "Perbaiki isian yang belum selesai sebelum berganti profil",
+      "profile_add_failed": "Tidak dapat menambah profil. Periksa isian dan batas 30 profil."
     },
     "vi": {
       "ai_title": "Dịch phụ đề bằng AI",
@@ -1381,7 +1521,17 @@
       "mode_off_pending": "Đã tắt AI. Phụ đề YouTube sẽ tiếp tục khi bản phụ đề gốc sẵn sàng.",
       "flyout_title": "Công tắc phụ đề AI trong menu video thường",
       "flyout_summary": "Hiện lối tắt trong menu trình phát. Ẩn lối tắt không tắt phụ đề AI; có hiệu lực khi mở lại menu.",
-      "shorts_flyout_title": "Công tắc phụ đề AI trong menu Shorts"
+      "shorts_flyout_title": "Công tắc phụ đề AI trong menu Shorts",
+      "profiles_title": "Hồ sơ API",
+      "profile_default": "Cấu hình ban đầu",
+      "profile_name": "Tên hồ sơ",
+      "profile_rename": "Đổi tên",
+      "profile_add": "Thêm hồ sơ",
+      "profiles_summary": "Chọn hồ sơ để kích hoạt và chỉnh sửa bên dưới. Các hồ sơ khác được giữ lại. Nhập địa chỉ, khóa và mô hình cho hồ sơ mới.",
+      "profile_name_error": "Nhập tên dài từ 1 đến 60 ký tự",
+      "profile_limit": "Có thể lưu tối đa 30 hồ sơ",
+      "profile_invalid_edits": "Sửa các trường chưa hoàn tất trước khi đổi hồ sơ",
+      "profile_add_failed": "Không thể thêm hồ sơ. Kiểm tra các trường và giới hạn 30 hồ sơ."
     }
   },
   "source_keys": {
@@ -1505,6 +1655,16 @@
     "选择模型（": "model",
     "在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效": "flyout_summary",
     "普通视频弹出菜单中的 AI 字幕开关": "flyout_title",
-    "Shorts 弹出菜单中的 AI 字幕开关": "shorts_flyout_title"
+    "Shorts 弹出菜单中的 AI 字幕开关": "shorts_flyout_title",
+    "API 配置方案": "profiles_title",
+    "原有配置": "profile_default",
+    "方案名称": "profile_name",
+    "重命名": "profile_rename",
+    "新增方案": "profile_add",
+    "选择方案后立即生效，可在下方编辑；其他方案保留。新方案不复制密钥，请先填写地址、密钥和模型。": "profiles_summary",
+    "请输入 1–60 个字符的方案名称": "profile_name_error",
+    "最多可保存 30 套配置方案": "profile_limit",
+    "请先修正当前未完成的输入，再切换方案": "profile_invalid_edits",
+    "无法新增方案，请检查输入及 30 套方案上限。": "profile_add_failed"
   }
 }

@@ -245,7 +245,7 @@ final class DeepSeekApiClient {
             connection.setReadTimeout(boundedTimeout(deadline, READ_TIMEOUT_MS));
             connection.setDoOutput(true);
             connection.setUseCaches(false);
-            connection.setRequestProperty("Authorization", "Bearer " + config.apiKey);
+            ProviderEndpoint.authenticate(connection,config.baseUrl,config.apiKey);
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Connection", "keep-alive");
@@ -330,12 +330,7 @@ final class DeepSeekApiClient {
     }
 
     private static String completionUrl(String configured) {
-        String value = configured == null ? "" : configured.trim();
-        while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
-        if (value.endsWith("/models")) value = value.substring(0, value.length() - "/models".length());
-        if (value.endsWith("/chat/completions")) return value;
-        if (value.endsWith("/v1")) return value + "/chat/completions";
-        return value + "/chat/completions";
+        return ProviderEndpoint.chat(configured);
     }
 
     private static boolean isDeepSeekModel(String model) {

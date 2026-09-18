@@ -119,3 +119,13 @@ API 测试失败：	cap_message_88ce10e8f20b
 在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效	cap_flyout_summary
 普通视频弹出菜单中的 AI 字幕开关	cap_flyout_title
 Shorts 弹出菜单中的 AI 字幕开关	cap_shorts_flyout_title
+API 配置方案	cap_profiles_title
+原有配置	cap_profile_default
+方案名称	cap_profile_name
+重命名	cap_profile_rename
+新增方案	cap_profile_add
+选择方案后立即生效，可在下方编辑；其他方案保留。新方案不复制密钥，请先填写地址、密钥和模型。	cap_profiles_summary
+请输入 1–60 个字符的方案名称	cap_profile_name_error
+最多可保存 30 套配置方案	cap_profile_limit
+请先修正当前未完成的输入，再切换方案	cap_profile_invalid_edits
+无法新增方案，请检查输入及 30 套方案上限。	cap_profile_add_failed

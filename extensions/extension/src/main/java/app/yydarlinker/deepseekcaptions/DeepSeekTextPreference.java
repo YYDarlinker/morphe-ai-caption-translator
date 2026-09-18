@@ -24,7 +24,7 @@ import android.widget.TextView;
  * keeps every setting on the page itself: there is no editor dialog and no page-level Save button.</p>
  */
 @SuppressWarnings("deprecation")
-public class DeepSeekTextPreference extends android.preference.Preference {
+public class DeepSeekTextPreference extends android.preference.Preference implements ApiProfiles.Editor {
     static final String KEY_BASE_URL = "deepseek_caption_base_url";
     static final String KEY_API_KEY = "deepseek_caption_api_key";
     static final String KEY_PROMPT = "deepseek_caption_prompt";
@@ -36,6 +36,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
     private EditText editor;
     private TextView state;
     private String lastCommitted = "";
+    private String boundProfile="";
 
     public DeepSeekTextPreference(Context context) {
         super(context);
@@ -63,6 +64,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
     }
 
     private void initialize() {
+        ApiProfiles.register(this);
         setPersistent(false);
         setSelectable(false);
     }
@@ -72,7 +74,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
         // Android groups rows of the same Preference subclass into one recycle pool. These rows
         // contain different editors (URL/key/prompt), so only reuse this exact field's view.
         String key = getKey();
-        View safeView = convertView != null && key != null && key.equals(convertView.getTag())
+        View safeView = convertView != null && key != null && (key+ApiProfiles.active(getContext())).equals(convertView.getTag())
                 ? convertView
                 : null;
         View bound=super.getView(safeView,parent);
@@ -84,13 +86,14 @@ public class DeepSeekTextPreference extends android.preference.Preference {
     @Override
     protected View onCreateView(ViewGroup parent) {
         cancelPendingSave();
+        boundProfile=ApiProfiles.active(getContext());
         Context context = getContext();
         if (parent instanceof ListView) {
             ((ListView) parent).setItemsCanFocus(true);
             parent.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         }
         LinearLayout root = new LinearLayout(context);
-        root.setTag(getKey());
+        root.setTag(getKey()+boundProfile);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         CaptionSettingsStyle.row(root);
@@ -122,21 +125,25 @@ public class DeepSeekTextPreference extends android.preference.Preference {
         updateState(false, null);
         root.addView(state, matchWrap());
 
+        final EditText createdEditor=editor;
+        final String createdProfile=boundProfile;
         editor.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
             @Override public void afterTextChanged(Editable value) {
-                scheduleSave(value == null ? "" : value.toString());
+                if(createdEditor==editor&&createdProfile.equals(ApiProfiles.active(getContext())))scheduleSave(value == null ? "" : value.toString());
             }
         });
         editor.setOnFocusChangeListener((view, hasFocus) -> {
+            if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
             if (!hasFocus) {
                 String text=editor.getText().toString();commitNow(text,true);
                 // Do not clear text on transient focus loss from Android action mode / keyboard.
             }
         });
         editor.setOnEditorActionListener((view, actionId, event) -> {
+            if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return false;
             boolean done = actionId == EditorInfo.IME_ACTION_DONE ||
                     (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
                             event.getAction() == KeyEvent.ACTION_DOWN);
@@ -151,6 +158,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
             @Override public void onViewAttachedToWindow(View view) {}
 
             @Override public void onViewDetachedFromWindow(View view) {
+                if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
                 commitNow(((EditText) view).getText().toString(), false);
                 if(KEY_API_KEY.equals(getKey())){cancelPendingSave();((EditText)view).setText("");cancelPendingSave();}
             }
@@ -207,6 +215,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
     }
 
     private void commit(String raw, boolean reportInvalid) {
+        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
         String value = raw == null ? "" : raw.trim();
         if (value.equals(lastCommitted)) return;
         if (KEY_API_KEY.equals(getKey()) && value.isEmpty()) return;
@@ -222,7 +231,7 @@ public class DeepSeekTextPreference extends android.preference.Preference {
             if (KEY_BASE_URL.equals(getKey()) || KEY_API_KEY.equals(getKey())) {
                 DeepSeekModelPreference.onCredentialsChanged(getContext());
             }
-            DynamicCaptionController.refreshConfiguration(getContext());
+            if(!ApiProfiles.flushing())DynamicCaptionController.refreshConfiguration(getContext());
         } catch (Throwable error) {
             String detail = error.getMessage();
             if (detail == null || detail.trim().isEmpty()) detail = "自动保存失败";
@@ -264,6 +273,18 @@ public class DeepSeekTextPreference extends android.preference.Preference {
                     (summary == null || summary.length() == 0 ? "修改后自动保存" : summary)));
         }
         state.setAlpha(1f);
+    }
+
+    @Override public boolean flushProfile(){
+        if(editor==null||!boundProfile.equals(ApiProfiles.active(getContext())))return true;
+        String value=editor.getText().toString().trim();commitNow(value,true);
+        return value.equals(lastCommitted) || (KEY_API_KEY.equals(getKey())&&value.isEmpty());
+    }
+    @Override public void profileChanged(){
+        cancelPendingSave();
+        boundProfile="";lastCommitted="";
+        if(editor!=null){editor.setText("");editor.clearFocus();}
+        notifyChanged();
     }
 
     private void cancelPendingSave() {

@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"一般影片彈出選單中的 AI 字幕開關"</string>
     <string name="cap_flyout_summary" formatted="false">"在播放器彈出選單中顯示快捷開關；隱藏不會關閉 AI 字幕，下次開啟選單時生效"</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Shorts 彈出選單中的 AI 字幕開關"</string>
+    <string name="cap_profiles_title" formatted="false">"API 設定方案"</string>
+    <string name="cap_profile_default" formatted="false">"原有設定"</string>
+    <string name="cap_profile_name" formatted="false">"方案名稱"</string>
+    <string name="cap_profile_rename" formatted="false">"重新命名"</string>
+    <string name="cap_profile_add" formatted="false">"新增方案"</string>
+    <string name="cap_profiles_summary" formatted="false">"選取方案後立即生效，可在下方編輯；其他方案保留。新方案不會複製金鑰，請先填寫網址、金鑰與模型。"</string>
+    <string name="cap_profile_name_error" formatted="false">"請輸入 1–60 個字元的方案名稱"</string>
+    <string name="cap_profile_limit" formatted="false">"最多可儲存 30 套設定方案"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"請先修正目前未完成的輸入，再切換方案"</string>
+    <string name="cap_profile_add_failed" formatted="false">"無法新增方案，請檢查輸入及 30 套方案上限。"</string>
 </resources>

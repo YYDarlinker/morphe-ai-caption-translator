@@ -159,7 +159,7 @@ fun main(args:Array<String>){
             val checkIndex=menuCode.indices.single { menuCall(it)==setting }
             check(checkIndex<addRow){"Visibility setting must be read before menu insertion"}
         }
-        for(preference in listOf("CaptionFlyoutPreference","CaptionShortsFlyoutPreference")){
+        for(preference in listOf("CaptionFlyoutPreference","CaptionShortsFlyoutPreference","ApiProfilesPreference")){
             val cls=classes.getValue("Lapp/yydarlinker/deepseekcaptions/$preference;")
             check(AccessFlags.PUBLIC.isSet(cls.accessFlags))
             check(cls.methods.any { it.name=="<init>"&&it.parameterTypes.map { t->t.toString() }==listOf("Landroid/content/Context;","Landroid/util/AttributeSet;") })

@@ -84,6 +84,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             toast("请先填写 API Key");
             return;
         }
+        final String testedProfile=ApiProfiles.active(getContext());
         setEnabled(false);
         setSummary(CaptionStrings.localize(getContext(), "测试中…"));
         new Thread(() -> {
@@ -102,6 +103,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             postToUi(() -> {
                 setEnabled(true);
                 setSummary(CaptionStrings.localize(getContext(), "使用当前已自动保存的配置测试连接"));
+                if(!testedProfile.equals(ApiProfiles.active(getContext())))return;
                 if(message.startsWith("API 可用：")) DynamicCaptionController.refreshConfiguration(getContext());
                 toast(message);
             });

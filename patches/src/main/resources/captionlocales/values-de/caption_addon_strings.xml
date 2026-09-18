@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"KI-Untertitelschalter im Menü normaler Videos"</string>
     <string name="cap_flyout_summary" formatted="false">"Zeigt den Schnellschalter im Wiedergabemenü. Ausblenden deaktiviert KI-Untertitel nicht; gilt beim erneuten Öffnen des Menüs."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"KI-Untertitelschalter im Shorts-Menü"</string>
+    <string name="cap_profiles_title" formatted="false">"API-Profile"</string>
+    <string name="cap_profile_default" formatted="false">"Bisherige Konfiguration"</string>
+    <string name="cap_profile_name" formatted="false">"Profilname"</string>
+    <string name="cap_profile_rename" formatted="false">"Umbenennen"</string>
+    <string name="cap_profile_add" formatted="false">"Profil hinzufügen"</string>
+    <string name="cap_profiles_summary" formatted="false">"Profil zum Aktivieren und Bearbeiten auswählen. Andere Profile bleiben erhalten. Neue Profile benötigen Adresse, Schlüssel und Modell."</string>
+    <string name="cap_profile_name_error" formatted="false">"Name mit 1–60 Zeichen eingeben"</string>
+    <string name="cap_profile_limit" formatted="false">"Bis zu 30 Profile speicherbar"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"Unvollständige Eingaben vor dem Profilwechsel korrigieren"</string>
+    <string name="cap_profile_add_failed" formatted="false">"Profil konnte nicht hinzugefügt werden. Eingaben und Grenze von 30 Profilen prüfen."</string>
 </resources>

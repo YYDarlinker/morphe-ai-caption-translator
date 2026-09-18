@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"通常動画メニューの AI 字幕スイッチ"</string>
     <string name="cap_flyout_summary" formatted="false">"プレーヤーメニューに切替スイッチを表示します。非表示にしても AI 字幕は無効になりません。次にメニューを開くと反映されます。"</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Shorts メニューの AI 字幕スイッチ"</string>
+    <string name="cap_profiles_title" formatted="false">"API プロファイル"</string>
+    <string name="cap_profile_default" formatted="false">"既存の設定"</string>
+    <string name="cap_profile_name" formatted="false">"プロファイル名"</string>
+    <string name="cap_profile_rename" formatted="false">"名前を変更"</string>
+    <string name="cap_profile_add" formatted="false">"プロファイルを追加"</string>
+    <string name="cap_profiles_summary" formatted="false">"選択したプロファイルが有効になり、下で編集できます。他の設定は保持されます。新規設定にはアドレス、キー、モデルを入力してください。"</string>
+    <string name="cap_profile_name_error" formatted="false">"1～60 文字の名前を入力してください"</string>
+    <string name="cap_profile_limit" formatted="false">"最大 30 件のプロファイルを保存できます"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"切り替える前に未完了の入力を修正してください"</string>
+    <string name="cap_profile_add_failed" formatted="false">"追加できません。入力内容と 30 件の上限を確認してください。"</string>
 </resources>

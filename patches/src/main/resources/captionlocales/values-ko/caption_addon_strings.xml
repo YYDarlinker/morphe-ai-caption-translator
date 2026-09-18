@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"일반 동영상 메뉴의 AI 자막 스위치"</string>
     <string name="cap_flyout_summary" formatted="false">"플레이어 메뉴에 바로가기를 표시합니다. 숨겨도 AI 자막은 꺼지지 않으며 메뉴를 다시 열면 적용됩니다."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Shorts 메뉴의 AI 자막 스위치"</string>
+    <string name="cap_profiles_title" formatted="false">"API 프로필"</string>
+    <string name="cap_profile_default" formatted="false">"기존 설정"</string>
+    <string name="cap_profile_name" formatted="false">"프로필 이름"</string>
+    <string name="cap_profile_rename" formatted="false">"이름 변경"</string>
+    <string name="cap_profile_add" formatted="false">"프로필 추가"</string>
+    <string name="cap_profiles_summary" formatted="false">"프로필을 선택하면 활성화되며 아래에서 편집할 수 있습니다. 다른 프로필은 유지됩니다. 새 프로필의 주소, 키, 모델을 입력하세요."</string>
+    <string name="cap_profile_name_error" formatted="false">"1~60자의 이름을 입력하세요"</string>
+    <string name="cap_profile_limit" formatted="false">"최대 30개의 프로필을 저장할 수 있습니다"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"전환하기 전에 완료되지 않은 입력을 수정하세요"</string>
+    <string name="cap_profile_add_failed" formatted="false">"프로필을 추가할 수 없습니다. 입력 내용과 30개 한도를 확인하세요."</string>
 </resources>

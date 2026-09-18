@@ -187,6 +187,8 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                 )
 
                 screen.addCategory("API 配置").apply {
+                    addPreference("app.yydarlinker.deepseekcaptions.ApiProfilesPreference",
+                        "deepseek_caption_profiles", "API 配置方案")
                     addPreference(
                         TEXT_PREF_CLASS,
                         "deepseek_caption_base_url",

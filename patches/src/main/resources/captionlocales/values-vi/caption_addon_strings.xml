@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"Công tắc phụ đề AI trong menu video thường"</string>
     <string name="cap_flyout_summary" formatted="false">"Hiện lối tắt trong menu trình phát. Ẩn lối tắt không tắt phụ đề AI; có hiệu lực khi mở lại menu."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Công tắc phụ đề AI trong menu Shorts"</string>
+    <string name="cap_profiles_title" formatted="false">"Hồ sơ API"</string>
+    <string name="cap_profile_default" formatted="false">"Cấu hình ban đầu"</string>
+    <string name="cap_profile_name" formatted="false">"Tên hồ sơ"</string>
+    <string name="cap_profile_rename" formatted="false">"Đổi tên"</string>
+    <string name="cap_profile_add" formatted="false">"Thêm hồ sơ"</string>
+    <string name="cap_profiles_summary" formatted="false">"Chọn hồ sơ để kích hoạt và chỉnh sửa bên dưới. Các hồ sơ khác được giữ lại. Nhập địa chỉ, khóa và mô hình cho hồ sơ mới."</string>
+    <string name="cap_profile_name_error" formatted="false">"Nhập tên dài từ 1 đến 60 ký tự"</string>
+    <string name="cap_profile_limit" formatted="false">"Có thể lưu tối đa 30 hồ sơ"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"Sửa các trường chưa hoàn tất trước khi đổi hồ sơ"</string>
+    <string name="cap_profile_add_failed" formatted="false">"Không thể thêm hồ sơ. Kiểm tra các trường và giới hạn 30 hồ sơ."</string>
 </resources>

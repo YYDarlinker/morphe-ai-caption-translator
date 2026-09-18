@@ -25,6 +25,7 @@ final class SecureApiKey {
     private SecureApiKey() {}
 
     static void save(Context context, String apiKey) throws Exception {
+        synchronized(ApiProfiles.LOCK) {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalArgumentException("API Key 不能为空");
         }
@@ -39,11 +40,14 @@ final class SecureApiKey {
         packed.put(iv);
         packed.put(ciphertext);
         String encoded = Base64.encodeToString(packed.array(), Base64.NO_WRAP);
-        prefs(context).edit().putString(VALUE, encoded).apply();
+        prefs(context).edit().putString(valueKey(context), encoded).putString(valueKey(context)+"_origin",origin(context)).apply();
+        }
     }
 
     static String load(Context context) {
-        String encoded = prefs(context).getString(VALUE, "");
+        synchronized(ApiProfiles.LOCK) {
+        if(!originMatches(context))return "";
+        String encoded = prefs(context).getString(valueKey(context), "");
         if (encoded == null || encoded.isEmpty()) return "";
         try {
             byte[] packed = Base64.decode(encoded, Base64.DEFAULT);
@@ -68,19 +72,26 @@ final class SecureApiKey {
         }
     }
 
-    static boolean hasSavedValue(Context context){return prefs(context).contains(VALUE);}
+    }
+
+    private static String valueKey(Context c){String id=ApiProfiles.active(c);return ApiProfiles.LEGACY.equals(id)?VALUE:VALUE+"_"+id;}
+
+    private static String origin(Context c){
+        java.net.URI u=java.net.URI.create(ApiProfiles.values(c).getString("base_url",DeepSeekConfig.DEFAULT_BASE_URL));
+        return u.getScheme().toLowerCase(java.util.Locale.ROOT)+"://"+u.getRawAuthority().toLowerCase(java.util.Locale.ROOT);
+    }
+    private static boolean originMatches(Context c){String saved=prefs(c).getString(valueKey(c)+"_origin","");return saved.isEmpty()||saved.equals(origin(c));}
+    static void bindLegacyOrigin(Context c){synchronized(ApiProfiles.LOCK){
+        if(prefs(c).contains(valueKey(c))&&!prefs(c).contains(valueKey(c)+"_origin"))prefs(c).edit().putString(valueKey(c)+"_origin",origin(c)).apply();
+    }}
+    static boolean hasSavedValue(Context context){synchronized(ApiProfiles.LOCK){return prefs(context).contains(valueKey(context))&&originMatches(context);}}
     static boolean hasKey(Context context) {
         return !load(context).isEmpty();
     }
 
     static void clear(Context context) {
-        prefs(context).edit().remove(VALUE).apply();
-        try {
-            KeyStore store = KeyStore.getInstance(ANDROID_KEY_STORE);
-            store.load(null);
-            if (store.containsAlias(ALIAS)) store.deleteEntry(ALIAS);
-        } catch (Throwable ignored) {
-        }
+        // All profile ciphertexts share the non-exportable key. Clearing ONE must not delete it.
+        synchronized(ApiProfiles.LOCK){prefs(context).edit().remove(valueKey(context)).remove(valueKey(context)+"_origin").apply();}
     }
 
     private static SharedPreferences prefs(Context context) {

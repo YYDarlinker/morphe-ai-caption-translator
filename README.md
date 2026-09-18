@@ -1,6 +1,6 @@
 # Anchored AI Captions
 
-## Current revision: 1.2.7
+## Current revision: 1.3.0
 
 Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
 
@@ -42,6 +42,11 @@ Use Expert mode. For AI, keep the compatible official default patch set (includi
 Release source: `https://github.com/YYDarlinker/morphe-ai-caption-translator`
 
 ## Configuration
+
+Version 1.3.0 adds named API profiles and provider-aware OpenAI-compatible endpoint handling.
+Your original configuration remains the first profile; new profiles start without a copied key.
+Select a profile in the API section to activate it, rename it, or edit its address/key/model below.
+Other profiles remain saved. See [provider compatibility, security and profile behavior](docs/API-PROFILES-1.3.0.md).
 
 Open YouTube → Settings → Morphe → AI caption translator. Configure the OpenAI-compatible API endpoint, model, API key and translation preferences. Keys are stored in Android Keystore-backed storage and are not bundled into this repository.
 

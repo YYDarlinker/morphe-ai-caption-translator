@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"مفتاح ترجمة الذكاء الاصطناعي في قائمة الفيديوهات العادية"</string>
     <string name="cap_flyout_summary" formatted="false">"إظهار الاختصار في قائمة المشغل. إخفاؤه لا يوقف ترجمة الذكاء الاصطناعي؛ يسري عند إعادة فتح القائمة."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"مفتاح ترجمة الذكاء الاصطناعي في قائمة Shorts"</string>
+    <string name="cap_profiles_title" formatted="false">"ملفات إعداد API"</string>
+    <string name="cap_profile_default" formatted="false">"الإعداد الأصلي"</string>
+    <string name="cap_profile_name" formatted="false">"اسم الملف"</string>
+    <string name="cap_profile_rename" formatted="false">"إعادة تسمية"</string>
+    <string name="cap_profile_add" formatted="false">"إضافة ملف"</string>
+    <string name="cap_profiles_summary" formatted="false">"اختر ملفًا لتفعيله وتعديله أدناه. تبقى الملفات الأخرى محفوظة. أدخل العنوان والمفتاح والنموذج للملف الجديد."</string>
+    <string name="cap_profile_name_error" formatted="false">"أدخل اسمًا من 1 إلى 60 حرفًا"</string>
+    <string name="cap_profile_limit" formatted="false">"يمكن حفظ 30 ملفًا كحد أقصى"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"صحح الحقول غير المكتملة قبل تبديل الملف"</string>
+    <string name="cap_profile_add_failed" formatted="false">"تعذرت الإضافة. تحقق من الحقول وحد 30 ملفًا."</string>
 </resources>

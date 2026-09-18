@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"Interruptor de subtítulos IA en vídeos normales"</string>
     <string name="cap_flyout_summary" formatted="false">"Muestra el acceso rápido en el menú del reproductor. Ocultarlo no desactiva los subtítulos IA; se aplica al reabrir el menú."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Interruptor de subtítulos IA en el menú de Shorts"</string>
+    <string name="cap_profiles_title" formatted="false">"Perfiles de API"</string>
+    <string name="cap_profile_default" formatted="false">"Configuración original"</string>
+    <string name="cap_profile_name" formatted="false">"Nombre del perfil"</string>
+    <string name="cap_profile_rename" formatted="false">"Renombrar"</string>
+    <string name="cap_profile_add" formatted="false">"Añadir perfil"</string>
+    <string name="cap_profiles_summary" formatted="false">"Seleccione un perfil para activarlo y editarlo abajo. Los demás se conservan. Configure la dirección, clave y modelo del nuevo perfil."</string>
+    <string name="cap_profile_name_error" formatted="false">"Introduzca un nombre de 1 a 60 caracteres"</string>
+    <string name="cap_profile_limit" formatted="false">"Se pueden guardar hasta 30 perfiles"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"Corrija los campos incompletos antes de cambiar de perfil"</string>
+    <string name="cap_profile_add_failed" formatted="false">"No se pudo añadir el perfil. Revise los campos y el límite de 30 perfiles."</string>
 </resources>

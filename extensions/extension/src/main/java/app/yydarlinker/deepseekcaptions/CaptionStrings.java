@@ -9,7 +9,7 @@ public final class CaptionStrings {
         if(c!=null)try{int id=c.getResources().getIdentifier("cap_"+key,"string",c.getPackageName());if(id!=0)return c.getString(id);}catch(Exception ignored){}
         return english.getOrDefault(key,key);
     }
-    private static String settings(Context c,String key){
+    static String settings(Context c,String key){
         // Public, non-obfuscated official resource API honors Morphe's language override.
         try{Object text=Class.forName("app.morphe.extension.shared.ResourceUtils").getMethod("getString",String.class).invoke(null,"cap_"+key);
             if(text instanceof String&&!text.equals("cap_"+key))return (String)text;

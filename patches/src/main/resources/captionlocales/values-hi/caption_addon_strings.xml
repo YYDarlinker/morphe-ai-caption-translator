@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"सामान्य वीडियो मेन्यू में AI उपशीर्षक स्विच"</string>
     <string name="cap_flyout_summary" formatted="false">"प्लेयर मेन्यू में शॉर्टकट दिखाएँ। छिपाने से AI उपशीर्षक बंद नहीं होते; मेन्यू दोबारा खोलने पर लागू होगा।"</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Shorts मेन्यू में AI उपशीर्षक स्विच"</string>
+    <string name="cap_profiles_title" formatted="false">"API प्रोफ़ाइल"</string>
+    <string name="cap_profile_default" formatted="false">"मूल कॉन्फ़िगरेशन"</string>
+    <string name="cap_profile_name" formatted="false">"प्रोफ़ाइल नाम"</string>
+    <string name="cap_profile_rename" formatted="false">"नाम बदलें"</string>
+    <string name="cap_profile_add" formatted="false">"प्रोफ़ाइल जोड़ें"</string>
+    <string name="cap_profiles_summary" formatted="false">"सक्रिय करने और नीचे संपादित करने के लिए प्रोफ़ाइल चुनें। अन्य प्रोफ़ाइल सुरक्षित रहती हैं। नई प्रोफ़ाइल में पता, कुंजी और मॉडल भरें।"</string>
+    <string name="cap_profile_name_error" formatted="false">"1–60 अक्षरों का नाम दर्ज करें"</string>
+    <string name="cap_profile_limit" formatted="false">"अधिकतम 30 प्रोफ़ाइल सहेजी जा सकती हैं"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"प्रोफ़ाइल बदलने से पहले अधूरे फ़ील्ड सुधारें"</string>
+    <string name="cap_profile_add_failed" formatted="false">"प्रोफ़ाइल नहीं जुड़ सकी। फ़ील्ड और 30 प्रोफ़ाइल की सीमा जाँचें।"</string>
 </resources>

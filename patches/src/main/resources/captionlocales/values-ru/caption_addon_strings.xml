@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"Переключатель ИИ-субтитров в меню обычных видео"</string>
     <string name="cap_flyout_summary" formatted="false">"Показывать переключатель в меню плеера. Скрытие не отключает ИИ-субтитры; изменение действует при повторном открытии меню."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Переключатель ИИ-субтитров в меню Shorts"</string>
+    <string name="cap_profiles_title" formatted="false">"Профили API"</string>
+    <string name="cap_profile_default" formatted="false">"Исходная конфигурация"</string>
+    <string name="cap_profile_name" formatted="false">"Название профиля"</string>
+    <string name="cap_profile_rename" formatted="false">"Переименовать"</string>
+    <string name="cap_profile_add" formatted="false">"Добавить профиль"</string>
+    <string name="cap_profiles_summary" formatted="false">"Выберите профиль для активации и редактирования ниже. Другие профили сохраняются. Для нового профиля укажите адрес, ключ и модель."</string>
+    <string name="cap_profile_name_error" formatted="false">"Введите название длиной 1–60 символов"</string>
+    <string name="cap_profile_limit" formatted="false">"Можно сохранить до 30 профилей"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"Исправьте незавершённые поля перед сменой профиля"</string>
+    <string name="cap_profile_add_failed" formatted="false">"Не удалось добавить профиль. Проверьте поля и ограничение в 30 профилей."</string>
 </resources>

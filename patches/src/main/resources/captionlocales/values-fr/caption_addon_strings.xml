@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"Bouton des sous-titres IA dans le menu des vidéos classiques"</string>
     <string name="cap_flyout_summary" formatted="false">"Afficher le raccourci dans le menu du lecteur. Le masquer ne désactive pas les sous-titres IA ; effet à la réouverture du menu."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Bouton des sous-titres IA dans le menu Shorts"</string>
+    <string name="cap_profiles_title" formatted="false">"Profils API"</string>
+    <string name="cap_profile_default" formatted="false">"Configuration existante"</string>
+    <string name="cap_profile_name" formatted="false">"Nom du profil"</string>
+    <string name="cap_profile_rename" formatted="false">"Renommer"</string>
+    <string name="cap_profile_add" formatted="false">"Ajouter un profil"</string>
+    <string name="cap_profiles_summary" formatted="false">"Sélectionnez un profil pour l’activer et le modifier ci-dessous. Les autres sont conservés. Configurez l’adresse, la clé et le modèle du nouveau profil."</string>
+    <string name="cap_profile_name_error" formatted="false">"Saisissez un nom de 1 à 60 caractères"</string>
+    <string name="cap_profile_limit" formatted="false">"Vous pouvez enregistrer jusqu’à 30 profils"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"Corrigez les champs incomplets avant de changer de profil"</string>
+    <string name="cap_profile_add_failed" formatted="false">"Impossible d’ajouter un profil. Vérifiez les champs et la limite de 30 profils."</string>
 </resources>

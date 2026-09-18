@@ -32,11 +32,15 @@ final class ContextualBatchApiClient {
     static final String LANE_REALTIME = "unit_realtime";
     static final String LANE_BACKGROUND = "unit_background";
 
-    private static volatile String minimalIdentity="";
+    private static final class Negotiation {
+        final String identity,category;
+        Negotiation(String identity,String category){this.identity=identity;this.category=category;}
+    }
+    private static volatile Negotiation negotiation;
     private static volatile String blockedIdentity="";
     private static volatile String blockedMessage="";
     private static String identity(DeepSeekConfig.Snapshot c) { return c.baseUrl+"\n"+c.model+"\n"+c.apiKey; }
-    static synchronized void resetRejection() { blockedIdentity="";blockedMessage="";minimalIdentity=""; }
+    static synchronized void resetRejection() { blockedIdentity="";blockedMessage="";negotiation=null; }
     private ContextualBatchApiClient() {}
 
     static Result translate(
@@ -113,7 +117,8 @@ final class ContextualBatchApiClient {
                 sourceChars * 2 + targets.size() * 96 + 320
         ));
         JSONObject request = ProviderRequestPolicy.request(config,systemPrompt,payload,outputTokens);
-        if(identity(config).equals(minimalIdentity)) ProviderRequestPolicy.removeOptional(request);
+        Negotiation cached=negotiation;
+        if(cached!=null&&identity(config).equals(cached.identity))ProviderRequestPolicy.removeOptional(request,cached.category);
 
         int contextCount = (contextBefore == null ? 0 : contextBefore.size()) +
                 (contextAfter == null ? 0 : contextAfter.size());
@@ -129,15 +134,17 @@ final class ContextualBatchApiClient {
         );
 
         boolean negotiated=false;
+        String negotiatedCategory="";
         while(true) {
             ensureActive(deadline,control);
             try {
                 Result result=parseAnchored(post(config,request,deadline,control,audit),targets,atoms,repair);
-                if(negotiated) minimalIdentity=identity(config);
+                if(negotiated)negotiation=new Negotiation(identity(config),negotiatedCategory);
                 TokenCostAudit.recordUnitBatchOutcome(audit,result.validCount());
                 return result;
             } catch(ProviderRequestException rejected) {
-                if(!negotiated && ProviderRequestPolicy.removeOptional(request)) {
+                negotiatedCategory=ProviderRequestPolicy.reason(rejected.providerDetail);
+                if(!negotiated && ProviderRequestPolicy.removeOptional(request,negotiatedCategory)) {
                     negotiated=true; continue; // exactly one minimal-schema retry, no window isolation.
                 }
                 blockedMessage="API 拒绝字幕请求（"+ProviderRequestPolicy.reason(rejected.providerDetail)+
@@ -362,7 +369,7 @@ final class ContextualBatchApiClient {
             connection.setReadTimeout(boundedTimeout(deadline, READ_TIMEOUT_MS));
             connection.setDoOutput(true);
             connection.setUseCaches(false);
-            connection.setRequestProperty("Authorization", "Bearer " + config.apiKey);
+            ProviderEndpoint.authenticate(connection,config.baseUrl,config.apiKey);
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Connection", "keep-alive");
@@ -547,12 +554,7 @@ final class ContextualBatchApiClient {
     }
 
     private static String completionUrl(String configured) {
-        String value = configured == null ? "" : configured.trim();
-        while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
-        if (value.endsWith("/models")) value = value.substring(0, value.length() - "/models".length());
-        if (value.endsWith("/chat/completions")) return value;
-        if (value.endsWith("/v1")) return value + "/chat/completions";
-        return value + "/chat/completions";
+        return ProviderEndpoint.chat(configured);
     }
 
     private static boolean isDeepSeekModel(String model) {

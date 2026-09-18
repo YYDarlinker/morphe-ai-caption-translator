@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Inline model editor plus automatic OpenAI-compatible model discovery. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekModelPreference extends android.preference.Preference {
+public final class DeepSeekModelPreference extends android.preference.Preference implements ApiProfiles.Editor {
     static final String KEY_MODEL = "deepseek_caption_model";
 
     private static final long AUTO_SAVE_DELAY_MS = 850L;
@@ -66,6 +66,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     private Button refresh;
     private Spinner choices;
     private String lastCommitted = "";
+    private String boundProfile="";
     private volatile int fetchGeneration;
     private boolean populatingChoices;
 
@@ -95,6 +96,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     private void initialize() {
+        ApiProfiles.register(this);
         setPersistent(false);
         setSelectable(false);
     }
@@ -112,7 +114,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
 
     @Override
     public View getView(View convertView, ViewGroup parent) {
-        View safe = convertView != null && KEY_MODEL.equals(convertView.getTag())
+        View safe = convertView != null && (KEY_MODEL+ApiProfiles.active(getContext())).equals(convertView.getTag())
                 ? convertView
                 : null;
         return super.getView(safe, parent);
@@ -121,6 +123,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     @Override
     protected View onCreateView(ViewGroup parent) {
         cancelPendingSave();
+        boundProfile=ApiProfiles.active(getContext());
         active = new WeakReference<>(this);
         Context context = getContext();
         if (parent instanceof ListView) {
@@ -129,7 +132,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         }
 
         LinearLayout root = new LinearLayout(context);
-        root.setTag(KEY_MODEL);
+        root.setTag(KEY_MODEL+boundProfile);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         CaptionSettingsStyle.row(root);
@@ -184,7 +187,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
                     int position,
                     long id
             ) {
-                if (populatingChoices || position <= 0) return;
+                if (parentView!=choices || !boundProfile.equals(ApiProfiles.active(getContext())) || populatingChoices || position <= 0) return;
                 Object selected = parentView.getItemAtPosition(position);
                 if (!(selected instanceof String)) return;
                 String model = ((String) selected).trim();
@@ -200,18 +203,22 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         state.setPadding(0,dp(4),0,0);state.setMaxLines(2);
         root.addView(state,matchWrap());
 
+        final EditText createdEditor=editor;
+        final String createdProfile=boundProfile;
         editor.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
             @Override public void afterTextChanged(Editable value) {
-                scheduleSave(value == null ? "" : value.toString());
+                if(createdEditor==editor&&createdProfile.equals(ApiProfiles.active(getContext())))scheduleSave(value == null ? "" : value.toString());
             }
         });
         editor.setOnFocusChangeListener((view, hasFocus) -> {
+            if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
             if (!hasFocus) commitNow(editor.getText().toString(), true);
         });
         editor.setOnEditorActionListener((view, actionId, event) -> {
+            if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return false;
             boolean done = actionId == EditorInfo.IME_ACTION_DONE ||
                     (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
                             event.getAction() == KeyEvent.ACTION_DOWN);
@@ -222,12 +229,14 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         });
         editor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
             @Override public void onViewAttachedToWindow(View view) {
+                if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
                 active = new WeakReference<>(DeepSeekModelPreference.this);
                 if (refresh != null) refresh.setEnabled(true);
                 showCachedOrFetch();
             }
 
             @Override public void onViewDetachedFromWindow(View view) {
+                if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
                 commitNow(((EditText) view).getText().toString(), false);
                 fetchGeneration++;
                 if (active.get() == DeepSeekModelPreference.this) {
@@ -240,6 +249,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     private void showCachedOrFetch() {
+        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
         DeepSeekConfig.Snapshot config = DeepSeekConfig.load(getContext());
         if (config.apiKey.isEmpty()) {
             setState("填写 API 地址和 API Key 后会自动获取；仍可手动输入", false);
@@ -261,6 +271,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     private void fetchModels(boolean userInitiated) {
+        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
         DeepSeekConfig.Snapshot config = DeepSeekConfig.load(getContext());
         if (config.apiKey.isEmpty()) {
             setState("请先填写 API Key；模型也可手动输入", true);
@@ -353,6 +364,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     private void commit(String raw, boolean reportInvalid) {
+        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
         String value = raw == null ? "" : raw.trim();
         if (value.equals(lastCommitted)) return;
         try {
@@ -360,7 +372,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
             lastCommitted = value;
             if (editor != null) editor.setError(null);
             setState("模型已自动保存", false);
-            DynamicCaptionController.refreshConfiguration(getContext());
+            if(!ApiProfiles.flushing())DynamicCaptionController.refreshConfiguration(getContext());
         } catch (Throwable error) {
             String detail = error.getMessage();
             if (detail == null || detail.trim().isEmpty()) detail = "模型自动保存失败";
@@ -373,6 +385,20 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         if (state == null) return;
         state.setText(CaptionStrings.localize(getContext(),text));
         state.setAlpha(important ? 1f : 0.72f);
+    }
+
+    @Override public boolean flushProfile(){
+        if(editor==null||!boundProfile.equals(ApiProfiles.active(getContext())))return true;
+        String value=editor.getText().toString().trim();commitNow(value,true);
+        return value.equals(lastCommitted);
+    }
+    @Override public void profileChanged(){
+        cancelPendingSave();
+        fetchGeneration++;
+        if(pendingCredentialRefresh!=null)main.removeCallbacks(pendingCredentialRefresh);
+        boundProfile="";lastCommitted="";
+        if(editor!=null){editor.setText("");editor.clearFocus();}
+        notifyChanged();
     }
 
     private void cancelPendingSave() {

@@ -30,8 +30,8 @@ final class DeepSeekModelCatalog {
             connection.setConnectTimeout(5_000);
             connection.setReadTimeout(10_000);
             connection.setUseCaches(false);
-            connection.setInstanceFollowRedirects(true);
-            connection.setRequestProperty("Authorization", "Bearer " + key);
+            connection.setInstanceFollowRedirects(false);
+            ProviderEndpoint.authenticate(connection,baseUrl,key);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", "YYDarlinker-AICaptions/2");
 
@@ -58,17 +58,7 @@ final class DeepSeekModelCatalog {
         }
     }
 
-    static String modelsUrl(String configured) {
-        String value = configured == null ? "" : configured.trim();
-        while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
-        if (value.endsWith("/chat/completions")) {
-            value = value.substring(0, value.length() - "/chat/completions".length());
-        } else if (value.endsWith("/completions")) {
-            value = value.substring(0, value.length() - "/completions".length());
-        }
-        if (value.endsWith("/models")) return value;
-        return value + "/models";
-    }
+    static String modelsUrl(String configured) { return ProviderEndpoint.models(configured); }
 
     private static List<String> parse(String response) throws Exception {
         JSONObject root = new JSONObject(response);

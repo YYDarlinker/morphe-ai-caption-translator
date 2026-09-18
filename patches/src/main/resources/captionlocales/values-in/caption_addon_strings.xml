@@ -93,4 +93,14 @@
     <string name="cap_flyout_title" formatted="false">"Sakelar subtitel AI di menu video biasa"</string>
     <string name="cap_flyout_summary" formatted="false">"Tampilkan pintasan di menu pemutar. Menyembunyikannya tidak mematikan subtitel AI; berlaku saat menu dibuka kembali."</string>
     <string name="cap_shorts_flyout_title" formatted="false">"Sakelar subtitel AI di menu Shorts"</string>
+    <string name="cap_profiles_title" formatted="false">"Profil API"</string>
+    <string name="cap_profile_default" formatted="false">"Konfigurasi awal"</string>
+    <string name="cap_profile_name" formatted="false">"Nama profil"</string>
+    <string name="cap_profile_rename" formatted="false">"Ubah nama"</string>
+    <string name="cap_profile_add" formatted="false">"Tambah profil"</string>
+    <string name="cap_profiles_summary" formatted="false">"Pilih profil untuk mengaktifkan dan mengeditnya di bawah. Profil lain tetap tersimpan. Isi alamat, kunci, dan model untuk profil baru."</string>
+    <string name="cap_profile_name_error" formatted="false">"Masukkan nama sepanjang 1–60 karakter"</string>
+    <string name="cap_profile_limit" formatted="false">"Maksimal 30 profil dapat disimpan"</string>
+    <string name="cap_profile_invalid_edits" formatted="false">"Perbaiki isian yang belum selesai sebelum berganti profil"</string>
+    <string name="cap_profile_add_failed" formatted="false">"Tidak dapat menambah profil. Periksa isian dan batas 30 profil."</string>
 </resources>

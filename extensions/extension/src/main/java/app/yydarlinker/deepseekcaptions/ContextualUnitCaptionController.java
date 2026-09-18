@@ -869,7 +869,8 @@ static void setMainActivity(Activity activity) {
                         }
 
                         @Override public void onQualityEvidence(JSONObject source,String response,String metadata) {
-                            if(!isCancelled())CaptionQualityTrace.record(session.context,session.config.apiKey,request.sequence,source,response,metadata);
+                            if(!isCancelled())CaptionQualityTrace.record(session.context,session.config.apiKey,request.sequence,source,response,
+                                    "session="+session.id+";owner_sha256="+CaptionQualityTrace.digest(session.videoId)+";"+metadata);
                         }
 
                         @Override public void onRequestBodySent() {

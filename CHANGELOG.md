@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.7...v1.3.0) (2026-09-18)
+
+### ✨ New Features
+
+* add isolated named API profiles and provider-aware endpoint support ([4786edc](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/4786edc92dda16de6dfef53fc53d47b0f55412b6))
+
 ## [1.2.7](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.6...v1.2.7) (2026-09-16)
 
 ### 🐛 Bug Fixes

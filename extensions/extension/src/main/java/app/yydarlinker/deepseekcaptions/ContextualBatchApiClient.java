@@ -259,13 +259,19 @@ final class ContextualBatchApiClient {
         return text;
     }
     static String boundedContext(List<String> values,boolean before) {
-        String text=String.join(" ",values);
-        int limit=160;
-        if(text.length()<=limit) return text;
-        if(before) {int start=text.length()-limit;if(Character.isLowSurrogate(text.charAt(start)))start++;
-            text=text.substring(start);int space=text.indexOf(' ');return space<0 ? text : text.substring(space+1);}
-        int end=limit;if(Character.isHighSurrogate(text.charAt(end-1)))end--;
-        text=text.substring(0,end);int space=text.lastIndexOf(' ');return space<0 ? text : text.substring(0,space);
+        String text=String.join(" ",values).trim();int preferred=160,hard=320;
+        if(text.length()<=preferred)return text;
+        if(before){
+            int base=Math.max(0,text.length()-hard),ideal=text.length()-preferred;
+            // Nearest preceding complete sentence, rather than the tail of a negation/relative clause.
+            for(int i=ideal;i>=base;i--)if(SentenceBoundaryUtil.strong(text,i))return text.substring(i+1).trim();
+            if(text.length()<=hard&&SemanticTaskPlanner.terminal(text))return text;
+            int at=ideal;if(at>0&&Character.isLowSurrogate(text.charAt(at)))at++;
+            int space=text.indexOf(' ',at);return space<0?text.substring(at):text.substring(space+1);
+        }
+        for(int i=preferred;i<Math.min(hard,text.length());i++)if(SentenceBoundaryUtil.strong(text,i))return text.substring(0,i+1).trim();
+        int at=preferred;if(Character.isHighSurrogate(text.charAt(at-1)))at--;
+        int space=text.lastIndexOf(' ',at);return text.substring(0,space<0?at:space).trim();
     }
 
     private static Result parse(

@@ -83,4 +83,16 @@ public class SemanticQuality134Test {
         assertEquals("json_schema",r.getJSONObject("response_format").getString("type"));assertEquals(0,r.getInt("presence_penalty"));assertFalse(r.has("temperature"));assertFalse(r.getBoolean("enable_thinking"));
         assertTrue(ProviderRequestPolicy.removeOptional(r,"response_format_unsupported"));assertEquals("json_object",r.getJSONObject("response_format").getString("type"));assertEquals(1500,r.getInt("max_tokens"));
     }
+
+    @Test public void qualityRepairSharesCapAndStopsAfterOnePerTask(){
+        assertTrue(CaptionRepairBudget.allow(0,0,1));assertFalse(CaptionRepairBudget.allow(1,1,2));
+        assertFalse(CaptionRepairBudget.allow(0,4,1));assertFalse(CaptionRepairBudget.allow(0,1,3));
+        assertEquals(3,AnchoredRetryPolicy.MAX_FAILURES);
+    }
+    @Test public void contextExtendsOnlyToFinishSentenceWithinHardBound(){
+        String sentence=String.join(" ",Collections.nCopies(30,"context"))+".";
+        String r=ContextualBatchApiClient.boundedContext(Arrays.asList(sentence),false);
+        assertEquals(sentence,r);assertTrue(r.length()<=320);
+        assertTrue(ContextualBatchApiClient.boundedContext(Arrays.asList(String.join(" ",Collections.nCopies(100,"context"))),false).length()<=160);
+    }
 }

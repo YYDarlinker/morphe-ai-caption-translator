@@ -13,9 +13,11 @@ public class Takeover124Test {
   Method m=CaptionOverlay.class.getDeclaredMethod("configure",FrameLayout.class,TextView.class,Activity.class,Rect.class);m.setAccessible(true);m.invoke(null,anchor,view,a,new Rect(0,0,360,240));assertEquals(2,view.getMaxLines());
   Method count=CaptionOverlay.class.getDeclaredMethod("lineCount",Activity.class,String.class,float.class,int.class);count.setAccessible(true);
   int width=Math.round(360*.90f)-view.getPaddingLeft()-view.getPaddingRight();
-  assertTrue("Full paragraph must fit rather than hiding its tail",(Integer)count.invoke(null,a,view.getText().toString(),view.getTextSize()/a.getResources().getDisplayMetrics().scaledDensity,width)<=2);
+  assertTrue("Displayed fallback must fit without clipping",(Integer)count.invoke(null,a,view.getText().toString(),view.getTextSize()/a.getResources().getDisplayMetrics().scaledDensity,width)<=2);
   assertNotNull(view.getLayout());assertTrue(view.getLayout().getLineCount()<=2);
-  assertEquals("The actual TextView layout must retain the translated tail",view.getText().length(),view.getLayout().getLineEnd(view.getLayout().getLineCount()-1));
+  assertEquals("The actual TextView must retain the fallback tail",view.getText().length(),view.getLayout().getLineEnd(view.getLayout().getLineCount()-1));
+  assertFalse(view.getText().toString().contains("relevance"));
+  assertTrue(view.getTextSize()/a.getResources().getDisplayMetrics().scaledDensity>=SubtitleStyleMetrics.scaledSp(DeepSeekConfig.MIN_CAPTION_TEXT_SIZE,360)-.01f);
   p.set(null,"");a.finish();
  }
  @Test public void backgroundSourceFetchCannotTakeOverVisibleShort(){

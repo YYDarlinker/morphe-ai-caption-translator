@@ -702,7 +702,7 @@ static void setMainActivity(Activity activity) {
         List<Integer> indices = new ArrayList<>();
         for (int i = current; i < session.units.size() && indices.size() < maximum; i++) {
             TranslationUnitTimeline.Unit unit = session.units.get(i);
-            if (i > current && unit.startMs > horizon) break;
+            if (i > current && (unit.startMs > horizon || unit.endMs-session.units.get(current).startMs>BACKGROUND_BATCH_SPAN_MS)) break;
             int state = session.states[i];
             if (state == READY || state == IN_FLIGHT || state == PERMANENT_FAILURE) {
                 if (i == current) return null;
@@ -1197,10 +1197,10 @@ static void setMainActivity(Activity activity) {
         recordFailureLocked(session, index, reason);
         int failures = session.failureCounts[index];
         if(CaptionQualityPolicy.failure(reason)) {
-            boolean repeated=session.qualityRepairs[index]++>0;
+            int priorTaskRepairs=session.qualityRepairs[index]++;
             // At most one quality-only repair per task and four per playback session. Other
             // errors still share the existing three-failure budget; no speculative duplicate.
-            if(repeated || session.qualityRepairCount>=4) {
+            if(!CaptionRepairBudget.allow(priorTaskRepairs,session.qualityRepairCount,failures)) {
                 session.states[index]=PERMANENT_FAILURE;session.retryAfterMs[index]=Long.MAX_VALUE;
                 CaptionDiagnostics.mark(session.context,"CAPTION_QUALITY_FALLBACK","unit="+index+";quality_repair_budget_exhausted=true");
                 return;
@@ -1534,8 +1534,9 @@ static void setMainActivity(Activity activity) {
     private static String overflowSource(Session session,long timeMs,long generation) {
         synchronized(session.lock) {
             if(!isCurrent(session)||session.cancelled||session.generation!=generation)return "";
-            int i=anchor(session.units,timeMs);if(i<0||i>=session.units.size())return "";
-            return CaptionFailureFallback.compactText(session.atoms,session.units.get(i),timeMs);
+            long current=session.currentTimeMs;
+            int i=anchor(session.units,current);if(i<0||i>=session.units.size())return "";
+            return CaptionFailureFallback.compactText(session.atoms,session.units.get(i),current);
         }
     }
 

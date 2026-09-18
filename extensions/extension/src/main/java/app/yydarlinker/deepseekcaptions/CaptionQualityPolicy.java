@@ -10,6 +10,8 @@ final class CaptionQualityPolicy {
             int chars=CaptionPresentationPolicy.visible(s.text);long ms=s.endMs-s.startMs;
             boolean cjk=CaptionPresentationPolicy.cjk(s.text);
             boolean clauses=s.text.matches("(?s).+[。！？!?，,；;].+");
+            if(!clauses)for(int i=unit.fromAtom+s.from;i<unit.fromAtom+s.to;i++)
+                if(SemanticTaskPlanner.boundaryEvidence(atoms,i)>=2 && SemanticTaskPlanner.safeBoundary(atoms,i)){clauses=true;break;}
             if(clauses && chars>(cjk?42:100) && (ms>7000 || chars>(cjk?64:170)))return PREFIX+"paragraph_needs_source_aligned_clauses";
             if(ms<950 && s.to<unit.toAtom-unit.fromAtom && dependent(s.text))return PREFIX+"orphan_fragment";
         }

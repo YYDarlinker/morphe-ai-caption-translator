@@ -72,7 +72,7 @@ final class SemanticTaskPlanner {
                 "is","am","are","was","were","be","been","being","have","has","had","do","does","did",
                 "can","could","will","would","should","must","may","might","not","never","no","very","more","most").contains(left))return false;
         if(Arrays.asList("of","to","is","are","was","were","has","have","can","will","would","should","which","whose").contains(right))return false;
-        if(left.matches(".*\\d.*") || left.endsWith("-") || left.endsWith("'s"))return false;
+        if(left.matches("[+-]?\\d+(?:[.,]\\d+)*(?:st|nd|rd|th)?") || left.endsWith("-") || left.endsWith("'s"))return false;
         String prior=at(a,i-1);
         // Do not strand the object of a determiner/negation or a modifier of the next noun.
         if(Arrays.asList("a","an","the","this","that","these","those","not","never").contains(prior))return false;

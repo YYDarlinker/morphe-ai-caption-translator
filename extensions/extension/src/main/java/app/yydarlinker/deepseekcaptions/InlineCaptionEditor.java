@@ -5,14 +5,20 @@ import android.view.*;
 import android.widget.EditText;
 /** Inline Android floating text actions, independent of the preference row's long-click handling. */
 public final class InlineCaptionEditor extends EditText {
+    private CaptionEditorViewport viewport;
     private ActionMode actions;private boolean sensitive;private float downX,downY;
     public InlineCaptionEditor(Context c){super(c);setFocusable(true);setFocusableInTouchMode(true);setLongClickable(true);setCursorVisible(true);
         setShowSoftInputOnFocus(true);setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);}
+    @Override public android.view.inputmethod.InputConnection onCreateInputConnection(android.view.inputmethod.EditorInfo info){
+        android.view.inputmethod.InputConnection connection=super.onCreateInputConnection(info);
+        info.imeOptions |= android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+        return connection;
+    }
     public void sensitive(boolean value){sensitive=value;}
     @Override public boolean onTouchEvent(android.view.MotionEvent e){
         if(e.getActionMasked()==MotionEvent.ACTION_UP){
             performClick();requestFocus();android.view.inputmethod.InputMethodManager ime=(android.view.inputmethod.InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if(ime!=null)post(()->ime.showSoftInput(this,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT));
+            if(ime!=null)post(()->{ime.showSoftInput(this,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);if(viewport!=null)viewport.reveal();});
         }
         if(e.getActionMasked()==MotionEvent.ACTION_DOWN){downX=e.getX();downY=e.getY();requestFocus();if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);}
         if(e.getActionMasked()==MotionEvent.ACTION_MOVE && Math.abs(e.getY()-downY)>ViewConfiguration.get(getContext()).getScaledTouchSlop()
@@ -38,5 +44,17 @@ public final class InlineCaptionEditor extends EditText {
         },ActionMode.TYPE_FLOATING);
         return actions!=null || super.performLongClick();
     }
-    @Override protected void onDetachedFromWindow(){if(actions!=null)actions.finish();super.onDetachedFromWindow();}
+    @Override protected void onAttachedToWindow(){
+        super.onAttachedToWindow();viewport=new CaptionEditorViewport(this);viewport.attach();
+    }
+    @Override protected void onFocusChanged(boolean focused,int direction,Rect previous){
+        super.onFocusChanged(focused,direction,previous);if(viewport!=null)viewport.focus(focused);
+    }
+    @Override protected void onSelectionChanged(int start,int end){
+        super.onSelectionChanged(start,end);if(viewport!=null)viewport.reveal();
+    }
+    @Override protected void onDetachedFromWindow(){
+        if(viewport!=null){viewport.detach();viewport=null;}
+        if(actions!=null)actions.finish();super.onDetachedFromWindow();
+    }
 }

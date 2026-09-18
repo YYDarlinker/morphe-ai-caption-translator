@@ -98,9 +98,21 @@
     <string name="cap_profile_name" formatted="false">"Название профиля"</string>
     <string name="cap_profile_rename" formatted="false">"Переименовать"</string>
     <string name="cap_profile_add" formatted="false">"Добавить профиль"</string>
-    <string name="cap_profiles_summary" formatted="false">"Выберите профиль для активации и редактирования ниже. Другие профили сохраняются. Для нового профиля укажите адрес, ключ и модель."</string>
+    <string name="cap_profiles_summary" formatted="false">"Управление текущим профилем"</string>
     <string name="cap_profile_name_error" formatted="false">"Введите название длиной 1–60 символов"</string>
     <string name="cap_profile_limit" formatted="false">"Можно сохранить до 30 профилей"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Исправьте незавершённые поля перед сменой профиля"</string>
     <string name="cap_profile_add_failed" formatted="false">"Не удалось добавить профиль. Проверьте поля и ограничение в 30 профилей."</string>
+    <string name="cap_profile_manage" formatted="false">"Управление текущим профилем"</string>
+    <string name="cap_profile_close" formatted="false">"Закрыть"</string>
+    <string name="cap_profile_save" formatted="false">"Сохранить"</string>
+    <string name="cap_profile_current" formatted="false">"Текущий профиль"</string>
+    <string name="cap_profile_delete" formatted="false">"Удалить профиль"</string>
+    <string name="cap_profile_clear_key" formatted="false">"Очистить API-ключ этого профиля"</string>
+    <string name="cap_profile_keep_one" formatted="false">"Должен остаться хотя бы один профиль. Можно очистить его API-ключ."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Новый профиль содержит стандартные требования к переводу, но не ключ и модель. Заполните поля на странице настроек."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Удаляет с устройства адрес, модель, требования к переводу и зашифрованный ключ этого профиля. Другие профили и настройки субтитров сохраняются. При удалении активного профиля включается первый оставшийся. Отменить действие нельзя."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Очищает только сохранённый ключ и несохранённый ввод ключа этого профиля. Адрес, модель и требования сохраняются. Другие профили не затрагиваются. Ключ у провайдера не отзывается."</string>
+    <string name="cap_prompt_summary" formatted="false">"Сохраняется отдельно для каждого профиля. Очистите поле для стандартных требований на языке интерфейса. Пользовательские требования автоматически не переводятся."</string>
+    <string name="cap_default_prompt" formatted="false">"Переводи точно, естественно и кратко на целевой язык, используя свойственные ему выражения. Сохраняй имена, термины, числа, тон и необходимые знаки препинания. Не добавляй пояснений, которых нет в оригинале."</string>
 </resources>

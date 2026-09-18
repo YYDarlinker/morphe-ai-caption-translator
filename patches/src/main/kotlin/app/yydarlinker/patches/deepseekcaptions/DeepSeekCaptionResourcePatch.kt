@@ -219,7 +219,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         TEXT_PREF_CLASS,
                         "deepseek_caption_prompt",
                         "翻译要求",
-                        "仅自动翻译模式调用 API；原字幕原文显示",
+                        "各方案独立保存；清空恢复随界面语言变化的默认要求",
                     )
                 }
 
@@ -251,11 +251,6 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                         ACTION_PREF_CLASS,
                         "deepseek_caption_clear_cache",
                         "清除字幕缓存",
-                    )
-                    addPreference(
-                        ACTION_PREF_CLASS,
-                        "deepseek_caption_delete_key",
-                        "删除 API Key",
                     )
                     addPreference(
                         DISPLAY_TEXT_DEBUG_PREF_CLASS,

@@ -61,17 +61,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             SourceCaptionCache.clear(context);
             toast("字幕缓存已清除");
         } else if (KEY_DELETE_KEY.equals(key)) {
-            new AlertDialog.Builder(context)
-                    .setTitle(CaptionStrings.localize(getContext(), "删除 API Key？"))
-                    .setMessage("只删除本机加密保存的 API Key，不修改其他设置。")
-                    .setNegativeButton("取消", null)
-                    .setPositiveButton("删除", (dialog, which) -> {
-                        SecureApiKey.clear(context);
-                        DeepSeekModelPreference.onCredentialsChanged(context);
-                        DynamicCaptionController.refreshConfiguration(context);
-                        toast("API Key 已删除");
-                    })
-                    .show();
+            new ApiProfilesPreference(context).showProfiles();
         } else if (KEY_CLEAR_DIAGNOSTICS.equals(key)) {
             CaptionDiagnostics.clear(context);
             toast("诊断记录已清空");
@@ -79,6 +69,9 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
     }
 
     private void testApi() {
+        if(!ApiProfiles.flushCurrent()){
+            toast(CaptionStrings.settings(getContext(),"profile_invalid_edits"));return;
+        }
         DeepSeekConfig.Snapshot config = DeepSeekConfig.load(getContext());
         if (config.apiKey.isEmpty()) {
             toast("请先填写 API Key");

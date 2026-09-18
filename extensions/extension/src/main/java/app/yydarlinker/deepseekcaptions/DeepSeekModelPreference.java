@@ -67,6 +67,8 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     private Spinner choices;
     private String lastCommitted = "";
     private String boundProfile="";
+    private View boundView;
+    private long boundRevision=-1;
     private volatile int fetchGeneration;
     private boolean populatingChoices;
 
@@ -114,7 +116,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
 
     @Override
     public View getView(View convertView, ViewGroup parent) {
-        View safe = convertView != null && (KEY_MODEL+ApiProfiles.active(getContext())).equals(convertView.getTag())
+        View safe = convertView != null && convertView == boundView && boundRevision==ApiProfiles.revision() && boundProfile.equals(ApiProfiles.active(getContext())) && (KEY_MODEL+boundProfile).equals(convertView.getTag())
                 ? convertView
                 : null;
         return super.getView(safe, parent);
@@ -122,8 +124,12 @@ public final class DeepSeekModelPreference extends android.preference.Preference
 
     @Override
     protected View onCreateView(ViewGroup parent) {
+        ApiProfiles.register(this);
+        // Commit before a scroll-induced recreation; the old debounce must not be discarded.
+        flushProfile();
         cancelPendingSave();
         boundProfile=ApiProfiles.active(getContext());
+        boundRevision=ApiProfiles.revision();
         active = new WeakReference<>(this);
         Context context = getContext();
         if (parent instanceof ListView) {
@@ -132,6 +138,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         }
 
         LinearLayout root = new LinearLayout(context);
+        boundView = root;
         root.setTag(KEY_MODEL+boundProfile);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
@@ -230,12 +237,14 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         editor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
             @Override public void onViewAttachedToWindow(View view) {
                 if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
+                ApiProfiles.register(DeepSeekModelPreference.this);
                 active = new WeakReference<>(DeepSeekModelPreference.this);
                 if (refresh != null) refresh.setEnabled(true);
                 showCachedOrFetch();
             }
 
             @Override public void onViewDetachedFromWindow(View view) {
+                if(view==editor)ApiProfiles.unregister(DeepSeekModelPreference.this);
                 if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
                 commitNow(((EditText) view).getText().toString(), false);
                 fetchGeneration++;
@@ -249,7 +258,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     private void showCachedOrFetch() {
-        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
+        if(boundRevision!=ApiProfiles.revision() || !boundProfile.equals(ApiProfiles.active(getContext())))return;
         DeepSeekConfig.Snapshot config = DeepSeekConfig.load(getContext());
         if (config.apiKey.isEmpty()) {
             setState("填写 API 地址和 API Key 后会自动获取；仍可手动输入", false);
@@ -271,7 +280,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     private void fetchModels(boolean userInitiated) {
-        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
+        if(boundRevision!=ApiProfiles.revision() || !boundProfile.equals(ApiProfiles.active(getContext())))return;
         DeepSeekConfig.Snapshot config = DeepSeekConfig.load(getContext());
         if (config.apiKey.isEmpty()) {
             setState("请先填写 API Key；模型也可手动输入", true);
@@ -364,7 +373,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     private void commit(String raw, boolean reportInvalid) {
-        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
+        if(boundRevision!=ApiProfiles.revision() || !boundProfile.equals(ApiProfiles.active(getContext())))return;
         String value = raw == null ? "" : raw.trim();
         if (value.equals(lastCommitted)) return;
         try {
@@ -388,7 +397,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
     }
 
     @Override public boolean flushProfile(){
-        if(editor==null||!boundProfile.equals(ApiProfiles.active(getContext())))return true;
+        if(editor==null||boundRevision!=ApiProfiles.revision()||!boundProfile.equals(ApiProfiles.active(getContext())))return true;
         String value=editor.getText().toString().trim();commitNow(value,true);
         return value.equals(lastCommitted);
     }
@@ -396,7 +405,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         cancelPendingSave();
         fetchGeneration++;
         if(pendingCredentialRefresh!=null)main.removeCallbacks(pendingCredentialRefresh);
-        boundProfile="";lastCommitted="";
+        boundProfile="";boundView=null;lastCommitted="";
         if(editor!=null){editor.setText("");editor.clearFocus();}
         notifyChanged();
     }

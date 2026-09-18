@@ -11,6 +11,7 @@ static final String[][] SOURCES={
 {"根据 API 地址和 Key 自动获取，也可手动输入","model_hint"},
 {"已启用；从自动翻译选择任意语言即可启动 AI 字幕","message_2c107e436145"},
 {"原字幕可直接显示；自动翻译需填写 API Key","message_1cc3c4b0aab0"},
+{"各方案独立保存；清空恢复随界面语言变化的默认要求","prompt_summary"},
 {"无法新增方案，请检查输入及 30 套方案上限。","profile_add_failed"},
 {"点按画面切换方向 · 字号与背景设置实时预览","preview_hint"},
 {"0% 为透明，100% 为不透明；松手保存","opacity_hint"},
@@ -233,10 +234,22 @@ static final String[][] ENGLISH={
 {"profile_name","Profile name"},
 {"profile_rename","Rename"},
 {"profile_add","Add profile"},
-{"profiles_summary","Select a profile to activate and edit it below. Other profiles are retained. New profiles have no key; configure the address, key and model before playback."},
+{"profiles_summary","Manage current profile"},
 {"profile_name_error","Enter a name of 1–60 characters"},
 {"profile_limit","Up to 30 profiles can be saved"},
 {"profile_invalid_edits","Correct the current unfinished fields before switching profiles"},
-{"profile_add_failed","Unable to add profile. Check the fields and the 30-profile limit."}
+{"profile_add_failed","Unable to add profile. Check the fields and the 30-profile limit."},
+{"profile_manage","Manage current profile"},
+{"profile_close","Close"},
+{"profile_save","Save"},
+{"profile_current","Current profile"},
+{"profile_delete","Delete profile"},
+{"profile_clear_key","Clear this profile’s API key"},
+{"profile_keep_one","Keep at least one profile. You can clear its API key instead."},
+{"profile_new_summary","New profiles use default translation requirements and have no API key or model. Complete the fields on the settings page."},
+{"profile_delete_summary","Delete this profile’s address, model, translation requirements and encrypted key from this device. Other profiles and subtitle settings are kept. If active, the first remaining profile becomes active. This cannot be undone."},
+{"profile_clear_key_summary","Clear only this profile’s saved key and any unsaved key entry. Keep its address, model and translation requirements. Other profiles are unchanged. This does not revoke the key with the provider."},
+{"prompt_summary","Saved per profile. Clear to restore defaults that follow the interface language. Custom requirements are never translated automatically."},
+{"default_prompt","Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source."}
 };
 }

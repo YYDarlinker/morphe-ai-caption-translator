@@ -1,5 +1,9 @@
 # 1.3.0 — named API profiles and provider-aware endpoints
 
+> Historical implementation notes. The provider matrix and credential boundaries still apply.
+> The profile UI and editor lifecycle described below are superseded by
+> [the 1.3.1 compact settings revision](API-PROFILES-UI-1.3.1.md).
+
 ## Settings and migration
 
 YouTube → Settings → Morphe → AI caption translator → API configuration.

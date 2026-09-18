@@ -98,9 +98,21 @@
     <string name="cap_profile_name" formatted="false">"Nombre del perfil"</string>
     <string name="cap_profile_rename" formatted="false">"Renombrar"</string>
     <string name="cap_profile_add" formatted="false">"Añadir perfil"</string>
-    <string name="cap_profiles_summary" formatted="false">"Seleccione un perfil para activarlo y editarlo abajo. Los demás se conservan. Configure la dirección, clave y modelo del nuevo perfil."</string>
+    <string name="cap_profiles_summary" formatted="false">"Gestionar perfil actual"</string>
     <string name="cap_profile_name_error" formatted="false">"Introduzca un nombre de 1 a 60 caracteres"</string>
     <string name="cap_profile_limit" formatted="false">"Se pueden guardar hasta 30 perfiles"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Corrija los campos incompletos antes de cambiar de perfil"</string>
     <string name="cap_profile_add_failed" formatted="false">"No se pudo añadir el perfil. Revise los campos y el límite de 30 perfiles."</string>
+    <string name="cap_profile_manage" formatted="false">"Gestionar perfil actual"</string>
+    <string name="cap_profile_close" formatted="false">"Cerrar"</string>
+    <string name="cap_profile_save" formatted="false">"Guardar"</string>
+    <string name="cap_profile_current" formatted="false">"Perfil actual"</string>
+    <string name="cap_profile_delete" formatted="false">"Eliminar perfil"</string>
+    <string name="cap_profile_clear_key" formatted="false">"Borrar la clave API de este perfil"</string>
+    <string name="cap_profile_keep_one" formatted="false">"Conserve al menos un perfil. Puede borrar su clave API."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Los perfiles nuevos incluyen instrucciones predeterminadas, sin clave ni modelo. Complete los campos en ajustes."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Elimina de este dispositivo la dirección, el modelo, las instrucciones y la clave cifrada de este perfil. Conserva los demás perfiles y los ajustes de subtítulos. Si está activo, se activa el primer perfil restante. No se puede deshacer."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Borra solo la clave guardada y la entrada de clave sin guardar de este perfil. Conserva la dirección, el modelo y las instrucciones. No afecta a otros perfiles ni revoca la clave en el proveedor."</string>
+    <string name="cap_prompt_summary" formatted="false">"Se guarda por perfil. Vacíe el campo para recuperar las instrucciones predeterminadas en el idioma de la interfaz. Las instrucciones personalizadas no se traducen automáticamente."</string>
+    <string name="cap_default_prompt" formatted="false">"Traduce de forma fiel, natural y concisa al idioma de destino, con expresiones propias de hablantes nativos. Conserva nombres, términos, números, tono y puntuación necesaria. No añadas explicaciones ausentes del original."</string>
 </resources>

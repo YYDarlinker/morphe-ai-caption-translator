@@ -18,7 +18,10 @@ final class CaptionSettingsStyle {
         TypedArray a=c.obtainStyledAttributes(new int[]{attr});
         try{return a.getColor(0,fallback);}finally{a.recycle();}
     }
-    static int primary(Context c){return color(c,android.R.attr.textColorPrimary,Color.DKGRAY);}
+    static int primary(Context c){
+        try{return (Integer)Class.forName("app.morphe.extension.shared.theme.ThemeUtils").getMethod("getAppForegroundColor").invoke(null);}
+        catch(ReflectiveOperationException | LinkageError unavailable){return color(c,android.R.attr.textColorPrimary,Color.DKGRAY);}
+    }
     static int secondary(Context c){return color(c,android.R.attr.textColorSecondary,primary(c));}
     static int tint(int color,int alpha){return (color&0x00ffffff)|(alpha<<24);}
     static void row(View view){Context c=view.getContext();view.setPadding(dp(c,20),dp(c,12),dp(c,20),dp(c,12));}

@@ -98,9 +98,21 @@
     <string name="cap_profile_name" formatted="false">"Tên hồ sơ"</string>
     <string name="cap_profile_rename" formatted="false">"Đổi tên"</string>
     <string name="cap_profile_add" formatted="false">"Thêm hồ sơ"</string>
-    <string name="cap_profiles_summary" formatted="false">"Chọn hồ sơ để kích hoạt và chỉnh sửa bên dưới. Các hồ sơ khác được giữ lại. Nhập địa chỉ, khóa và mô hình cho hồ sơ mới."</string>
+    <string name="cap_profiles_summary" formatted="false">"Quản lý hồ sơ hiện tại"</string>
     <string name="cap_profile_name_error" formatted="false">"Nhập tên dài từ 1 đến 60 ký tự"</string>
     <string name="cap_profile_limit" formatted="false">"Có thể lưu tối đa 30 hồ sơ"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Sửa các trường chưa hoàn tất trước khi đổi hồ sơ"</string>
     <string name="cap_profile_add_failed" formatted="false">"Không thể thêm hồ sơ. Kiểm tra các trường và giới hạn 30 hồ sơ."</string>
+    <string name="cap_profile_manage" formatted="false">"Quản lý hồ sơ hiện tại"</string>
+    <string name="cap_profile_close" formatted="false">"Đóng"</string>
+    <string name="cap_profile_save" formatted="false">"Lưu"</string>
+    <string name="cap_profile_current" formatted="false">"Hồ sơ hiện tại"</string>
+    <string name="cap_profile_delete" formatted="false">"Xóa hồ sơ"</string>
+    <string name="cap_profile_clear_key" formatted="false">"Xóa khóa API của hồ sơ này"</string>
+    <string name="cap_profile_keep_one" formatted="false">"Giữ lại ít nhất một hồ sơ. Bạn có thể xóa khóa API của hồ sơ đó."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Hồ sơ mới có hướng dẫn dịch mặc định, không sao chép khóa hay mô hình. Điền các trường trên trang cài đặt sau khi tạo."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Xóa địa chỉ, mô hình, hướng dẫn dịch và khóa mã hóa của hồ sơ này khỏi thiết bị. Giữ các hồ sơ khác và cài đặt phụ đề. Nếu đang dùng, hồ sơ đầu tiên còn lại sẽ được kích hoạt. Không thể hoàn tác."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Chỉ xóa khóa đã lưu và phần nhập khóa chưa lưu của hồ sơ này. Giữ địa chỉ, mô hình, hướng dẫn và các hồ sơ khác. Không thu hồi khóa ở phía nhà cung cấp."</string>
+    <string name="cap_prompt_summary" formatted="false">"Lưu riêng theo hồ sơ. Để trống để khôi phục hướng dẫn mặc định theo ngôn ngữ giao diện. Hướng dẫn tùy chỉnh không được dịch tự động."</string>
+    <string name="cap_default_prompt" formatted="false">"Dịch trung thực, tự nhiên và súc tích sang ngôn ngữ đích bằng cách diễn đạt bản ngữ. Giữ nguyên tên, thuật ngữ, số liệu, giọng điệu và dấu câu cần thiết. Không thêm giải thích không có trong bản gốc."</string>
 </resources>

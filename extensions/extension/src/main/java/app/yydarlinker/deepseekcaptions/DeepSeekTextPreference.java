@@ -37,6 +37,9 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
     private TextView state;
     private String lastCommitted = "";
     private String boundProfile="";
+    private View boundView;
+    private long boundRevision=-1;
+    private String boundDefaultPrompt="";
 
     public DeepSeekTextPreference(Context context) {
         super(context);
@@ -74,7 +77,7 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
         // Android groups rows of the same Preference subclass into one recycle pool. These rows
         // contain different editors (URL/key/prompt), so only reuse this exact field's view.
         String key = getKey();
-        View safeView = convertView != null && key != null && (key+ApiProfiles.active(getContext())).equals(convertView.getTag())
+        View safeView = convertView != null && convertView == boundView && boundRevision==ApiProfiles.revision() && (!KEY_PROMPT.equals(key) || boundDefaultPrompt.equals(DeepSeekConfig.defaultPrompt(getContext()))) && boundProfile.equals(ApiProfiles.active(getContext())) && key != null && (key+boundProfile).equals(convertView.getTag())
                 ? convertView
                 : null;
         View bound=super.getView(safeView,parent);
@@ -85,14 +88,20 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
 
     @Override
     protected View onCreateView(ViewGroup parent) {
+        ApiProfiles.register(this);
+        // Commit before a scroll-induced recreation; the old debounce must not be discarded.
+        flushProfile();
         cancelPendingSave();
         boundProfile=ApiProfiles.active(getContext());
+        boundRevision=ApiProfiles.revision();
+        boundDefaultPrompt=DeepSeekConfig.defaultPrompt(getContext());
         Context context = getContext();
         if (parent instanceof ListView) {
             ((ListView) parent).setItemsCanFocus(true);
             parent.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         }
         LinearLayout root = new LinearLayout(context);
+        boundView = root;
         root.setTag(getKey()+boundProfile);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
@@ -139,6 +148,10 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
             if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
             if (!hasFocus) {
                 String text=editor.getText().toString();commitNow(text,true);
+                if(KEY_PROMPT.equals(getKey()) && text.trim().isEmpty()){
+                    String defaults=DeepSeekConfig.defaultPrompt(getContext());
+                    lastCommitted=defaults.trim();editor.setText(defaults);cancelPendingSave();
+                }
                 // Do not clear text on transient focus loss from Android action mode / keyboard.
             }
         });
@@ -155,9 +168,10 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
             return false;
         });
         editor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-            @Override public void onViewAttachedToWindow(View view) {}
+            @Override public void onViewAttachedToWindow(View view) {if(view==editor)ApiProfiles.register(DeepSeekTextPreference.this);}
 
             @Override public void onViewDetachedFromWindow(View view) {
+                if(view==editor)ApiProfiles.unregister(DeepSeekTextPreference.this);
                 if(view!=editor||!createdProfile.equals(ApiProfiles.active(getContext())))return;
                 commitNow(((EditText) view).getText().toString(), false);
                 if(KEY_API_KEY.equals(getKey())){cancelPendingSave();((EditText)view).setText("");cancelPendingSave();}
@@ -215,7 +229,7 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
     }
 
     private void commit(String raw, boolean reportInvalid) {
-        if(!boundProfile.equals(ApiProfiles.active(getContext())))return;
+        if(boundRevision!=ApiProfiles.revision() || !boundProfile.equals(ApiProfiles.active(getContext())))return;
         String value = raw == null ? "" : raw.trim();
         if (value.equals(lastCommitted)) return;
         if (KEY_API_KEY.equals(getKey()) && value.isEmpty()) return;
@@ -276,13 +290,13 @@ public class DeepSeekTextPreference extends android.preference.Preference implem
     }
 
     @Override public boolean flushProfile(){
-        if(editor==null||!boundProfile.equals(ApiProfiles.active(getContext())))return true;
+        if(editor==null||boundRevision!=ApiProfiles.revision()||!boundProfile.equals(ApiProfiles.active(getContext())))return true;
         String value=editor.getText().toString().trim();commitNow(value,true);
         return value.equals(lastCommitted) || (KEY_API_KEY.equals(getKey())&&value.isEmpty());
     }
     @Override public void profileChanged(){
         cancelPendingSave();
-        boundProfile="";lastCommitted="";
+        boundProfile="";boundView=null;lastCommitted="";
         if(editor!=null){editor.setText("");editor.clearFocus();}
         notifyChanged();
     }

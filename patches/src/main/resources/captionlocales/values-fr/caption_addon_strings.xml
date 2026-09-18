@@ -98,9 +98,21 @@
     <string name="cap_profile_name" formatted="false">"Nom du profil"</string>
     <string name="cap_profile_rename" formatted="false">"Renommer"</string>
     <string name="cap_profile_add" formatted="false">"Ajouter un profil"</string>
-    <string name="cap_profiles_summary" formatted="false">"Sélectionnez un profil pour l’activer et le modifier ci-dessous. Les autres sont conservés. Configurez l’adresse, la clé et le modèle du nouveau profil."</string>
+    <string name="cap_profiles_summary" formatted="false">"Gérer le profil actuel"</string>
     <string name="cap_profile_name_error" formatted="false">"Saisissez un nom de 1 à 60 caractères"</string>
     <string name="cap_profile_limit" formatted="false">"Vous pouvez enregistrer jusqu’à 30 profils"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Corrigez les champs incomplets avant de changer de profil"</string>
     <string name="cap_profile_add_failed" formatted="false">"Impossible d’ajouter un profil. Vérifiez les champs et la limite de 30 profils."</string>
+    <string name="cap_profile_manage" formatted="false">"Gérer le profil actuel"</string>
+    <string name="cap_profile_close" formatted="false">"Fermer"</string>
+    <string name="cap_profile_save" formatted="false">"Enregistrer"</string>
+    <string name="cap_profile_current" formatted="false">"Profil actuel"</string>
+    <string name="cap_profile_delete" formatted="false">"Supprimer le profil"</string>
+    <string name="cap_profile_clear_key" formatted="false">"Effacer la clé API de ce profil"</string>
+    <string name="cap_profile_keep_one" formatted="false">"Conservez au moins un profil. Vous pouvez effacer sa clé API."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Les nouveaux profils ont des consignes par défaut, sans clé ni modèle. Complétez les champs dans les paramètres."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Supprime de cet appareil l’adresse, le modèle, les consignes et la clé chiffrée de ce profil. Les autres profils et réglages des sous-titres sont conservés. Si ce profil est actif, le premier profil restant est activé. Cette action est irréversible."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Efface uniquement la clé enregistrée et la saisie de clé non enregistrée de ce profil. L’adresse, le modèle et les consignes restent inchangés, ainsi que les autres profils. La clé n’est pas révoquée auprès du fournisseur."</string>
+    <string name="cap_prompt_summary" formatted="false">"Enregistré par profil. Effacez pour retrouver les consignes par défaut dans la langue de l’interface. Les consignes personnalisées ne sont pas traduites automatiquement."</string>
+    <string name="cap_default_prompt" formatted="false">"Traduis fidèlement, naturellement et avec concision dans la langue cible, avec des tournures idiomatiques. Préserve les noms, la terminologie, les nombres, le ton et la ponctuation nécessaire. N’ajoute pas d’explications absentes du texte source."</string>
 </resources>

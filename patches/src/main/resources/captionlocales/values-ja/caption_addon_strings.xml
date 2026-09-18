@@ -98,9 +98,21 @@
     <string name="cap_profile_name" formatted="false">"プロファイル名"</string>
     <string name="cap_profile_rename" formatted="false">"名前を変更"</string>
     <string name="cap_profile_add" formatted="false">"プロファイルを追加"</string>
-    <string name="cap_profiles_summary" formatted="false">"選択したプロファイルが有効になり、下で編集できます。他の設定は保持されます。新規設定にはアドレス、キー、モデルを入力してください。"</string>
+    <string name="cap_profiles_summary" formatted="false">"現在のプロファイルを管理"</string>
     <string name="cap_profile_name_error" formatted="false">"1～60 文字の名前を入力してください"</string>
     <string name="cap_profile_limit" formatted="false">"最大 30 件のプロファイルを保存できます"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"切り替える前に未完了の入力を修正してください"</string>
     <string name="cap_profile_add_failed" formatted="false">"追加できません。入力内容と 30 件の上限を確認してください。"</string>
+    <string name="cap_profile_manage" formatted="false">"現在のプロファイルを管理"</string>
+    <string name="cap_profile_close" formatted="false">"閉じる"</string>
+    <string name="cap_profile_save" formatted="false">"保存"</string>
+    <string name="cap_profile_current" formatted="false">"現在のプロファイル"</string>
+    <string name="cap_profile_delete" formatted="false">"プロファイルを削除"</string>
+    <string name="cap_profile_clear_key" formatted="false">"このプロファイルの API キーを消去"</string>
+    <string name="cap_profile_keep_one" formatted="false">"少なくとも1件のプロファイルを残してください。API キーだけを消去できます。"</string>
+    <string name="cap_profile_new_summary" formatted="false">"新規プロファイルには既定の翻訳指示が含まれます。キーやモデルはコピーしません。作成後に設定画面で入力してください。"</string>
+    <string name="cap_profile_delete_summary" formatted="false">"このプロファイルのアドレス、モデル、翻訳指示、暗号化キーを端末から削除します。他のプロファイルと字幕設定は保持します。使用中の場合は残った最初のプロファイルが有効になります。元に戻せません。"</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"このプロファイルの保存済みキーと未保存のキー入力のみ消去します。アドレス、モデル、翻訳指示、他のプロファイルは保持します。提供元でキーを失効させる操作ではありません。"</string>
+    <string name="cap_prompt_summary" formatted="false">"プロファイルごとに保存します。空にすると画面言語に応じた既定の指示に戻ります。独自の指示は自動翻訳しません。"</string>
+    <string name="cap_default_prompt" formatted="false">"対象言語の自然な表現を使い、忠実かつ簡潔に翻訳してください。人名、専門用語、数字、語調、必要な句読点を保持し、原文にない説明を追加しないでください。"</string>
 </resources>

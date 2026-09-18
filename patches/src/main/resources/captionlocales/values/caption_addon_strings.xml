@@ -98,9 +98,21 @@
     <string name="cap_profile_name" formatted="false">"Profile name"</string>
     <string name="cap_profile_rename" formatted="false">"Rename"</string>
     <string name="cap_profile_add" formatted="false">"Add profile"</string>
-    <string name="cap_profiles_summary" formatted="false">"Select a profile to activate and edit it below. Other profiles are retained. New profiles have no key; configure the address, key and model before playback."</string>
+    <string name="cap_profiles_summary" formatted="false">"Manage current profile"</string>
     <string name="cap_profile_name_error" formatted="false">"Enter a name of 1–60 characters"</string>
     <string name="cap_profile_limit" formatted="false">"Up to 30 profiles can be saved"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Correct the current unfinished fields before switching profiles"</string>
     <string name="cap_profile_add_failed" formatted="false">"Unable to add profile. Check the fields and the 30-profile limit."</string>
+    <string name="cap_profile_manage" formatted="false">"Manage current profile"</string>
+    <string name="cap_profile_close" formatted="false">"Close"</string>
+    <string name="cap_profile_save" formatted="false">"Save"</string>
+    <string name="cap_profile_current" formatted="false">"Current profile"</string>
+    <string name="cap_profile_delete" formatted="false">"Delete profile"</string>
+    <string name="cap_profile_clear_key" formatted="false">"Clear this profile’s API key"</string>
+    <string name="cap_profile_keep_one" formatted="false">"Keep at least one profile. You can clear its API key instead."</string>
+    <string name="cap_profile_new_summary" formatted="false">"New profiles use default translation requirements and have no API key or model. Complete the fields on the settings page."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Delete this profile’s address, model, translation requirements and encrypted key from this device. Other profiles and subtitle settings are kept. If active, the first remaining profile becomes active. This cannot be undone."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Clear only this profile’s saved key and any unsaved key entry. Keep its address, model and translation requirements. Other profiles are unchanged. This does not revoke the key with the provider."</string>
+    <string name="cap_prompt_summary" formatted="false">"Saved per profile. Clear to restore defaults that follow the interface language. Custom requirements are never translated automatically."</string>
+    <string name="cap_default_prompt" formatted="false">"Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source."</string>
 </resources>

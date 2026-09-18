@@ -165,6 +165,19 @@ fun main(args:Array<String>){
             check(cls.methods.any { it.name=="<init>"&&it.parameterTypes.map { t->t.toString() }==listOf("Landroid/content/Context;","Landroid/util/AttributeSet;") })
         }
         println("INDEPENDENT_FLYOUT_SETTINGS_PASS regular=true shorts=true xml_constructors=true")
+        val dialogClass=classes.getValue("Lapp/morphe/extension/shared/ui/CustomDialog;")
+        val createArgs=listOf("Landroid/content/Context;","Ljava/lang/CharSequence;","Ljava/lang/CharSequence;",
+            "Landroid/widget/EditText;","Ljava/lang/CharSequence;","Ljava/lang/Runnable;","Ljava/lang/Runnable;",
+            "Ljava/lang/CharSequence;","Ljava/lang/Runnable;","Z","Z")
+        check(AccessFlags.PUBLIC.isSet(dialogClass.accessFlags))
+        check(dialogClass.methods.any { it.name=="create" && it.parameterTypes.map { t->t.toString() }==createArgs
+            && AccessFlags.PUBLIC.isSet(it.accessFlags) && AccessFlags.STATIC.isSet(it.accessFlags)
+            && it.returnType=="Landroid/util/Pair;" }) { "Morphe dialog public adapter signature missing" }
+        check(classes.getValue("Lapp/morphe/extension/shared/theme/ThemeUtils;").methods.any {
+            it.name=="getAppForegroundColor" && it.parameterTypes.isEmpty() && it.returnType=="I" && AccessFlags.PUBLIC.isSet(it.accessFlags) })
+        for(helper in listOf("CaptionSettingsDialogs","CaptionEditorViewport"))check(classes.containsKey("Lapp/yydarlinker/deepseekcaptions/$helper;"))
+        println("PROFILE_DIALOG_HOST_API_PASS public_create_11=true theme_foreground=true viewport_helper=true")
+
 
         for(name in listOf("addNativeRow","topMenu","shortsOpen","dismissNative","nativeContainer"))check(menu.methods.single { it.name==name }.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().any())
         for(ins in menu.methods.single { it.name=="nativeContainer" }.implementation!!.instructions){

@@ -98,9 +98,21 @@
     <string name="cap_profile_name" formatted="false">"Nome do perfil"</string>
     <string name="cap_profile_rename" formatted="false">"Renomear"</string>
     <string name="cap_profile_add" formatted="false">"Adicionar perfil"</string>
-    <string name="cap_profiles_summary" formatted="false">"Selecione um perfil para ativar e editar abaixo. Os outros são mantidos. Configure o endereço, a chave e o modelo do novo perfil."</string>
+    <string name="cap_profiles_summary" formatted="false">"Gerir perfil atual"</string>
     <string name="cap_profile_name_error" formatted="false">"Introduza um nome de 1 a 60 caracteres"</string>
     <string name="cap_profile_limit" formatted="false">"É possível guardar até 30 perfis"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Corrija os campos incompletos antes de mudar de perfil"</string>
     <string name="cap_profile_add_failed" formatted="false">"Não foi possível adicionar o perfil. Verifique os campos e o limite de 30 perfis."</string>
+    <string name="cap_profile_manage" formatted="false">"Gerir perfil atual"</string>
+    <string name="cap_profile_close" formatted="false">"Fechar"</string>
+    <string name="cap_profile_save" formatted="false">"Guardar"</string>
+    <string name="cap_profile_current" formatted="false">"Perfil atual"</string>
+    <string name="cap_profile_delete" formatted="false">"Eliminar perfil"</string>
+    <string name="cap_profile_clear_key" formatted="false">"Limpar a chave API deste perfil"</string>
+    <string name="cap_profile_keep_one" formatted="false">"Mantenha pelo menos um perfil. Pode limpar a respetiva chave API."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Os novos perfis incluem instruções predefinidas, sem chave nem modelo. Preencha os campos nas definições."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Elimina deste dispositivo o endereço, o modelo, as instruções e a chave encriptada deste perfil. Mantém os outros perfis e as definições de legendas. Se estiver ativo, ativa o primeiro perfil restante. Não é possível anular."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Limpa apenas a chave guardada e a entrada de chave não guardada deste perfil. Mantém o endereço, o modelo e as instruções. Não afeta outros perfis nem revoga a chave no fornecedor."</string>
+    <string name="cap_prompt_summary" formatted="false">"Guardado por perfil. Limpe para repor as instruções predefinidas no idioma da interface. As instruções personalizadas não são traduzidas automaticamente."</string>
+    <string name="cap_default_prompt" formatted="false">"Traduz de forma fiel, natural e concisa para o idioma de destino, usando expressões nativas. Preserva nomes, terminologia, números, tom e pontuação necessária. Não acrescentes explicações ausentes do original."</string>
 </resources>

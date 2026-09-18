@@ -52,11 +52,10 @@ final class DeepSeekConfig {
         synchronized(ApiProfiles.LOCK) {
         SharedPreferences p = ApiProfiles.values(context);
         SharedPreferences global = prefs(context);
-        String prompt = safe(p.getString(PROMPT, DEFAULT_PROMPT), DEFAULT_PROMPT);
-        if (LEGACY_CHINESE_PROMPT.equals(prompt)) {
-            prompt = DEFAULT_PROMPT;
-            p.edit().putString(PROMPT, DEFAULT_PROMPT).apply();
-        }
+        String prompt = p.getString(PROMPT, "");
+        // Absence is a dynamic default, not a Chinese string frozen into each profile.
+        if (prompt == null || prompt.trim().isEmpty() || LEGACY_CHINESE_PROMPT.equals(prompt)
+                || DEFAULT_PROMPT.equals(prompt)) prompt = defaultPrompt(context);
         return new Snapshot(
                 global.getBoolean(ENABLED, false),
                 safe(p.getString(BASE_URL, DEFAULT_BASE_URL), DEFAULT_BASE_URL),
@@ -103,11 +102,19 @@ final class DeepSeekConfig {
         synchronized(ApiProfiles.LOCK){ApiProfiles.values(context).edit().putString(MODEL, clean).apply();}
     }
 
+    static String defaultPrompt(Context context) {
+        return CaptionStrings.settings(context, "default_prompt");
+    }
+
     static void savePrompt(Context context, String value) {
         String clean = value == null ? "" : value.trim();
-        synchronized(ApiProfiles.LOCK){ApiProfiles.values(context).edit()
-                .putString(PROMPT, clean.isEmpty() ? DEFAULT_PROMPT : clean)
-                .apply();}
+        synchronized (ApiProfiles.LOCK) {
+            SharedPreferences.Editor edit = ApiProfiles.values(context).edit();
+            if (clean.isEmpty() || clean.equals(defaultPrompt(context)) || clean.equals(DEFAULT_PROMPT)
+                    || clean.equals(LEGACY_CHINESE_PROMPT)) edit.remove(PROMPT);
+            else edit.putString(PROMPT, clean);
+            edit.apply();
+        }
     }
 
     static void saveCaptionTextSize(Context context, int value) {

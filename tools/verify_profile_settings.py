@@ -16,6 +16,9 @@ for p in root.rglob("*.xml"):
   assert row.tag=="app.yydarlinker.deepseekcaptions.ApiProfilesPreference"
   assert row.get(a+"title")=="@string/cap_profiles_title"
   assert row.get(a+"dependency") is None
+  assert not any(n.get(a+"key")=="deepseek_caption_delete_key" for n in r.iter()),"Unscoped key deletion must not appear in diagnostics"
+  prompt=[n for n in r.iter() if n.get(a+"key")=="deepseek_caption_prompt"]
+  assert len(prompt)==1 and prompt[0].get(a+"summary")=="@string/cap_prompt_summary"
   found.append(str(p))
 assert len(found)==3,("Expected all three Morphe settings layouts",found)
-print(json.dumps({"settings_files":found,"profiles_first_in_api_category":True,"independent_of_engine_toggle":True},indent=2))
+print(json.dumps({"settings_files":found,"profiles_first_in_api_category":True,"independent_of_engine_toggle":True,"no_key_deletion_in_diagnostics":True,"profile_prompt_help":True},indent=2))

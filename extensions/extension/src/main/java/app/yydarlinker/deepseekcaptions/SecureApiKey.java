@@ -74,7 +74,8 @@ final class SecureApiKey {
 
     }
 
-    private static String valueKey(Context c){String id=ApiProfiles.active(c);return ApiProfiles.LEGACY.equals(id)?VALUE:VALUE+"_"+id;}
+    private static String valueKey(Context c){return valueKey(ApiProfiles.active(c));}
+    private static String valueKey(String id){return ApiProfiles.LEGACY.equals(id)?VALUE:VALUE+"_"+id;}
 
     private static String origin(Context c){
         java.net.URI u=java.net.URI.create(ApiProfiles.values(c).getString("base_url",DeepSeekConfig.DEFAULT_BASE_URL));
@@ -91,7 +92,13 @@ final class SecureApiKey {
 
     static void clear(Context context) {
         // All profile ciphertexts share the non-exportable key. Clearing ONE must not delete it.
-        synchronized(ApiProfiles.LOCK){prefs(context).edit().remove(valueKey(context)).remove(valueKey(context)+"_origin").apply();}
+        synchronized(ApiProfiles.LOCK){clear(context, ApiProfiles.active(context));}
+    }
+
+    static void clear(Context context, String id) {
+        synchronized (ApiProfiles.LOCK) {
+            prefs(context).edit().remove(valueKey(id)).remove(valueKey(id)+"_origin").apply();
+        }
     }
 
     private static SharedPreferences prefs(Context context) {

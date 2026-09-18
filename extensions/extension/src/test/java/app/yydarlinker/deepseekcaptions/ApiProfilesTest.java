@@ -48,9 +48,6 @@ public class ApiProfilesTest {
   DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);EditText edit=p.getView(null,new LinearLayout(a)).findViewById(android.R.id.edit);edit.setText("not a URL");
   String b=ApiProfiles.create(a,"B","https://b.example/v1");assertFalse(ApiProfiles.select(a,b));assertEquals("default",ApiProfiles.active(a));assertNotNull(edit.getError());
  }
- @Test public void profilePanelUsesExistingStyleAndNoKeyReadback(){
-  ApiProfilesPreference p=new ApiProfilesPreference(a);android.view.View root=p.getView(null,new LinearLayout(a));assertTrue(root instanceof LinearLayout);assertTrue(root.getPaddingLeft()>0);
- }
  @Test public void delayedModelEditsCannotCrossProfiles(){
   DeepSeekModelPreference p=new DeepSeekModelPreference(a);p.setKey(DeepSeekModelPreference.KEY_MODEL);LinearLayout parent=new LinearLayout(a);
   LinearLayout old=(LinearLayout)p.getView(null,parent);EditText input=(EditText)old.getChildAt(1);input.setText("old-new-model");
@@ -70,15 +67,15 @@ public class ApiProfilesTest {
   DeepSeekConfig.saveBaseUrl(a,DeepSeekConfig.DEFAULT_BASE_URL);assertTrue(SecureApiKey.hasSavedValue(a));
  }
 
- @Test public void profilePanelButtonsStayInsideNarrowLayoutAndSwitchCanBeUsed(){
-  ApiProfilesPreference p=new ApiProfilesPreference(a);LinearLayout root=(LinearLayout)p.getView(null,new LinearLayout(a));
-  int width=CaptionSettingsStyle.dp(a,320);root.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec(0,android.view.View.MeasureSpec.UNSPECIFIED));root.layout(0,0,width,root.getMeasuredHeight());
-  LinearLayout actions=(LinearLayout)root.getChildAt(3);assertEquals(2,actions.getChildCount());assertTrue(actions.getChildAt(1).getRight()<=actions.getWidth());
-  Button add=(Button)actions.getChildAt(1);add.performClick();assertEquals(2,ApiProfiles.list(a).size());assertNotEquals("default",ApiProfiles.active(a));
-  EditText name=(EditText)root.getChildAt(2);name.setText("Bailian 北京");((Button)actions.getChildAt(0)).performClick();assertEquals("Bailian 北京",ApiProfiles.list(a).get(ApiProfiles.active(a)));
-  ((Spinner)root.getChildAt(1)).setSelection(0);org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
-  // Invoke actual listener in a detached test view: real Android invokes it on layout/selection.
-  Spinner spinner=(Spinner)root.getChildAt(1);spinner.getOnItemSelectedListener().onItemSelected(spinner,null,0,0);assertEquals("default",ApiProfiles.active(a));
+ @Test public void offscreenPromptRoundTripMustRebindAndRemainEditable(){
+  DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
+  LinearLayout parent=new LinearLayout(a);android.view.View old=p.getView(null,parent);
+  String initial=((EditText)old.findViewById(android.R.id.edit)).getText().toString();assertFalse(initial.isEmpty());
+  String b=ApiProfiles.create(a,"B","https://b.example/v1");assertTrue(ApiProfiles.select(a,b));
+  // Row remains offscreen while B is active, so ListView never asks it to create a B view.
+  assertTrue(ApiProfiles.select(a,"default"));
+  android.view.View rebound=p.getView(old,parent);EditText input=rebound.findViewById(android.R.id.edit);
+  assertEquals(initial,input.getText().toString());input.setText("editable after round trip");assertTrue(p.flushProfile());
+  assertEquals("editable after round trip",DeepSeekConfig.load(a).prompt);
  }
-
 }

@@ -25,12 +25,19 @@ Independent YouTube AI subtitle addon, compatible with Morphe.
 
 This repository is a Morphe custom patch. It routes YouTube automatic-translation selections through a user-provided OpenAI-compatible API and displays the result in a dedicated in-player subtitle box.
 
+## Caption quality
+
+The semantic-task revision separates translation understanding from API batching and screen events.
+It adds source-aligned named output, bounded serious-quality repair, a real minimum readable font,
+and opt-in quality evidence without changing native/AI ownership or profiles. See
+[semantic quality, costs, fallback and verification limits](docs/SEMANTIC-QUALITY-1.3.4.md).
+
 ## Caption engine
 
 The caption engine uses an anchored joint translation plan:
 
-- local code creates bounded source windows, never final subtitles;
-- one API request translates a window and pairs each translation with its exact contiguous source phrase;
+- local code creates bounded semantic source tasks, never final subtitles;
+- one normal API request translates whole tasks and returns coherent events paired with exact contiguous source phrases;
 - local validation requires exact source coverage and strictly increasing ranges;
 - displayed timestamps always come from the original source atoms, never translated-text length;
 - English provider captions can be calibrated against English auto-generated captions as a clock-only reference;

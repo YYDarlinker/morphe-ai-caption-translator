@@ -1361,13 +1361,15 @@ static void setMainActivity(Activity activity) {
                                 session.displayPlans[group.firstUnit] = plan;
                             }
                             if (plan == null && !grouped) {
-                                if(session.states[index] == PERMANENT_FAILURE) {
+                                boolean repairingQuality=CaptionQualityPolicy.failure(session.lastFailureReasons[index]) &&
+                                        (session.states[index]==RETRY_WAIT || session.states[index]==IN_FLIGHT);
+                                if(session.states[index] == PERMANENT_FAILURE || repairingQuality) {
                                     text = CaptionFailureFallback.text(session.atoms,unit,timeMs);
                                     if(!text.isEmpty() && !session.fallbackLogged[index]){
                                         session.fallbackLogged[index]=true;
                                         CaptionDiagnostics.mark(session.context,"TRANSLATION_SOURCE_FALLBACK", "unit="+index+";failures="+session.failureCounts[index]+";reason="+session.lastFailureReasons[index]);
                                     }
-                                    selectedBoundaryReason="translation_failed_source_fallback";
+                                    selectedBoundaryReason=repairingQuality?"quality_repair_original":"translation_failed_source_fallback";
                                     selectedSourceText=unit.sourceText;
                                     selectedRejectionSummary=session.lastFailureReasons[index];
                                 }

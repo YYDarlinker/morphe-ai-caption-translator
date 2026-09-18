@@ -2,7 +2,7 @@ package app.yydarlinker.deepseekcaptions;
 import java.util.*;import java.util.regex.*;import java.text.Normalizer;
 /** Cursor-only, token-preserving match. Decorative punctuation may vary; numbers/signs may not. */
 final class SourcePhraseAlignment {
-    private static final Pattern TOKENS=Pattern.compile("[+-]?\\p{N}+(?:[.,:]\\p{N}+)*(?:%|％)?|[\\p{L}\\p{N}]+(?:['’][\\p{L}\\p{N}]+)*");
+    private static final Pattern TOKENS=Pattern.compile("(?<=\\p{N})[-–/](?=\\p{N})|(?<![\\p{L}\\p{N}])[+-]?\\p{N}+(?:[.,:]\\p{N}+)*(?:%|％)?|[\\p{L}\\p{N}]+(?:['’][\\p{L}\\p{N}]+)*");
     static String canonical(String text){
         String s=Normalizer.normalize(text==null?"":text,Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).replace('’','\'');
         Matcher m=TOKENS.matcher(s);StringBuilder b=new StringBuilder();

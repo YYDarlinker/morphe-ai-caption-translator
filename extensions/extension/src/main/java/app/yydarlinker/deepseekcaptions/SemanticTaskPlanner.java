@@ -51,7 +51,8 @@ final class SemanticTaskPlanner {
             int index=tasks.size();String text=SourceAtomTimeline.join(atoms,from,end);
             tasks.add(new TranslationUnitTimeline.Unit(index,"s"+index+"-"+from+"-"+end,
                     from,end,first.cueIndex,last.cueIndex,first.startMs,last.endMs,text,
-                    reason.equals("bounded_continuation")?TranslationUnitTimeline.Confidence.LOW:TranslationUnitTimeline.Confidence.HIGH,reason));
+                    (reason.equals("source_break")||terminal(last.text))?TranslationUnitTimeline.Confidence.HIGH:
+                    reason.equals("clause_boundary")?TranslationUnitTimeline.Confidence.MEDIUM:TranslationUnitTimeline.Confidence.LOW,reason));
             from=end+1;
         }
         return new TranslationUnitTimeline.Result(Collections.unmodifiableList(tasks),atoms,

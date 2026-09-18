@@ -76,4 +76,20 @@ public class QualityPipeline134Test {
         JSONArray data=new JSONArray(activity.getSharedPreferences("caption_quality_evidence",Context.MODE_PRIVATE).getString("records","[]"));assertEquals(6,data.length());
         DeepSeekConfig.saveDisplayTextDebugEnabled(activity,false);DeepSeekConfig.saveDisplayTextDebugEnabled(activity,true);assertEquals("",CaptionQualityTrace.text(activity));
     }
+
+    @Test public void expiredTraceIsRemovedOnRead()throws Exception{
+        DeepSeekConfig.saveDisplayTextDebugEnabled(activity,true);
+        JSONObject row=new JSONObject().put("at",System.currentTimeMillis()-25*60*60*1000L).put("source","old private text");
+        activity.getSharedPreferences("caption_quality_evidence",Context.MODE_PRIVATE).edit().putString("records",new JSONArray().put(row).toString()).commit();
+        assertEquals("",CaptionQualityTrace.text(activity));
+        assertEquals("[]",activity.getSharedPreferences("caption_quality_evidence",Context.MODE_PRIVATE).getString("records","[]"));
+    }
+
+    @Test public void escapedDebugTextCannotExceedStorageBudget()throws Exception{
+        DeepSeekConfig.saveDisplayTextDebugEnabled(activity,true);
+        String noisy=String.join("",Collections.nCopies(12000,"\""));
+        CaptionQualityTrace.record(activity,"test-local-key",1,new JSONObject().put("source",noisy),noisy,"fixture");
+        String saved=activity.getSharedPreferences("caption_quality_evidence",Context.MODE_PRIVATE).getString("records","[]");
+        assertTrue(saved.length()<=36000);assertTrue(saved.contains("truncated"));
+    }
 }

@@ -140,7 +140,7 @@ final class ContextualBatchApiClient {
             try {
                 String content=post(config,request,deadline,control,audit);
                 if(control!=null)control.onQualityEvidence(payload,content,
-                        "protocol="+CaptionWireProtocol.VERSION+";format="+(request.optJSONObject("response_format")==null?"prompt_json":request.optJSONObject("response_format").optString("type"))+
+                        "protocol="+CaptionWireProtocol.VERSION+";prompt_sha256="+CaptionQualityTrace.digest(systemPrompt)+";format="+(request.optJSONObject("response_format")==null?"prompt_json":request.optJSONObject("response_format").optString("type"))+
                         ";thinking="+request.opt("enable_thinking")+";presence_penalty="+request.opt("presence_penalty")+
                         ";temperature="+(request.has("temperature")?request.opt("temperature"):"provider_default")+
                         ";negotiated="+negotiated+";category="+negotiatedCategory);
@@ -159,6 +159,9 @@ final class ContextualBatchApiClient {
                     "）。已停止自动重试，请检查 API 地址/模型并运行测试 API。";
                 blockedIdentity=identity(config);
                 throw new PermanentException(rejected.category(),blockedMessage, "");
+            } catch(BatchFormatException invalid) {
+                TokenCostAudit.recordUnitQualityOutcome(audit,0,targets.size(),0);
+                throw invalid;
             }
         }
     }

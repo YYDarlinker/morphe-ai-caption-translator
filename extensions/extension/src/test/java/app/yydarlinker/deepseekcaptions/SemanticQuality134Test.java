@@ -68,6 +68,9 @@ public class SemanticQuality134Test {
         assertNotEquals(SourcePhraseAlignment.canonical("1.5"),SourcePhraseAlignment.canonical("15"));
         assertNotEquals(SourcePhraseAlignment.canonical("-10"),SourcePhraseAlignment.canonical("10"));
         assertNotEquals(SourcePhraseAlignment.canonical("a part"),SourcePhraseAlignment.canonical("apart"));
+        assertEquals(SourcePhraseAlignment.canonical("GPT-5.6"),SourcePhraseAlignment.canonical("GPT 5.6"));
+        assertNotEquals(SourcePhraseAlignment.canonical("5-10"),SourcePhraseAlignment.canonical("5 10"));
+        assertNotEquals(SourcePhraseAlignment.canonical("1/2"),SourcePhraseAlignment.canonical("1 2"));
         assertEquals(SourcePhraseAlignment.canonical("1,000"),SourcePhraseAlignment.canonical("1000"));
         assertEquals(SourcePhraseAlignment.canonical("They're ready!"),SourcePhraseAlignment.canonical("they’re ready."));
     }

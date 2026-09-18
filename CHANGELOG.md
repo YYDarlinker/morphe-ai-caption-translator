@@ -1,3 +1,13 @@
+## [1.3.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.3.3...v1.3.4) (2026-09-18)
+
+### 🐛 Bug Fixes
+
+* bound semantic batching costs and redact escaped diagnostic URLs ([ca4fa0e](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/ca4fa0e54b9582ea3e44314a385ff0fed84430e2))
+* distinguish quality evidence across video sessions ([5e47a37](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/5e47a373845e5454d7998f30b0694b61d5d0febb))
+* isolate strict phrase validation from unchanged source timing ([24b22e8](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/24b22e83760d8ac2d1ead50cd3191d71b1de8953))
+* preserve numeric ranges and bound quality evidence retention ([414a743](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/414a743b566dd265ba362b6b94b7f5b86f37fafb))
+* separate semantic caption tasks and enforce aligned readable output ([bd7c141](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/bd7c1416db6c46d7379f7fb0fc10bc63f91305b4))
+
 ## [1.3.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.3.2...v1.3.3) (2026-09-18)
 
 ### 🐛 Bug Fixes

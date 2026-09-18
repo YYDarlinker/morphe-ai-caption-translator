@@ -28,8 +28,8 @@ public class PreprocessEquivalent133Test {
         }
     }
     @Test public void cachedRegexRetainsExactOriginalWordWeights(){
-        for(String word:Arrays.asList("hello","1.23","o’clock","word?!","punctuation","你好","日本語","русский","",":-","🍀")){
-            if(word.matches("[A-Za-z0-9'’.,!?;:-]+"))assertEquals(Math.max(1,Math.min(5,(SourcePhraseAlignment.canonical(word).length()+3)/4)),SourceAtomTimeline.estimatedWordWeight(word));
+        for(String word:Arrays.asList("hello","1.23","o’clock","word?!","punctuation","你好","日本語","русский","",":-","🍀","we're","they're","1,000.2","-3.5","3-4","GPT-5.6")){
+            if(word.matches("[A-Za-z0-9'’.,!?;:-]+"))assertEquals(Math.max(1,Math.min(5,((int)word.toLowerCase(Locale.ROOT).codePoints().filter(Character::isLetterOrDigit).count()+3)/4)),SourceAtomTimeline.estimatedWordWeight(word));
         }
     }
 }

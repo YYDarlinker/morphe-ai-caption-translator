@@ -490,7 +490,7 @@ final class SourceAtomTimeline {
     // This is an estimate, not measured speech. Native boundaries and cue duration never change.
     static int estimatedWordWeight(String token) {
         if(token!=null && LATIN_WEIGHT.matcher(token).matches()) {
-            int length=SourcePhraseAlignment.canonical(token).length();
+            int length=SourcePhraseAlignment.timingLexical(token).length();
             return Math.max(1,Math.min(5,(length+3)/4));
         }
         return Math.max(1,lexicalWeight(token));

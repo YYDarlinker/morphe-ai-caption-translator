@@ -68,6 +68,7 @@ public class SemanticQuality134Test {
         assertNotEquals(SourcePhraseAlignment.canonical("1.5"),SourcePhraseAlignment.canonical("15"));
         assertNotEquals(SourcePhraseAlignment.canonical("-10"),SourcePhraseAlignment.canonical("10"));
         assertNotEquals(SourcePhraseAlignment.canonical("a part"),SourcePhraseAlignment.canonical("apart"));
+        assertNotEquals(SourcePhraseAlignment.canonical("we're"),SourcePhraseAlignment.canonical("were"));
         assertEquals(SourcePhraseAlignment.canonical("GPT-5.6"),SourcePhraseAlignment.canonical("GPT 5.6"));
         assertNotEquals(SourcePhraseAlignment.canonical("5-10"),SourcePhraseAlignment.canonical("5 10"));
         assertNotEquals(SourcePhraseAlignment.canonical("1/2"),SourcePhraseAlignment.canonical("1 2"));
@@ -121,5 +122,12 @@ public class SemanticQuality134Test {
             String joined=String.join(" ",r.units.stream().map(u->u.sourceText).toArray(String[]::new));
             assertEquals(source,joined);assertTrue(r.units.stream().anyMatch(u->u.sourceText.contains(clause)));
         }
+    }
+
+    @Test public void stricterMatchingCannotChangeTimingReferenceFingerprint(){
+        String[] inputs={"we're", "were", "GPT-5.6", "1.5", "15", "a part", "1,000", "−3.5", "Hello WORLD!"};
+        for(String word:inputs){StringBuilder old=new StringBuilder();word.toLowerCase(Locale.ROOT).codePoints().filter(Character::isLetterOrDigit).forEach(old::appendCodePoint);
+            assertEquals(old.toString(),SourcePhraseAlignment.timingLexical(word));}
+        assertNotEquals(SourcePhraseAlignment.canonical("1.5"),SourcePhraseAlignment.timingLexical("1.5"));
     }
 }

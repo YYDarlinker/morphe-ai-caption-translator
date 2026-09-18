@@ -58,7 +58,10 @@ an unaligned `text` response that can turn a task into a single paragraph.
 
 Source matching preserves token boundaries, decimal points, numeric signs/ranges/fractions,
 and percent symbols. Decorative punctuation/case/spacing and unambiguous thousands separators
-remain tolerable. Model-name hyphens are not misclassified as negative numbers. Numeric
+remain tolerable. Model-name hyphens are not misclassified as negative numbers, while contractions retain meaningful
+apostrophes. The old lexical fingerprint is explicitly isolated for source timing weights and
+ASR reference identity: stricter online matching cannot silently change either. A frozen old-formula
+regression includes contractions, decimal/range punctuation and model names. Numeric
 substitution checking is deliberately narrow: a clear single Arabic-number substitution can
 be rejected, but word-form numbers, unit conversions, scope/negation and semantic equivalence
 are not certified by a regex. Existing name protection remains.

@@ -122,4 +122,6 @@
     <string name="cap_profile_delete_switch" formatted="false">"После удаления включить:"</string>
     <string name="cap_profile_keep" formatted="false">"Сохранить профиль"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Подтвердить удаление"</string>
+    <string name="cap_source_retry" formatted="false">"Соединение с субтитрами прервано. Повторная попытка…"</string>
+    <string name="cap_source_unavailable" formatted="false">"Исходные субтитры недоступны. Выберите дорожку ещё раз."</string>
 </resources>

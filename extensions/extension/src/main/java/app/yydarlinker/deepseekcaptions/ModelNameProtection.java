@@ -5,6 +5,7 @@ import org.json.JSONArray;
 /** Protect model/version compounds before windowing; no paid correction pass and no global Soul replacement. */
 final class ModelNameProtection {
     private static final Pattern NAME=Pattern.compile("(?i)^(GPT|Deepseek|Claude|Opus|Gemini|Qwen|Llama)[ -]*(?:v)?[0-9]+(?:[.。]\\s*[0-9]+)*(?:[ -]+(?:Sol|Soul|Flash|Pro|Mini|Max|Sonnet|Haiku))?[.,!?]?$" );
+    private static final Pattern PREFIX=Pattern.compile("(?i)^(GPT|Deepseek|Claude|Opus|Gemini|Qwen|Llama)");
     static boolean isName(String value){return NAME.matcher(value.trim()).matches();}
     static String normalize(String text){
         String n=text.replaceAll("(?<=[0-9])[.。]\\s+(?=[0-9])",".");
@@ -14,6 +15,9 @@ final class ModelNameProtection {
     static SourceAtomTimeline.Result protect(SourceAtomTimeline.Result source){
         List<SourceAtomTimeline.Atom> out=new ArrayList<>();List<SourceAtomTimeline.Atom> a=source.atoms;
         for(int i=0;i<a.size();) {
+            // NAME is anchored to these brands. An ordinary word cannot begin a protected
+            // compound; skip six joined-string allocations without changing a single boundary.
+            if(!a.get(i).text.trim().isEmpty() && !PREFIX.matcher(a.get(i).text.trim()).find()){out.add(a.get(i++));continue;}
             int best=i;String value=a.get(i).text;
             for(int end=i;end<Math.min(a.size(),i+6);end++) {
                 if(a.get(end).endMs-a.get(i).startMs>4000)break;

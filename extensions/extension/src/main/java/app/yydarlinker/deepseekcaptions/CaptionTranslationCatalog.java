@@ -258,6 +258,8 @@ static final String[][] ENGLISH={
 {"profile_delete_inline","Delete this profile and its saved key from this device? Other profiles are kept. This cannot be undone."},
 {"profile_delete_switch","After deletion, activate:"},
 {"profile_keep","Keep profile"},
-{"profile_confirm_delete","Confirm deletion"}
+{"profile_confirm_delete","Confirm deletion"},
+{"source_retry","Caption connection interrupted. Retrying…"},
+{"source_unavailable","Source captions unavailable. Try selecting the caption track again."}
 };
 }

@@ -122,4 +122,6 @@
     <string name="cap_profile_delete_switch" formatted="false">"मिटाने के बाद सक्रिय करें:"</string>
     <string name="cap_profile_keep" formatted="false">"प्रोफ़ाइल रखें"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"मिटाने की पुष्टि करें"</string>
+    <string name="cap_source_retry" formatted="false">"उपशीर्षक कनेक्शन टूट गया। फिर कोशिश की जा रही है…"</string>
+    <string name="cap_source_unavailable" formatted="false">"मूल उपशीर्षक उपलब्ध नहीं हैं। उपशीर्षक ट्रैक फिर चुनें।"</string>
 </resources>

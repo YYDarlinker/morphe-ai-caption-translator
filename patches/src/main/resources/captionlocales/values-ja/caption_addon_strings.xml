@@ -122,4 +122,6 @@
     <string name="cap_profile_delete_switch" formatted="false">"削除後に有効にするプロファイル："</string>
     <string name="cap_profile_keep" formatted="false">"プロファイルを残す"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"削除を確定"</string>
+    <string name="cap_source_retry" formatted="false">"字幕の接続が切れました。再試行中…"</string>
+    <string name="cap_source_unavailable" formatted="false">"元の字幕を取得できません。字幕トラックを選び直してください。"</string>
 </resources>

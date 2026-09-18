@@ -122,4 +122,6 @@
     <string name="cap_profile_delete_switch" formatted="false">"Setelah dihapus, aktifkan:"</string>
     <string name="cap_profile_keep" formatted="false">"Pertahankan profil"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Konfirmasi hapus"</string>
+    <string name="cap_source_retry" formatted="false">"Koneksi subtitel terputus. Mencoba lagi…"</string>
+    <string name="cap_source_unavailable" formatted="false">"Subtitel sumber tidak tersedia. Pilih kembali trek subtitel."</string>
 </resources>

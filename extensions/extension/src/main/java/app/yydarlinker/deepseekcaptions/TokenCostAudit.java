@@ -534,8 +534,8 @@ final class TokenCostAudit {
             if (sunkPrompts > 0L) {
                 out.append("\n已发出但未读取的请求：").append(format(sunkPrompts))
                         .append(" 次 · ").append(format(value(totalAll, "sunk_prompt_bytes")))
-                        .append(" bytes。provider 很可能已计费，但下方所有 token/成本数字都不含它们，")
-                        .append("因此实际支出高于估算值。");
+                        .append(" bytes。provider 是否处理或计费尚未确认；下方 token/成本不包含这些未知用量，")
+                        .append("不能据此确定实际支出。");
             }
 
             long localSuccess = value(totalsMetrics, "display_local_success");

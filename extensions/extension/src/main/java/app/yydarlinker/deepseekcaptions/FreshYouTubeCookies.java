@@ -29,43 +29,54 @@ final class FreshYouTubeCookies {
 
     private FreshYouTubeCookies() {}
 
-    static String get(boolean forceRefresh) {
-        long now = System.currentTimeMillis();
-        String current = cached;
-        if (!forceRefresh && !current.isEmpty() && now - fetchedAt < MAX_AGE_MS) return current;
+    private static boolean refreshing;
+    private static long lastRefreshAttempt;
 
-        synchronized (FreshYouTubeCookies.class) {
-            now = System.currentTimeMillis();
-            current = cached;
-            if (!forceRefresh && !current.isEmpty() && now - fetchedAt < MAX_AGE_MS) return current;
-            String refreshed = fetch();
-            if (!refreshed.isEmpty()) {
-                cached = refreshed;
-                fetchedAt = now;
-                return refreshed;
-            }
-            return current;
+    /** A signed native caption URL normally works without a separate cookie bootstrap request. */
+    static String cached() {
+        return System.currentTimeMillis()-fetchedAt<MAX_AGE_MS?cached:"";
+    }
+
+    /** Only an actual 401/403 justifies this extra GET. It shares the source request deadline. */
+    static String refresh(long deadline,DeepSeekApiClient.RequestControl control) throws Exception {
+        long now=System.nanoTime();
+        synchronized(FreshYouTubeCookies.class){
+            if(refreshing || (lastRefreshAttempt>0 && now-lastRefreshAttempt<java.util.concurrent.TimeUnit.SECONDS.toNanos(30)))return cached;
+            refreshing=true;lastRefreshAttempt=now;
         }
+        try{
+            String refreshed=fetch(Math.min(deadline,now+java.util.concurrent.TimeUnit.SECONDS.toNanos(3)),control);
+            if(!refreshed.isEmpty()){cached=refreshed;fetchedAt=System.currentTimeMillis();}
+            return cached;
+        }finally{synchronized(FreshYouTubeCookies.class){refreshing=false;}}
     }
 
     static String userAgent() {
         return USER_AGENT;
     }
 
-    private static String fetch() {
+    private static String fetch(long deadline,DeepSeekApiClient.RequestControl control) throws Exception {
+        RawCaptionSource.checkActive(control);
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) new URL("https://www.youtube.com/sw.js").openConnection();
+            URL url=new URL("https://www.youtube.com/sw.js");
+            connection=DeepSeekCaptionHook.openWithYouTubeCronet(url);
+            if(connection==null)connection=(HttpURLConnection)url.openConnection();
+            if(control!=null)control.onConnection(connection);RawCaptionSource.checkActive(control);
             connection.setRequestMethod("GET");
-            connection.setConnectTimeout(6000);
-            connection.setReadTimeout(6000);
+            connection.setConnectTimeout(RawCaptionSource.remaining(deadline));
+            connection.setReadTimeout(RawCaptionSource.remaining(deadline));
             connection.setInstanceFollowRedirects(true);
             connection.setUseCaches(false);
             connection.setRequestProperty("User-Agent", USER_AGENT);
             connection.setRequestProperty("Referer", "https://www.youtube.com/");
             connection.setRequestProperty("Accept", "*/*");
             connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
-            int status = connection.getResponseCode();
+            int status;
+            try(NetworkDeadline guard=new NetworkDeadline(connection,deadline)){
+                status=connection.getResponseCode();
+                RawCaptionSource.remaining(deadline);RawCaptionSource.checkActive(control);
+            }
             if (status < 200 || status >= 300) return "";
 
             StringBuilder output = new StringBuilder();
@@ -86,10 +97,11 @@ final class FreshYouTubeCookies {
                 }
             }
             return output.toString();
-        } catch (Throwable ignored) {
-            return "";
+        } catch (Exception ignored) {
+            RawCaptionSource.checkActive(control);return "";
         } finally {
             if (connection != null) connection.disconnect();
+            if(control!=null)control.onConnection(null);
         }
     }
 }

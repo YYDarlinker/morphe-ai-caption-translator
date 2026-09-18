@@ -122,4 +122,6 @@
     <string name="cap_profile_delete_switch" formatted="false">"After deletion, activate:"</string>
     <string name="cap_profile_keep" formatted="false">"Keep profile"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Confirm deletion"</string>
+    <string name="cap_source_retry" formatted="false">"Caption connection interrupted. Retrying…"</string>
+    <string name="cap_source_unavailable" formatted="false">"Source captions unavailable. Try selecting the caption track again."</string>
 </resources>

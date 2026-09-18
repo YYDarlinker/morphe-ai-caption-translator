@@ -6,6 +6,7 @@ final class PlaybackClockEstimator {
     static final long MAX_PRECISE_CALLBACK_GAP_MS = 2_400L;
     static final long MAX_CLOCK_EXTRAPOLATION_MS = 4_500L;
     private static final long MIN_RATE_SAMPLE_MS = 120L;
+    static final long BACKWARD_SEEK_TOLERANCE_MS = 250L;
     private static final float MIN_RATE = 0.25f;
     private static final float MAX_RATE = 3.0f;
     private static final float MAX_PLAUSIBLE_RATE = 3.25f;
@@ -49,19 +50,21 @@ final class PlaybackClockEstimator {
         confirmedPosition = cleanVideo;
         long cleanRealtime = Math.max(0L, newRealtimeMs);
         if (realtimeMs <= 0L || cleanRealtime <= realtimeMs) {
+            boolean backward=realtimeMs>0 && cleanVideo<videoTimeMs-BACKWARD_SEEK_TOLERANCE_MS;
+            if(backward){lastEstimate=cleanVideo;playbackRate=1f;}
             videoTimeMs = cleanVideo;
             realtimeMs = cleanRealtime;
             stableRateSample = false;
-            return new Update(false, true, playbackRate);
+            return new Update(backward, true, playbackRate);
         }
 
         long realDelta = cleanRealtime - realtimeMs;
         long videoDelta = cleanVideo - videoTimeMs;
-        if(realDelta<MIN_RATE_SAMPLE_MS && Math.abs(videoDelta)<seekThresholdMs)
+        if(realDelta<MIN_RATE_SAMPLE_MS && videoDelta>=-BACKWARD_SEEK_TOLERANCE_MS && Math.abs(videoDelta)<seekThresholdMs)
             return new Update(false,false,playbackRate);
         boolean stale = realDelta > MAX_FRESH_CALLBACK_GAP_MS;
         boolean uncertain = !stale && realDelta > MAX_PRECISE_CALLBACK_GAP_MS;
-        boolean obviousBackwardSeek = videoDelta < -seekThresholdMs;
+        boolean obviousBackwardSeek = videoDelta < -BACKWARD_SEEK_TOLERANCE_MS;
         boolean paused = !obviousBackwardSeek && Math.abs(videoDelta) <= 40L;
         boolean seek;
         if (obviousBackwardSeek) {

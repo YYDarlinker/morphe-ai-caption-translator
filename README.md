@@ -1,6 +1,11 @@
 # Anchored AI Captions
 
-## Current revision: 1.3.0
+## Release status
+
+The installed-source version is recorded in `patches-bundle.json` and the GitHub Releases page.
+
+Source-network recovery, seek-demanded missing captions and lower startup overhead are described in
+[caption recovery and verification boundaries](docs/CAPTION-RECOVERY-1.3.3.md). The inline scheme-B profile manager is included.
 
 Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
 
@@ -51,7 +56,7 @@ Address, key, model and translation requirements remain inline on the original s
 At least one profile is retained; deleting the active one selects the first remaining profile.
 New profiles have localized default translation requirements, no copied key and an empty model.
 Defaults follow the interface language; custom requirements are preserved verbatim.
-See [local API configuration scheme B](docs/PROFILE-INLINE-LOCAL.md),
+See [inline API configuration scheme B](docs/PROFILE-INLINE-LOCAL.md),
 [interaction and keyboard fixes](docs/SETTINGS-INTERACTION-1.3.2.md),
 [compact settings](docs/API-PROFILES-UI-1.3.1.md), and
 [provider compatibility and key isolation](docs/API-PROFILES-1.3.0.md).

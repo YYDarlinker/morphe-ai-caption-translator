@@ -39,10 +39,8 @@ final class DeepSeekApiClient {
         void onConnection(HttpURLConnection connection);
 
         /**
-         * Called once the full request body has been written to the socket. From this point the
-         * provider has already received the prompt and will bill it, so cancelling the request can
-         * only discard a result that was already paid for. Schedulers use this to stop preempting
-         * work whose cost is already sunk.
+         * Called after writing the full request body locally. The provider may already have
+         * started work; receipt and billing are not proven. Avoid speculative duplicate POSTs.
          */
         default void onRequestBodySent() {}
     }

@@ -122,4 +122,6 @@
     <string name="cap_profile_delete_switch" formatted="false">"刪除後將啟用："</string>
     <string name="cap_profile_keep" formatted="false">"保留方案"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"確認刪除"</string>
+    <string name="cap_source_retry" formatted="false">"字幕連線中斷，正在自動重試…"</string>
+    <string name="cap_source_unavailable" formatted="false">"暫時無法取得原字幕，請重新選擇字幕軌道。"</string>
 </resources>

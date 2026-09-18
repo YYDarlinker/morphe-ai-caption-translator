@@ -1,3 +1,5 @@
+Current source recovery, demand scheduling and startup: [1.3.3](CAPTION-RECOVERY-1.3.3.md).
+
 Current modular boundaries and localization: [1.2.0](MODULAR-CAPTIONS-1.2.0.md). The anchored translation engine below is retained.
 
 # Architecture and delivery notes

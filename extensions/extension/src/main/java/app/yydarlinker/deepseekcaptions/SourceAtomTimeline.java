@@ -27,6 +27,7 @@ import java.util.Locale;
  */
 final class SourceAtomTimeline {
     private static final int MAX_CJK_TOKEN_CHARS = 4;
+    private static final java.util.regex.Pattern LATIN_WEIGHT = java.util.regex.Pattern.compile("[A-Za-z0-9'’.,!?;:-]+");
     private static final long ROLLING_BRIDGE_MAX_MS = 100L;
     private static final long ROLLING_CHUNK_MAX_MS = 4_500L;
 
@@ -488,7 +489,7 @@ final class SourceAtomTimeline {
     // Fallback only: limit the influence of long English spellings/model names within a known cue.
     // This is an estimate, not measured speech. Native boundaries and cue duration never change.
     static int estimatedWordWeight(String token) {
-        if(token!=null && token.matches("[A-Za-z0-9'’.,!?;:-]+")) {
+        if(token!=null && LATIN_WEIGHT.matcher(token).matches()) {
             int length=SourcePhraseAlignment.canonical(token).length();
             return Math.max(1,Math.min(5,(length+3)/4));
         }

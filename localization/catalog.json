@@ -60,7 +60,9 @@
     "profile_name_error",
     "profile_limit",
     "profile_invalid_edits",
-    "profile_add_failed"
+    "profile_add_failed",
+    "source_retry",
+    "source_unavailable"
   ],
   "languages": {
     "en": {
@@ -185,7 +187,9 @@
       "profile_delete_inline": "Delete this profile and its saved key from this device? Other profiles are kept. This cannot be undone.",
       "profile_delete_switch": "After deletion, activate:",
       "profile_keep": "Keep profile",
-      "profile_confirm_delete": "Confirm deletion"
+      "profile_confirm_delete": "Confirm deletion",
+      "source_retry": "Caption connection interrupted. Retrying…",
+      "source_unavailable": "Source captions unavailable. Try selecting the caption track again."
     },
     "zh-rCN": {
       "ai_title": "AI 字幕翻译",
@@ -309,7 +313,9 @@
       "profile_delete_inline": "删除此方案及其本机保存的密钥？其他方案不受影响，此操作无法撤销。",
       "profile_delete_switch": "删除后将启用：",
       "profile_keep": "保留方案",
-      "profile_confirm_delete": "确认删除"
+      "profile_confirm_delete": "确认删除",
+      "source_retry": "字幕连接中断，正在自动重试…",
+      "source_unavailable": "暂时无法获取原字幕，请重新选择字幕轨道。"
     },
     "zh-rTW": {
       "ai_title": "AI 字幕翻譯",
@@ -433,7 +439,9 @@
       "profile_delete_inline": "刪除此方案及其儲存在本機的金鑰？其他方案不受影響，此操作無法復原。",
       "profile_delete_switch": "刪除後將啟用：",
       "profile_keep": "保留方案",
-      "profile_confirm_delete": "確認刪除"
+      "profile_confirm_delete": "確認刪除",
+      "source_retry": "字幕連線中斷，正在自動重試…",
+      "source_unavailable": "暫時無法取得原字幕，請重新選擇字幕軌道。"
     },
     "es": {
       "ai_title": "Traducción de subtítulos con IA",
@@ -557,7 +565,9 @@
       "profile_delete_inline": "¿Eliminar este perfil y su clave guardada del dispositivo? Se conservan los demás perfiles. No se puede deshacer.",
       "profile_delete_switch": "Tras eliminar, activar:",
       "profile_keep": "Conservar perfil",
-      "profile_confirm_delete": "Confirmar eliminación"
+      "profile_confirm_delete": "Confirmar eliminación",
+      "source_retry": "Conexión de subtítulos interrumpida. Reintentando…",
+      "source_unavailable": "Subtítulos de origen no disponibles. Vuelve a seleccionar la pista."
     },
     "fr": {
       "ai_title": "Traduction des sous-titres par IA",
@@ -681,7 +691,9 @@
       "profile_delete_inline": "Supprimer ce profil et sa clé enregistrée sur cet appareil ? Les autres profils sont conservés. Cette action est irréversible.",
       "profile_delete_switch": "Après suppression, activer :",
       "profile_keep": "Conserver le profil",
-      "profile_confirm_delete": "Confirmer la suppression"
+      "profile_confirm_delete": "Confirmer la suppression",
+      "source_retry": "Connexion aux sous-titres interrompue. Nouvelle tentative…",
+      "source_unavailable": "Sous-titres source indisponibles. Sélectionnez à nouveau la piste."
     },
     "de": {
       "ai_title": "KI-Untertitelübersetzung",
@@ -805,7 +817,9 @@
       "profile_delete_inline": "Dieses Profil und seinen gespeicherten Schlüssel vom Gerät löschen? Andere Profile bleiben erhalten. Dies lässt sich nicht rückgängig machen.",
       "profile_delete_switch": "Nach dem Löschen aktivieren:",
       "profile_keep": "Profil behalten",
-      "profile_confirm_delete": "Löschen bestätigen"
+      "profile_confirm_delete": "Löschen bestätigen",
+      "source_retry": "Untertitelverbindung unterbrochen. Erneuter Versuch…",
+      "source_unavailable": "Quelluntertitel nicht verfügbar. Bitte Untertitelspur erneut auswählen."
     },
     "pt": {
       "ai_title": "Tradução de legendas com IA",
@@ -929,7 +943,9 @@
       "profile_delete_inline": "Eliminar este perfil e a sua chave guardada do dispositivo? Os outros perfis são mantidos. Não é possível anular.",
       "profile_delete_switch": "Após eliminar, ativar:",
       "profile_keep": "Manter perfil",
-      "profile_confirm_delete": "Confirmar eliminação"
+      "profile_confirm_delete": "Confirmar eliminação",
+      "source_retry": "Conexão das legendas interrompida. Tentando novamente…",
+      "source_unavailable": "Legendas de origem indisponíveis. Selecione a faixa novamente."
     },
     "ru": {
       "ai_title": "Перевод субтитров с ИИ",
@@ -1053,7 +1069,9 @@
       "profile_delete_inline": "Удалить этот профиль и его сохранённый ключ с устройства? Другие профили сохранятся. Действие нельзя отменить.",
       "profile_delete_switch": "После удаления включить:",
       "profile_keep": "Сохранить профиль",
-      "profile_confirm_delete": "Подтвердить удаление"
+      "profile_confirm_delete": "Подтвердить удаление",
+      "source_retry": "Соединение с субтитрами прервано. Повторная попытка…",
+      "source_unavailable": "Исходные субтитры недоступны. Выберите дорожку ещё раз."
     },
     "ja": {
       "ai_title": "AI 字幕翻訳",
@@ -1177,7 +1195,9 @@
       "profile_delete_inline": "このプロファイルと端末に保存されたキーを削除しますか？他のプロファイルは保持されます。元に戻せません。",
       "profile_delete_switch": "削除後に有効にするプロファイル：",
       "profile_keep": "プロファイルを残す",
-      "profile_confirm_delete": "削除を確定"
+      "profile_confirm_delete": "削除を確定",
+      "source_retry": "字幕の接続が切れました。再試行中…",
+      "source_unavailable": "元の字幕を取得できません。字幕トラックを選び直してください。"
     },
     "ko": {
       "ai_title": "AI 자막 번역",
@@ -1301,7 +1321,9 @@
       "profile_delete_inline": "이 프로필과 기기에 저장된 키를 삭제할까요? 다른 프로필은 유지됩니다. 되돌릴 수 없습니다.",
       "profile_delete_switch": "삭제 후 활성화:",
       "profile_keep": "프로필 유지",
-      "profile_confirm_delete": "삭제 확인"
+      "profile_confirm_delete": "삭제 확인",
+      "source_retry": "자막 연결이 끊겼습니다. 다시 시도 중…",
+      "source_unavailable": "원본 자막을 불러올 수 없습니다. 자막 트랙을 다시 선택하세요."
     },
     "ar": {
       "ai_title": "ترجمة الترجمة النصية بالذكاء الاصطناعي",
@@ -1425,7 +1447,9 @@
       "profile_delete_inline": "هل تريد حذف هذا الملف ومفتاحه المحفوظ من الجهاز؟ تبقى الملفات الأخرى. لا يمكن التراجع.",
       "profile_delete_switch": "بعد الحذف، تفعيل:",
       "profile_keep": "الإبقاء على الملف",
-      "profile_confirm_delete": "تأكيد الحذف"
+      "profile_confirm_delete": "تأكيد الحذف",
+      "source_retry": "انقطع اتصال الترجمة. جارٍ إعادة المحاولة…",
+      "source_unavailable": "الترجمة الأصلية غير متاحة. أعد اختيار مسار الترجمة."
     },
     "hi": {
       "ai_title": "AI उपशीर्षक अनुवाद",
@@ -1549,7 +1573,9 @@
       "profile_delete_inline": "इस प्रोफ़ाइल और डिवाइस पर सहेजी कुंजी को मिटाएँ? अन्य प्रोफ़ाइल सुरक्षित रहेंगी। यह वापस नहीं हो सकता।",
       "profile_delete_switch": "मिटाने के बाद सक्रिय करें:",
       "profile_keep": "प्रोफ़ाइल रखें",
-      "profile_confirm_delete": "मिटाने की पुष्टि करें"
+      "profile_confirm_delete": "मिटाने की पुष्टि करें",
+      "source_retry": "उपशीर्षक कनेक्शन टूट गया। फिर कोशिश की जा रही है…",
+      "source_unavailable": "मूल उपशीर्षक उपलब्ध नहीं हैं। उपशीर्षक ट्रैक फिर चुनें।"
     },
     "id": {
       "ai_title": "Terjemahan subtitel AI",
@@ -1673,7 +1699,9 @@
       "profile_delete_inline": "Hapus profil ini dan kunci tersimpannya dari perangkat? Profil lain tetap ada. Tidak dapat dibatalkan.",
       "profile_delete_switch": "Setelah dihapus, aktifkan:",
       "profile_keep": "Pertahankan profil",
-      "profile_confirm_delete": "Konfirmasi hapus"
+      "profile_confirm_delete": "Konfirmasi hapus",
+      "source_retry": "Koneksi subtitel terputus. Mencoba lagi…",
+      "source_unavailable": "Subtitel sumber tidak tersedia. Pilih kembali trek subtitel."
     },
     "vi": {
       "ai_title": "Dịch phụ đề bằng AI",
@@ -1797,7 +1825,9 @@
       "profile_delete_inline": "Xóa hồ sơ này và khóa đã lưu khỏi thiết bị? Các hồ sơ khác được giữ lại. Không thể hoàn tác.",
       "profile_delete_switch": "Sau khi xóa, kích hoạt:",
       "profile_keep": "Giữ hồ sơ",
-      "profile_confirm_delete": "Xác nhận xóa"
+      "profile_confirm_delete": "Xác nhận xóa",
+      "source_retry": "Kết nối phụ đề bị gián đoạn. Đang thử lại…",
+      "source_unavailable": "Không thể tải phụ đề gốc. Hãy chọn lại bản phụ đề."
     }
   },
   "source_keys": {

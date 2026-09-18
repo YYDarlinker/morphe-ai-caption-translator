@@ -122,4 +122,6 @@
     <string name="cap_profile_delete_switch" formatted="false">"Nach dem Löschen aktivieren:"</string>
     <string name="cap_profile_keep" formatted="false">"Profil behalten"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Löschen bestätigen"</string>
+    <string name="cap_source_retry" formatted="false">"Untertitelverbindung unterbrochen. Erneuter Versuch…"</string>
+    <string name="cap_source_unavailable" formatted="false">"Quelluntertitel nicht verfügbar. Bitte Untertitelspur erneut auswählen."</string>
 </resources>

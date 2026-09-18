@@ -228,6 +228,13 @@ static void setMainActivity(Activity activity) {
             if (current != null && !current.cancelled && current.requestKey.equals(requestKey) &&
                     sameTranslationConfig(current.config, config)) {
                 current.activatedAtMs = SystemClock.elapsedRealtime();
+                // Same track/config, possibly a newly signed URL after network recovery.
+                if(!current.translatedUrl.equals(translatedUrl)) {
+                    current.translatedUrl=translatedUrl;
+                    if(!current.timelineReady && current.sourceFailed) {
+                        current.terminalError=false;current.error="";current.sourceRetryAtMs=0;
+                    }
+                }
                 boolean instant = visible && !current.visible && current.firstReady;
                 if (visible) current.visible = true;
                 if (current.visible) render(current, current.currentTimeMs);
@@ -270,7 +277,7 @@ static void setMainActivity(Activity activity) {
                 "固定翻译单元 + 只读上下文；" +
                         (visible ? "当前单元优先" : "仅预热源轨、单元和缓存，不预翻译")
         );
-        session.sourceTask = SOURCES.submit(() -> loadAndStart(session));
+        scheduleSource(session);
     }
 
     static void observeTimedTextUrl(String url) {
@@ -378,9 +385,28 @@ static void setMainActivity(Activity activity) {
                 stage + "；用时 " + Math.max(0L, SystemClock.elapsedRealtime() - started) + " ms");
     }
 
+    private static void scheduleSource(Session session) {
+        synchronized(session.lock) {
+            if(!isCurrent(session)||session.cancelled||session.timelineReady||session.terminalError||session.sourceLoading||
+                    session.sourceRetryAtMs>SystemClock.elapsedRealtime()||(!session.visible&&session.sourceFailures>0))return;
+            session.sourceLoading=true;
+            session.sourceTask=SOURCES.submit(()->loadAndStart(session));
+        }
+    }
+
     private static void loadAndStart(Session session) {
+        long started=SystemClock.elapsedRealtime();
+        String attemptUrl=session.translatedUrl;
         try {
-            RawCaptionSource.Source source = RawCaptionSource.load(session.context, session.translatedUrl, false, !session.sourceOnly);
+            RawCaptionSource.Source source = RawCaptionSource.load(session.context, attemptUrl, false, !session.sourceOnly,
+                    new DeepSeekApiClient.RequestControl(){
+                        public boolean isCancelled(){return session.cancelled||!isCurrent(session);}
+                        public void onConnection(HttpURLConnection connection){
+                            session.sourceConnection=connection;
+                            if(connection!=null&&isCancelled())connection.disconnect();
+                        }
+                    });
+            markPreprocessStage(session,"source fetch + timing",started);
             if (!isCurrent(session) || session.cancelled) return;
             long stageStarted = SystemClock.elapsedRealtime();
             int appendEvents = SourceAtomTimeline.countAppendEvents(source.body);
@@ -466,7 +492,7 @@ static void setMainActivity(Activity activity) {
                     session.startupAnchorTimeMs = session.currentTimeMs;
                     session.startupAnchorIndex = anchor(session.units, session.currentTimeMs);
                     session.startupSeekDebounceConsumed = false;
-                    session.timelineReady = true;
+                    session.error="";session.sourceFailed=false;session.sourceRetryAtMs=0;
                 }
             }
 
@@ -478,8 +504,11 @@ static void setMainActivity(Activity activity) {
             synchronized (session.lock) {
                 // Keep independently translated windows separate; no cross-window semantic evidence.
                 int current = anchor(session.units, session.currentTimeMs);
+                if(session.cancelled || !isCurrent(session))return;
                 session.firstReady = isReadyLocked(session, current);
                 currentCacheHit = session.firstReady;
+                // Display ticks cannot race cache restoration and send a duplicate paid request.
+                session.timelineReady=true;
             }
             TokenCostAudit.recordUnitCacheOutcome(
                     timeline.units.size(), cached, currentCacheHit
@@ -501,12 +530,33 @@ static void setMainActivity(Activity activity) {
             }
         } catch (Throwable failure) {
             if (!session.cancelled && isCurrent(session)) {
-                failSession(session, CaptionDiagnostics.errorDetail(failure));
+                SourceRecoveryPolicy.Failure reason=SourceRecoveryPolicy.classify(failure);
+                boolean descriptorChanged=!attemptUrl.equals(session.translatedUrl);
+                if((reason.retryable || descriptorChanged) && !session.timelineReady) {
+                    long delay;
+                    synchronized(session.lock) {
+                        session.sourceFailed=true;session.sourceFailures++;
+                        delay=descriptorChanged?0:SourceRecoveryPolicy.delay(session.sourceFailures,reason.retryAfterMs);
+                        session.sourceRetryAtMs=SystemClock.elapsedRealtime()+delay;
+                        session.error=CaptionStrings.settings(session.context,"source_retry");
+                    }
+                    CaptionDiagnostics.mark(session.context,"SOURCE_RETRY_SCHEDULED",
+                            "category="+reason.category+";attempt="+session.sourceFailures+";delay_ms="+delay+
+                            ";source_get_only=true;elapsed_ms="+(SystemClock.elapsedRealtime()-started));
+                    render(session,session.currentTimeMs);
+                } else {
+                    session.sourceFailed=true;
+                    CaptionDiagnostics.mark(session.context,"SOURCE_LOAD_FAILED","category="+reason.category);
+                    failSession(session,CaptionStrings.settings(session.context,"source_unavailable"));
+                }
             }
+        } finally {
+            synchronized(session.lock){session.sourceLoading=false;}
         }
     }
 
     private static void schedule(Session session) {
+        if(!session.timelineReady){scheduleSource(session);return;}
         if (!isCurrent(session) || session.cancelled || session.sourceOnly || session.terminalError || !session.timelineReady || !session.visible) return;
         Request cancelBackground = null;
         Request startRealtime = null;
@@ -525,7 +575,7 @@ static void setMainActivity(Activity activity) {
                 Request background = session.backgroundRequest;
                 boolean backgroundOwnsCurrent = background != null && background.contains(current);
                 if (backgroundOwnsCurrent && background.bodySent) {
-                    // The request already incurred provider work: await its bounded timeout,
+                    // The sent request may already incur provider work: await its bounded timeout,
                     // never pay for a speculative concurrent copy of the same source window.
                     if (session.lastPromotionSkippedSequence != background.sequence) {
                         session.lastPromotionSkippedSequence = background.sequence;
@@ -833,9 +883,14 @@ static void setMainActivity(Activity activity) {
             );
             finishBatch(session, request, result, started);
         } catch (Throwable failure) {
-            if(failure instanceof ContextualBatchApiClient.PermanentException) {
-                synchronized(session.lock) { detachRequestLocked(session,request); }
-                failSession(session,failure.getMessage());
+            if(failure instanceof ContextualBatchApiClient.PermanentException &&
+                    !"content_filter".equals(ContextualBatchApiClient.failureCategory(failure))) {
+                synchronized(session.lock) {
+                    if(!ContextualUnitCorePolicy.acceptsRequestResult(isCurrent(session),session.cancelled,request.cancelled,
+                            request.generation,session.generation))return;
+                    detachRequestLocked(session,request);
+                    failSession(session,failure.getMessage());
+                }
                 return;
             }
             failBatch(session, request, failure, started);
@@ -1182,47 +1237,34 @@ static void setMainActivity(Activity activity) {
         return Math.max(1L, Math.round(previous * 0.65d + clean * 0.35d));
     }
     private static void reprioritizeAfterSeek(Session session, long timeMs) {
-        Request realtime;
-        Request background;
+        Request cancelRealtime=null,cancelBackground=null;
+        int preserved=0;
         synchronized (session.lock) {
-            if (session.units.isEmpty()) return;
+            if (session.units.isEmpty() || session.terminalError) return;
             int current = anchor(session.units, timeMs);
             session.generation++;
             session.lastRenderSignature = "";
-            realtime = session.realtimeRequest;
-            background = session.backgroundRequest;
-            if (realtime != null) realtime.cancelled = true;
-            if (background != null) background.cancelled = true;
-            session.realtimeRequest = null;
-            session.backgroundRequest = null;
-            if (realtime != null) resetRequestLocked(session, realtime, PENDING);
-            if (background != null) resetRequestLocked(session, background, PENDING);
-            for (int i = Math.max(0, current - 1); i < Math.min(session.states.length, current + 8); i++) {
-                if (session.states[i] != READY) session.states[i] = PENDING;
-                session.realtimeAttempts[i] = 0;
-                session.realtimeRetryAfterMs[i] = 0L;
-                session.retryAfterMs[i] = 0L;
-                session.failureCounts[i] = 0;
-                session.lastFailureReasons[i] = "";
-                session.delayedRetryUsed[i] = false;
-                session.isolatedRetries[i] = false;
-                session.suppressedBridges[i] = false;
-                if (i < session.displayGroupsByUnit.length) {
-                    ContextualDisplayGroupPolicy.Group group = session.displayGroupsByUnit[i];
-                    if (group != null && session.displayPlans[group.firstUnit] == null) {
-                        session.groupWaitStartedAtMs[group.firstUnit] = 0L;
-                        session.groupSuppressed[group.firstUnit] = false;
-                    }
-                }
+            Request realtime=session.realtimeRequest,background=session.backgroundRequest;
+            if(realtime!=null) {
+                if(realtime.contains(current)){realtime.generation=session.generation;preserved++;}
+                else {realtime.cancelled=true;cancelRealtime=realtime;session.realtimeRequest=null;resetRequestLocked(session,realtime,PENDING);}
+            }
+            if(background!=null) {
+                if(background.bodySent || background.contains(current)){background.generation=session.generation;preserved++;}
+                else {background.cancelled=true;cancelBackground=background;session.backgroundRequest=null;resetRequestLocked(session,background,PENDING);}
+            }
+            // A revisit only reopens the demanded window. Do not reset the entire future retry budget.
+            if(current>=0 && current<session.states.length && session.states[current]!=READY && session.states[current]!=IN_FLIGHT) {
+                session.states[current]=PENDING;
+                session.realtimeAttempts[current]=0;
+                resetUnitRecoveryLocked(session,current);
+                session.fallbackLogged[current]=false;
             }
         }
-        if (realtime != null) realtime.cancel();
-        if (background != null) background.cancel();
-        CaptionDiagnostics.mark(
-                session.context,
-                "CONTEXTUAL_SEEK_REPRIORITIZED",
-                "已围绕跳转位置取消旧批次并重置附近 unit；保留全部 READY 缓存"
-        );
+        if(cancelRealtime!=null)cancelRealtime.cancel();
+        if(cancelBackground!=null)cancelBackground.cancel();
+        CaptionDiagnostics.mark(session.context,"CONTEXTUAL_SEEK_REPRIORITIZED",
+                "current_only=true;preserved_requests="+preserved+";ready_cache_preserved=true");
         schedule(session);
     }
 
@@ -1735,7 +1777,7 @@ static void setMainActivity(Activity activity) {
         final boolean priority;
         final boolean fallbackAllowed;
         final boolean concurrentRescue;
-        final long generation;
+        volatile long generation; // A same-video request that still covers a seek stays useful.
         final long sequence;
         volatile boolean sourceOnly;
         volatile boolean cancelled;
@@ -1838,7 +1880,7 @@ static void setMainActivity(Activity activity) {
         final long id;
         final long createdAtMs = SystemClock.elapsedRealtime();
         final Context context;
-        final String translatedUrl;
+        volatile String translatedUrl;
         final String requestKey;
         volatile String videoId;
         final TargetLanguage targetLanguage;
@@ -1869,6 +1911,10 @@ static void setMainActivity(Activity activity) {
         boolean[] fallbackLogged=new boolean[0];
         volatile String lastRenderSignature = "";
         volatile Future<?> sourceTask;
+        volatile HttpURLConnection sourceConnection;
+        volatile boolean sourceLoading,sourceFailed;
+        volatile int sourceFailures;
+        volatile long sourceRetryAtMs;
         volatile Request realtimeRequest;
         volatile Request backgroundRequest;
 
@@ -1925,6 +1971,8 @@ static void setMainActivity(Activity activity) {
                 backgroundRequest = null;
             }
             if (source != null) source.cancel(true);
+            HttpURLConnection sourceHttp=sourceConnection;
+            if(sourceHttp!=null)sourceHttp.disconnect();
             if (current != null) current.cancel();
             if (ahead != null) ahead.cancel();
         }

@@ -105,6 +105,11 @@ final class SourceCaptionCache {
         }
     }
 
+    static void remove(Context context,String key) {
+        new File(directory(context),key+".source").delete();
+        new File(directory(context),key+".type").delete();
+    }
+
     static void clear(Context context) {
         File[] files = directory(context).listFiles();
         if (files == null) return;

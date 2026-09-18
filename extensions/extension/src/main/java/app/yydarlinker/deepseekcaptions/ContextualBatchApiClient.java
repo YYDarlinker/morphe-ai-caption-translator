@@ -359,10 +359,12 @@ final class ContextualBatchApiClient {
         boolean auditRecorded = false;
         int auditAttempt = 0;
         int sentBodyBytes = 0;
+        NetworkDeadline timer=null;
         try {
             ensureActive(deadline, control);
             connection = (HttpURLConnection) new URL(completionUrl(config.baseUrl)).openConnection();
             if (control != null) control.onConnection(connection);
+            timer=new NetworkDeadline(connection,deadline);
             connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(boundedTimeout(deadline, CONNECT_TIMEOUT_MS));
@@ -384,10 +386,12 @@ final class ContextualBatchApiClient {
             if (control != null) control.onRequestBodySent();
 
             ensureActive(deadline, control);
+            connection.setReadTimeout(boundedTimeout(deadline,READ_TIMEOUT_MS));
             int status = connection.getResponseCode();
+            ensureActive(deadline,control);
             InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
             String response = stream == null ? "" : new String(
-                    readFully(stream, MAX_RESPONSE_BYTES), StandardCharsets.UTF_8
+                    readFully(stream, MAX_RESPONSE_BYTES,connection,deadline,control), StandardCharsets.UTF_8
             );
             consumed = true;
             if (status == 408 || status == 409 || status == 425 || status == 429 || status >= 500) {
@@ -450,21 +454,31 @@ final class ContextualBatchApiClient {
             }
             ensureActive(deadline, control);
             throw new RetryableException("network", "API 网络错误", network);
+        } catch(RetryableException failure) {
+            if(auditAttempt>0 && !auditRecorded){
+                TokenCostAudit.recordFailure(audit,auditAttempt,failure.category());
+                TokenCostAudit.recordSunkPrompt(audit,sentBodyBytes);auditRecorded=true;
+            }
+            throw failure;
         } finally {
             if (auditAttempt > 0 && !auditRecorded) {
                 TokenCostAudit.recordFailure(audit, auditAttempt, "cancelled_or_exception");
                 TokenCostAudit.recordSunkPrompt(audit, sentBodyBytes);
             }
+            if(timer!=null)timer.close();
             if (connection != null && !consumed) connection.disconnect();
             if (control != null) control.onConnection(null);
         }
     }
 
-    private static byte[] readFully(InputStream stream, int maxBytes) throws Exception {
+    static byte[] readFully(InputStream stream, int maxBytes,HttpURLConnection connection,long deadline,
+                            DeepSeekApiClient.RequestControl control) throws Exception {
         try (InputStream input = stream; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
-            int read;
-            while ((read = input.read(buffer)) >= 0) {
+            while (true) {
+                ensureActive(deadline,control);
+                connection.setReadTimeout(boundedTimeout(deadline,READ_TIMEOUT_MS));
+                int read=input.read(buffer);ensureActive(deadline,control);if(read<0)break;
                 if (output.size() + read > maxBytes) throw new IllegalStateException("网络响应过大");
                 output.write(buffer, 0, read);
             }

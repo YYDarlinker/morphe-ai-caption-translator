@@ -1,8 +1,9 @@
-# Inline API profile management — local scheme B
+# Inline API profile management — scheme B
 
-Status: this scheme-B slice is retained only on the local `local/scheme-b` branch, based on
-v1.3.2. It is not part of the GitHub release branch. The UI code does not change the caption
-engine or API request policy.
+Originally completed locally on v1.3.2 and retained in commit `f7dc223`. This slice is included
+with the 1.3.3 caption-recovery release. The UI code itself does not change the caption engine
+or API request policy. The verification below describes its earlier isolated local check;
+see CAPTION-RECOVERY-1.3.3.md and the release verification for the combined build.
 
 ## Interaction and visual treatment
 

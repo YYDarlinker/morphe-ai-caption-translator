@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.3.0...v1.3.1) (2026-09-18)
+
+### 🐛 Bug Fixes
+
+* simplify API profile management and restore reliable inline editing ([34834c8](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/34834c81c438ca9fb204a559a558ebf0f27705f2))
+
 ## [1.3.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.7...v1.3.0) (2026-09-18)
 
 ### ✨ New Features

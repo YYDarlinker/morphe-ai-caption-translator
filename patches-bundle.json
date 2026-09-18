@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-09-18T05:16:49",
-  "description": "## [1.3.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.2.7...v1.3.0) (2026-09-18)\n\n### ✨ New Features\n\n* add isolated named API profiles and provider-aware endpoint support ([4786edc](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/4786edc92dda16de6dfef53fc53d47b0f55412b6))",
-  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.3.0/patches-1.3.0.mpp",
+  "created_at": "2026-09-18T06:43:27",
+  "description": "## [1.3.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.3.0...v1.3.1) (2026-09-18)\n\n### 🐛 Bug Fixes\n\n* simplify API profile management and restore reliable inline editing ([34834c8](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/34834c81c438ca9fb204a559a558ebf0f27705f2))",
+  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.3.1/patches-1.3.1.mpp",
   "signature_download_url": "",
-  "version": "1.3.0"
+  "version": "1.3.1"
 }

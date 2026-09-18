@@ -260,6 +260,7 @@ static final String[][] ENGLISH={
 {"profile_keep","Keep profile"},
 {"profile_confirm_delete","Confirm deletion"},
 {"source_retry","Caption connection interrupted. Retrying…"},
-{"source_unavailable","Source captions unavailable. Try selecting the caption track again."}
+{"source_unavailable","Source captions unavailable. Try selecting the caption track again."},
+{"caption_overflow","Caption too long — original unavailable"}
 };
 }

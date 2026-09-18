@@ -25,11 +25,11 @@ public class ContinuityR3Test {
     }
     @Test public void rejectionHasReasonWithoutLeakingText() throws Exception {
         ContextualBatchApiClient.Result r=ContextualBatchApiClient.parseAnchored("{\"translations\":[{\"id\":\"w0\",\"segments\":[[5,\"private response\"]]}]}",Collections.singletonList(unit()),atoms());
-        assertEquals(0,r.validCount());assertTrue(r.rejectionReasons.get("w0").contains("range"));
+        assertEquals(0,r.validCount());assertTrue(r.rejectionReasons.get("w0").contains("source_phrase_object_required"));
         assertFalse(r.rejectionReasons.toString().contains("private"));
     }
     @Test public void incidentalFenceIsTransportNotTranslationFailure() throws Exception {
-        String raw="```json\n{\"translations\":[{\"id\":\"w0\",\"segments\":[[1,\"你好世界\"]]}]}\n```";
+        String raw="```json\n{\"translations\":[{\"id\":\"w0\",\"segments\":[[\"Hello world\",\"你好世界\"]]}]}\n```";
         assertEquals(1,ContextualBatchApiClient.parseAnchored(raw,Collections.singletonList(unit()),atoms()).validCount());
     }
     @Test public void contextIsBoundedOnBothSides(){

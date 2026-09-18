@@ -38,12 +38,12 @@ public class AnchoredCaptionTest {
         List<SourceAtomTimeline.Atom> a=atoms(4);TranslationUnitTimeline.Unit u=unit(a);
         ContextualBatchApiClient.Result result=ContextualBatchApiClient.parseAnchored(
           "{\"translations\":[{\"id\":\"unknown\",\"segments\":[[3,\"无关\"]]},"
-          +"{\"id\":\"w0\",\"segments\":[[3,\"完整的字幕翻译\"]]}]}",Collections.singletonList(u),a);
+          +"{\"id\":\"w0\",\"segments\":[[\"word0 word1 word2 word3\",\"完整的字幕翻译\"]]}]}",Collections.singletonList(u),a);
         assertEquals(1,result.validCount());assertEquals(1,result.unknownIds.size());assertEquals(1,result.plansById.size());
     }
     @Test public void duplicateIdsInvalidateEvenWhenThirdDuplicateIsValid() throws Exception {
         List<SourceAtomTimeline.Atom> a=atoms(4);
-        String row="{\"id\":\"w0\",\"segments\":[[3,\"完整的字幕翻译\"]]}";
+        String row="{\"id\":\"w0\",\"segments\":[[\"word0 word1 word2 word3\",\"完整的字幕翻译\"]]}";
         ContextualBatchApiClient.Result r=ContextualBatchApiClient.parseAnchored(
           "{\"translations\":["+row+","+row+","+row+"]}",Collections.singletonList(unit(a)),a);
         assertEquals(0,r.validCount());assertTrue(r.plansById.isEmpty());

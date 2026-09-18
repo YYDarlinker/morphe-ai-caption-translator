@@ -5,7 +5,7 @@ public class Recovery110HttpTest {
   MockWebServer server=new MockWebServer();server.start();
   try{
    ContextualBatchApiClient.resetRejection();
-   String content=new JSONObject().put("translations",new JSONArray().put(new JSONObject().put("id","w0").put("text","你好，世界。"))).toString();
+   String content=new JSONObject().put("translations",new JSONArray().put(new JSONObject().put("id","w0").put("segments",new JSONArray().put(new JSONObject().put("source","Hello world").put("translation","你好，世界。"))))).toString();
    server.enqueue(new MockResponse().setResponseCode(200).setBody(new JSONObject().put("choices",new JSONArray().put(new JSONObject().put("finish_reason","stop").put("message",new JSONObject().put("content",content)))).toString()));
    DeepSeekConfig.Snapshot config=new DeepSeekConfig.Snapshot(true,server.url("/").toString(),"deepseek-flash","Faithful",18,70,"FAKE-LOCAL-KEY");
    List<SourceAtomTimeline.Atom> atoms=Arrays.asList(new SourceAtomTimeline.Atom(0,1000,"Hello",0,true),new SourceAtomTimeline.Atom(1000,2000,"world",0,true));
@@ -14,7 +14,8 @@ public class Recovery110HttpTest {
    assertEquals(1,result.validCount());assertEquals(1,server.getRequestCount());
    JSONObject request=new JSONObject(server.takeRequest().getBody().readUtf8());
    JSONObject payload=new JSONObject(request.getJSONArray("messages").getJSONObject(1).getString("content"));
-   assertEquals("whole_text_recovery",payload.getJSONArray("targets").getJSONObject(0).getString("response_mode"));
+   assertFalse(payload.getJSONArray("targets").getJSONObject(0).has("response_mode"));
+   assertTrue(payload.getJSONArray("targets").getJSONObject(0).has("repair_instruction"));
    assertTrue(request.getInt("max_tokens")<=3072);
   }finally{server.shutdown();ContextualBatchApiClient.resetRejection();}
  }

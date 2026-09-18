@@ -18,6 +18,12 @@ final class ProviderRequestPolicy {
         if("api.minimax.io".equals(host)||"api.minimaxi.com".equals(host))r.put("reasoning_split",true);
         if("api.deepseek.com".equals(host)) r.put("thinking",new JSONObject().put("type","disabled"));
         if(ProviderEndpoint.bailian(host)||"api.siliconflow.cn".equals(host)||"api.siliconflow.com".equals(host)) r.put("enable_thinking",false);
+        if(ProviderEndpoint.bailian(host) && (config.model.equals("qwen3.8-flash") || config.model.startsWith("qwen3.8-flash-"))) {
+            r.put("response_format",CaptionWireProtocol.schema());
+            // Copy-sensitive translation: no novelty/repetition incentive. Keep the provider's
+            // temperature until controlled quality evaluation justifies changing it.
+            r.put("presence_penalty",0);
+        }
         if("api.anthropic.com".equals(host))r.remove("response_format"); // Compatibility API ignores it; prompt still requires JSON.
         if("open.bigmodel.cn".equals(host)||ProviderEndpoint.ark(host))
             r.put("thinking",new JSONObject().put("type","disabled"));
@@ -27,7 +33,8 @@ final class ProviderRequestPolicy {
     static String reason(String body) {
         String text=body==null ? "" : body.toLowerCase(Locale.ROOT);
         if(text.contains("json") && (text.contains("messages") || text.contains("prompt"))) return "json_prompt_required";
-        if(text.contains("response_format") || text.contains("json_object")) return "response_format_unsupported";
+        if(text.contains("response_format") || text.contains("json_object") || text.contains("json_schema")) return "response_format_unsupported";
+        if(text.contains("presence_penalty"))return "presence_penalty_unsupported";
         if(text.contains("thinking")) return "thinking_unsupported";
         if(text.contains("model")) return "model_rejected";
         if(text.contains("token")) return "output_budget_rejected";
@@ -35,7 +42,15 @@ final class ProviderRequestPolicy {
     }
     static boolean removeOptional(JSONObject request,String category) {
         boolean changed=false;
-        if(category!=null&&category.contains("response_format")){changed=request.has("response_format");request.remove("response_format");return changed;}
+        if(category!=null&&category.contains("response_format")){
+            JSONObject format=request.optJSONObject("response_format");
+            if(format!=null && "json_schema".equals(format.optString("type"))) {
+                try {request.put("response_format",new JSONObject().put("type","json_object"));}catch(JSONException impossible){throw new IllegalStateException(impossible);}
+                return true;
+            }
+            changed=request.has("response_format");request.remove("response_format");return changed;
+        }
+        if(category!=null&&category.contains("presence_penalty")){changed=request.has("presence_penalty");request.remove("presence_penalty");return changed;}
         if(category!=null&&category.contains("thinking")){changed=request.has("thinking")||request.has("enable_thinking");request.remove("thinking");request.remove("enable_thinking");return changed;}
         return removeOptional(request);
     }

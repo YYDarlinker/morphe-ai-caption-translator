@@ -43,6 +43,8 @@ final class DeepSeekApiClient {
          * started work; receipt and billing are not proven. Avoid speculative duplicate POSTs.
          */
         default void onRequestBodySent() {}
+        default void onQualityEvidence(JSONObject source, String response, String metadata) {}
+
     }
 
     static List<String> translateWindow(

@@ -82,7 +82,7 @@ final class ContextualBatchApiClient {
             );
             sourceChars += text.length();
             JSONObject item=new JSONObject().put("id",unit.id).put("span_ms",unit.endMs-unit.startMs)
-                    .put("source_text",text);
+                    .put("source_text",text).put("boundary",unit.reason);
             JSONArray times=new JSONArray();
             for(int n=unit.fromAtom;n<=unit.toAtom;n++) times.put(new JSONArray().put(atoms.get(n).text).put(Math.round((atoms.get(n).endMs-unit.startMs)/100.0)));
             item.put("timed_words",times);
@@ -95,7 +95,7 @@ final class ContextualBatchApiClient {
             if(protectedTerms.length()>0)item.put("preserve_terms",protectedTerms);
             if(repair.containsKey(unit.id)) {
                 item.put("previous_validation_error",repair.get(unit.id));
-                if(ProtocolRecovery.wholeText(repair.get(unit.id),unit)) item.put("response_mode","whole_text_recovery");
+                item.put("repair_instruction","Return the same source coverage as named source/translation segments; split only at coherent source clauses, never flatten to one paragraph.");
             }
             targetValues.put(item);
         }
@@ -138,7 +138,13 @@ final class ContextualBatchApiClient {
         while(true) {
             ensureActive(deadline,control);
             try {
-                Result result=parseAnchored(post(config,request,deadline,control,audit),targets,atoms,repair);
+                String content=post(config,request,deadline,control,audit);
+                if(control!=null)control.onQualityEvidence(payload,content,
+                        "protocol="+CaptionWireProtocol.VERSION+";format="+(request.optJSONObject("response_format")==null?"prompt_json":request.optJSONObject("response_format").optString("type"))+
+                        ";thinking="+request.opt("enable_thinking")+";presence_penalty="+request.opt("presence_penalty")+
+                        ";temperature="+(request.has("temperature")?request.opt("temperature"):"provider_default")+
+                        ";negotiated="+negotiated+";category="+negotiatedCategory);
+                Result result=parseAnchored(content,targets,atoms,repair);
                 if(negotiated)negotiation=new Negotiation(identity(config),negotiatedCategory);
                 TokenCostAudit.recordUnitBatchOutcome(audit,result.validCount());
                 return result;
@@ -200,17 +206,28 @@ final class ContextualBatchApiClient {
             if(!seen.add(id)) { plans.remove(id); texts.remove(id); invalid.add(id); reasons.put(id,"duplicate_response_id"); continue; }
             try {
                 JSONArray segments=row.optJSONArray("segments");
-                if(segments==null && ProtocolRecovery.wholeText(repair.get(id),unit) && row.opt("text") instanceof String)
-                    segments=new JSONArray().put(new JSONArray().put(unit.toAtom-unit.fromAtom).put(row.getString("text")));
+
                 AnchoredCaptionPlan plan=AnchoredCaptionPlan.parseSourcePhrases(segments,atoms,unit,row.optJSONArray("attach_next"));
                 plans.put(id,plan); texts.put(id,plan.canonical);
-            } catch(Exception rejected) { invalid.add(id); reasons.put(id,(rejected.getMessage()==null ? "invalid_structure" : rejected.getMessage())+";last="+(unit.toAtom-unit.fromAtom)+";ends="+safeEnds(row.optJSONArray("segments"))); }
+            } catch(Exception rejected) { invalid.add(id); reasons.put(id,(rejected.getMessage()==null ? "invalid_structure" : rejected.getMessage())+";last="+(unit.toAtom-unit.fromAtom)+";shape="+safeShape(row.optJSONArray("segments"))); }
         }
         for(TranslationUnitTimeline.Unit unit:targets) if(!plans.containsKey(unit.id)) missing.add(unit.id);
         Result result=new Result(texts,missing,invalid,unknown);
         result.plansById.putAll(plans);
         result.rejectionReasons.putAll(reasons);
         return result;
+    }
+
+    static String safeShape(JSONArray rows) {
+        if(rows==null)return "missing";StringBuilder out=new StringBuilder();
+        for(int i=0;i<Math.min(12,rows.length());i++) {
+            if(i>0)out.append(',');Object row=rows.opt(i);
+            if(row instanceof JSONObject) {JSONObject o=(JSONObject)row;
+                out.append(o.opt("source") instanceof String && o.opt("translation") instanceof String?"source_translation":"object_fields");}
+            else if(row instanceof JSONArray) {JSONArray a=(JSONArray)row;out.append("array").append(a.length()).append(a.opt(0) instanceof String?"_phrase":"_nonphrase");}
+            else out.append("nonsegment");
+        }
+        return out.toString();
     }
 
     static String safeEnds(JSONArray rows) {
@@ -423,6 +440,7 @@ final class ContextualBatchApiClient {
             }
             JSONObject choice = choices.optJSONObject(0);
             String finish = choice == null ? "" : choice.optString("finish_reason", "");
+            if(control!=null)control.onQualityEvidence(null,"","response_model="+root.optString("model", "unreported")+";finish_reason="+finish);
             if ("length".equals(finish)) {
                 throw new BatchFormatException("finish_length", "API 输出达到 max_tokens，固定单元 JSON 被截断");
             }

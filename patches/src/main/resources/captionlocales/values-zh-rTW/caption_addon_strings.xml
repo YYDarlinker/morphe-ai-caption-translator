@@ -124,4 +124,5 @@
     <string name="cap_profile_confirm_delete" formatted="false">"確認刪除"</string>
     <string name="cap_source_retry" formatted="false">"字幕連線中斷，正在自動重試…"</string>
     <string name="cap_source_unavailable" formatted="false">"暫時無法取得原字幕，請重新選擇字幕軌道。"</string>
+    <string name="cap_caption_overflow" formatted="false">"字幕過長，原文暫不可用"</string>
 </resources>

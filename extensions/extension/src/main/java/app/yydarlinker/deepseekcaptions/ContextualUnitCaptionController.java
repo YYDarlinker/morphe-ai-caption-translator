@@ -49,7 +49,7 @@ final class ContextualUnitCaptionController {
     private static final long LONG_DISPLAY_THRESHOLD_MS = 5_200L;
     private static final int CACHE_FORMAT = 3;
     private static final byte[] CACHE_MARKER =
-            "\n#ai-source-phrase-113".getBytes(StandardCharsets.UTF_8);
+            "\n#ai-semantic-objects-134".getBytes(StandardCharsets.UTF_8);
 
     private static final AtomicLong SESSION_IDS = new AtomicLong();
     private static final AtomicLong THREAD_IDS = new AtomicLong();
@@ -427,8 +427,8 @@ static void setMainActivity(Activity activity) {
                     "; nativeRatio="+atomized.preciseRatio());
             if (!sessionMayContinue(session)) return;
             stageStarted = SystemClock.elapsedRealtime();
-            TranslationUnitTimeline.Result timeline = session.sourceOnly ? NativeSourcePlan.build(source.document) : AnchoredWindowPlanner.build(atomized);
-            markPreprocessStage(session, "TranslationUnitTimeline.build", stageStarted);
+            TranslationUnitTimeline.Result timeline = session.sourceOnly ? NativeSourcePlan.build(source.document) : SemanticTaskPlanner.build(atomized);
+            markPreprocessStage(session, "SemanticTaskPlanner.build", stageStarted);
             if (!sessionMayContinue(session)) return;
             if (timeline.units.isEmpty()) {
                 failSession(session, "这个视频没有可用的本地翻译单元");
@@ -467,6 +467,7 @@ static void setMainActivity(Activity activity) {
                     session.groupWaitStartedAtMs = new long[count];
                     session.groupSuppressed = new boolean[count];
                     session.states = new int[count];
+                    session.qualityRepairs=new int[count];
                     session.realtimeAttempts = new int[count];
                     session.realtimeRetryAfterMs = new long[count];
                     session.delayedRetryUsed = new boolean[count];
@@ -867,6 +868,10 @@ static void setMainActivity(Activity activity) {
                             }
                         }
 
+                        @Override public void onQualityEvidence(JSONObject source,String response,String metadata) {
+                            if(!isCancelled())CaptionQualityTrace.record(session.context,session.config.apiKey,request.sequence,source,response,metadata);
+                        }
+
                         @Override public void onRequestBodySent() {
                             request.bodySent = true;
                             request.bodySentAtMs = SystemClock.elapsedRealtime();
@@ -1191,6 +1196,18 @@ static void setMainActivity(Activity activity) {
                 session.states[index] == READY) return;
         recordFailureLocked(session, index, reason);
         int failures = session.failureCounts[index];
+        if(CaptionQualityPolicy.failure(reason)) {
+            boolean repeated=session.qualityRepairs[index]++>0;
+            // At most one quality-only repair per task and four per playback session. Other
+            // errors still share the existing three-failure budget; no speculative duplicate.
+            if(repeated || session.qualityRepairCount>=4) {
+                session.states[index]=PERMANENT_FAILURE;session.retryAfterMs[index]=Long.MAX_VALUE;
+                CaptionDiagnostics.mark(session.context,"CAPTION_QUALITY_FALLBACK","unit="+index+";quality_repair_budget_exhausted=true");
+                return;
+            }
+            session.qualityRepairCount++;
+            session.isolatedRetries[index]=true;
+        }
         ContextualUnitCorePolicy.RetryDecision decision =
                 AnchoredRetryPolicy.decide(failureKind, failures, priority);
         if (decision.permanent) {
@@ -1398,7 +1415,13 @@ static void setMainActivity(Activity activity) {
                                 selectedSourceText = plan.sourceText;
                                 selectedCanonicalText = plan.canonicalText;
                                 if(selectedSlice>=0){DisplaySlice actual=plan.slices.get(selectedSlice);
-                                    selectedBoundaryReason += ";start="+actual.startMs+";end="+actual.endMs+";chars="+CaptionPresentationPolicy.visible(actual.text);}
+                                    selectedBoundaryReason += ";start="+actual.startMs+";end="+actual.endMs+";chars="+CaptionPresentationPolicy.visible(actual.text);
+                                    AnchoredCaptionPlan aligned=session.anchoredPlans[index];
+                                    if(aligned!=null && selectedSlice<aligned.segments.size()){
+                                        AnchoredCaptionPlan.Segment sg=aligned.segments.get(selectedSlice);
+                                        selectedSourceText=SourceAtomTimeline.join(session.atoms,unit.fromAtom+sg.from,unit.fromAtom+sg.to);
+                                    }
+                                }
                                 text = plan.textAt(timeMs);
                                 if(!session.sourceOnly) text=CaptionPresentationPolicy.wrap(text);
                                 if (text == null) text = "";
@@ -1468,7 +1491,7 @@ static void setMainActivity(Activity activity) {
         CaptionOverlay.RenderGuard guard = overlayGuard(session, renderGeneration);
         if (text.isEmpty()) CaptionOverlay.hide(guard);
         else if (status) CaptionOverlay.showStatus(text, guard);
-        else CaptionOverlay.showCaption(text, guard);
+        else CaptionOverlay.showCaption(text, guard, () -> overflowSource(session,timeMs,renderGeneration));
     }
 
     private static String diagnosticText(String value, int maxChars) {
@@ -1506,6 +1529,14 @@ static void setMainActivity(Activity activity) {
             end = Math.max(end, session.units.get(i).endMs);
         }
         return Math.max(0L, end - session.currentTimeMs);
+    }
+
+    private static String overflowSource(Session session,long timeMs,long generation) {
+        synchronized(session.lock) {
+            if(!isCurrent(session)||session.cancelled||session.generation!=generation)return "";
+            int i=anchor(session.units,timeMs);if(i<0||i>=session.units.size())return "";
+            return CaptionFailureFallback.compactText(session.atoms,session.units.get(i),timeMs);
+        }
     }
 
     private static boolean isReadyLocked(Session session, int index) {
@@ -1908,6 +1939,8 @@ static void setMainActivity(Activity activity) {
         volatile int startupAnchorIndex = -1;
         volatile String error = "";
         volatile String cacheKey = "";
+        int qualityRepairCount;
+        int[] qualityRepairs=new int[0];
         boolean[] fallbackLogged=new boolean[0];
         volatile String lastRenderSignature = "";
         volatile Future<?> sourceTask;

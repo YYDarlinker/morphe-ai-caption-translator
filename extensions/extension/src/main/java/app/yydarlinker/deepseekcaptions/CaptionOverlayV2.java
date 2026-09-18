@@ -44,6 +44,7 @@ final class CaptionOverlay {
     private static WeakReference<TextView> textRef = new WeakReference<>(null);
 
     private static String pendingText = "";
+    private static java.util.function.Supplier<String> overflowSource;
     private static boolean pendingStatus;
     private static boolean suppressed;
     private static boolean guardedExpansion;
@@ -107,6 +108,9 @@ final class CaptionOverlay {
         else scheduleGeometry();
     });}
 
+    static void showCaption(String text,RenderGuard guard,java.util.function.Supplier<String> source) {
+        show(text,false,guard,source);
+    }
     static void showCaption(String text) { show(text, false, null); }
     static void showStatus(String text) { show(text, true, null); }
     static void showCaption(String text, RenderGuard guard) { show(text, false, guard); }
@@ -170,6 +174,7 @@ final class CaptionOverlay {
         runMain(() -> {
             if (!allows(guard)) return;
             pendingText = "";
+            overflowSource=null;
             FrameLayout anchor = anchorRef.get();
             TextView text = textRef.get();
             if (text != null) text.setClickable(false);
@@ -180,6 +185,7 @@ final class CaptionOverlay {
     static void clear() {
         runMain(() -> {
             pendingText = "";
+            overflowSource=null;
             pendingStatus = false;
             guardedExpansion = false;
             detachOverlay();
@@ -203,11 +209,13 @@ final class CaptionOverlay {
         if (anchor != null) anchor.setVisibility(View.GONE);
     }
 
-    private static void show(String text, boolean status, RenderGuard guard) {
+    private static void show(String text, boolean status, RenderGuard guard) { show(text,status,guard,null); }
+    private static void show(String text,boolean status,RenderGuard guard,java.util.function.Supplier<String> source) {
         String clean = text == null ? "" : text.trim();
         runMain(() -> {
             if (!allows(guard)) return;
             pendingText = clean;
+            overflowSource=source;
             pendingStatus = status;
             if (clean.isEmpty() || suppressed || guardedExpansion) {
                 FrameLayout anchor = anchorRef.get();
@@ -345,7 +353,18 @@ final class CaptionOverlay {
 
         view.setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED);
         view.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
-        view.setText(pendingText);
+        String shown=pendingText;
+        int available=Math.max(1,anchorWidth-view.getPaddingLeft()-view.getPaddingRight());
+        if(lineCount(activity,shown,finalSp,available)>2) {
+            // Never crop a translated paragraph or turn it into tiny text. It is a labelled
+            // source fallback, not a successful translation; actual lines remain readable.
+            String source=overflowSource==null?"":overflowSource.get();
+            shown=source==null?"":source;
+            if(shown.isEmpty()||lineCount(activity,shown,finalSp,available)>2)
+                shown=CaptionStrings.get(activity,"caption_overflow");
+            if(lineCount(activity,shown,finalSp,available)>2)shown="…";
+        }
+        view.setText(shown);
         view.setSingleLine(false);
         view.setMaxLines(2); // setSingleLine(false) resets maxLines on Android.
         try { view.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE); }
@@ -387,19 +406,10 @@ final class CaptionOverlay {
             size = Math.max(minimum, size - 0.5f);
         }
         if (lineCount(activity,text,size,available)>2) {
-            // A valid older cached plan or provider can still return a paragraph. Do not silently
-            // crop its tail at maxLines=2, invent timing, or buy another model pass. Fit the whole
-            // event as an explicitly degraded last resort; normal clauses keep the chosen style.
-            float low=Math.max(0.1f,Math.min(size,preferred)/64f), high=size;
-            for(int i=0;i<12;i++){
-                float mid=(low+high)/2f;
-                if(lineCount(activity,text,mid,available)<=2)low=mid;else high=mid;
-            }
-            size=low;
             if(!text.equals(lastOverflowText)||lastOverflowWidth!=available){
                 lastOverflowText=text;lastOverflowWidth=available;
-                CaptionDiagnostics.mark(activity,"OVERLAY_READABILITY_DEGRADED",
-                        "two_line_fit=true;chars="+text.length()+";sp="+size+";preferred_min_sp="+minimum);
+                CaptionDiagnostics.mark(activity,"OVERLAY_READABILITY_FALLBACK",
+                        "minimum_font_preserved=true;chars="+text.length()+";sp="+size);
             }
         }
         return size;

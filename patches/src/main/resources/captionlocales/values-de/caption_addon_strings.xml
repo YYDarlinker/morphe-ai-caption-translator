@@ -124,4 +124,5 @@
     <string name="cap_profile_confirm_delete" formatted="false">"Löschen bestätigen"</string>
     <string name="cap_source_retry" formatted="false">"Untertitelverbindung unterbrochen. Erneuter Versuch…"</string>
     <string name="cap_source_unavailable" formatted="false">"Quelluntertitel nicht verfügbar. Bitte Untertitelspur erneut auswählen."</string>
+    <string name="cap_caption_overflow" formatted="false">"Untertitel zu lang – Original nicht verfügbar"</string>
 </resources>

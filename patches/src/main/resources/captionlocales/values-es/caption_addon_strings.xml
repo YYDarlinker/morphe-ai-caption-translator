@@ -124,4 +124,5 @@
     <string name="cap_profile_confirm_delete" formatted="false">"Confirmar eliminación"</string>
     <string name="cap_source_retry" formatted="false">"Conexión de subtítulos interrumpida. Reintentando…"</string>
     <string name="cap_source_unavailable" formatted="false">"Subtítulos de origen no disponibles. Vuelve a seleccionar la pista."</string>
+    <string name="cap_caption_overflow" formatted="false">"Subtítulo demasiado largo; original no disponible"</string>
 </resources>

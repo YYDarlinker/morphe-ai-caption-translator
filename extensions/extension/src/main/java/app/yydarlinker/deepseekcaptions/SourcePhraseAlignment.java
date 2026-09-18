@@ -1,18 +1,33 @@
 package app.yydarlinker.deepseekcaptions;
-import java.util.*;
-/** Match a copied contiguous source phrase at the CURRENT cursor, never search elsewhere. */
+import java.util.*;import java.util.regex.*;import java.text.Normalizer;
+/** Cursor-only, token-preserving match. Decorative punctuation may vary; numbers/signs may not. */
 final class SourcePhraseAlignment {
- static String canonical(String s){StringBuilder b=new StringBuilder();if(s!=null)s.toLowerCase(Locale.ROOT).codePoints().filter(Character::isLetterOrDigit).forEach(b::appendCodePoint);return b.toString();}
- static int end(String phrase,List<SourceAtomTimeline.Atom> atoms,int from,int last){
-  String target=canonical(phrase);StringBuilder actual=new StringBuilder();
-  for(int i=from;i<=last;i++){
-   actual.append(canonical(atoms.get(i).text));
-   if(actual.toString().equals(target)){
-    // Punctuation-only tails belong to the preceding phrase and must not become tiny events.
-    while(i<last&&canonical(atoms.get(i+1).text).isEmpty())i++;return i;
-   }
-   if(actual.length()>target.length()||!target.startsWith(actual.toString()))break;
-  }
-  throw new IllegalArgumentException("source_phrase_mismatch;cursor="+from);
- }
+    private static final Pattern TOKENS=Pattern.compile("[+-]?\\p{N}+(?:[.,:]\\p{N}+)*(?:%|％)?|[\\p{L}\\p{N}]+(?:['’][\\p{L}\\p{N}]+)*");
+    static String canonical(String text){
+        String s=Normalizer.normalize(text==null?"":text,Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).replace('’','\'');
+        Matcher m=TOKENS.matcher(s);StringBuilder b=new StringBuilder();
+        while(m.find()){
+            String token=m.group().replace("'","");
+            // Thousands separators are unambiguous only in complete three-digit groups.
+            if(token.matches("[+-]?\\d{1,3}(,\\d{3})+(\\.\\d+)?%?"))token=token.replace(",","");
+            if(b.length()>0)b.append('|');b.append(token);
+        }
+        return b.toString();
+    }
+    static int end(String phrase,List<SourceAtomTimeline.Atom> atoms,int from,int last){
+        String target=canonical(phrase);
+        if(target.isEmpty()){
+            if(from<=last&&canonical(atoms.get(from).text).isEmpty())return from;
+            throw new IllegalArgumentException("source_phrase_empty");
+        }
+        for(int i=from;i<=last;i++){
+            String actual=canonical(SourceAtomTimeline.join(atoms,from,i));
+            if(actual.equals(target)){
+                while(i<last&&canonical(atoms.get(i+1).text).isEmpty())i++;
+                return i;
+            }
+            if(actual.length()>target.length()||!target.startsWith(actual))break;
+        }
+        throw new IllegalArgumentException("source_phrase_mismatch;cursor="+from);
+    }
 }

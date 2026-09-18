@@ -22,8 +22,7 @@ public class Refinement112Test {
         List<SourceAtomTimeline.Atom> a=atoms("200","megapixels");
         AnchoredCaptionPlan p=AnchoredCaptionPlan.parseSourcePhrases(new JSONArray().put(new JSONArray().put("200").put("两百"))
                 .put(new JSONArray().put("megapixels").put("百万像素")),a,unit(a),null);
-        assertEquals(0,p.segments.get(0).from);assertEquals(900,p.segments.get(0).endMs);
-        assertEquals(1000,p.segments.get(1).startMs);
+        assertEquals(1,p.segments.size());assertEquals(0,p.segments.get(0).from);assertEquals(1900,p.segments.get(0).endMs);
         assertEquals(p.toJson().toString(),AnchoredCaptionPlan.parse(p.toJson(),a,unit(a)).toJson().toString());
     }
     @Test public void wrongNumericPhraseCannotBecomeAnIndex()throws Exception {

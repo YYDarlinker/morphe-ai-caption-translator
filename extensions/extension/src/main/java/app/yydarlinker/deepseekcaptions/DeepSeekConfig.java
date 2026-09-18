@@ -86,6 +86,7 @@ final class DeepSeekConfig {
 
     static void saveDisplayTextDebugEnabled(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(DISPLAY_TEXT_DEBUG, enabled).apply();
+        if(!enabled)CaptionQualityTrace.clear(context);
     }
 
     static void saveBaseUrl(Context context, String value) {

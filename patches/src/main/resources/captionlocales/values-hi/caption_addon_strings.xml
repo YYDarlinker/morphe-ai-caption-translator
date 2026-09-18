@@ -124,4 +124,5 @@
     <string name="cap_profile_confirm_delete" formatted="false">"मिटाने की पुष्टि करें"</string>
     <string name="cap_source_retry" formatted="false">"उपशीर्षक कनेक्शन टूट गया। फिर कोशिश की जा रही है…"</string>
     <string name="cap_source_unavailable" formatted="false">"मूल उपशीर्षक उपलब्ध नहीं हैं। उपशीर्षक ट्रैक फिर चुनें।"</string>
+    <string name="cap_caption_overflow" formatted="false">"उपशीर्षक बहुत लंबा है — मूल पाठ उपलब्ध नहीं"</string>
 </resources>

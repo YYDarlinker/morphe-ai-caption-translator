@@ -124,4 +124,5 @@
     <string name="cap_profile_confirm_delete" formatted="false">"تأكيد الحذف"</string>
     <string name="cap_source_retry" formatted="false">"انقطع اتصال الترجمة. جارٍ إعادة المحاولة…"</string>
     <string name="cap_source_unavailable" formatted="false">"الترجمة الأصلية غير متاحة. أعد اختيار مسار الترجمة."</string>
+    <string name="cap_caption_overflow" formatted="false">"الترجمة طويلة جدًا — النص الأصلي غير متاح"</string>
 </resources>

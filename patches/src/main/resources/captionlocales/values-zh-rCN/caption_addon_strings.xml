@@ -125,4 +125,5 @@
     <string name="cap_source_retry" formatted="false">"字幕连接中断，正在自动重试…"</string>
     <string name="cap_source_unavailable" formatted="false">"暂时无法获取原字幕，请重新选择字幕轨道。"</string>
     <string name="cap_caption_overflow" formatted="false">"字幕过长，原文暂不可用"</string>
+    <string name="cap_quality_outcome" formatted="false">"本地校验：接受 / 拒绝（其中质量问题）"</string>
 </resources>

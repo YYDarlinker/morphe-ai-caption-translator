@@ -204,6 +204,14 @@ final class TokenCostAudit {
             persistLocked();
         }
     }
+    static void recordUnitQualityOutcome(Request request,int accepted,int rejected,int qualityRejected) {
+        if(request==null)return;
+        synchronized(LOCK){stateLocked();updateBucketsLocked(request,b->{
+            add(b,"accepted_caption_units",Math.max(0,accepted));
+            add(b,"rejected_caption_units",Math.max(0,rejected));
+            add(b,"quality_rejected_units",Math.max(0,qualityRejected));
+        });persistLocked();}
+    }
     static void recordCommittedAtoms(String detailBucket, long committedAtoms) {
         if (detailBucket == null || detailBucket.isEmpty() || committedAtoms <= 0L) return;
         synchronized (LOCK) {
@@ -471,6 +479,10 @@ final class TokenCostAudit {
                     .append(" · ").append(format(value(totalAll, "failures"))).append(" 次失败")
                     .append(" · 内部重试 ").append(format(value(totalAll, "internal_retries"))).append(" 次");
             appendFailureBreakdown(out, totalAll);
+            long accepted=value(totalAll,"accepted_caption_units"),rejected=value(totalAll,"rejected_caption_units");
+            if(accepted+rejected>0)out.append("\n").append(CaptionStrings.settings(context,"quality_outcome"))
+                    .append(": ").append(accepted).append(" / ").append(rejected)
+                    .append(" (").append(value(totalAll,"quality_rejected_units")).append(")");
             out.append("\nTokens：").append(format(totalTokens))
                     .append(" = 输入 ").append(format(value(totalAll, "prompt_tokens")))
                     .append(" + 输出 ").append(format(value(totalAll, "completion_tokens")));

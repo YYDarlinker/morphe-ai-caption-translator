@@ -23,8 +23,11 @@ final class CaptionQualityTrace {
         }catch(Exception ignored){}
     }
     static String redact(String value,String key,int limit){
-        String text=value==null?"":value;
-        if(key!=null&&!key.isEmpty())text=text.replace(key,"[redacted]");
+        String text=(value==null?"":value).replace("\\/","/");
+        if(key!=null&&!key.isEmpty()){
+            text=text.replace(key,"[redacted]");
+            String escaped=JSONObject.quote(key);if(escaped.length()>2)text=text.replace(escaped.substring(1,escaped.length()-1),"[redacted]");
+        }
         text=text.replaceAll("(?i)https?://[^\\s\\\"<>]+","[URL redacted]")
                 .replaceAll("(?i)(bearer\\s+|sk-)[A-Za-z0-9_.-]{8,}","[credential redacted]");
         return text.length()<=limit?text:text.substring(0,limit)+" [truncated]";

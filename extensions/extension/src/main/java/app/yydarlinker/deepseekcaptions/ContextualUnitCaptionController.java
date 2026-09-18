@@ -942,7 +942,9 @@ static void setMainActivity(Activity activity) {
                         text = clean;
                     }
                 }
-                if (text != null && !text.trim().isEmpty()) {
+                boolean silentPlan=text!=null && text.trim().isEmpty() && result!=null && result.plansById.containsKey(id)
+                        && ContextualCaptionTextPolicy.sourceForTranslation(session.units.get(index).sourceText).isEmpty();
+                if (text != null && (!text.trim().isEmpty() || silentPlan)) {
                     AnchoredCaptionPlan candidate=result.plansById.get(id);
                     if(candidate!=null)for(AnchoredCaptionPlan.Segment seg:candidate.segments){
                         String issue=CaptionPresentationPolicy.issue(seg.text,seg.endMs-seg.startMs);
@@ -1207,6 +1209,7 @@ static void setMainActivity(Activity activity) {
             }
             session.qualityRepairCount++;
             session.isolatedRetries[index]=true;
+            CaptionDiagnostics.mark(session.context,"CAPTION_QUALITY_REPAIR","unit="+index+";session_repairs="+session.qualityRepairCount+";limit="+CaptionRepairBudget.SESSION_QUALITY_REPAIRS+";shared_failure_count="+failures);
         }
         ContextualUnitCorePolicy.RetryDecision decision =
                 AnchoredRetryPolicy.decide(failureKind, failures, priority);

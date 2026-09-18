@@ -72,7 +72,7 @@ public class QualityPipeline134Test {
         CaptionQualityTrace.record(activity,"test-local-key",1,new JSONObject().put("source","private"),"private", "fixture");
         assertEquals("",CaptionQualityTrace.text(activity));DeepSeekConfig.saveDisplayTextDebugEnabled(activity,true);
         for(int i=0;i<20;i++)CaptionQualityTrace.record(activity,"test-local-key",i,new JSONObject().put("source","test-local-key https://secret.example/token"),"response", "fixture");
-        String trace=CaptionQualityTrace.text(activity);assertTrue(trace.contains("redacted"));assertFalse(trace.contains("test-local-key"));assertFalse(trace.contains("secret.example"));
+        String trace=CaptionQualityTrace.text(activity);assertTrue(trace.contains("redacted"));assertFalse("Key must be redacted",trace.contains("test-local-key"));assertFalse("JSON-escaped URLs must be redacted",trace.contains("secret.example"));
         JSONArray data=new JSONArray(activity.getSharedPreferences("caption_quality_evidence",Context.MODE_PRIVATE).getString("records","[]"));assertEquals(6,data.length());
         DeepSeekConfig.saveDisplayTextDebugEnabled(activity,false);DeepSeekConfig.saveDisplayTextDebugEnabled(activity,true);assertEquals("",CaptionQualityTrace.text(activity));
     }

@@ -147,6 +147,8 @@ final class ContextualBatchApiClient {
                 Result result=parseAnchored(content,targets,atoms,repair);
                 if(negotiated)negotiation=new Negotiation(identity(config),negotiatedCategory);
                 TokenCostAudit.recordUnitBatchOutcome(audit,result.validCount());
+                int qualityRejected=0;for(String reason:result.rejectionReasons.values())if(CaptionQualityPolicy.failure(reason))qualityRejected++;
+                TokenCostAudit.recordUnitQualityOutcome(audit,result.validCount(),result.missingIds.size(),qualityRejected);
                 return result;
             } catch(ProviderRequestException rejected) {
                 negotiatedCategory=ProviderRequestPolicy.reason(rejected.providerDetail);

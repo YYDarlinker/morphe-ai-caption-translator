@@ -125,4 +125,5 @@
     <string name="cap_source_retry" formatted="false">"Koneksi subtitel terputus. Mencoba lagi…"</string>
     <string name="cap_source_unavailable" formatted="false">"Subtitel sumber tidak tersedia. Pilih kembali trek subtitel."</string>
     <string name="cap_caption_overflow" formatted="false">"Subtitel terlalu panjang — teks asli tidak tersedia"</string>
+    <string name="cap_quality_outcome" formatted="false">"Validasi lokal: diterima / ditolak (kualitas)"</string>
 </resources>

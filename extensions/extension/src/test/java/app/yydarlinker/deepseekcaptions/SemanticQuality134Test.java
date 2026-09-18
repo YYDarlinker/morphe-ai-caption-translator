@@ -95,4 +95,28 @@ public class SemanticQuality134Test {
         assertEquals(sentence,r);assertTrue(r.length()<=320);
         assertTrue(ContextualBatchApiClient.boundedContext(Arrays.asList(String.join(" ",Collections.nCopies(100,"context"))),false).length()<=160);
     }
+
+    @Test public void shortSentencesShareTaskSoApiOverheadDoesNotExplode(){
+        List<SourceAtomTimeline.Atom>a=atoms("One complete sentence. A second sentence. A third sentence. A fourth sentence.",400);
+        assertTrue(tasks(a).units.size()<4);
+    }
+    @Test public void syntheticBoundaryCorpusKeepsCoverageWithoutInventingWords(){
+        String[] clauses={
+            "I am not going to ask what the outcome would be",
+            "this pace of modernisation probably cannot last forever",
+            "twenty conventional ballistic missiles were available",
+            "the fifth generation aircraft entered service",
+            "this does not mean that the result is certain",
+            "if the budget grows we may buy more equipment",
+            "the cost is three times the original price",
+            "the number is 1.5 percent rather than 15 percent",
+            "we will examine research development spending and industry",
+            "they said that the system was not ready"};
+        for(String clause:clauses)for(int prefix=0;prefix<10;prefix++){
+            String source=String.join(" ",Collections.nCopies(30+prefix,"context"))+" "+clause;
+            List<SourceAtomTimeline.Atom>a=atoms(source,230);TranslationUnitTimeline.Result r=tasks(a);
+            String joined=String.join(" ",r.units.stream().map(u->u.sourceText).toArray(String[]::new));
+            assertEquals(source,joined);assertTrue(r.units.stream().anyMatch(u->u.sourceText.contains(clause)));
+        }
+    }
 }

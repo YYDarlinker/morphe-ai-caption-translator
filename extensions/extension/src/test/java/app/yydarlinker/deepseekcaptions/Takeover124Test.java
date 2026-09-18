@@ -17,7 +17,7 @@ public class Takeover124Test {
   assertNotNull(view.getLayout());assertTrue(view.getLayout().getLineCount()<=2);
   assertEquals("The actual TextView must retain the fallback tail",view.getText().length(),view.getLayout().getLineEnd(view.getLayout().getLineCount()-1));
   assertFalse(view.getText().toString().contains("relevance"));
-  assertTrue(view.getTextSize()/a.getResources().getDisplayMetrics().scaledDensity>=SubtitleStyleMetrics.scaledSp(DeepSeekConfig.MIN_CAPTION_TEXT_SIZE,360)-.01f);
+  assertTrue(view.getTextSize()/a.getResources().getDisplayMetrics().scaledDensity>=SubtitleStyleMetrics.scaledSp(DeepSeekConfig.MIN_CAPTION_TEXT_SIZE,240/a.getResources().getDisplayMetrics().density)-.01f);
   p.set(null,"");a.finish();
  }
  @Test public void backgroundSourceFetchCannotTakeOverVisibleShort(){

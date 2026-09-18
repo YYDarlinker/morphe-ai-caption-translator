@@ -125,4 +125,5 @@
     <string name="cap_source_retry" formatted="false">"Conexión de subtítulos interrumpida. Reintentando…"</string>
     <string name="cap_source_unavailable" formatted="false">"Subtítulos de origen no disponibles. Vuelve a seleccionar la pista."</string>
     <string name="cap_caption_overflow" formatted="false">"Subtítulo demasiado largo; original no disponible"</string>
+    <string name="cap_quality_outcome" formatted="false">"Validación local: aceptados / rechazados (calidad)"</string>
 </resources>

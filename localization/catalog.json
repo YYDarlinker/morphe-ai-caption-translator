@@ -190,7 +190,8 @@
       "profile_confirm_delete": "Confirm deletion",
       "source_retry": "Caption connection interrupted. Retrying…",
       "source_unavailable": "Source captions unavailable. Try selecting the caption track again.",
-      "caption_overflow": "Caption too long — original unavailable"
+      "caption_overflow": "Caption too long — original unavailable",
+      "quality_outcome": "Local validation: accepted / rejected (quality)"
     },
     "zh-rCN": {
       "ai_title": "AI 字幕翻译",
@@ -317,7 +318,8 @@
       "profile_confirm_delete": "确认删除",
       "source_retry": "字幕连接中断，正在自动重试…",
       "source_unavailable": "暂时无法获取原字幕，请重新选择字幕轨道。",
-      "caption_overflow": "字幕过长，原文暂不可用"
+      "caption_overflow": "字幕过长，原文暂不可用",
+      "quality_outcome": "本地校验：接受 / 拒绝（其中质量问题）"
     },
     "zh-rTW": {
       "ai_title": "AI 字幕翻譯",
@@ -444,7 +446,8 @@
       "profile_confirm_delete": "確認刪除",
       "source_retry": "字幕連線中斷，正在自動重試…",
       "source_unavailable": "暫時無法取得原字幕，請重新選擇字幕軌道。",
-      "caption_overflow": "字幕過長，原文暫不可用"
+      "caption_overflow": "字幕過長，原文暫不可用",
+      "quality_outcome": "本機驗證：接受 / 拒絕（其中品質問題）"
     },
     "es": {
       "ai_title": "Traducción de subtítulos con IA",
@@ -571,7 +574,8 @@
       "profile_confirm_delete": "Confirmar eliminación",
       "source_retry": "Conexión de subtítulos interrumpida. Reintentando…",
       "source_unavailable": "Subtítulos de origen no disponibles. Vuelve a seleccionar la pista.",
-      "caption_overflow": "Subtítulo demasiado largo; original no disponible"
+      "caption_overflow": "Subtítulo demasiado largo; original no disponible",
+      "quality_outcome": "Validación local: aceptados / rechazados (calidad)"
     },
     "fr": {
       "ai_title": "Traduction des sous-titres par IA",
@@ -698,7 +702,8 @@
       "profile_confirm_delete": "Confirmer la suppression",
       "source_retry": "Connexion aux sous-titres interrompue. Nouvelle tentative…",
       "source_unavailable": "Sous-titres source indisponibles. Sélectionnez à nouveau la piste.",
-      "caption_overflow": "Sous-titre trop long — original indisponible"
+      "caption_overflow": "Sous-titre trop long — original indisponible",
+      "quality_outcome": "Validation locale : acceptés / rejetés (qualité)"
     },
     "de": {
       "ai_title": "KI-Untertitelübersetzung",
@@ -825,7 +830,8 @@
       "profile_confirm_delete": "Löschen bestätigen",
       "source_retry": "Untertitelverbindung unterbrochen. Erneuter Versuch…",
       "source_unavailable": "Quelluntertitel nicht verfügbar. Bitte Untertitelspur erneut auswählen.",
-      "caption_overflow": "Untertitel zu lang – Original nicht verfügbar"
+      "caption_overflow": "Untertitel zu lang – Original nicht verfügbar",
+      "quality_outcome": "Lokale Prüfung: akzeptiert / abgelehnt (Qualität)"
     },
     "pt": {
       "ai_title": "Tradução de legendas com IA",
@@ -952,7 +958,8 @@
       "profile_confirm_delete": "Confirmar eliminação",
       "source_retry": "Conexão das legendas interrompida. Tentando novamente…",
       "source_unavailable": "Legendas de origem indisponíveis. Selecione a faixa novamente.",
-      "caption_overflow": "Legenda longa demais — original indisponível"
+      "caption_overflow": "Legenda longa demais — original indisponível",
+      "quality_outcome": "Validação local: aceitos / rejeitados (qualidade)"
     },
     "ru": {
       "ai_title": "Перевод субтитров с ИИ",
@@ -1079,7 +1086,8 @@
       "profile_confirm_delete": "Подтвердить удаление",
       "source_retry": "Соединение с субтитрами прервано. Повторная попытка…",
       "source_unavailable": "Исходные субтитры недоступны. Выберите дорожку ещё раз.",
-      "caption_overflow": "Субтитр слишком длинный — оригинал недоступен"
+      "caption_overflow": "Субтитр слишком длинный — оригинал недоступен",
+      "quality_outcome": "Локальная проверка: принято / отклонено (качество)"
     },
     "ja": {
       "ai_title": "AI 字幕翻訳",
@@ -1206,7 +1214,8 @@
       "profile_confirm_delete": "削除を確定",
       "source_retry": "字幕の接続が切れました。再試行中…",
       "source_unavailable": "元の字幕を取得できません。字幕トラックを選び直してください。",
-      "caption_overflow": "字幕が長すぎます。原文を表示できません"
+      "caption_overflow": "字幕が長すぎます。原文を表示できません",
+      "quality_outcome": "ローカル検証：採用 / 拒否（品質）"
     },
     "ko": {
       "ai_title": "AI 자막 번역",
@@ -1333,7 +1342,8 @@
       "profile_confirm_delete": "삭제 확인",
       "source_retry": "자막 연결이 끊겼습니다. 다시 시도 중…",
       "source_unavailable": "원본 자막을 불러올 수 없습니다. 자막 트랙을 다시 선택하세요.",
-      "caption_overflow": "자막이 너무 깁니다. 원문을 표시할 수 없습니다"
+      "caption_overflow": "자막이 너무 깁니다. 원문을 표시할 수 없습니다",
+      "quality_outcome": "로컬 검증: 수락 / 거부 (품질)"
     },
     "ar": {
       "ai_title": "ترجمة الترجمة النصية بالذكاء الاصطناعي",
@@ -1460,7 +1470,8 @@
       "profile_confirm_delete": "تأكيد الحذف",
       "source_retry": "انقطع اتصال الترجمة. جارٍ إعادة المحاولة…",
       "source_unavailable": "الترجمة الأصلية غير متاحة. أعد اختيار مسار الترجمة.",
-      "caption_overflow": "الترجمة طويلة جدًا — النص الأصلي غير متاح"
+      "caption_overflow": "الترجمة طويلة جدًا — النص الأصلي غير متاح",
+      "quality_outcome": "التحقق المحلي: مقبول / مرفوض (الجودة)"
     },
     "hi": {
       "ai_title": "AI उपशीर्षक अनुवाद",
@@ -1587,7 +1598,8 @@
       "profile_confirm_delete": "मिटाने की पुष्टि करें",
       "source_retry": "उपशीर्षक कनेक्शन टूट गया। फिर कोशिश की जा रही है…",
       "source_unavailable": "मूल उपशीर्षक उपलब्ध नहीं हैं। उपशीर्षक ट्रैक फिर चुनें।",
-      "caption_overflow": "उपशीर्षक बहुत लंबा है — मूल पाठ उपलब्ध नहीं"
+      "caption_overflow": "उपशीर्षक बहुत लंबा है — मूल पाठ उपलब्ध नहीं",
+      "quality_outcome": "स्थानीय जाँच: स्वीकार / अस्वीकार (गुणवत्ता)"
     },
     "id": {
       "ai_title": "Terjemahan subtitel AI",
@@ -1714,7 +1726,8 @@
       "profile_confirm_delete": "Konfirmasi hapus",
       "source_retry": "Koneksi subtitel terputus. Mencoba lagi…",
       "source_unavailable": "Subtitel sumber tidak tersedia. Pilih kembali trek subtitel.",
-      "caption_overflow": "Subtitel terlalu panjang — teks asli tidak tersedia"
+      "caption_overflow": "Subtitel terlalu panjang — teks asli tidak tersedia",
+      "quality_outcome": "Validasi lokal: diterima / ditolak (kualitas)"
     },
     "vi": {
       "ai_title": "Dịch phụ đề bằng AI",
@@ -1841,7 +1854,8 @@
       "profile_confirm_delete": "Xác nhận xóa",
       "source_retry": "Kết nối phụ đề bị gián đoạn. Đang thử lại…",
       "source_unavailable": "Không thể tải phụ đề gốc. Hãy chọn lại bản phụ đề.",
-      "caption_overflow": "Phụ đề quá dài — không có văn bản gốc"
+      "caption_overflow": "Phụ đề quá dài — không có văn bản gốc",
+      "quality_outcome": "Kiểm tra cục bộ: chấp nhận / từ chối (chất lượng)"
     }
   },
   "source_keys": {

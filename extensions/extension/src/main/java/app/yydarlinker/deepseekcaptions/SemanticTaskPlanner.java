@@ -27,7 +27,11 @@ final class SemanticTaskPlanner {
                 long gap=atoms.get(i+1).startMs-atoms.get(i).endMs;
                 if(gap>=700 || speaker(atoms.get(i+1).text)) {hard=i;reason="source_break";break;}
                 String text=atoms.get(i).text.trim();
-                if(terminal(text)) {hard=i;reason="sentence_boundary";break;}
+                if(terminal(text)) {
+                    candidate=i;reason="sentence_boundary";
+                    if(span>=6000){hard=i;break;}
+                    continue; // Batch short complete sentences without making each an API job.
+                }
                 if(i-from>=3 && span>=1800 && safeBoundary(atoms,i)) {
                     int evidence=boundaryEvidence(atoms,i);
                     if(evidence>=2) {candidate=i;if(span>=SOFT_MS){reason="clause_boundary";break;}}

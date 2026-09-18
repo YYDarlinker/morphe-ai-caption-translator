@@ -125,4 +125,5 @@
     <string name="cap_source_retry" formatted="false">"Соединение с субтитрами прервано. Повторная попытка…"</string>
     <string name="cap_source_unavailable" formatted="false">"Исходные субтитры недоступны. Выберите дорожку ещё раз."</string>
     <string name="cap_caption_overflow" formatted="false">"Субтитр слишком длинный — оригинал недоступен"</string>
+    <string name="cap_quality_outcome" formatted="false">"Локальная проверка: принято / отклонено (качество)"</string>
 </resources>

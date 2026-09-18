@@ -261,6 +261,7 @@ static final String[][] ENGLISH={
 {"profile_confirm_delete","Confirm deletion"},
 {"source_retry","Caption connection interrupted. Retrying…"},
 {"source_unavailable","Source captions unavailable. Try selecting the caption track again."},
-{"caption_overflow","Caption too long — original unavailable"}
+{"caption_overflow","Caption too long — original unavailable"},
+{"quality_outcome","Local validation: accepted / rejected (quality)"}
 };
 }

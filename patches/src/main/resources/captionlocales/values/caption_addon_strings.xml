@@ -125,4 +125,5 @@
     <string name="cap_source_retry" formatted="false">"Caption connection interrupted. Retrying…"</string>
     <string name="cap_source_unavailable" formatted="false">"Source captions unavailable. Try selecting the caption track again."</string>
     <string name="cap_caption_overflow" formatted="false">"Caption too long — original unavailable"</string>
+    <string name="cap_quality_outcome" formatted="false">"Local validation: accepted / rejected (quality)"</string>
 </resources>

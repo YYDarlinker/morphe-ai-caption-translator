@@ -125,4 +125,5 @@
     <string name="cap_source_retry" formatted="false">"انقطع اتصال الترجمة. جارٍ إعادة المحاولة…"</string>
     <string name="cap_source_unavailable" formatted="false">"الترجمة الأصلية غير متاحة. أعد اختيار مسار الترجمة."</string>
     <string name="cap_caption_overflow" formatted="false">"الترجمة طويلة جدًا — النص الأصلي غير متاح"</string>
+    <string name="cap_quality_outcome" formatted="false">"التحقق المحلي: مقبول / مرفوض (الجودة)"</string>
 </resources>

@@ -125,4 +125,5 @@
     <string name="cap_source_retry" formatted="false">"Conexão das legendas interrompida. Tentando novamente…"</string>
     <string name="cap_source_unavailable" formatted="false">"Legendas de origem indisponíveis. Selecione a faixa novamente."</string>
     <string name="cap_caption_overflow" formatted="false">"Legenda longa demais — original indisponível"</string>
+    <string name="cap_quality_outcome" formatted="false">"Validação local: aceitos / rejeitados (qualidade)"</string>
 </resources>

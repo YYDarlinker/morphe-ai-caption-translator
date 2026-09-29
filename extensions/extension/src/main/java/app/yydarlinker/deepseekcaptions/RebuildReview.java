@@ -6,6 +6,7 @@ import java.util.regex.*;
 /** Bounded, advisory fidelity review with targeted repair candidates. */
 final class RebuildReview {
   static final int MAX_SESSION_REPAIRS = 6;
+  static final int MAX_SEMANTIC_ATTEMPTS = 3; // Initial translation plus two repairs.
 
   static final class Issue {
     final int from,to;
@@ -168,6 +169,27 @@ final class RebuildReview {
     }
     return n;
   }
+  static boolean hasSemanticRepairRisk(RebuildProtocol.Plan p) {
+    return p != null && semanticScore(p) > 0;
+  }
+  /** A flagged new subject must stay with its finite verb in every repair candidate. */
+  static boolean splitsFlaggedSubject(RebuildSource source, RebuildProtocol.Plan previous,
+                                      RebuildProtocol.Plan candidate) {
+    if (source == null || previous == null || candidate == null) return false;
+    for (Issue issue : previous.issues) {
+      if (!issue.code.equals("possible_subject_attachment")) continue;
+      int lo = Math.max(0, issue.from), hi = Math.min(source.words.size() - 1, issue.to);
+      for (int i = lo; i + 3 <= hi; i++) {
+        if (!source.words.get(i).key.equals("would")
+            || !source.words.get(i + 1).key.equals("follow")
+            || !source.words.get(i + 3).key.equals("reduced")) continue;
+        int subject = i + 2;
+        for (RebuildProtocol.Event event : candidate.events)
+          if (event.to == subject) return true;
+      }
+    }
+    return false;
+  }
   private static int segmentationPenalty(RebuildProtocol.Plan p){
     int n=0;
     for(Issue i:p.issues) {
@@ -186,6 +208,11 @@ final class RebuildReview {
     if(score(candidate.issues)==score(previous.issues))return previous;
     return score(candidate.issues)<score(previous.issues)?candidate:previous;
   }
+  static RebuildProtocol.Plan prefer(RebuildProtocol.Plan previous, RebuildProtocol.Plan candidate,
+                                    RebuildSource source) {
+    return splitsFlaggedSubject(source, previous, candidate)
+        ? previous : prefer(previous, candidate);
+  }
   static boolean structuralRetry(String reason) {
     if (reason == null) return false;
     String code = reason;
@@ -197,6 +224,7 @@ final class RebuildReview {
   }
 
   static boolean shouldRepair(RebuildProtocol.Plan p,int attempts,int repairs,long position,long end) {
-    return score(p.issues)>0 && attempts<2 && repairs<MAX_SESSION_REPAIRS && position<end;
+    int maxAttempts = hasSemanticRepairRisk(p) ? MAX_SEMANTIC_ATTEMPTS : 2;
+    return score(p.issues)>0 && attempts<maxAttempts && repairs<MAX_SESSION_REPAIRS && position<end;
   }
 }

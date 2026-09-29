@@ -775,8 +775,10 @@ public class RebuildIntegrationTest {
   @Test public void unresolvedReviewDoesNotLoopOrDiscardCandidate()throws Exception {
     mode=6;reviewSource();start(false);RebuildController.Session s=session();
     await(()->s.states!=null&&s.states[0]==RebuildController.WAITING&&s.plans[0]!=null);
+    advance(1500);await(()->calls.get()==2 && s.states[0]==RebuildController.WAITING);
     advance(1500);await(()->s.states[0]==RebuildController.READY);advance(3000);
-    assertEquals(2,calls.get());assertTrue(RebuildReview.score(s.plans[0].issues)>0);
+    assertEquals(3,calls.get());assertEquals(2,s.repairCount);
+    assertTrue(RebuildReview.score(s.plans[0].issues)>0);
     assertNull(RebuildCache.read(a,s.cacheKey,s.source,s.blocks.get(0)));
   }
   @Test public void malformedRepairPreservesPreviouslyValidatedCandidate()throws Exception {

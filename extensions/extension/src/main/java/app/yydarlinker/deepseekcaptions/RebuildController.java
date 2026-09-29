@@ -596,12 +596,14 @@ final class RebuildController {
         if (i > index && !allowAhead) break;
         if (s.states[i] != WAITING || s.retryAt[i] > now) continue;
         int maxAttempts =
-            s.attempts[i] == 2
-                    && s.plans[i] == null
-                    && RebuildReview.structuralRetry(s.reasons[i])
-                    && s.repairCount < RebuildReview.MAX_SESSION_REPAIRS
-                ? 3
-                : 2;
+            RebuildReview.hasSemanticRepairRisk(s.plans[i])
+                ? RebuildReview.MAX_SEMANTIC_ATTEMPTS
+                : s.attempts[i] == 2
+                        && s.plans[i] == null
+                        && RebuildReview.structuralRetry(s.reasons[i])
+                        && s.repairCount < RebuildReview.MAX_SESSION_REPAIRS
+                    ? 3
+                    : 2;
         if (s.attempts[i] >= maxAttempts) {
           s.states[i] = s.plans[i] == null ? FAILED : READY;
           continue;
@@ -665,8 +667,12 @@ final class RebuildController {
         if (!current(s) || job.cancelled) return;
         if(restoredFromCache)s.attempts[job.index]=Math.max(0,s.attempts[job.index]-1);
         RebuildProtocol.Plan candidate=accepted;
-        accepted = RebuildReview.prefer(s.plans[job.index],candidate);
         RebuildProtocol.Plan old=s.plans[job.index];
+        boolean subjectSplit=RebuildReview.splitsFlaggedSubject(s.source,old,candidate);
+        accepted = RebuildReview.prefer(old,candidate,s.source);
+        if(subjectSplit)
+          CaptionDiagnostics.mark(s.context,"REBUILD_REPAIR_SUBJECT_SPLIT_REJECTED",
+              "session="+s.id+";request="+job.traceId+";block="+b.index+";attempts="+s.attempts[job.index]);
         if(old!=null && accepted==old && candidate!=old && RebuildReview.score(old.issues)>0)
           CaptionDiagnostics.mark(s.context,"REBUILD_REPAIR_NO_PROGRESS",
               "session="+s.id+";request="+job.traceId+";block="+b.index+";old_risks="+RebuildReview.score(old.issues)+";candidate_risks="+RebuildReview.score(candidate.issues));

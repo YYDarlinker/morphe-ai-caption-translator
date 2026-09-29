@@ -50,6 +50,7 @@ public class RebuildN11A14ReviewTest {
     assertEquals("dependent_boundary", risks.get(0).code);
     RebuildProtocol.Plan candidate = new RebuildProtocol.Plan(events, "{}", risks);
     assertSame(previous, RebuildReview.prefer(previous, candidate));
-    assertFalse(RebuildReview.shouldRepair(previous, 2, 1, 384647, 391744));
+    assertTrue(RebuildReview.shouldRepair(previous, 2, 1, 384647, 391744));
+    assertFalse(RebuildReview.shouldRepair(previous, 3, 2, 384647, 391744));
   }
 }

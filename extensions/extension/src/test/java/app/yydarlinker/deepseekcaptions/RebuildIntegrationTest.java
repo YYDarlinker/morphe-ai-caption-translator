@@ -765,6 +765,56 @@ public class RebuildIntegrationTest {
     assertTrue(s.position<7040);
     assertEquals(7040,s.plans[0].events.get(0).end);
   }
+  @Test public void failedBlockShowsEachOriginalCueOnlyInItsOwnTime()throws Exception {
+    engine.fixtureBody=new JSONObject().put("events",new JSONArray()
+      .put(RebuildR2SourceTest.cue(80,6960,"This is the first sentence.",false))
+      .put(RebuildR2SourceTest.cue(7040,12960,"Earlier claims belong to this cue.",false))
+      .put(RebuildR2SourceTest.cue(20000,8920,"Later equipment belongs to this cue.",false))).toString();
+    blockResponse=true;start(false);RebuildController.Session s=session();await(()->s.blocks!=null);
+    assertEquals(7040,s.blocks.get(1).start);
+    assertEquals(28920,s.blocks.get(1).end);
+    synchronized(s){s.states[1]=RebuildController.FAILED;s.reasons[1]="semantic_anchor_leak";}
+    RebuildController.time(7000);
+    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] This is the first sentence."));
+    assertFalse(s.lastShown,s.lastShown.contains("字幕暂不可用"));
+    assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
+    RebuildController.time(7040);
+    assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:1:7040_20000"));
+    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] Earlier claims belong to this cue."));
+    assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
+    assertFalse(s.lastShown,s.lastShown.contains("字幕暂不可用"));
+    RebuildController.time(19999);
+    assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
+    RebuildController.time(20000);
+    assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:1:20000_28920"));
+    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] Later equipment belongs to this cue."));
+    RebuildController.time(28920);
+    assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
+  }
+  @Test public void eventReviewShowsOwnedOriginalWhileKeepingAcceptedTextWhenSafe()throws Exception {
+    engine.startMs=384639;engine.duration=7105;
+    engine.fixtureBody=new JSONObject().put("events",new JSONArray().put(
+        RebuildR2SourceTest.cue(384639,7105,"Foreign investment and explosive economic growth followed.",false))).toString();
+    blockResponse=true;start(false);RebuildController.Session s=session();await(()->s.blocks!=null);
+    RebuildPlanner.Block b=s.blocks.get(0);
+    RebuildProtocol.Event event=new RebuildProtocol.Event(b.from,b.to,b.start,b.end,"可展示的译文");
+    synchronized(s){
+      s.plans[0]=new RebuildProtocol.Plan(Collections.singletonList(event),"{}",Collections.emptyList());
+      s.states[0]=RebuildController.READY;
+    }
+    RebuildController.time(384647);
+    assertTrue(s.lastShown,s.lastShown.contains("可展示的译文"));
+    synchronized(s){
+      s.plans[0]=new RebuildProtocol.Plan(Collections.singletonList(event),"{}",Collections.singletonList(
+          new RebuildReview.Issue(b.from,b.to,"possible_subject_attachment","review",true)));
+    }
+    RebuildController.time(384648);
+    assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:0:"));
+    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] Foreign investment and explosive economic growth followed."));
+    assertFalse(s.lastShown,s.lastShown.contains("字幕暂不可用"));
+    RebuildController.time(391744);
+    assertFalse(s.lastShown,s.lastShown.contains("Foreign investment"));
+  }
   @Test public void r28LateReadabilityDoesNotInventOrExtendTimes() {
     RebuildProtocol.Event e=new RebuildProtocol.Event(0,20,80,7040,"在2月24日之前，你只需在网上稍作搜索，就能找到声称俄罗斯拥有世界第二强军事力量的人");
     assertTrue(RebuildController.lateUnreadable(e,6282));

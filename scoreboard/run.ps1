@@ -12,4 +12,6 @@ Push-Location $repo
 try {
     & $python @argsForPython
     if ($LASTEXITCODE -ne 0) { throw "Scoreboard exited with code $LASTEXITCODE" }
+    & $python (Join-Path $PSScriptRoot 'n9.py')
+    if ($LASTEXITCODE -ne 0) { throw "N9 evidence mirror exited with code $LASTEXITCODE" }
 } finally { Pop-Location }

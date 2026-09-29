@@ -15,7 +15,9 @@ final class RebuildSemantics {
       {"\\bmissiles?\\b", "导弹|飛彈"}
   };
   // Explicit Latin model IDs only. "armada" alone can mean a fleet, "tank" can store water.
-  static final Pattern MODEL = Pattern.compile("(?i)(?<![a-z0-9])((?:[a-z]{1,4}(?=-))|(?:(?:t|j|su|mig|f|b|a)(?= )))[- ](\\d{1,3})(?![a-z0-9])");
+  static final Pattern MODEL = Pattern.compile("(?i)(?<![a-z0-9])((?:[a-z]{1,4}(?=-))|(?:(?:t|j|su|mig|f|b|a)(?= )))[- ](\\d{1,3})s?(?![a-z0-9])");
+  // Source lists can name a tank by its plural model alone (e.g. "10 000 t-62s").
+  static final Pattern TANK_MODEL = Pattern.compile("(?i)\\bt-(?:14|34|54|55|62|64|72|80|90)s?\\b");
   static Set<String> models(String x) {
     Set<String> out=new HashSet<>();Matcher m=MODEL.matcher(x);
     while(m.find())out.add(m.group(1).toLowerCase(Locale.ROOT)+"-"+m.group(2));
@@ -26,6 +28,7 @@ final class RebuildSemantics {
   static boolean supports(int concept, String owned) {
     if(concept==2 && has("\\b(?:water|fuel|storage|septic|fish)\\b",owned)) return false;
     if(has(ANCHORS[concept][0],owned)) return true;
+    if(concept==2 && TANK_MODEL.matcher(owned).find()) return true;
     // Context-qualified acronym recognition, never an ASR/text replacement (Sam can be a name).
     return concept==3 && has("\\bsams?\\b",owned)
         && has("\\b(?:chinese|military|missiles?|defen[sc]e|mainland|bases|surface-to-air)\\b",owned);

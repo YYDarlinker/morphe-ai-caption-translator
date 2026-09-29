@@ -861,32 +861,29 @@ final class RebuildController {
               boolean late = merged == null && !eventId.equals(s.displayedEvent)
                   && (eventId.equals(s.withheldEvent) || lateUnreadable(e,s.position));
               if(blocked || late) {
-                text = s.states[i]==READY || s.states[i]==FAILED ? "字幕暂不可用" : "字幕校正中…";
-                status=true; fallbackReason=blocked?"event_review":"late_unreadable";
                 if(late && !eventId.equals(s.withheldEvent))CaptionDiagnostics.mark(s.context,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
                 if(late)s.withheldEvent=eventId;
+                // A rejected display candidate still has source ownership and a bounded time.
+                // Keep the original readable instead of turning an entire event into a status.
+                text = source;
+                eventId = "source:" + eventId;
+                fallbackReason=blocked?"event_review":"late_unreadable";
               } else s.displayedEvent=eventId;
             }
           } else if (p == null) {
-            text = s.states[i]==FAILED ? "字幕暂不可用" : "字幕翻译中…";
-            status = true;
-            source = text;
             fallbackReason = s.states[i]==FAILED ? "failed:"+s.reasons[i]
                 : s.attempts[i]>1 ? "retrying" : "pending_translation";
-            // A01 cold start: show the active source cue while the first plan is in flight.
-            // Keep the wait diagnostic and never mark the translated event as displayed.
-            if(i==0 && s.states[i]!=FAILED) {
-              CaptionDocument.Cue cue=originalCue(s,s.position);
-              RebuildPlanner.Block block=s.blocks.get(i);
-              if(cue!=null && cue.startMs<block.end && cue.endMs>block.start) {
-                eventStart=Math.max(cue.startMs,block.start);
-                eventEnd=Math.min(cue.endMs,block.end);
-                if(eventStart<=s.position && s.position<eventEnd) {
-                  text="[原文 / Original] "+cue.text;
-                  source=text;
-                  eventId="source:"+i+":"+eventStart+"_"+eventEnd;
-                  status=false;
-                }
+            // Use the A01 timed source cue for every unresolved block, including final
+            // failure. A block-wide status would announce a later cue before its onset.
+            CaptionDocument.Cue cue=originalCue(s,s.position);
+            RebuildPlanner.Block block=s.blocks.get(i);
+            if(cue!=null && cue.startMs<block.end && cue.endMs>block.start) {
+              eventStart=Math.max(cue.startMs,block.start);
+              eventEnd=Math.min(cue.endMs,block.end);
+              if(eventStart<=s.position && s.position<eventEnd) {
+                text="[原文 / Original] "+cue.text;
+                source=text;
+                eventId="source:"+i+":"+eventStart+"_"+eventEnd;
               }
             }
           }

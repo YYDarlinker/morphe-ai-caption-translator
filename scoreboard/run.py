@@ -576,7 +576,7 @@ def score(evidence: dict) -> dict:
         selected = [r for r in trace if r["kind"] == "REBUILD_SELECTED" and
                     event_id(r) in {(e["from"], e["to"]) for e in parts}]
         selected_ranges_match = all(
-            r.get("range") == f"{evidence["times"][event_id(r)[0]][0]}-{evidence["times"][event_id(r)[1]][1]}"
+            r.get("range") == f"{evidence['times'][event_id(r)[0]][0]}-{evidence['times'][event_id(r)[1]][1]}"
             for r in selected)
         invariant = {
             "source_word_ids": [a, z], "missing": [i for i in range(a, z + 1) if owners[i] == 0],

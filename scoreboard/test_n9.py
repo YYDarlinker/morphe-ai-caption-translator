@@ -29,6 +29,13 @@ class N9ReplayTest(unittest.TestCase):
     def test_a14_review_shows_its_owned_event_original(self):
         a14 = n9.score()["cases"]["A14"]
         self.assertEqual(7101, a14["frozen"]["blackout_duration_ms"])
+        self.assertEqual("真风险已裁决；新版真机待验", a14["status"])
+        self.assertEqual({"decision": "keep_semantic_block",
+                          "risk": "possible_subject_attachment",
+                          "repair_candidate_risk": "dependent_boundary",
+                          "accepted_translation_displayable": False,
+                          "new_live_requests": 0, "new_live_tokens": 0},
+                         a14["review_adjudication"])
         self.assertEqual("event_source", a14["policy_mirror"]["decision_at_blackout_onset"]["decision"])
         self.assertEqual("[原文 / Original] " + a14["source"],
                          a14["policy_mirror"]["decision_at_blackout_onset"]["text"])

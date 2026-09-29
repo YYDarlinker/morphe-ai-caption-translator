@@ -139,6 +139,17 @@ def score() -> dict:
                        "A14: accepted review response drift")
             run.ensure(any(row.get("block") == str(block) for row in no_progress),
                        "A14: repair no-progress record missing")
+            risk_lines = [line for line in history if " | REBUILD_QUALITY_WARNING | " in line
+                          and "block=17;" in line and
+                          "possible_subject_attachment range=1219-1240:" in line]
+            run.ensure(len(risk_lines) == 2,
+                       "A14: frozen subject-attachment warning drift")
+            repaired = request_rows[1]["response"]["events"]
+            run.ensure([(e["from"], e["to"]) for e in repaired[:2]] == [(1219, 1229), (1230, 1240)]
+                       and source["owned_tokens"][1229 - source["owned_tokens"][0][0]][1] == "deng"
+                       and source["owned_tokens"][1230 - source["owned_tokens"][0][0]][1] == "reduced"
+                       and 1229 in source["avoid_event_end_after"],
+                       "A14: repair's protected Deng/reduced split drift")
         policy_case = {**definition, "event_source": event["source"]}
         intervals = ([{"start_ms": definition["owned_ms"][0],
                        "end_ms": definition["owned_ms"][1], "cue": None,
@@ -164,6 +175,17 @@ def score() -> dict:
                                     "status_only_ms_in_owned_window": definition["owned_ms"][1] - definition["owned_ms"][0] - readable,
                                     "source_cue_intervals": intervals,
                                     "device_presented_verified": False}}
+        if name == "A14":
+            result["status"] = "真风险已裁决；新版真机待验"
+            result["display_evidence"] = "冻结旧状态已显示；N9 原文兜底仅离线镜像，真机待验"
+            result["review_adjudication"] = {
+                "decision": "keep_semantic_block",
+                "risk": "possible_subject_attachment",
+                "repair_candidate_risk": "dependent_boundary",
+                "accepted_translation_displayable": False,
+                "new_live_requests": 0,
+                "new_live_tokens": 0,
+            }
         results[name] = result
     # A13's first visible failure state in the original playback must not be
     # projected backward to A04's later 20.732 s event.

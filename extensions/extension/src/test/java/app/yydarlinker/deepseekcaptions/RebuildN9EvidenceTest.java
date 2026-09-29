@@ -39,8 +39,15 @@ public class RebuildN9EvidenceTest {
     assertTrue(a13.getJSONObject("policy_mirror").getBoolean("no_future_source_at_7160"));
     assertEquals("source_cue",a13.getJSONObject("policy_mirror").getJSONObject("decision_at_blackout_onset").getString("decision"));
     assertEquals("event_source",a14.getJSONObject("policy_mirror").getJSONObject("decision_at_blackout_onset").getString("decision"));
+    JSONObject adjudication=a14.getJSONObject("review_adjudication");
+    assertEquals("keep_semantic_block",adjudication.getString("decision"));
+    assertEquals("possible_subject_attachment",adjudication.getString("risk"));
+    assertEquals("dependent_boundary",adjudication.getString("repair_candidate_risk"));
+    assertFalse(adjudication.getBoolean("accepted_translation_displayable"));
+    assertEquals(0,adjudication.getInt("new_live_requests"));
+    assertEquals(0,adjudication.getInt("new_live_tokens"));
     assertEquals("未验证",a13.getString("status"));
-    assertEquals("未验证",a14.getString("status"));
+    assertEquals("真风险已裁决；新版真机待验",a14.getString("status"));
     JSONObject old=new JSONObject(new String(Files.readAllBytes(root.resolve("scoreboard/results/frozen-baseline.json")),StandardCharsets.UTF_8));
     assertEquals(12,old.getJSONObject("cases").length());
     for(int i=1;i<=12;i++)assertTrue(old.getJSONObject("cases").has(String.format("A%02d",i)));

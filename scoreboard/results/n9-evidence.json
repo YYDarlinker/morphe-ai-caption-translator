@@ -180,8 +180,8 @@
         384647,
         391748
       ],
-      "status": "未验证",
-      "display_evidence": "冻结状态已显示；新策略仅离线镜像，真机待验",
+      "status": "真风险已裁决；新版真机待验",
+      "display_evidence": "冻结旧状态已显示；N9 原文兜底仅离线镜像，真机待验",
       "source": "foreign investment and the explosive economic growth that would follow deng reduced the share of gdp that was focused on the pla",
       "rejected_translation": null,
       "accepted_translation": "外资以及邓之后爆发的经济增长，降低了GDP中用于解放军的份额",
@@ -230,6 +230,14 @@
           }
         ],
         "device_presented_verified": false
+      },
+      "review_adjudication": {
+        "decision": "keep_semantic_block",
+        "risk": "possible_subject_attachment",
+        "repair_candidate_risk": "dependent_boundary",
+        "accepted_translation_displayable": false,
+        "new_live_requests": 0,
+        "new_live_tokens": 0
       }
     }
   }

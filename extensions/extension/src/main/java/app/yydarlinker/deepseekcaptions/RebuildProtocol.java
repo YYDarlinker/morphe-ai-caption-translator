@@ -189,11 +189,8 @@ final class RebuildProtocol {
       String source = s.text(from, to);
       if(e.has("source") && (!(e.opt("source") instanceof String) ||
           !source.replaceAll("\\s+", " ").trim().equals(e.getString("source").replaceAll("\\s+", " ").trim()))) {
-        String quoted=e.optString("source","");
-        if(quoted.length()>120)quoted=quoted.substring(0,120);
         Invalid mismatch=new Invalid("source_quote_mismatch",
-            "range="+from+"-"+to+"; exact source="+source+"; model quote="+quoted
-                +"; do not repeat or omit source words across adjacent events");
+            "range="+from+"-"+to+"; exact source="+source);
         // Only exact all-source recovery is allowed. No deletion, fuzzy matching, or free retries.
         if(mayRebind){
           int changed=exactQuoteRebind(root,s,b);
@@ -215,15 +212,7 @@ final class RebuildProtocol {
       if ((visible > (cj ? 60 : 155) && (z - a > 8500 || sentences(text) > 1))
           || visible > (cj ? 100 : 260)) presentation.add(new RebuildReview.Issue(from,to,"paragraph","Choose coherent source clauses at normal font; retain every proposition.",true));
       if (!numbersSafe(source, text)) throw new Invalid("numeric_substitution");
-      try {
-        RebuildSemantics.validate(s, from, to, text);
-      } catch (Invalid invalid) {
-        if (!"numeric_range_invention".equals(invalid.code)) throw invalid;
-        // Keep the rest of a structurally sound block available, but never show
-        // this event's invented numeric range. The full block is still repaired.
-        presentation.add(new RebuildReview.Issue(from,to,"numeric_range_invention",
-            "The target invents a range between adjacent ASR numbers. Preserve uncertainty and translate the complete block again.",true));
-      }
+      RebuildSemantics.validate(s, from, to, text);
       if (to - from >= 8 && visible <= 1) throw new Invalid("information_collapse");
       if (to < b.to && RebuildPlanner.strongDependentEnding(s, to))
         throw new Invalid("dependent_source_end");
@@ -269,10 +258,7 @@ final class RebuildProtocol {
     }
     if (end < 0 || string || depth != 0) throw new Invalid("json");
     String suffix = raw.substring(end).trim();
-    // The observed gateway adds only these closing tags, in order. Do not accept
-    // arbitrary trailing text merely because it mentions DSML somewhere.
-    boolean dsmlWrapper = suffix.matches(
-        "</｜｜DSML｜｜ parameter>(?:\\s*</｜｜DSML｜｜ invoke>)?(?:\\s*</｜｜DSML｜｜ calls>)?");
+    boolean dsmlWrapper = suffix.startsWith("<") && suffix.contains("DSML") && suffix.contains(">");
     if (!suffix.isEmpty() && !dsmlWrapper) throw new Invalid("json");
     return raw.substring(start, end);
   }

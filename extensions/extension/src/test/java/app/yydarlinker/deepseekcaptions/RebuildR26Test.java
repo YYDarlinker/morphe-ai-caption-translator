@@ -74,10 +74,13 @@ public class RebuildR26Test {
   }
   @Test public void adjacentAsrDigitsCannotInventRange()throws Exception {
     RebuildSource s=RebuildContractTest.source("about 50 20 fifth generation aircraft",400);RebuildPlanner.Block b=RebuildContractTest.block(s);
-    RebuildProtocol.Plan plan=RebuildProtocol.parseBound(
-        RebuildContractTest.reply(b,new JSONArray().put(quoted(s,0,s.words.size()-1,"约50至20架五代战机"))),s,b);
-    assertTrue(plan.issues.stream().anyMatch(x->x.code.equals("numeric_range_invention")&&x.repair));
-    assertTrue("The invented range must never appear on screen",RebuildReview.blocked(plan,plan.events.get(0)));
+    try {
+      RebuildProtocol.parseBound(RebuildContractTest.reply(b,new JSONArray().put(
+          quoted(s,0,s.words.size()-1,"约50至20架五代战机"))),s,b);
+      fail("Published parser must reject this invented range");
+    } catch(RebuildProtocol.Invalid expected) {
+      assertEquals("numeric_range_invention",expected.code);
+    }
   }
   @Test public void authenticNumberRangeAndGroupedThousandsRemainValid()throws Exception {
     for(String raw:Arrays.asList("50 to 60 aircraft","10 000 tanks")){

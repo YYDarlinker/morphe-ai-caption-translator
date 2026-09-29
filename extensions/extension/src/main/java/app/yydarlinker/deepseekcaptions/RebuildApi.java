@@ -141,10 +141,7 @@ final class RebuildApi {
         RebuildProtocol.Plan plan = RebuildProtocol.parseBound(content, s, b);
         if(plan.reboundEvents>0)trace(control,"REBUILD_SOURCE_REBOUND",
             "block="+b.index+";events_rebound="+plan.reboundEvents+";rule=exact_owned_source_v1");
-        // The player may have changed shape while this network request was in flight.
-        CaptionOverlay.LayoutBudget latest=CaptionOverlay.budget();
-        if(latest==null)latest=layout;
-        plan = RebuildReview.withLayoutReview(plan,s,latest == null ? null : latest::fits);
+        plan = RebuildReview.withLayoutReview(plan,layout == null ? null : layout::fits);
         TokenCostAudit.recordUnitQualityOutcome(audit, 1, 0, 0);
         TokenCostAudit.recordUnitBatchOutcome(audit, 1);
         return plan;

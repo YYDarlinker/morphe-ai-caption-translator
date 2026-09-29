@@ -644,23 +644,21 @@ final class RebuildController {
       synchronized (s) {
         if (!current(s) || job.cancelled) return;
         if(restoredFromCache)s.attempts[job.index]=Math.max(0,s.attempts[job.index]-1);
-        CaptionOverlay.LayoutBudget currentLayout=CaptionOverlay.budget();
-        java.util.function.Predicate<String> currentFits=currentLayout==null?null:currentLayout::fits;
         RebuildProtocol.Plan candidate=accepted;
-        accepted = RebuildReview.prefer(s.plans[job.index],candidate,currentFits,s.position);
+        accepted = RebuildReview.prefer(s.plans[job.index],candidate);
         RebuildProtocol.Plan old=s.plans[job.index];
         if(old!=null && accepted==old && candidate!=old && RebuildReview.score(old.issues)>0)
           CaptionDiagnostics.mark(s.context,"REBUILD_REPAIR_NO_PROGRESS",
               "session="+s.id+";request="+job.traceId+";block="+b.index+";old_risks="+RebuildReview.score(old.issues)+";candidate_risks="+RebuildReview.score(candidate.issues));
         RebuildProtocol.Event onScreen=old==null?null:old.at(s.position);
         String onScreenId=onScreen==null?"":job.index+":"+onScreen.from+"-"+onScreen.to;
-        if(old!=null && accepted!=old && onScreen!=null && onScreenId.equals(s.displayedEvent) && !RebuildReview.blocked(old,onScreen,currentFits))
+        if(old!=null && accepted!=old && onScreen!=null && onScreenId.equals(s.displayedEvent) && !RebuildReview.blocked(old,onScreen))
           s.pendingPlans[job.index]=accepted;
         else s.plans[job.index] = accepted;
-        boolean review=RebuildReview.shouldRepair(accepted,s.attempts[job.index],s.repairCount,s.position,b.end,currentFits);
+        boolean review=RebuildReview.shouldRepair(accepted,s.attempts[job.index],s.repairCount,s.position,b.end);
         s.states[job.index] = review ? WAITING : READY;
         if(review) {
-          s.reasons[job.index]=RebuildReview.repair(accepted,s.position);
+          s.reasons[job.index]=RebuildReview.repair(accepted.issues);
           s.retryAt[job.index]=SystemClock.elapsedRealtime()+1200;
         }
         s.jobs[job.index] = null;
@@ -802,8 +800,7 @@ final class RebuildController {
             eventStart = e.start;
             eventEnd = e.end;
             text = RebuildReview.uncertainNumbers(p,e) ? "〔原字幕数字存疑〕"+e.text : e.text;
-            CaptionOverlay.LayoutBudget currentLayout=CaptionOverlay.budget();
-            boolean blocked = RebuildReview.blocked(p,e,currentLayout==null?null:currentLayout::fits);
+            boolean blocked = RebuildReview.blocked(p,e);
             boolean late = !eventId.equals(s.displayedEvent) && (eventId.equals(s.withheldEvent) ||
                 lateUnreadable(e,s.position));
             if(blocked || late) {

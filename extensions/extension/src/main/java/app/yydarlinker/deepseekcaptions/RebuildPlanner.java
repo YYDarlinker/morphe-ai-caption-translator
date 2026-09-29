@@ -127,14 +127,6 @@ final class RebuildPlanner {
         || matches(next,"^the (reality|creation|question|point|goal|reason|problem|result|argument)\\b.*")
         || next.startsWith("i'm ")
         || next.startsWith("let's ")) return 50;
-    // A new named subject plus auxiliary (including a negative contraction) is a
-    // useful soft clause start in unpunctuated ASR: "... on the internet china doesn't ...".
-    String nextHead=s.words.get(i+1).key;
-    // Adverb + auxiliary can still belong to the preceding subject:
-    // "that pace of modernisation probably can't go on forever".
-    if (!matches(nextHead,"probably|possibly|perhaps|maybe|often|always|usually|rarely|sometimes|never|actually|certainly|generally|definitely")
-        && matches(next,"^[a-z][a-z'-]+ (?:doesn't|didn't|isn't|aren't|hasn't|haven't|won't|can't|does|did|is|are|was|were|has|have|had|will|would|can|could)\\b.*"))
-      return 50;
     if (left.endsWith(",") || s.words.get(i).text.endsWith(",")) return 30;
     return s.words.get(i).cue != s.words.get(i + 1).cue ? 10 : 0;
   }

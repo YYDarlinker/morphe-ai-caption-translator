@@ -70,9 +70,8 @@ final class RebuildSemantics {
       // 10 000 / 160 000 can be grouped thousands, not automatically a malformed quantity.
       if(adjacent.group(2).length()==3)continue;
       String reversed=Pattern.quote(adjacent.group(1))+"\\s*(?:至|到|—|–|-)\\s*"+Pattern.quote(adjacent.group(2));
-      // These two source numbers are adjacent. A conjunction elsewhere in the event
-      // cannot license a range between them (the captured "and has about 50 20" case).
-      if(has(reversed,target))
+      // v1.3.5 release applies this exemption to the whole owned source range.
+      if(has(reversed,target) && !has("\\b(?:to|through|between|and|range)\\b",raw))
         throw new RebuildProtocol.Invalid("numeric_range_invention");
     }
   }

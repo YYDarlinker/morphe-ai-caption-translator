@@ -10,6 +10,8 @@ import android.util.TypedValue;
 import android.view.*;
 import android.widget.*;
 import java.lang.ref.WeakReference;
+import java.util.Collections;
+import java.util.List;
 import java.util.function.Supplier;
 
 /** One event in one view. Layout never edits a translation or creates new timeline events. */
@@ -53,6 +55,23 @@ final class CaptionOverlay {
           <= 2;
     }
 
+    boolean fitsPreferred(String value) {
+      if (value.isEmpty()) return true;
+      TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+      paint.setTypeface(Typeface.DEFAULT);
+      paint.setTextSize(preferredPx);
+      return StaticLayout.Builder.obtain(value, 0, value.length(), paint, Math.max(1, width))
+          .setIncludePad(false)
+          .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
+          .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+          .build().getLineCount() <= 2;
+    }
+
+    boolean canPresent(RebuildProtocol.Event event) {
+      return !RebuildPageLayout.plan(event.text, event.start, event.end,
+          this::fitsPreferred).isEmpty();
+    }
+
     int preferredColumns() { return Math.max(1,(int)(width/Math.max(1,preferredPx))); }
 
     int approximateColumns() {
@@ -67,6 +86,9 @@ final class CaptionOverlay {
   }
 
   private static String pendingText = "", pendingIdentity = "", lastNotice = "";
+  private static long pendingStart = -1, pendingEnd = -1, pendingPosition = -1;
+  private static List<RebuildPageLayout.Page> pendingPages = Collections.emptyList();
+  private static int shownPage = -1;
   private static boolean previousShorts;
   private static boolean pendingStatus, suppressed, guardedExpansion;
   private static RenderGuard currentGuard;
@@ -122,11 +144,32 @@ final class CaptionOverlay {
     show(s, false, g, f, id);
   }
 
+  static void showEvent(String s, RenderGuard g, Supplier<String> f, String id,
+      long start, long end, long position) {
+    show(s, false, g, f, id, start, end, position);
+  }
+
+  static void position(long position) {
+    main(() -> {
+      pendingPosition = position;
+      int next = RebuildPageLayout.indexAt(pendingPages, position);
+      if (next >= 0 && next != shownPage) {
+        dirty = true;
+        render();
+      }
+    });
+  }
+
   private static void show(String s, boolean status, RenderGuard g, Supplier<String> f) {
     show(s, status, g, f, "");
   }
 
   private static void show(String s, boolean status, RenderGuard g, Supplier<String> f, String id) {
+    show(s, status, g, f, id, -1, -1, -1);
+  }
+
+  private static void show(String s, boolean status, RenderGuard g, Supplier<String> f, String id,
+      long start, long end, long position) {
     if (g != null && !g.isValid()) return;
     long command = COMMAND.incrementAndGet();
     main(
@@ -134,6 +177,11 @@ final class CaptionOverlay {
           if (command != COMMAND.get() || g != null && !g.isValid()) return;
           pendingText = s == null ? "" : s;
           pendingIdentity = id;
+          pendingStart = start;
+          pendingEnd = end;
+          pendingPosition = position;
+          pendingPages = Collections.emptyList();
+          shownPage = -1;
           pendingStatus = status;
           currentGuard = g;
           fallback = f;
@@ -153,6 +201,8 @@ final class CaptionOverlay {
         () -> {
           if (command != COMMAND.get() || g != null && !g.isValid()) return;
           pendingText = "";
+          pendingPages = Collections.emptyList();
+          shownPage = -1;
           fallback = null;
           currentGuard = g;
           hideView();
@@ -165,6 +215,8 @@ final class CaptionOverlay {
         () -> {
           if (command != COMMAND.get()) return;
           pendingText = "";
+          pendingPages = Collections.emptyList();
+          shownPage = -1;
           pendingStatus = false;
           fallback = null;
           currentGuard = null;
@@ -253,6 +305,8 @@ final class CaptionOverlay {
     lastLayout = 0;
     lastNotice = "";
     layoutBudget = null;
+    pendingPages = Collections.emptyList();
+    shownPage = -1;
   }
 
   private static boolean attach(Activity a) {
@@ -342,9 +396,19 @@ final class CaptionOverlay {
     float preferred = SubtitleStyleMetrics.scaledSp(cfg.captionTextSize, b.width()/a.getResources().getDisplayMetrics().density), size = preferred;
     String shown = pendingText;
     String mode = pendingStatus ? "status" : "caption";
-    // Scale only within the user's readable range, not to arbitrarily small text.
-    while (size > 12 && lines(a, shown, size, inner) > 2) size = Math.max(12, size - .5f);
-    if (lines(a, shown, size, inner) > 2) {
+    pendingPages = !pendingStatus && pendingStart >= 0 && pendingEnd > pendingStart
+        ? RebuildPageLayout.plan(pendingText, pendingStart, pendingEnd,
+            value -> lines(a, value, preferred, inner) <= 2)
+        : Collections.emptyList();
+    shownPage = RebuildPageLayout.indexAt(pendingPages, pendingPosition);
+    if (shownPage >= 0) {
+      shown = pendingPages.get(shownPage).text;
+      if (pendingPages.size() > 1) mode = "caption_page";
+    } else {
+      // Only events beyond the bounded time/page budget use the old shrink/fallback path.
+      while (size > 12 && lines(a, shown, size, inner) > 2) size = Math.max(12, size - .5f);
+    }
+    if (shownPage < 0 && lines(a, shown, size, inner) > 2) {
       mode = "original_fallback";
       shown = fallback == null ? "" : fallback.get();
       if (shown == null || shown.isEmpty() || lines(a, shown, size, inner) > 2) {
@@ -353,7 +417,7 @@ final class CaptionOverlay {
       }
       if (lines(a, shown, size, inner) > 2) shown = "…";
     }
-    String notice = pendingIdentity + "|" + pendingText + "|" + mode + "|" + inner + "|" + size;
+    String notice = pendingIdentity + "|" + pendingText + "|" + mode + "|" + inner + "|" + size + "|" + shownPage;
     if (!notice.equals(lastNotice)) {
       lastNotice = notice;
       String detail =
@@ -366,7 +430,10 @@ final class CaptionOverlay {
               + ";sp="
               + size
               + ";lines="
-              + lines(a, pendingText, size, inner);
+              + lines(a, pendingText, size, inner)
+              + (shownPage >= 0 ? ";page=" + (shownPage + 1) + "/" + pendingPages.size()
+                  + ";page_range=" + pendingPages.get(shownPage).start + "-"
+                  + pendingPages.get(shownPage).end : ";pagination_unresolved=true");
       if (mode.equals("original_fallback") || mode.equals("overflow_status"))
         CaptionDiagnostics.mark(a, "REBUILD_LAYOUT_FALLBACK", detail);
       if (DeepSeekConfig.displayTextDebugEnabled(a))

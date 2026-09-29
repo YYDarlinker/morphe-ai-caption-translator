@@ -10,6 +10,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -34,6 +35,9 @@ CASES = {
     "A10": (527, 556), "A11": (622, 637), "A12": (629, 641),
 }
 EVENT_ID = re.compile(r"(?:^|:)\d+-(\d+)$")
+LAYOUT_MAX_PAGES = 3
+LAYOUT_MIN_PAGE_MS = 1000
+LAYOUT_MAX_CPS = 12
 
 
 def sha256(path: Path) -> str:
@@ -228,6 +232,49 @@ def review_risks(trace: list[dict], block: int, event: dict) -> list[str]:
     return sorted(set(risks))
 
 
+def replay_layout_pages(event: dict, selected_ms: int, measured: dict, normal_sp: float) -> dict:
+    """Bounded policy prediction from captured lines/sp; never a new font measurement."""
+    text = event["text"]
+    observed_sp = float(measured["sp"])
+    observed_lines = int(measured["lines"])
+    needs_pages = observed_lines > 2 or observed_sp < normal_sp - 0.05
+    page_count = max(2, math.ceil(observed_lines / 2)) if needs_pages else 1
+    # Runtime page boundaries use the full owned event window; selected_ms is
+    # retained in the replay decision as the first observed playback position.
+    begin, end = event["start_ms"], event["end_ms"]
+    if page_count > LAYOUT_MAX_PAGES or end - begin < page_count * LAYOUT_MIN_PAGE_MS:
+        return {"decision": "unresolved_layout_fallback", "pages": [],
+                "page_count_required": page_count, "page_plan_kind": "offline_illustration",
+                "device_layout_verified": False}
+    # A punctuation boundary nearest each even-length target keeps the recorded
+    # translation byte-for-byte while making the offline timing deterministic.
+    cuts = [0]
+    for page in range(1, page_count):
+        target = round(len(text) * page / page_count)
+        low = cuts[-1] + 1
+        high = len(text) - (page_count - page)
+        punctuation = [i for i in range(low, high + 1) if text[i - 1] in "，。；：！？,.;:!?"]
+        cut = min(punctuation, key=lambda i: (abs(i - target), i)) if punctuation else max(low, min(target, high))
+        cuts.append(cut)
+    cuts.append(len(text))
+    pages = []
+    for i in range(page_count):
+        start = begin + round((end - begin) * cuts[i] / len(text))
+        stop = end if i == page_count - 1 else begin + round((end - begin) * cuts[i + 1] / len(text))
+        chunk = text[cuts[i]:cuts[i + 1]]
+        duration = stop - start
+        pages.append({"index": i + 1, "text": chunk, "start_ms": start,
+                      "end_ms": stop, "duration_ms": duration,
+                      "cps": round(len(chunk) * 1000 / duration, 2) if duration > 0 else None})
+    valid = ("".join(p["text"] for p in pages) == text and
+             all(p["duration_ms"] >= LAYOUT_MIN_PAGE_MS and
+                 len(p["text"]) * 1000 <= LAYOUT_MAX_CPS * p["duration_ms"] for p in pages))
+    return {"decision": "caption_pages" if valid else "unresolved_layout_fallback",
+            "pages": pages if valid else [], "page_count_required": page_count,
+            "page_plan_kind": "offline_illustration",
+            "device_layout_verified": False}
+
+
 def replay_visibility(evidence: dict, facts: dict) -> dict:
     """Java policy mirror. This predicts decisions at recorded playback ticks, not device rendering."""
     trace = evidence["trace"]
@@ -290,9 +337,18 @@ def replay_visibility(evidence: dict, facts: dict) -> dict:
             invisible["event_review"].append({"start_ms": start, "end_ms": end,
                                                "duration_ms": end - start})
 
-    # Font measurement is frozen, while the two-line rule and resulting display
-    # decision are the current local policy. No Android font measurement is invented.
-    for measurement in (r for r in trace if r["kind"] == "REBUILD_LAYOUT_FALLBACK"):
+    # Only the captured A10 overflow and A06 same-width shrink are replayed.
+    # Their measured lines/sp are inputs, never claimed as a new device layout.
+    layout_rows = [r for r in trace if r["kind"] == "REBUILD_LAYOUT_FALLBACK" and
+                   event_id(r) == (527, 556)]
+    layout_rows += [r for r in trace if r["kind"] == "REBUILD_PRESENTED" and
+                    r.get("mode") == "caption" and event_id(r) == (211, 242)]
+    layout_rows = list({event_id(r): r for r in layout_rows}.values())
+    normal_fonts = {}
+    for row in trace:
+        if row["kind"] == "REBUILD_PRESENTED" and row.get("mode") == "caption" and row.get("sp"):
+            normal_fonts[row["width"]] = max(float(row["sp"]), normal_fonts.get(row["width"], 0))
+    for measurement in layout_rows:
         span = event_id(measurement)
         event = next(e for e in evidence["events"] if span == (e["from"], e["to"]))
         selected = next(r for r in trace if r["kind"] == "REBUILD_SELECTED" and
@@ -300,19 +356,23 @@ def replay_visibility(evidence: dict, facts: dict) -> dict:
         start = max(int(selected["time"]), event["start_ms"])
         end = event["end_ms"]
         lines = int(measurement["lines"])
-        decision = "overflow_status" if lines > 2 else "caption"
-        decisions.append({"reason": "overflow", "range": [*span],
-                          "position_ms": start, "decision": decision,
+        normal_sp = normal_fonts[measurement["width"]] if span == (211, 242) else float(measurement["sp"])
+        page_plan = replay_layout_pages(event, start, measurement, normal_sp)
+        reason = "font_shrink" if span == (211, 242) else "overflow"
+        decisions.append({"reason": reason, "range": [*span],
+                          "position_ms": start, **page_plan,
+                          "normal_font_sp": normal_sp, "max_pages": LAYOUT_MAX_PAGES,
+                          "min_page_ms": LAYOUT_MIN_PAGE_MS, "max_cps": LAYOUT_MAX_CPS,
                           "measurement": {"source": "captured_android_font_result",
                                           "width": int(measurement["width"]),
                                           "sp": float(measurement["sp"]), "lines": lines}})
-        if decision == "overflow_status":
+        if reason == "overflow" and page_plan["decision"] != "caption_pages":
             invisible["overflow"].append({"range": [*span], "start_ms": start,
                                           "end_ms": end, "duration_ms": max(0, end - start),
                                           "method": "selected_position_to_owned_event_end",
                                           "owned_event_duration_ms": end - event["start_ms"]})
     return {"label": "Java policy mirror; offline simulated display decisions, not device PRESENTED evidence",
-            "policy": "paragraph advisory; semantic/layout blockers and lateUnreadable threshold unchanged",
+            "policy": "paragraph advisory; bounded layout pagination inside owned event time; semantic blockers unchanged",
             "decisions": decisions,
             "invisible_ms": {key: {"total": sum(x["duration_ms"] for x in rows), "intervals": rows}
                              for key, rows in invisible.items()}}
@@ -358,8 +418,10 @@ def score(evidence: dict) -> dict:
                 event_id(r) == (a,z) and r.get("text") == "字幕暂不可用" for r in trace) and
                 any(r["kind"] == "REBUILD_PRESENTED" and r.get("mode") == "status" and
                     r.get("text") == "字幕暂不可用" for r in trace))
-        result = {"status": "未验证" if case in ("A11", "A12") else "通过",
-                  "display_evidence": "仅生成" if case in ("A11", "A12") else ("策略镜像预测正文显示；真机未验证" if case == "A07" else ("溢出状态提示已显示，正文未显示" if case == "A10" else "已显示")),
+        result = {"status": "未验证" if case in ("A06", "A10", "A11", "A12") else "通过",
+                  "display_evidence": "仅生成" if case in ("A11", "A12") else
+                      ("离线容量预测两页；切点仅作示意，真机排版未验证" if case in ("A06", "A10") else
+                       "策略镜像预测正文显示；真机未验证" if case == "A07" else "已显示"),
                   "source_invariant": invariant,
                   "events": [{k: e[k] for k in ("from", "to", "start_ms", "end_ms", "source", "text")}
                              for e in parts], "checks": {}}
@@ -386,9 +448,16 @@ def score(evidence: dict) -> dict:
             check["bad_modifier_order_hits"] = sum(s.count("只有：甚至早在入侵之前") for s in text)
             bad = check["bad_modifier_order_hits"] > 0
         elif case == "A06":
-            check["font_shrink_events"] = sum(a <= (event_id(r) or (-1,-1))[0] <= z for r in shrunk)
+            decision = next(d for d in replay["decisions"] if d["reason"] == "font_shrink" and
+                            d["range"] == [a, z])
+            check["frozen_font_shrink_events"] = sum(a <= (event_id(r) or (-1,-1))[0] <= z for r in shrunk)
+            check["font_shrink_events"] = 0 if decision["decision"] == "caption_pages" else check["frozen_font_shrink_events"]
             check["normal_font_sp"] = reference_font["2025"]
-            bad = check["font_shrink_events"] > 0
+            check["planned_font_sp"] = decision["normal_font_sp"]
+            check["page_plan"] = decision["pages"]
+            check["page_plan_kind"] = decision["page_plan_kind"]
+            check["device_layout_verified"] = decision["device_layout_verified"]
+            bad = check["font_shrink_events"] > 0 or not decision["pages"]
         elif case == "A07":
             decision = next(d for d in replay["decisions"] if d["reason"] == "event_review" and
                             d["range"] == [a, z])
@@ -406,10 +475,17 @@ def score(evidence: dict) -> dict:
             check["bad_strategy_string_hits"] = sum(s.count("战略是构建出来的战略") for s in text)
             bad = check["bad_strategy_string_hits"] > 0
         elif case == "A10":
-            check["overflow_events"] = sum((event_id(r) == (a,z)) for r in trace if r["kind"] == "REBUILD_LAYOUT_FALLBACK")
+            decision = next(d for d in replay["decisions"] if d["reason"] == "overflow" and
+                            d["range"] == [a, z])
+            check["frozen_overflow_events"] = sum((event_id(r) == (a,z)) for r in trace if r["kind"] == "REBUILD_LAYOUT_FALLBACK")
+            check["overflow_events"] = int(decision["decision"] != "caption_pages")
             check["overflow_fallback_attributed_ms"] = sum(x["duration_ms"] for x in buckets["overflow"])
             check["selected_text"] = a10["text"]
-            check["caption_presented"] = any(r.get("mode") == "caption" for r in displayed(trace,a,z))
+            check["caption_presented"] = decision["decision"] == "caption_pages"
+            check["caption_presented_layer"] = "Java policy mirror; device PRESENTED unverified"
+            check["page_plan"] = decision["pages"]
+            check["page_plan_kind"] = decision["page_plan_kind"]
+            check["device_layout_verified"] = decision["device_layout_verified"]
             bad = check["overflow_events"] > 0 or not check["caption_presented"]
         elif case == "A11":
             check["intro_only_page_hits"] = sum(bool(re.sub(r"[\s，。！？：.!?]+$", "", s) == "我要问的问题是") for s in text)
@@ -435,8 +511,9 @@ def score(evidence: dict) -> dict:
         "layer": "frozen_facts_plus_java_policy_mirror", "input_sha256": HASHES,
         "limits": ["Time is estimated from frozen diagnostic words, not real speech alignment.",
                     "Only 687 source words / ten blocks are covered, not the full video.",
-                    "Overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
+                    "Frozen overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
                     "A07 policy replay is simulated, not a new Android PRESENTED record.",
+                    "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
                     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."],
         "source_srt_cues": evidence["srt_cues"], "covered_source_word_ids": [0, 686],
         "frozen_request_attempts": len(evidence["records"]),
@@ -446,7 +523,9 @@ def score(evidence: dict) -> dict:
         "frozen_baseline": {"invisible_ms": {key: {"total": sum(x["duration_ms"] for x in baseline[key]),
                                               "intervals": baseline[key]} for key in
                                              ("pending_translation", "event_review", "overflow")},
-                            "A07_captured_caption_presented": False},
+                            "A07_captured_caption_presented": False,
+                            "A06_captured_font_shrink_events": len(shrunk),
+                            "A10_captured_overflow_events": case_results["A10"]["checks"]["frozen_overflow_events"]},
         "policy_replay": replay,
         "metrics": {
             "invisible_ms": replay["invisible_ms"],
@@ -455,7 +534,8 @@ def score(evidence: dict) -> dict:
                               (("A04","question_then_stranded_if_hits"),
                                ("A08","range_split_repeated_start_hits"),
                                ("A11","intro_only_page_hits"))},
-            "font_shrink_events": len(shrunk), "overflow_events": case_results["A10"]["checks"]["overflow_events"],
+            "font_shrink_events": case_results["A06"]["checks"]["font_shrink_events"],
+            "overflow_events": case_results["A10"]["checks"]["overflow_events"],
             "bad_translation_string_hits": {name: case_results[name]["checks"][field] for name,field in
                                             (("A02","bad_index_string_hits"),
                                              ("A03","bad_heck_string_hits"),

@@ -114,6 +114,16 @@ final class RebuildReview {
       }
     return all.size()==plan.issues.size() ? plan : new RebuildProtocol.Plan(plan.events,plan.json,all,plan.reboundEvents);
   }
+  static RebuildProtocol.Plan withLayoutReview(RebuildProtocol.Plan plan, CaptionOverlay.LayoutBudget budget) {
+    if (budget == null) return plan;
+    List<Issue> all = new ArrayList<>(plan.issues);
+    for (RebuildProtocol.Event e : plan.events)
+      if (!budget.canPresent(e))
+        all.add(new Issue(e.from, e.to, "layout_overflow",
+            "The complete event exceeds the bounded page/time budget at the preferred font; retain its source and text.", true));
+    return all.size() == plan.issues.size() ? plan
+        : new RebuildProtocol.Plan(plan.events, plan.json, all, plan.reboundEvents);
+  }
   static boolean uncertainNumbers(RebuildProtocol.Plan p,RebuildProtocol.Event e) {
     for(Issue i:p.issues)if(i.code.equals("source_number_ambiguity")&&i.from<=e.to&&i.to>=e.from)return true;
     return false;
@@ -128,6 +138,16 @@ final class RebuildReview {
         if(issue.from<=event.to && issue.to>=event.from)return true;
       }
     }
+    return false;
+  }
+  static boolean semanticBlocked(RebuildProtocol.Plan plan, RebuildProtocol.Event event) {
+    for (Issue issue : plan.issues)
+      if ((issue.code.equals("possible_polarity_change")
+          || issue.code.equals("possible_arithmetic_misread")
+          || issue.code.equals("possible_subject_attachment"))
+          && issue.from <= event.to && issue.to >= event.from) return true;
+    // Layout is remeasured at presentation. The overlay records an unresolved
+    // fallback if neither bounded pages nor its existing fallback can show it.
     return false;
   }
   static int score(List<Issue> issues){int n=0;for(Issue i:issues)if(i.repair)n++;return n;}

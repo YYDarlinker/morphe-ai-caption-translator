@@ -354,6 +354,7 @@ final class RebuildController {
       }
     }
     if (seek) CaptionOverlay.hide();
+    CaptionOverlay.position(s.position);
     kick(s);
     scheduleTick();
   }
@@ -407,6 +408,7 @@ final class RebuildController {
     synchronized (s) {
       s.position = position();
     }
+    CaptionOverlay.position(s.position);
     kick(s);
     scheduleTick();
   }
@@ -652,7 +654,7 @@ final class RebuildController {
               "session="+s.id+";request="+job.traceId+";block="+b.index+";old_risks="+RebuildReview.score(old.issues)+";candidate_risks="+RebuildReview.score(candidate.issues));
         RebuildProtocol.Event onScreen=old==null?null:old.at(s.position);
         String onScreenId=onScreen==null?"":job.index+":"+onScreen.from+"-"+onScreen.to;
-        if(old!=null && accepted!=old && onScreen!=null && onScreenId.equals(s.displayedEvent) && !RebuildReview.blocked(old,onScreen))
+        if(old!=null && accepted!=old && onScreen!=null && onScreenId.equals(s.displayedEvent) && !RebuildReview.semanticBlocked(old,onScreen))
           s.pendingPlans[job.index]=accepted;
         else s.plans[job.index] = accepted;
         boolean review=RebuildReview.shouldRepair(accepted,s.attempts[job.index],s.repairCount,s.position,b.end);
@@ -800,7 +802,7 @@ final class RebuildController {
             eventStart = e.start;
             eventEnd = e.end;
             text = RebuildReview.uncertainNumbers(p,e) ? "〔原字幕数字存疑〕"+e.text : e.text;
-            boolean blocked = RebuildReview.blocked(p,e);
+            boolean blocked = RebuildReview.semanticBlocked(p,e);
             boolean late = !eventId.equals(s.displayedEvent) && (eventId.equals(s.withheldEvent) ||
                 lateUnreadable(e,s.position));
             if(blocked || late) {
@@ -837,7 +839,8 @@ final class RebuildController {
     else if (text.isEmpty()) CaptionOverlay.hide(guard);
     else
       CaptionOverlay.showEvent(
-          text, guard, () -> s.sourceOnly ? fallback : "", s.id + ":" + generation + ":" + eventId);
+          text, guard, () -> s.sourceOnly ? fallback : "", s.id + ":" + generation + ":" + eventId,
+          eventStart, eventEnd, selectedAt);
     if (DeepSeekConfig.displayTextDebugEnabled(s.context))
       CaptionDiagnostics.mark(
           s.context,

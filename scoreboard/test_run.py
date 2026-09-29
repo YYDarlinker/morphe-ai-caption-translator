@@ -17,9 +17,9 @@ class FrozenReplayTest(unittest.TestCase):
 
     def test_frozen_cost_and_visibility(self):
         result = self.result
-        self.assertEqual(result["case_totals"], {"通过": 1, "失败": 9, "未验证": 2})
+        self.assertEqual(result["case_totals"], {"通过": 1, "失败": 7, "未验证": 4})
         self.assertEqual({k:v["total"] for k,v in result["metrics"]["invisible_ms"].items()},
-                         {"pending_translation": 3103, "event_review": 0, "overflow": 7332})
+                         {"pending_translation": 3103, "event_review": 0, "overflow": 0})
         self.assertEqual({k:v["total"] for k,v in result["frozen_baseline"]["invisible_ms"].items()},
                          {"pending_translation": 3103, "event_review": 12550, "overflow": 7332})
         self.assertIn("Java policy mirror", result["policy_replay"]["label"])
@@ -35,8 +35,8 @@ class FrozenReplayTest(unittest.TestCase):
         self.assertTrue(self.result["metrics"]["source_ownership_all_cases"])
         self.assertEqual(self.result["metrics"]["fragment_hits"], {"A04": 1, "A08": 1, "A11": 1})
         self.assertEqual(self.result["metrics"]["short_pages_a12_only_under_1000ms"], 1)
-        self.assertEqual(self.result["metrics"]["font_shrink_events"], 1)
-        self.assertEqual(self.result["metrics"]["overflow_events"], 1)
+        self.assertEqual(self.result["metrics"]["font_shrink_events"], 0)
+        self.assertEqual(self.result["metrics"]["overflow_events"], 0)
         self.assertEqual(self.result["metrics"]["bad_translation_string_hits"],
                          {"A02": 1, "A03": 1, "A09": 1})
         for case in ("A11", "A12"):
@@ -45,7 +45,7 @@ class FrozenReplayTest(unittest.TestCase):
             self.assertEqual(self.result["cases"][case]["display_evidence"], "仅生成")
         self.assertTrue(self.result["cases"]["A07"]["checks"]["caption_presented"])
         self.assertIn("mirror", self.result["cases"]["A07"]["checks"]["caption_presented_layer"])
-        self.assertFalse(self.result["cases"]["A10"]["checks"]["caption_presented"])
+        self.assertTrue(self.result["cases"]["A10"]["checks"]["caption_presented"])
         self.assertEqual(self.result["cases"]["A01"]["checks"]["reading_time_after_first_caption_ms"], 3845)
 
     def test_a07_ignores_paragraph_risk_but_keeps_hard_review_blocker(self):
@@ -63,6 +63,36 @@ class FrozenReplayTest(unittest.TestCase):
         changed = run.score(evidence)
         self.assertEqual(changed["metrics"]["invisible_ms"]["event_review"]["total"], 12550)
         self.assertEqual(changed["cases"]["A07"]["status"], "失败")
+
+    def test_a06_a10_paginate_within_owned_time_without_font_shrink_or_status(self):
+        self.assertEqual(self.result["frozen_baseline"]["A06_captured_font_shrink_events"], 1)
+        self.assertEqual(self.result["frozen_baseline"]["A10_captured_overflow_events"], 1)
+        for case in ("A06", "A10"):
+            row = self.result["cases"][case]
+            pages = row["checks"]["page_plan"]
+            event = row["events"][0]
+            self.assertEqual(row["status"], "未验证")
+            self.assertFalse(row["checks"]["device_layout_verified"])
+            self.assertEqual(row["checks"]["page_plan_kind"], "offline_illustration")
+            self.assertEqual(len(pages), 2)
+            self.assertEqual("".join(page["text"] for page in pages), event["text"])
+            self.assertEqual(pages[0]["start_ms"], event["start_ms"])
+            self.assertEqual(pages[-1]["end_ms"], event["end_ms"])
+            self.assertTrue(all(page["duration_ms"] >= 1000 and page["cps"] <= 12
+                                for page in pages))
+            self.assertEqual(pages[0]["end_ms"], pages[1]["start_ms"])
+        self.assertEqual(self.result["cases"]["A06"]["checks"]["planned_font_sp"], 21.4)
+        self.assertEqual(self.result["cases"]["A10"]["checks"]["overflow_fallback_attributed_ms"], 0)
+
+    def test_page_cap_or_insufficient_time_remains_unresolved(self):
+        event = {"text": "字幕" * 30, "start_ms": 100, "end_ms": 7500}
+        self.assertEqual(run.replay_layout_pages(event, 100,
+                         {"sp": "12.0", "lines": "7"}, 12.0)["decision"],
+                         "unresolved_layout_fallback")
+        event["end_ms"] = 2000
+        self.assertEqual(run.replay_layout_pages(event, 100,
+                         {"sp": "12.0", "lines": "3"}, 12.0)["decision"],
+                         "unresolved_layout_fallback")
 
     def test_generated_live_evidence_is_not_presented(self):
         blocks = [{"block": n, "response": r["plan"]} for n, r in self.evidence["by_block"].items()]

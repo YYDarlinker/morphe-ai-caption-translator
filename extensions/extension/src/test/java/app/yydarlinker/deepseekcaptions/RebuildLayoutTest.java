@@ -257,4 +257,51 @@ public class RebuildLayoutTest {
     float preview=SubtitleStyleMetrics.previewTextPx(18,1080,density,scaledDensity,previewWidth);
     assertEquals(actual*previewWidth/actualWidth,preview,.001f);
   }
+
+  @Test public void a10NarrowEventShowsBothOwnedPagesInsteadOfOverflowStatus() throws Exception {
+    bounds = new Rect(0, 0, 600, 340);
+    assertTimedPages(
+        "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，而是因为会计标准不同，以及纳入和排除的项目不同。",
+        165680, 173023);
+  }
+
+  @Test public void a06LongEventKeepsPreferredFontAcrossPages() throws Exception {
+    bounds = new Rect(0, 0, 1000, 560);
+    assertTimedPages(
+        "这就让人不禁要问：如果中国国防开支如此之少，那么这些隐形战斗机、航空母舰、高超音速导弹和反舰弹道导弹都从何而来？",
+        65002, 76092);
+  }
+
+  @Test public void eventBeyondReadablePageBudgetRecordsUnresolvedFallback() throws Exception {
+    CaptionDiagnostics.clear(a);
+    bounds = new Rect(0, 0, 240, 400);
+    String caption = String.join("", java.util.Collections.nCopies(120, "字"));
+    CaptionOverlay.showEvent(caption, () -> true, () -> "", "n3-unresolved", 0, 5000, 0);
+    assertNotEquals(caption, text().getText().toString());
+    assertEquals(caption, field("pendingText"));
+    String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
+        .getString("history", "");
+    assertTrue(history.contains("REBUILD_LAYOUT_FALLBACK"));
+    assertTrue(history.contains("pagination_unresolved=true"));
+  }
+
+  @SuppressWarnings("unchecked")
+  private void assertTimedPages(String caption, long start, long end) throws Exception {
+    CaptionOverlay.showEvent(caption, () -> true, () -> "", "n3", start, end, start);
+    java.util.List<RebuildPageLayout.Page> pages =
+        (java.util.List<RebuildPageLayout.Page>) field("pendingPages");
+    assertEquals(2, pages.size());
+    assertEquals(pages.get(0).text, text().getText().toString());
+    float density = a.getResources().getDisplayMetrics().density;
+    float expected = SubtitleStyleMetrics.scaledSp(
+        DeepSeekConfig.displayStyle(a).captionTextSize, bounds.width() / density)
+        * a.getResources().getDisplayMetrics().scaledDensity;
+    assertEquals("no font shrink", expected, text().getTextSize(), .1f);
+    CaptionOverlay.position(pages.get(1).start);
+    assertEquals(pages.get(1).text, text().getText().toString());
+    assertEquals("no font shrink on second page", expected, text().getTextSize(), .1f);
+    assertEquals(caption, pages.get(0).text + pages.get(1).text);
+    assertEquals(start, pages.get(0).start);
+    assertEquals(end, pages.get(1).end);
+  }
 }

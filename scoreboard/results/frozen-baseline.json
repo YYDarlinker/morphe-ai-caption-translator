@@ -7,8 +7,9 @@
   "limits": [
     "Time is estimated from frozen diagnostic words, not real speech alignment.",
     "Only 687 source words / ten blocks are covered, not the full video.",
-    "Overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
+    "Frozen overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
     "A07 policy replay is simulated, not a new Android PRESENTED record.",
+    "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."
   ],
   "source_srt_cues": 1484,
@@ -3922,11 +3923,13 @@
         ]
       }
     },
-    "A07_captured_caption_presented": false
+    "A07_captured_caption_presented": false,
+    "A06_captured_font_shrink_events": 1,
+    "A10_captured_overflow_events": 1
   },
   "policy_replay": {
     "label": "Java policy mirror; offline simulated display decisions, not device PRESENTED evidence",
-    "policy": "paragraph advisory; semantic/layout blockers and lateUnreadable threshold unchanged",
+    "policy": "paragraph advisory; bounded layout pagination inside owned event time; semantic blockers unchanged",
     "decisions": [
       {
         "reason": "pending_translation",
@@ -3961,12 +3964,77 @@
           556
         ],
         "position_ms": 165691,
-        "decision": "overflow_status",
+        "decision": "caption_pages",
+        "pages": [
+          {
+            "index": 1,
+            "text": "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，",
+            "start_ms": 165680,
+            "end_ms": 169876,
+            "duration_ms": 4196,
+            "cps": 7.63
+          },
+          {
+            "index": 2,
+            "text": "而是因为会计标准不同，以及纳入和排除的项目不同。",
+            "start_ms": 169876,
+            "end_ms": 173023,
+            "duration_ms": 3147,
+            "cps": 7.63
+          }
+        ],
+        "page_count_required": 2,
+        "page_plan_kind": "offline_illustration",
+        "device_layout_verified": false,
+        "normal_font_sp": 12.0,
+        "max_pages": 3,
+        "min_page_ms": 1000,
+        "max_cps": 12,
         "measurement": {
           "source": "captured_android_font_result",
           "width": 1121,
           "sp": 12.0,
           "lines": 3
+        }
+      },
+      {
+        "reason": "font_shrink",
+        "range": [
+          211,
+          242
+        ],
+        "position_ms": 65024,
+        "decision": "caption_pages",
+        "pages": [
+          {
+            "index": 1,
+            "text": "这就让人不禁要问：如果中国国防开支如此之少，",
+            "start_ms": 65002,
+            "end_ms": 69359,
+            "duration_ms": 4357,
+            "cps": 5.05
+          },
+          {
+            "index": 2,
+            "text": "那么这些隐形战斗机、航空母舰、高超音速导弹和反舰弹道导弹都从何而来？",
+            "start_ms": 69359,
+            "end_ms": 76092,
+            "duration_ms": 6733,
+            "cps": 5.05
+          }
+        ],
+        "page_count_required": 2,
+        "page_plan_kind": "offline_illustration",
+        "device_layout_verified": false,
+        "normal_font_sp": 21.4,
+        "max_pages": 3,
+        "min_page_ms": 1000,
+        "max_cps": 12,
+        "measurement": {
+          "source": "captured_android_font_result",
+          "width": 2025,
+          "sp": 20.4,
+          "lines": 2
         }
       }
     ],
@@ -3986,20 +4054,8 @@
         "intervals": []
       },
       "overflow": {
-        "total": 7332,
-        "intervals": [
-          {
-            "range": [
-              527,
-              556
-            ],
-            "start_ms": 165691,
-            "end_ms": 173023,
-            "duration_ms": 7332,
-            "method": "selected_position_to_owned_event_end",
-            "owned_event_duration_ms": 7343
-          }
-        ]
+        "total": 0,
+        "intervals": []
       }
     }
   },
@@ -4020,20 +4076,8 @@
         "intervals": []
       },
       "overflow": {
-        "total": 7332,
-        "intervals": [
-          {
-            "range": [
-              527,
-              556
-            ],
-            "start_ms": 165691,
-            "end_ms": 173023,
-            "duration_ms": 7332,
-            "method": "selected_position_to_owned_event_end",
-            "owned_event_duration_ms": 7343
-          }
-        ]
+        "total": 0,
+        "intervals": []
       }
     },
     "short_pages_a12_only_under_1000ms": 1,
@@ -4042,8 +4086,8 @@
       "A08": 1,
       "A11": 1
     },
-    "font_shrink_events": 1,
-    "overflow_events": 1,
+    "font_shrink_events": 0,
+    "overflow_events": 0,
     "bad_translation_string_hits": {
       "A02": 1,
       "A03": 1,
@@ -4053,8 +4097,8 @@
   },
   "case_totals": {
     "通过": 1,
-    "失败": 9,
-    "未验证": 2
+    "失败": 7,
+    "未验证": 4
   },
   "cases": {
     "A01": {
@@ -4199,8 +4243,8 @@
       }
     },
     "A06": {
-      "status": "失败",
-      "display_evidence": "已显示",
+      "status": "未验证",
+      "display_evidence": "离线容量预测两页；切点仅作示意，真机排版未验证",
       "source_invariant": {
         "source_word_ids": [
           211,
@@ -4221,8 +4265,30 @@
         }
       ],
       "checks": {
-        "font_shrink_events": 1,
-        "normal_font_sp": 21.4
+        "frozen_font_shrink_events": 1,
+        "font_shrink_events": 0,
+        "normal_font_sp": 21.4,
+        "planned_font_sp": 21.4,
+        "page_plan": [
+          {
+            "index": 1,
+            "text": "这就让人不禁要问：如果中国国防开支如此之少，",
+            "start_ms": 65002,
+            "end_ms": 69359,
+            "duration_ms": 4357,
+            "cps": 5.05
+          },
+          {
+            "index": 2,
+            "text": "那么这些隐形战斗机、航空母舰、高超音速导弹和反舰弹道导弹都从何而来？",
+            "start_ms": 69359,
+            "end_ms": 76092,
+            "duration_ms": 6733,
+            "cps": 5.05
+          }
+        ],
+        "page_plan_kind": "offline_illustration",
+        "device_layout_verified": false
       }
     },
     "A07": {
@@ -4316,8 +4382,8 @@
       }
     },
     "A10": {
-      "status": "失败",
-      "display_evidence": "溢出状态提示已显示，正文未显示",
+      "status": "未验证",
+      "display_evidence": "离线容量预测两页；切点仅作示意，真机排版未验证",
       "source_invariant": {
         "source_word_ids": [
           527,
@@ -4338,10 +4404,32 @@
         }
       ],
       "checks": {
-        "overflow_events": 1,
-        "overflow_fallback_attributed_ms": 7332,
+        "frozen_overflow_events": 1,
+        "overflow_events": 0,
+        "overflow_fallback_attributed_ms": 0,
         "selected_text": "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，而是因为会计标准不同，以及纳入和排除的项目不同。",
-        "caption_presented": false
+        "caption_presented": true,
+        "caption_presented_layer": "Java policy mirror; device PRESENTED unverified",
+        "page_plan": [
+          {
+            "index": 1,
+            "text": "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，",
+            "start_ms": 165680,
+            "end_ms": 169876,
+            "duration_ms": 4196,
+            "cps": 7.63
+          },
+          {
+            "index": 2,
+            "text": "而是因为会计标准不同，以及纳入和排除的项目不同。",
+            "start_ms": 169876,
+            "end_ms": 173023,
+            "duration_ms": 3147,
+            "cps": 7.63
+          }
+        ],
+        "page_plan_kind": "offline_illustration",
+        "device_layout_verified": false
       }
     },
     "A11": {

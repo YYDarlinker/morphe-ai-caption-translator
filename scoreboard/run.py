@@ -1,0 +1,561 @@
+"""Frozen v1.3.5 evidence replay; stdlib only. No network unless --live is explicit.
+
+This replays the recorded source ownership, accepted requests/responses and display
+trace, not Android font measurement or an unobserved device execution.
+"""
+from __future__ import annotations
+
+import argparse
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+ROOT = Path(__file__).resolve().parents[1]
+DIAG = ROOT / "caption-diagnostics-1.3.5-20260927-084217.txt"
+SRT = ROOT / "China's Military Modernisation Speedrun - Budgets, Industry, and Purchasing Power Parity [mH5TlcMo_m4].en.srt"
+RESULT = ROOT / "scoreboard/results/frozen-baseline.json"
+HASHES = {
+    "diagnostics": "32c570274b9e13bb00c2185b6b0374acf14b94b5d59e6f16a5374258006fe764",
+    "srt": "b86a06b339d36d63fff0b75598b5df6c3c3eb80230863717e713ca542daae9c8",
+}
+# Event ranges are the accepted case boundaries, never derived from the Chinese text.
+CASES = {
+    "A01": (0, 24), "A02": (25, 41), "A03": (42, 52),
+    "A04": (73, 97), "A05": (127, 144), "A06": (211, 242),
+    "A07": (243, 280), "A08": (383, 406), "A09": (407, 419),
+    "A10": (527, 556), "A11": (622, 637), "A12": (629, 641),
+}
+EVENT_ID = re.compile(r"(?:^|:)\d+-(\d+)$")
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def ensure(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
+
+def fields(detail: str) -> dict[str, str]:
+    return dict(part.split("=", 1) for part in detail.split(";") if "=" in part)
+
+
+def srt_words() -> list[str]:
+    cues = re.split(r"\n\s*\n", SRT.read_text(encoding="utf-8-sig").replace("\r\n", "\n").strip())
+    ensure(all(re.match(r"^\d+\n\d\d:\d\d:\d\d,\d{3} -->", cue) for cue in cues), "Bad source SRT cue")
+    return re.findall(r"[a-z]+|\d+", " ".join(cue.split("\n", 2)[2] for cue in cues).lower())
+
+
+def read_evidence() -> dict:
+    for name, path in (("diagnostics", DIAG), ("srt", SRT)):
+        ensure(sha256(path) == HASHES[name], f"Frozen {name} hash differs from ACCEPTANCE.md")
+    lines = DIAG.read_text(encoding="utf-8").splitlines()
+    token_line = next((line for line in lines if line.startswith("Tokens：")), "")
+    audit = re.fullmatch(r"Tokens：([\d,]+) = 输入 ([\d,]+) \+ 输出 ([\d,]+)", token_line)
+    ensure(audit is not None, "Frozen token cost audit missing")
+    frozen_token_audit = dict(zip(("total_tokens", "input_tokens", "output_tokens"),
+                                  (int(x.replace(",", "")) for x in audit.groups())))
+    ensure(frozen_token_audit["total_tokens"] == frozen_token_audit["input_tokens"] +
+           frozen_token_audit["output_tokens"], "Frozen token audit does not balance")    # The 11 compact 'Extended quality evidence' records are canonical. Earlier
+    # 'Quality evidence' rows are a bounded duplicate, not extra requests.
+    records = [json.loads(line) for line in lines if line.startswith('{"at":')]
+    ensure([r["request"] for r in records] == list(range(3, 14)), "Expected requests 3..13 once each")
+    for record in records:
+        record["payload"] = json.loads(record["source"])
+        record["plan"] = json.loads(record["response"]) if record["response"] else None
+    ensure(records[4]["plan"] is None and records[5]["plan"] is not None,
+           "Request 7 must be rejected; request 8 is the accepted replacement")
+    by_block = {int(r["payload"]["block"].split("_")[0][1:]): r
+                for r in records if r["plan"] is not None}
+    ensure(sorted(by_block) == list(range(10)), "Expected ten accepted blocks, 0..9")
+    tokens: dict[int, str] = {}
+    times: dict[int, tuple[int, int]] = {}
+    events: list[dict] = []
+    for block, record in sorted(by_block.items()):
+        payload, plan = record["payload"], record["plan"]
+        ensure(plan["block"] == payload["block"], f"Block {block}: identity mismatch")
+        span_tokens = payload["owned_tokens"]
+        ids = [t[0] for t in span_tokens]
+        ensure(ids == list(range(ids[0], ids[-1] + 1)), f"Block {block}: noncontiguous source tokens")
+        ensure(payload["source_text"] == " ".join(t[1] for t in span_tokens),
+               f"Block {block}: source text mismatch")
+        stamp = payload["diagnostic_only_source_times"]
+        ensure([t[0] for t in stamp] == ids and len(stamp) == len(span_tokens),
+               f"Block {block}: missing frozen word timing")
+        for (idx, word), (tid, start, end, *_rest) in zip(span_tokens, stamp):
+            ensure(tid == idx and 0 <= start < end, f"Block {block}: invalid word timing")
+            ensure(idx not in tokens, f"Duplicate source word {idx}")
+            tokens[idx] = word
+            times[idx] = (start, end)
+        next_id = ids[0]
+        for e in plan["events"]:
+            a, z = e["from"], e["to"]
+            ensure(a == next_id and a <= z <= ids[-1], f"Block {block}: lost/duplicated source ownership")
+            ensure(e.get("source") == " ".join(tokens[i] for i in range(a, z + 1)),
+                   f"Block {block}: source quote mismatch at {a}-{z}")
+            ensure(isinstance(e.get("text"), str) and bool(e["text"].strip()),
+                   f"Block {block}: missing translation at {a}-{z}")
+            events.append(dict(e, start_ms=times[a][0], end_ms=times[z][1], block=block))
+            next_id = z + 1
+        ensure(next_id == ids[-1] + 1, f"Block {block}: missing trailing source")
+    ensure(sorted(tokens) == list(range(687)), "Missing/duplicate global source IDs 0..686")
+    ensure(all(times[i][1] <= times[i + 1][0] for i in range(686)), "Source word times overlap")
+    ensure(all(e["end_ms"] <= events[i+1]["start_ms"] for i, e in enumerate(events[:-1])),
+           "Response events overlap or borrow the next event's source time")
+    original = re.findall(r"[a-z]+|\d+", " ".join(tokens.values()).lower())
+    ensure(srt_words()[:len(original)] == original, "Recorded source does not match SRT prefix")
+
+    # Only chronological playback records (not the 'recent' duplicate header or
+    # pretty-printed quality evidence) count as display evidence.
+    trace: list[dict] = []
+    for line in lines:
+        match = re.match(r"(\d+) \| (REBUILD_[A-Z_]+) \| (.*)$", line)
+        if match:
+            at, kind, detail = match.groups()
+            trace.append({"at": int(at), "kind": kind, **fields(detail)})
+    unique = {}
+    for row in trace:
+        unique[(row["at"], row["kind"])] = row
+    trace = sorted(unique.values(), key=lambda x: x["at"])
+    return {"records": records, "by_block": by_block, "frozen_token_audit": frozen_token_audit, "tokens": tokens,
+            "times": times, "events": events, "trace": trace, "srt_cues": len(re.split(
+                r"\n\s*\n", SRT.read_text(encoding="utf-8-sig").strip()))}
+
+
+def event_for(evidence: dict, start: int, end: int) -> list[dict]:
+    return [e for e in evidence["events"] if e["to"] >= start and e["from"] <= end]
+
+
+def event_id(row: dict) -> tuple[int, int] | None:
+    match = EVENT_ID.search(row.get("id", ""))
+    if not match:
+        return None
+    nums = row["id"].split(":")[-1].split("-")
+    return int(nums[0]), int(nums[1])
+
+
+def displayed(trace: list[dict], a: int, z: int) -> list[dict]:
+    # Deduplicate the earlier 'recent' header by (id, mode, text).
+    seen = {}
+    for row in trace:
+        if row["kind"] != "REBUILD_PRESENTED":
+            continue
+        span = event_id(row)
+        if span and span[0] <= z and span[1] >= a:
+            seen[(row.get("id"), row.get("mode"), row.get("text"))] = row
+    return list(seen.values())
+
+
+def intervals(evidence: dict) -> dict:
+    trace = evidence["trace"]
+    ended = [row for row in trace if row["kind"] == "REBUILD_FALLBACK_END"]
+    fallbacks = defaultdict(list)
+    for row in ended:
+        if row.get("reason") in ("pending_translation", "event_review"):
+            a, z = int(row["start"]), int(row["end"])
+            fallbacks[row["reason"]].append({"start_ms": a, "end_ms": z, "duration_ms": z-a})
+    # Unlike the other two types, overflow logs have no FALLBACK_BEGIN/END.
+    # Attribute the selected event's remaining time, not a fabricated transition.
+    overflows = []
+    for row in trace:
+        if row["kind"] != "REBUILD_LAYOUT_FALLBACK" or row.get("mode") != "overflow_status":
+            continue
+        match = next((s for s in trace if s["kind"] == "REBUILD_SELECTED" and s.get("id") == row.get("id")), None)
+        span = event_id(row)
+        event = next((e for e in evidence["events"] if span == (e["from"], e["to"])), None)
+        ensure(match is not None and event is not None, "Overflow event cannot be attributed")
+        begin, end = max(int(match["time"]), event["start_ms"]), event["end_ms"]
+        overflows.append({"range": [*span], "start_ms": begin, "end_ms": end,
+                          "duration_ms": max(0, end-begin), "method": "selected_position_to_owned_event_end",
+                          "owned_event_duration_ms": end-event["start_ms"]})
+    for reason in ("pending_translation", "event_review"):
+        fallbacks[reason] = list({(x["start_ms"], x["end_ms"]): x for x in fallbacks[reason]}.values())
+    return {"pending_translation": fallbacks["pending_translation"],
+            "event_review": fallbacks["event_review"], "overflow": overflows}
+
+
+def score(evidence: dict) -> dict:
+    trace, events = evidence["trace"], evidence["events"]
+    buckets = intervals(evidence)
+    reference_font = {}
+    for row in trace:
+        if row["kind"] == "REBUILD_PRESENTED" and row.get("mode") == "caption" and row.get("sp"):
+            reference_font[row["width"]] = max(float(row["sp"]), reference_font.get(row["width"], 0))
+    shrunk = [row for row in trace if row["kind"] == "REBUILD_PRESENTED"
+              and row.get("mode") == "caption" and row.get("sp")
+              and float(row["sp"]) < reference_font[row["width"]] - 0.05]
+    shrunk = list({row["id"]: row for row in shrunk}.values())
+    a10 = next(e for e in events if e["from"] == 527 and e["to"] == 556)
+    ensure(reference_font["2025"] == 21.4, "Cannot reproduce A06 normal-size reference")
+    short_a12 = [e for e in event_for(evidence, 638, 641)
+                 if e["from"] == 638 and e["to"] == 641 and e["end_ms"] - e["start_ms"] < 1000]
+    case_results = {}
+    for case, (a, z) in CASES.items():
+        parts = event_for(evidence, a, z)
+        owners = Counter(i for e in parts for i in range(e["from"], e["to"] + 1) if a <= i <= z)
+        selected = [r for r in trace if r["kind"] == "REBUILD_SELECTED" and
+                    event_id(r) in {(e["from"], e["to"]) for e in parts}]
+        selected_ranges_match = all(
+            r.get("range") == f"{evidence["times"][event_id(r)[0]][0]}-{evidence["times"][event_id(r)[1]][1]}"
+            for r in selected)
+        invariant = {
+            "source_word_ids": [a, z], "missing": [i for i in range(a, z + 1) if owners[i] == 0],
+            "duplicated": [i for i in range(a, z + 1) if owners[i] > 1],
+            "no_next_source_time_borrowed": selected_ranges_match and all(
+                e["end_ms"] <= evidence["times"].get(e["to"] + 1, (e["end_ms"],))[0] for e in parts),
+        }
+        is_shown = bool(displayed(trace, a, z))
+        if case == "A07":
+            is_shown = is_shown or (any(r["kind"] == "REBUILD_SELECTED" and
+                event_id(r) == (a,z) and r.get("text") == "字幕暂不可用" for r in trace) and
+                any(r["kind"] == "REBUILD_PRESENTED" and r.get("mode") == "status" and
+                    r.get("text") == "字幕暂不可用" for r in trace))
+        result = {"status": "未验证" if case in ("A11", "A12") else "通过",
+                  "display_evidence": "仅生成" if case in ("A11", "A12") else ("状态提示已显示，正文未显示" if case == "A07" else ("溢出状态提示已显示，正文未显示" if case == "A10" else "已显示")),
+                  "source_invariant": invariant,
+                  "events": [{k: e[k] for k in ("from", "to", "start_ms", "end_ms", "source", "text")}
+                             for e in parts], "checks": {}}
+        check = result["checks"]
+        text = [e["text"] for e in parts]
+        if case == "A01":
+            check["pending_translation_ms"] = sum(x["duration_ms"] for x in buckets["pending_translation"])
+            check["target_ms"] = 2000
+            check["caption_before_owned_end"] = any(r.get("mode") == "caption" for r in displayed(trace,a,z))
+            caption_selection = [int(r["time"]) for r in selected if r.get("text") == parts[0]["text"]]
+            check["reading_time_after_first_caption_ms"] = (parts[0]["end_ms"] - min(caption_selection)) if caption_selection else None
+            bad = check["pending_translation_ms"] > 2000 or not check["caption_before_owned_end"]
+        elif case == "A02":
+            check["bad_index_string_hits"] = sum(s.count("索引") for s in text)
+            bad = check["bad_index_string_hits"] > 0
+        elif case == "A03":
+            check["bad_heck_string_hits"] = sum(s.count("见鬼") for s in text)
+            bad = check["bad_heck_string_hits"] > 0
+        elif case == "A04":
+            check["question_then_stranded_if_hits"] = int(len(text) > 1 and text[0].rstrip().endswith("？")
+                                                     and text[1].lstrip().startswith("如果"))
+            bad = check["question_then_stranded_if_hits"] > 0
+        elif case == "A05":
+            check["bad_modifier_order_hits"] = sum(s.count("只有：甚至早在入侵之前") for s in text)
+            bad = check["bad_modifier_order_hits"] > 0
+        elif case == "A06":
+            check["font_shrink_events"] = sum(a <= (event_id(r) or (-1,-1))[0] <= z for r in shrunk)
+            check["normal_font_sp"] = reference_font["2025"]
+            bad = check["font_shrink_events"] > 0
+        elif case == "A07":
+            check["event_review_fallback_ms"] = sum(x["duration_ms"] for x in buckets["event_review"])
+            check["accepted_text_generated"] = bool(parts[0]["text"].strip())
+            check["caption_presented"] = any(r.get("mode") == "caption" for r in displayed(trace,a,z))
+            bad = check["event_review_fallback_ms"] > 0 or not check["caption_presented"]
+        elif case == "A08":
+            check["range_split_repeated_start_hits"] = int(len(text) > 1 and
+                bool(re.search(r"射程可以[…\.]*$", text[0])) and bool(re.search(r"^[…\.]*射程",text[1])))
+            check["new_topic_same_page_hits"] = sum("台湾" in s and "今天要讲" in s for s in text)
+            bad = bool(check["range_split_repeated_start_hits"] or check["new_topic_same_page_hits"])
+        elif case == "A09":
+            check["bad_strategy_string_hits"] = sum(s.count("战略是构建出来的战略") for s in text)
+            bad = check["bad_strategy_string_hits"] > 0
+        elif case == "A10":
+            check["overflow_events"] = sum((event_id(r) == (a,z)) for r in trace if r["kind"] == "REBUILD_LAYOUT_FALLBACK")
+            check["overflow_fallback_attributed_ms"] = sum(x["duration_ms"] for x in buckets["overflow"])
+            check["selected_text"] = a10["text"]
+            check["caption_presented"] = any(r.get("mode") == "caption" for r in displayed(trace,a,z))
+            bad = check["overflow_events"] > 0 or not check["caption_presented"]
+        elif case == "A11":
+            check["intro_only_page_hits"] = sum(bool(re.sub(r"[\s，。！？：.!?]+$", "", s) == "我要问的问题是") for s in text)
+            check["presentation_verified"] = False
+            bad = bool(check["intro_only_page_hits"])
+        else:  # A12: threshold is explicitly local; not a global short-page standard.
+            check["short_638_641_pages_under_1000ms"] = len(short_a12)
+            check["split_question_hits"] = int(len(text) > 1 and "有没有遗漏？" in text[0]
+                                               and text[1].startswith("有没有应该纳入的内容"))
+            check["presentation_verified"] = False
+            bad = bool(check["short_638_641_pages_under_1000ms"] or check["split_question_hits"])
+        ensure(is_shown == (case not in ("A11", "A12")), f"{case}: display evidence classification drift")
+        if invariant["missing"] or invariant["duplicated"] or not invariant["no_next_source_time_borrowed"]:
+            bad = True
+        if case not in ("A11", "A12") and bad:
+            result["status"] = "失败"
+        if case in ("A11", "A12"):
+            result["generated_layer_alarm"] = bad
+        result["checks"] = check
+        case_results[case] = result
+    status = Counter(c["status"] for c in case_results.values())
+    return {
+        "layer": "frozen_offline_evidence_replay", "input_sha256": HASHES,
+        "limits": ["Time is estimated from frozen diagnostic words, not real speech alignment.",
+                   "Only 687 source words / ten blocks are covered, not the full video.",
+                   "Overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
+                   "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."],
+        "source_srt_cues": evidence["srt_cues"], "covered_source_word_ids": [0, 686],
+        "frozen_request_attempts": len(evidence["records"]),
+        "frozen_accepted_blocks": len(evidence["by_block"]),
+        "frozen_token_audit": evidence["frozen_token_audit"],
+        "metrics": {
+            "invisible_ms": {key: {"total": sum(x["duration_ms"] for x in buckets[key]), "intervals": buckets[key]}
+                             for key in ("pending_translation", "event_review", "overflow")},
+            "short_pages_a12_only_under_1000ms": len(short_a12),
+            "fragment_hits": {name: case_results[name]["checks"][field] for name,field in
+                              (("A04","question_then_stranded_if_hits"),
+                               ("A08","range_split_repeated_start_hits"),
+                               ("A11","intro_only_page_hits"))},
+            "font_shrink_events": len(shrunk), "overflow_events": case_results["A10"]["checks"]["overflow_events"],
+            "bad_translation_string_hits": {name: case_results[name]["checks"][field] for name,field in
+                                            (("A02","bad_index_string_hits"),
+                                             ("A03","bad_heck_string_hits"),
+                                             ("A09","bad_strategy_string_hits"))},
+            "source_ownership_all_cases": all(not c["source_invariant"]["missing"] and
+                not c["source_invariant"]["duplicated"] and c["source_invariant"]["no_next_source_time_borrowed"]
+                for c in case_results.values()),
+        },
+        "case_totals": {key: status[key] for key in ("通过", "失败", "未验证")}, "cases": case_results,
+    }
+
+# Live mode is intentionally outside score(): it never replaces a frozen response.
+def java_string(source: str, name: str) -> str:
+    match = re.search(r"(?:static )?final String " + re.escape(name) + r"\s*=\s*(.*?);", source, re.S)
+    ensure(match is not None, f"Java prompt constant missing: {name}")
+    chunks = re.findall(r'"(?:\\.|[^"\\])*"', match.group(1))
+    ensure(bool(chunks), f"Java prompt constant empty: {name}")
+    return "".join(json.loads(chunk) for chunk in chunks)
+
+
+def current_prompt() -> str:
+    path = ROOT / "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions"
+    protocol = (path / "RebuildProtocol.java").read_text(encoding="utf-8")
+    config = (path / "DeepSeekConfig.java").read_text(encoding="utf-8")
+    ensure('static final String VERSION = "event-rebuild-r2.12"' in protocol,
+           "Current prompt has a different event protocol")
+    return (java_string(protocol, "PROMPT") + java_string(protocol, "FIDELITY_PROMPT")
+            + " Target language: zh-Hans. User translation preferences: "
+            + java_string(config, "DEFAULT_PROMPT"))
+
+
+def api_endpoint(base: str) -> tuple[str, str]:
+    uri = urllib.parse.urlsplit(base.strip())
+    ensure(uri.scheme in ("https", "http") and uri.hostname and not uri.username and
+           not uri.password and not uri.fragment, "Invalid OpenAI-compatible API base URL")
+    host = uri.hostname.lower()
+    path = uri.path.rstrip("/")
+    for ending in ("/chat/completions", "/completions", "/models"):
+        if path.endswith(ending):
+            path = path[:-len(ending)]
+            break
+    ensure(not any(path.endswith(x) for x in ("/messages", "/responses", "/api/generate")),
+           "Use an OpenAI-compatible Chat Completions base URL")
+    if not path:
+        if host.endswith(".maas.aliyuncs.com") or "dashscope.aliyuncs.com" in host:
+            path = "/compatible-mode/v1"
+        elif host == "openrouter.ai":
+            path = "/api/v1"
+        else:
+            path = "/v1"
+    return urllib.parse.urlunsplit((uri.scheme, uri.netloc, path + "/chat/completions", uri.query, "")), host
+
+
+def online_schema() -> dict:
+    obj = lambda fields: {"type": "object", "additionalProperties": False,
+                          "properties": fields, "required": list(fields)}
+    event = obj({"from": {"type": "integer"}, "to": {"type": "integer"},
+                 "source": {"type": "string"}, "text": {"type": "string"}})
+    return {"type": "json_schema", "json_schema": {"name": "caption_events", "strict": True,
+             "schema": obj({"block": {"type": "string"},
+                            "events": {"type": "array", "items": event}})}}
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        raise ValueError("API redirect denied")
+
+
+def generated_case_results(evidence: dict, blocks: list[dict]) -> dict:
+    """Live text/ownership proxies only: there is no live device display trace."""
+    events = [event for row in blocks for event in row.get("response", {}).get("events", [])]
+    result = {}
+    for case, (a, z) in CASES.items():
+        relevant = [e for e in events if e["to"] >= a and e["from"] <= z]
+        owned = Counter(i for e in relevant for i in range(max(a, e["from"]), min(z, e["to"]) + 1))
+        texts = [e["text"] for e in relevant]
+        alarms = {}
+        if case == "A02": alarms["索引"] = sum(t.count("索引") for t in texts)
+        elif case == "A03": alarms["见鬼"] = sum(t.count("见鬼") for t in texts)
+        elif case == "A05": alarms["旧修饰顺序"] = sum(t.count("只有：甚至早在入侵之前") for t in texts)
+        elif case == "A09": alarms["旧战略坏串"] = sum(t.count("战略是构建出来的战略") for t in texts)
+        elif case == "A04": alarms["问号后悬空如果"] = int(len(texts) > 1 and
+            texts[0].endswith("？") and texts[1].startswith("如果"))
+        elif case == "A08": alarms["射程硬断"] = int(len(texts) > 1 and
+            bool(re.search(r"射程可以[…\.]*$", texts[0])) and bool(re.search(r"^[…\.]*射程", texts[1])))
+        elif case == "A11": alarms["引导语独页"] = sum(
+            re.sub(r"[\s，。！？：.!?]+$", "", t) == "我要问的问题是" for t in texts)
+        elif case == "A12": alarms["638-641独立短页"] = sum(e["from"] == 638 and e["to"] == 641
+            and evidence["times"][641][1] - evidence["times"][638][0] < 1000 for e in relevant)
+        result[case] = {
+            "display_status": "未验证", "source_word_ids": [a, z],
+            "source_ownership_complete_once": all(owned[i] == 1 for i in range(a, z + 1)),
+            "generated_layer_alarms": alarms,
+            "timing_layout_semantics": "未验证：无线上真机展示/字体数据；字串报警不代表自然度验收",
+        }
+    return result
+
+def live_once(evidence: dict) -> Path:
+    key, base, model = (os.environ.get("MORPHE_P4_" + name, "").strip()
+                        for name in ("API_KEY", "BASE_URL", "MODEL"))
+    ensure(key and base and model, "--live needs MORPHE_P4_API_KEY, MORPHE_P4_BASE_URL, MORPHE_P4_MODEL")
+    endpoint, host = api_endpoint(base)
+    prompt = current_prompt()
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = RESULT.parent / f"live-{stamp}.json"
+    ensure(not target.exists(), "Live result already exists at this timestamp; no repeat request was made")
+    digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    output = {"layer": "live_explicit_separate", "captured_at_utc": datetime.now(timezone.utc).isoformat(),
+              "source_sha256": HASHES, "prompt_sha256": digest,
+              "diagnostic_prompt_sha256": "6568e2f9063e4e4bf72fa1750470fd172fb3135150b8a883347087e2c97a542d",
+              "prompt_matches_phone_hash": digest == "6568e2f9063e4e4bf72fa1750470fd172fb3135150b8a883347087e2c97a542d",
+              "prompt_source": "current checked-in RebuildProtocol plus DeepSeekConfig.DEFAULT_PROMPT; device custom preference unknown",
+              "endpoint_sha256": hashlib.sha256(endpoint.encode()).hexdigest(),
+              "model": model, "format": "OpenAI-compatible chat completions",
+              "policy": "Ten unique blocks, one API request per block; no retry, no redirects, no other network access",
+              "display_evidence": "none; generated responses only", "blocks": [],
+              "api_attempts": 0, "status": "in_progress", "token_usage": {}}
+    opener = urllib.request.build_opener(NoRedirect())
+
+    def save():
+        # Persist after each charged attempt; avoid storing any credentials or raw HTTP errors.
+        temp = target.with_suffix(".tmp")
+        temp.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temp.replace(target)
+    save()
+    for block in range(10):
+        # block 4's first frozen request was rejected as truncated; live run is one
+        # complete baseline, not a silent two-attempt replay or ten preloaded answers.
+        record = evidence["records"][4] if block == 4 else evidence["by_block"][block]
+        payload = {k: v for k, v in record["payload"].items() if not k.startswith("diagnostic_only_")}
+        ensure("repair" not in payload, "First live attempt cannot contain a past repair")
+        limit = min(3072, max(1000, len(payload["source_text"]) * 2 + 600))
+        body = {"model": model, "stream": False, "max_tokens": limit,
+                "messages": [{"role": "system", "content": "Return valid JSON only. " + prompt},
+                             {"role": "user", "content": json.dumps(payload, ensure_ascii=False, separators=(",", ":"))}],
+                "response_format": {"type": "json_object"}}
+        if host == "api.openai.com":
+            body["max_completion_tokens"] = body.pop("max_tokens")
+        if host in ("api.minimax.io", "api.minimaxi.com"):
+            body["reasoning_split"] = True
+        if host == "api.deepseek.com":
+            body["thinking"] = {"type": "disabled"}
+        if any(host == name or host.endswith("." + name) for name in
+               ("dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com",
+                "dashscope-us.aliyuncs.com", "maas.aliyuncs.com")) or host in ("api.siliconflow.cn", "api.siliconflow.com"):
+            body["enable_thinking"] = False
+        if ((host.endswith(".maas.aliyuncs.com") or "dashscope.aliyuncs.com" in host) and
+                (model == "qwen3.8-flash" or model.startswith("qwen3.8-flash-"))):
+            body["response_format"] = online_schema()
+            body["presence_penalty"] = 0
+        if host == "api.anthropic.com":
+            body.pop("response_format")
+        headers = {"Content-Type": "application/json; charset=utf-8", "Accept": "application/json",
+                   "api-key" if host.endswith(".openai.azure.com") or host.endswith(".services.ai.azure.com")
+                   else "Authorization": key if host.endswith(".openai.azure.com") or
+                   host.endswith(".services.ai.azure.com") else "Bearer " + key}
+        req = urllib.request.Request(endpoint, data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+                                     headers=headers, method="POST")
+        row = {"block": block, "source_ids": [payload["owned_tokens"][0][0],
+                                              payload["owned_tokens"][-1][0]],
+               "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()}
+        output["api_attempts"] += 1
+        try:
+            with opener.open(req, timeout=10 if block == 0 else 16) as response:
+                raw = response.read(2 * 1024 * 1024 + 1)
+                ensure(len(raw) <= 2 * 1024 * 1024, "API response exceeds 2 MiB")
+            reply = json.loads(raw)
+            usage = reply.get("usage", {})
+            row["usage"] = usage
+            choice = reply["choices"][0]
+            row["finish_reason"] = choice.get("finish_reason")
+            content = choice.get("message", {}).get("content") or ""
+            try:
+                plan = json.loads(content)
+                expected = payload["owned_tokens"]
+                next_id = expected[0][0]
+                ensure(plan.get("block") == payload["block"], "block mismatch")
+                for event in plan["events"]:
+                    a, z = event["from"], event["to"]
+                    ensure(a == next_id and a <= z <= expected[-1][0], "source ownership gap/overlap")
+                    ensure(event["source"] == " ".join(expected[i-expected[0][0]][1] for i in range(a,z+1)),
+                           "source quote mismatch")
+                    ensure(bool(event["text"].strip()), "empty translation")
+                    next_id = z+1
+                ensure(next_id == expected[-1][0]+1, "missing trailing source words")
+                row["contract"] = "source_ownership_ok" if row["finish_reason"] != "length" else "output_truncated"
+                row["response"] = plan
+            except (ValueError, KeyError, TypeError, IndexError) as exc:
+                row["contract"] = "invalid_generated_response: " + str(exc)[:160]
+                row["response_text"] = content[:10000]
+            output["blocks"].append(row)
+            if row["contract"] != "source_ownership_ok":
+                output["status"] = "partial_invalid_generated_response"
+                save()
+                break
+        except urllib.error.HTTPError as exc:
+            row["error"] = "http_" + str(exc.code)
+            output["blocks"].append(row)
+            output["status"] = "partial_http_failure"
+            save()
+            break
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+            row["error"] = type(exc).__name__
+            output["blocks"].append(row)
+            output["status"] = "partial_transport_failure"
+            save()
+            break
+        save()
+    if len(output["blocks"]) == 10 and all(b.get("contract") == "source_ownership_ok" for b in output["blocks"]):
+        output["status"] = "complete_generated_only"
+    output["generated_case_results"] = generated_case_results(evidence, output["blocks"])
+    for keyname in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        output["token_usage"][keyname] = sum(b.get("usage", {}).get(keyname, 0) for b in output["blocks"])
+    output["token_usage"]["reported_blocks"] = sum("usage" in b for b in output["blocks"])
+    save()
+    return target
+
+
+def main(argv=None) -> int:
+    if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--live", action="store_true", help="EXPLICIT: one pass of ten paid remote translation API calls")
+    args = parser.parse_args(argv)
+    evidence = read_evidence()
+    frozen = score(evidence)
+    RESULT.write_text(json.dumps(frozen, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print("冻结离线计分板（不请求网络）")
+    for name, row in frozen["cases"].items():
+        print(f"  {name}: {row['status']}  [{row['display_evidence']}]")
+    totals = frozen["case_totals"]
+    print(f"总计：通过 {totals['通过']} / 失败 {totals['失败']} / 未验证 {totals['未验证']}")
+    missing = frozen["metrics"]["invisible_ms"]
+    print("不可见时长(ms)：pending_translation={pending_translation}；event_review={event_review}；"
+          "overflow(按归属时间估算)={overflow}".format(**{k: v["total"] for k, v in missing.items()}))
+    print(f"JSON: {RESULT}")
+    if args.live:
+        path = live_once(evidence)
+        output = json.loads(path.read_text(encoding="utf-8"))
+        print(f"线上层：{output['status']}；API 尝试 {output['api_attempts']}；token 用量 {output['token_usage']}")
+        print(f"单独存档：{path}")
+        return 0 if output["status"] == "complete_generated_only" else 2
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (ValueError, FileNotFoundError, KeyError) as error:
+        print("回放失败：" + str(error), file=sys.stderr)
+        sys.exit(1)

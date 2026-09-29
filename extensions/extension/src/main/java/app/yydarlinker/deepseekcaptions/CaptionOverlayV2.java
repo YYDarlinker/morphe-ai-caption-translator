@@ -94,6 +94,9 @@ final class CaptionOverlay {
   private static RenderGuard currentGuard;
   private static Supplier<String> fallback;
   private static Rect previous = new Rect();
+  private static int normalVideoWidth;
+  private static boolean referenceShorts, referenceLandscape;
+  private static String playerType = "";
   private static long lastScan, lastLayout;
   private static boolean dirty = true;
   private static float downY, initial;
@@ -112,7 +115,11 @@ final class CaptionOverlay {
   static void setActivity(Activity a) {
     main(
         () -> {
-          if (activityRef.get() != a) detach();
+          if (activityRef.get() != a) {
+            detach();
+            normalVideoWidth = 0;
+            playerType = "";
+          }
           activityRef = new WeakReference<>(a);
           CaptionSurface.activity(a);
           dirty = true;
@@ -220,6 +227,7 @@ final class CaptionOverlay {
           pendingStatus = false;
           fallback = null;
           currentGuard = null;
+          normalVideoWidth = 0;
           hideView();
         });
   }
@@ -252,6 +260,11 @@ final class CaptionOverlay {
     main(
         () -> {
           String s = type == null ? "" : type.toUpperCase(java.util.Locale.ROOT);
+          boolean changed = !s.equals(playerType);
+          if (changed) {
+            playerType = s;
+            normalVideoWidth = 0;
+          }
           suppressed =
               !CaptionSurface.isShorts()
                   && (s.contains("MINIM")
@@ -260,6 +273,11 @@ final class CaptionOverlay {
                       || s.contains("PICTURE_IN_PICTURE"));
           dirty = true;
           render();
+          // This callback may arrive before YouTube updates the video bounds.
+          if (changed) {
+            normalVideoWidth = 0;
+            dirty = true;
+          }
         });
   }
 
@@ -385,6 +403,17 @@ final class CaptionOverlay {
     dirty = false;
     previous.set(b);
     DeepSeekConfig.Snapshot cfg = DeepSeekConfig.displayStyle(a);
+    boolean landscapeHost = host.getWidth() > host.getHeight();
+    if (normalVideoWidth == 0 || shorts != referenceShorts
+        || landscapeHost != referenceLandscape) {
+      normalVideoWidth = b.width();
+      referenceShorts = shorts;
+      referenceLandscape = landscapeHost;
+    } else {
+      normalVideoWidth = Math.max(normalVideoWidth, b.width());
+    }
+    float preferred = SubtitleStyleMetrics.renderedSp(
+        cfg.captionTextSize,b.width(),normalVideoWidth);
     int width = Math.max(1, Math.round(b.width() * (CaptionSurface.isShorts() ? .78f : .92f)));
     int inner = Math.max(1, width - text.getPaddingLeft() - text.getPaddingRight());
     layoutBudget =
@@ -392,8 +421,9 @@ final class CaptionOverlay {
             inner,
             TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_SP, 12, a.getResources().getDisplayMetrics()),
-            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, SubtitleStyleMetrics.scaledSp(cfg.captionTextSize,b.width()/a.getResources().getDisplayMetrics().density),a.getResources().getDisplayMetrics()));
-    float preferred = SubtitleStyleMetrics.scaledSp(cfg.captionTextSize, b.width()/a.getResources().getDisplayMetrics().density), size = preferred;
+            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, preferred,
+                a.getResources().getDisplayMetrics()));
+    float size = preferred;
     String shown = pendingText;
     String mode = pendingStatus ? "status" : "caption";
     boolean ownedCaption = !pendingStatus && pendingStart >= 0 && pendingEnd > pendingStart;

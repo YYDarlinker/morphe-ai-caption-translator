@@ -133,27 +133,29 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     }
 
     private int minimum() {
-        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MIN_CAPTION_TEXT_SIZE : 0;
+        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MIN_CAPTION_TEXT_SIZE_TENTHS : 0;
     }
 
     private int maximum() {
-        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MAX_CAPTION_TEXT_SIZE : 100;
+        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MAX_CAPTION_TEXT_SIZE_TENTHS : 100;
     }
 
     private int currentValue() {
         DeepSeekConfig.Snapshot current = DeepSeekConfig.displayStyle(getContext());
         return KEY_TEXT_SIZE.equals(getKey())
-                ? current.captionTextSize
+                ? Math.round(current.captionTextSize * 10f)
                 : current.backgroundOpacity;
     }
 
     private String format(int value) {
-        return KEY_TEXT_SIZE.equals(getKey()) ? value + " sp" : value + "%";
+        return KEY_TEXT_SIZE.equals(getKey())
+                ? String.format(java.util.Locale.ROOT, "%.1f sp", value / 10f)
+                : value + "%";
     }
 
     private void saveValue(int value) {
         if (KEY_TEXT_SIZE.equals(getKey())) {
-            DeepSeekConfig.saveCaptionTextSize(getContext(), value);
+            DeepSeekConfig.saveCaptionTextSize(getContext(), value / 10f);
         } else {
             DeepSeekConfig.saveBackgroundOpacity(getContext(), value);
         }

@@ -25,7 +25,8 @@ import org.robolectric.annotation.GraphicsMode;
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class RebuildN15PagingReplayTest {
   static final int WIDTH=1121;
-  static final float PREFERRED_PX=WIDTH/24f;
+  static final float PREFERRED_PX=System.getenv("MORPHE_N15_FONT_PX")==null
+      ? WIDTH/24f : Float.parseFloat(System.getenv("MORPHE_N15_FONT_PX"));
   static int lines(String value) {
     TextPaint paint=new TextPaint(Paint.ANTI_ALIAS_FLAG);
     paint.setTypeface(Typeface.DEFAULT);
@@ -132,13 +133,14 @@ public class RebuildN15PagingReplayTest {
         .put("event_count",count).put("test_lines_100_han",lines(String.join("",Collections.nCopies(100,"中"))))
         .put("viewport_width_px",WIDTH)
         .put("preferred_font_px",PREFERRED_PX)
-        .put("measurement","Robolectric SDK28 StaticLayout, approx 24 CJK columns; not a phone measurement")
+        .put("measurement","Robolectric SDK28 StaticLayout proxy; not a phone measurement")
         .toString(2)+"\n").getBytes(StandardCharsets.UTF_8));
     }
     assertEquals(9684,nextWord);
     assertEquals(9576,chineseWords);
     assertEquals(108,fallbackWords);
     assertEquals("captured accepted Chinese events",540,count);
-    assertEquals("StaticLayout native graphics must actually wrap",5,lines(String.join("",Collections.nCopies(100,"中"))));
+    assertTrue("StaticLayout native graphics must actually wrap",
+        lines(String.join("",Collections.nCopies(100,"中")))>=5);
   }
 }

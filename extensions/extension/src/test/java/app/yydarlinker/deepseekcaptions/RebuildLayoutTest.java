@@ -234,13 +234,26 @@ public class RebuildLayoutTest {
     assertTrue(text().getMeasuredWidth()<Math.round(bounds.width()*.92f)-20);
     assertEquals(2,text().getLayout().getLineCount());
   }
-  @Test public void fullscreenScalesFontWithActualVideoWidthAndRestores() throws Exception {
+  @Test public void ordinaryVideoWidthsKeepAbsoluteFontSize() throws Exception {
     bounds=new Rect(0,0,360,203);CaptionOverlay.showCaption("Short caption",()->true);
     float inline=text().getTextSize();
+    CaptionOverlay.setPlayerType("FULLSCREEN");
     bounds=new Rect(0,0,640,360);CaptionOverlay.refreshStyle(a);
-    assertEquals(inline*640f/360f,text().getTextSize(),.1f);
+    assertEquals(inline,text().getTextSize(),.1f);
+    CaptionOverlay.setPlayerType("WATCH");
     bounds=new Rect(0,0,360,203);CaptionOverlay.refreshStyle(a);
     assertEquals(inline,text().getTextSize(),.1f);
+    shorts=true;CaptionOverlay.refreshStyle(a);
+    assertEquals(inline,text().getTextSize(),.1f);
+  }
+  @Test public void videoContractionWithinSamePlayerScalesAndRestores() throws Exception {
+    bounds=new Rect(0,0,640,360);CaptionOverlay.showCaption("Short caption",()->true);
+    float normal=text().getTextSize();
+    bounds=new Rect(0,0,360,203);CaptionOverlay.refreshStyle(a);
+    assertEquals(Math.max(12f,normal/a.getResources().getDisplayMetrics().scaledDensity
+        *360f/640f)*a.getResources().getDisplayMetrics().scaledDensity,text().getTextSize(),.1f);
+    bounds=new Rect(0,0,640,360);CaptionOverlay.refreshStyle(a);
+    assertEquals(normal,text().getTextSize(),.1f);
   }
   @Test public void longWrappedTextKeepsAllCharactersAtCompactWidth() throws Exception {
     bounds=new Rect(0,0,360,203);
@@ -251,10 +264,10 @@ public class RebuildLayoutTest {
     assertTrue(layout.getLineCount()<=2);
     assertEquals(caption.length(),layout.getLineEnd(layout.getLineCount()-1));
   }
-  @Test public void previewAndRendererShareProportionalSizing() {
-    float density=3,scaledDensity=3.6f,actualWidth=1920,previewWidth=600;
-    float actual=SubtitleStyleMetrics.scaledSp(18,actualWidth/density)*scaledDensity;
-    float preview=SubtitleStyleMetrics.previewTextPx(18,1080,density,scaledDensity,previewWidth);
+  @Test public void previewAndRendererShareAbsoluteSizing() {
+    float scaledDensity=3.6f,actualWidth=1920,previewWidth=600;
+    float actual=18f*scaledDensity;
+    float preview=SubtitleStyleMetrics.previewTextPx(18,actualWidth,scaledDensity,previewWidth);
     assertEquals(actual*previewWidth/actualWidth,preview,.001f);
   }
 
@@ -339,9 +352,7 @@ public class RebuildLayoutTest {
     java.util.List<RebuildPageLayout.Page> pages =
         (java.util.List<RebuildPageLayout.Page>) field("pendingPages");
     assertEquals(expectedPages, pages.size());
-    float density = a.getResources().getDisplayMetrics().density;
-    float expected = SubtitleStyleMetrics.scaledSp(
-        DeepSeekConfig.displayStyle(a).captionTextSize, bounds.width() / density)
+    float expected = DeepSeekConfig.displayStyle(a).captionTextSize
         * a.getResources().getDisplayMetrics().scaledDensity;
     StringBuilder joined = new StringBuilder();
     long cursor = start;

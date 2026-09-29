@@ -1,9 +1,13 @@
 package app.yydarlinker.deepseekcaptions;
 final class SubtitleStyleMetrics {
     static int alpha(int opacity){return Math.round(255f*Math.max(0,Math.min(100,opacity))/100f);}
-    // Configured sp at a 360dp content width; matches the live overlay.
-    static float scaledSp(int configured,float videoWidthDp){return Math.max(12,configured*videoWidthDp/360f);}
-    static float previewTextPx(int configured,float actualVideoWidthPx,float density,float scaledDensity,float previewWidth){
-        return scaledSp(configured,actualVideoWidthPx/density)*scaledDensity*previewWidth/Math.max(1,actualVideoWidthPx);
+    static float renderedSp(float configured,float videoWidthPx,float normalVideoWidthPx){
+        if (normalVideoWidthPx <= 0 || videoWidthPx >= normalVideoWidthPx * .8f)
+            return configured;
+        // The measured video frame contracts while the same player remains active (comments).
+        return Math.max(12f,configured * videoWidthPx / normalVideoWidthPx);
+    }
+    static float previewTextPx(float configured,float actualVideoWidthPx,float scaledDensity,float previewWidth){
+        return configured*scaledDensity*previewWidth/Math.max(1,actualVideoWidthPx);
     }
 }

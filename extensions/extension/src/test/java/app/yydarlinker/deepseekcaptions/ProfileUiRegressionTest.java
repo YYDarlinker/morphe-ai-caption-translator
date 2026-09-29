@@ -115,7 +115,7 @@ public class ProfileUiRegressionTest {
         String b=ApiProfiles.create(a,"B","https://b.example");
         a.getSharedPreferences("deepseek_caption_secret",0).edit().putString("api_key_ciphertext","A").putString("api_key_ciphertext_"+b,"B").apply();
         ApiProfiles.delete(a,"default");
-        assertEquals(b,ApiProfiles.active(a));assertTrue(DeepSeekConfig.enabled(a));assertEquals(15,DeepSeekConfig.load(a).captionTextSize);
+        assertEquals(b,ApiProfiles.active(a));assertTrue(DeepSeekConfig.enabled(a));assertEquals(20f,DeepSeekConfig.load(a).captionTextSize,.001f);
         assertFalse(DeepSeekConfig.flyoutMenuEnabled(a));assertFalse(ApiProfiles.values(a,"default").contains("prompt"));
         assertFalse(ApiProfiles.list(a.getApplicationContext()).containsKey("default"));assertTrue(SecureApiKey.hasSavedValue(a));
     }

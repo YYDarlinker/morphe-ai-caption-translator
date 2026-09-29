@@ -29,7 +29,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
         root.addView(preview,new LinearLayout.LayoutParams(-1,-2));
         TextView hint=new TextView(c);hint.setText(CaptionStrings.localize(c,"点按画面切换方向 · 字号与背景设置实时预览"));CaptionSettingsStyle.caption(hint);hint.setPadding(0,CaptionSettingsStyle.dp(c,8),0,0);root.addView(hint);return root;
     }
-    static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.size=value;else p.opacity=value;p.invalidate();}}
+    static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.size=value/10f;else p.opacity=value;p.invalidate();}}
     // Both orientations use the same on-screen video width, so the configured font
     // has the same apparent size. Bound the tall frame to 75% of the display;
     // settings remain scrollable rather than squeezing the portrait video.
@@ -40,18 +40,18 @@ public final class SubtitleStylePreview extends android.preference.Preference {
         float videoWidth=frameWidth(width,screenHeight,density);
         return portrait?videoWidth*16f/9f:Math.max(videoWidth*9f/16f,Math.min(220*density,screenHeight*.48f));
     }
-    static TextView sampleLabel(Context c,String sample,int size,int opacity,float contentWidth,boolean portrait){
+    static TextView sampleLabel(Context c,String sample,float size,int opacity,float contentWidth,boolean portrait){
         android.util.DisplayMetrics d=c.getResources().getDisplayMetrics();TextView label=new TextView(c);
         label.setIncludeFontPadding(false);label.setGravity(Gravity.CENTER);label.setTextColor(Color.WHITE);label.setText(sample);label.setMaxLines(2);label.setEllipsize(null);
         label.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);label.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
         int padX=Math.round(6*d.density),padY=Math.round(4*d.density);label.setPadding(padX,padY,padX,padY);
-        int maximum=Math.max(1,Math.round(contentWidth*(portrait?.78f:.92f))-2*padX);float sp=SubtitleStyleMetrics.scaledSp(size,contentWidth/d.density);
+        int maximum=Math.max(1,Math.round(contentWidth*(portrait?.78f:.92f))-2*padX);float sp=size;
         label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,sp);label.setShadowLayer(d.density,0,d.density,0xD0000000);
         GradientDrawable bg=new GradientDrawable();bg.setColor(SubtitleStyleMetrics.alpha(opacity)<<24);bg.setCornerRadius(4*d.density);label.setBackground(bg);
         int compact=CaptionOverlay.compactWidth(c,sample,sp,maximum)+2*padX;label.measure(View.MeasureSpec.makeMeasureSpec(compact,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));label.layout(0,0,compact,label.getMeasuredHeight());return label;
     }
     static final class Preview extends View {
-        boolean portrait;int size,opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);Runnable onOrientationChanged;
+        boolean portrait;float size;int opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);Runnable onOrientationChanged;
         Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);size=s.captionTextSize;opacity=s.backgroundOpacity;setClickable(true);setFocusable(true);describe();}
         private void describe(){setContentDescription(CaptionStrings.localize(getContext(),(portrait?"竖屏":"横屏")+"字幕预览，点击切换方向"));}
         @Override public boolean performClick(){super.performClick();portrait=!portrait;describe();if(onOrientationChanged!=null)onOrientationChanged.run();requestLayout();invalidate();return true;}

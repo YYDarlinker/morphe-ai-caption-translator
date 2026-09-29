@@ -23,12 +23,11 @@ public class SettingsPolish113Test {
             assertEquals(frame*16f/9f,tall,.001f);
             assertTrue(tall<=height*.75f+1);
             assertTrue(wide>=frame*9f/16f);
-            for(int size:new int[]{13,18}){
-                // Real phone content: portrait is screen width, landscape is full width.
-                // Render each through the same on-screen preview frame.
-                float portrait=SubtitleStyleMetrics.previewTextPx(size,width,1,1,frame);
-                float landscape=SubtitleStyleMetrics.previewTextPx(size,height,1,1,frame);
-                assertTrue(Math.abs(portrait-landscape)/landscape<.13f);
+            for(int size:new int[]{18,23}){
+                float portrait=SubtitleStyleMetrics.previewTextPx(size,width,1,frame);
+                float landscape=SubtitleStyleMetrics.previewTextPx(size,height,1,frame);
+                assertEquals(size*frame/width,portrait,.001f);
+                assertEquals(size*frame/height,landscape,.001f);
             }
         }
     }

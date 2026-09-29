@@ -120,7 +120,9 @@ final class RebuildReview {
   }
   static boolean blocked(RebuildProtocol.Plan plan,RebuildProtocol.Event event) {
     for(Issue issue:plan.issues) {
-      if(issue.code.equals("layout_overflow") || issue.code.equals("paragraph")
+      // A paragraph warning is advisory once the full, source-bound plan is accepted.
+      // Withholding it can hide a readable event for its entire owned interval.
+      if(issue.code.equals("layout_overflow")
           || issue.code.equals("possible_polarity_change") || issue.code.equals("possible_arithmetic_misread")
           || issue.code.equals("possible_subject_attachment")) {
         if(issue.from<=event.to && issue.to>=event.from)return true;

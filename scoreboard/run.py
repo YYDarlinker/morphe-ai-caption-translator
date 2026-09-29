@@ -183,9 +183,148 @@ def intervals(evidence: dict) -> dict:
             "event_review": fallbacks["event_review"], "overflow": overflows}
 
 
+def frozen_facts(evidence: dict) -> dict:
+    """Immutable network/plan/source inputs; no display policy is applied here."""
+    trace = evidence["trace"]
+    requests = []
+    for record in evidence["records"]:
+        number = record["request"]
+        sent = next(r for r in trace if r["kind"] == "REBUILD_REQUEST" and
+                    int(r["request"]) == number)
+        received = next(r for r in trace if r["kind"] == "REBUILD_HTTP_RESPONSE" and
+                        int(r["request"]) == number)
+        outcome = next(r for r in trace if r["kind"] in
+                       ("REBUILD_EVENTS_ACCEPTED", "REBUILD_EVENTS_REJECTED") and
+                       int(r["request"]) == number)
+        ensure(abs(record["at"] - received["at"]) <= 3,
+               f"Request {number}: response timestamp drift")
+        ensure((outcome["kind"] == "REBUILD_EVENTS_ACCEPTED") == (record["plan"] is not None),
+               f"Request {number}: acceptance differs from frozen response")
+        requests.append({"request": number, "block": record["payload"]["block"],
+                         "request_wall_ms": sent["at"], "request_position_ms": int(sent["position"]),
+                         "response_wall_ms": received["at"], "decision_wall_ms": outcome["at"],
+                         "accepted": record["plan"] is not None})
+    return {
+        "requests": requests,
+        "accepted_plans": [{"block": block, "request": record["request"],
+                            "plan": record["plan"]} for block, record in sorted(evidence["by_block"].items())],
+        "source_word_timeline": [[i, *evidence["times"][i]] for i in sorted(evidence["times"])],
+    }
+
+
+def review_risks(trace: list[dict], block: int, event: dict) -> list[str]:
+    """Use captured review observations as inputs, not captured display choices."""
+    risks = []
+    for row in trace:
+        if row["kind"] != "REBUILD_QUALITY_WARNING" or int(row.get("block", -1)) != block \
+                or row.get("repair_candidate") != "true":
+            continue
+        for key, value in row.items():
+            if not key.endswith(" range"):
+                continue
+            span = re.match(r"(\d+)-(\d+):", value)
+            if span and int(span[1]) <= event["to"] and int(span[2]) >= event["from"]:
+                risks.append(key[:-6])
+    return sorted(set(risks))
+
+
+def replay_visibility(evidence: dict, facts: dict) -> dict:
+    """Java policy mirror. This predicts decisions at recorded playback ticks, not device rendering."""
+    trace = evidence["trace"]
+    requests = {r["request"]: r for r in facts["requests"]}
+    accepted = {block: requests[record["request"]] for block, record in evidence["by_block"].items()}
+    decisions = []
+    invisible = {key: [] for key in ("pending_translation", "event_review", "overflow")}
+
+    # Playback probes are frozen, but their meaning is determined from accepted
+    # response availability and the policy below, never from old fallback totals.
+    for probe in (r for r in trace if r["kind"] == "REBUILD_FALLBACK_BEGIN" and
+                  r.get("reason") == "pending_translation"):
+        start = int(probe["position"])
+        event = next(e for e in evidence["events"] if e["start_ms"] <= start < e["end_ms"])
+        ready = accepted[event["block"]]["decision_wall_ms"]
+        selected = [r for r in trace if r["kind"] == "REBUILD_SELECTED" and
+                    event_id(r) == (event["from"], event["to"]) and r["at"] >= ready]
+        end = min(int(r["time"]) for r in selected) if selected else event["end_ms"]
+        duration = max(0, end - start)
+        decisions.append({"reason": "pending_translation", "range": [event["from"], event["to"]],
+                          "position_ms": start, "decision": "status_until_accepted_plan",
+                          "first_caption_position_ms": end})
+        if duration:
+            invisible["pending_translation"].append({"start_ms": start,
+                                                       "end_ms": end, "duration_ms": duration})
+
+    # Re-evaluate the old review probe against the accepted plan. Paragraph is an
+    # advisory segmentation risk in Java; semantic and measured-layout blockers remain.
+    hard_risks = {"layout_overflow", "possible_polarity_change",
+                  "possible_arithmetic_misread", "possible_subject_attachment"}
+    for probe in (r for r in trace if r["kind"] == "REBUILD_FALLBACK_BEGIN" and
+                  r.get("reason") == "event_review"):
+        start = int(probe["position"])
+        selected = next(r for r in trace if r["kind"] == "REBUILD_SELECTED" and
+                        int(r.get("time", -1)) == start)
+        span = event_id(selected)
+        event = next(e for e in evidence["events"] if span == (e["from"], e["to"]))
+        request = accepted[event["block"]]
+        risks = review_risks(trace, event["block"], event)
+        blocked = bool(hard_risks.intersection(risks))
+        available = request["decision_wall_ms"] <= selected["at"]
+        late = start - event["start_ms"] > 1000 and \
+            event["end_ms"] - start < 1000 and len(event["text"]) > 12
+        decision = "caption" if available and not blocked and not late else \
+                   "event_review" if blocked else "late_unreadable" if late else "pending_translation"
+        late_probe = next((r for r in trace if r["kind"] == "REBUILD_LATE_UNREADABLE" and
+                           r.get("event") == f'{event["block"]}:{event["from"]}-{event["to"]}'), None)
+        decisions.append({"reason": "event_review", "range": [event["from"], event["to"]],
+                          "position_ms": start, "accepted_request": request["request"],
+                          "review_risks": risks, "decision": decision,
+                          "late_probe_position_ms": event["end_ms"] - int(late_probe["remaining"])
+                              if late_probe else None,
+                          "late_probe_decision": "caption_continues" if late_probe and decision == "caption"
+                              else "status_continues" if late_probe else None,
+                          "caption_text": event["text"] if decision == "caption" else None})
+        if decision != "caption":
+            next_ticks = [int(r["time"]) for r in trace if r["kind"] == "REBUILD_SELECTED" and
+                          int(r.get("time", -1)) > start]
+            end = min(next_ticks) if next_ticks else event["end_ms"]
+            invisible["event_review"].append({"start_ms": start, "end_ms": end,
+                                               "duration_ms": end - start})
+
+    # Font measurement is frozen, while the two-line rule and resulting display
+    # decision are the current local policy. No Android font measurement is invented.
+    for measurement in (r for r in trace if r["kind"] == "REBUILD_LAYOUT_FALLBACK"):
+        span = event_id(measurement)
+        event = next(e for e in evidence["events"] if span == (e["from"], e["to"]))
+        selected = next(r for r in trace if r["kind"] == "REBUILD_SELECTED" and
+                        event_id(r) == span)
+        start = max(int(selected["time"]), event["start_ms"])
+        end = event["end_ms"]
+        lines = int(measurement["lines"])
+        decision = "overflow_status" if lines > 2 else "caption"
+        decisions.append({"reason": "overflow", "range": [*span],
+                          "position_ms": start, "decision": decision,
+                          "measurement": {"source": "captured_android_font_result",
+                                          "width": int(measurement["width"]),
+                                          "sp": float(measurement["sp"]), "lines": lines}})
+        if decision == "overflow_status":
+            invisible["overflow"].append({"range": [*span], "start_ms": start,
+                                          "end_ms": end, "duration_ms": max(0, end - start),
+                                          "method": "selected_position_to_owned_event_end",
+                                          "owned_event_duration_ms": end - event["start_ms"]})
+    return {"label": "Java policy mirror; offline simulated display decisions, not device PRESENTED evidence",
+            "policy": "paragraph advisory; semantic/layout blockers and lateUnreadable threshold unchanged",
+            "decisions": decisions,
+            "invisible_ms": {key: {"total": sum(x["duration_ms"] for x in rows), "intervals": rows}
+                             for key, rows in invisible.items()}}
+
+
 def score(evidence: dict) -> dict:
     trace, events = evidence["trace"], evidence["events"]
-    buckets = intervals(evidence)
+    baseline = intervals(evidence)
+    facts = frozen_facts(evidence)
+    replay = replay_visibility(evidence, facts)
+    buckets = {key: replay["invisible_ms"][key]["intervals"] for key in
+               ("pending_translation", "event_review", "overflow")}
     reference_font = {}
     for row in trace:
         if row["kind"] == "REBUILD_PRESENTED" and row.get("mode") == "caption" and row.get("sp"):
@@ -220,7 +359,7 @@ def score(evidence: dict) -> dict:
                 any(r["kind"] == "REBUILD_PRESENTED" and r.get("mode") == "status" and
                     r.get("text") == "字幕暂不可用" for r in trace))
         result = {"status": "未验证" if case in ("A11", "A12") else "通过",
-                  "display_evidence": "仅生成" if case in ("A11", "A12") else ("状态提示已显示，正文未显示" if case == "A07" else ("溢出状态提示已显示，正文未显示" if case == "A10" else "已显示")),
+                  "display_evidence": "仅生成" if case in ("A11", "A12") else ("策略镜像预测正文显示；真机未验证" if case == "A07" else ("溢出状态提示已显示，正文未显示" if case == "A10" else "已显示")),
                   "source_invariant": invariant,
                   "events": [{k: e[k] for k in ("from", "to", "start_ms", "end_ms", "source", "text")}
                              for e in parts], "checks": {}}
@@ -251,9 +390,12 @@ def score(evidence: dict) -> dict:
             check["normal_font_sp"] = reference_font["2025"]
             bad = check["font_shrink_events"] > 0
         elif case == "A07":
+            decision = next(d for d in replay["decisions"] if d["reason"] == "event_review" and
+                            d["range"] == [a, z])
             check["event_review_fallback_ms"] = sum(x["duration_ms"] for x in buckets["event_review"])
             check["accepted_text_generated"] = bool(parts[0]["text"].strip())
-            check["caption_presented"] = any(r.get("mode") == "caption" for r in displayed(trace,a,z))
+            check["caption_presented"] = decision["decision"] == "caption"
+            check["caption_presented_layer"] = "Java policy mirror; device PRESENTED unverified"
             bad = check["event_review_fallback_ms"] > 0 or not check["caption_presented"]
         elif case == "A08":
             check["range_split_repeated_start_hits"] = int(len(text) > 1 and
@@ -290,18 +432,24 @@ def score(evidence: dict) -> dict:
         case_results[case] = result
     status = Counter(c["status"] for c in case_results.values())
     return {
-        "layer": "frozen_offline_evidence_replay", "input_sha256": HASHES,
+        "layer": "frozen_facts_plus_java_policy_mirror", "input_sha256": HASHES,
         "limits": ["Time is estimated from frozen diagnostic words, not real speech alignment.",
-                   "Only 687 source words / ten blocks are covered, not the full video.",
-                   "Overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
-                   "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."],
+                    "Only 687 source words / ten blocks are covered, not the full video.",
+                    "Overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
+                    "A07 policy replay is simulated, not a new Android PRESENTED record.",
+                    "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."],
         "source_srt_cues": evidence["srt_cues"], "covered_source_word_ids": [0, 686],
         "frozen_request_attempts": len(evidence["records"]),
         "frozen_accepted_blocks": len(evidence["by_block"]),
         "frozen_token_audit": evidence["frozen_token_audit"],
+        "frozen_facts": facts,
+        "frozen_baseline": {"invisible_ms": {key: {"total": sum(x["duration_ms"] for x in baseline[key]),
+                                              "intervals": baseline[key]} for key in
+                                             ("pending_translation", "event_review", "overflow")},
+                            "A07_captured_caption_presented": False},
+        "policy_replay": replay,
         "metrics": {
-            "invisible_ms": {key: {"total": sum(x["duration_ms"] for x in buckets[key]), "intervals": buckets[key]}
-                             for key in ("pending_translation", "event_review", "overflow")},
+            "invisible_ms": replay["invisible_ms"],
             "short_pages_a12_only_under_1000ms": len(short_a12),
             "fragment_hits": {name: case_results[name]["checks"][field] for name,field in
                               (("A04","question_then_stranded_if_hits"),
@@ -422,8 +570,8 @@ def live_once(evidence: dict) -> Path:
               "prompt_source": "current checked-in RebuildProtocol plus DeepSeekConfig.DEFAULT_PROMPT; device custom preference unknown",
               "endpoint_sha256": hashlib.sha256(endpoint.encode()).hexdigest(),
               "model": model, "format": "OpenAI-compatible chat completions",
-              "policy": "Ten unique blocks, one API request per block; no retry, no redirects, no other network access",
-              "display_evidence": "none; generated responses only", "blocks": [],
+               "policy": "Block 4 first request only; one API attempt, no retry or redirects",
+               "display_evidence": "none; generated responses only", "blocks": [],
               "api_attempts": 0, "status": "in_progress", "token_usage": {}}
     opener = urllib.request.build_opener(NoRedirect())
 
@@ -433,10 +581,10 @@ def live_once(evidence: dict) -> Path:
         temp.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temp.replace(target)
     save()
-    for block in range(10):
-        # block 4's first frozen request was rejected as truncated; live run is one
-        # complete baseline, not a silent two-attempt replay or ten preloaded answers.
-        record = evidence["records"][4] if block == 4 else evidence["by_block"][block]
+    for block in (4,):
+        # Validate the first request only. A second block-4 attempt would conceal
+        # output_truncated, and the other nine blocks add no evidence for A07.
+        record = evidence["records"][4]
         payload = {k: v for k, v in record["payload"].items() if not k.startswith("diagnostic_only_")}
         ensure("repair" not in payload, "First live attempt cannot contain a past repair")
         limit = min(3072, max(1000, len(payload["source_text"]) * 2 + 600))
@@ -467,7 +615,8 @@ def live_once(evidence: dict) -> Path:
         req = urllib.request.Request(endpoint, data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
                                      headers=headers, method="POST")
         row = {"block": block, "source_ids": [payload["owned_tokens"][0][0],
-                                              payload["owned_tokens"][-1][0]],
+                                               payload["owned_tokens"][-1][0]],
+               "output_budget_tokens": limit,
                "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()}
         output["api_attempts"] += 1
         try:
@@ -496,7 +645,8 @@ def live_once(evidence: dict) -> Path:
                 row["contract"] = "source_ownership_ok" if row["finish_reason"] != "length" else "output_truncated"
                 row["response"] = plan
             except (ValueError, KeyError, TypeError, IndexError) as exc:
-                row["contract"] = "invalid_generated_response: " + str(exc)[:160]
+                row["contract"] = "output_truncated" if row.get("finish_reason") == "length" else \
+                                  "invalid_generated_response: " + str(exc)[:160]
                 row["response_text"] = content[:10000]
             output["blocks"].append(row)
             if row["contract"] != "source_ownership_ok":
@@ -516,9 +666,10 @@ def live_once(evidence: dict) -> Path:
             save()
             break
         save()
-    if len(output["blocks"]) == 10 and all(b.get("contract") == "source_ownership_ok" for b in output["blocks"]):
-        output["status"] = "complete_generated_only"
-    output["generated_case_results"] = generated_case_results(evidence, output["blocks"])
+    if len(output["blocks"]) == 1 and output["blocks"][0].get("contract") == "source_ownership_ok":
+        output["status"] = "complete_block4_generated_only"
+    if output["blocks"] and "response" in output["blocks"][0]:
+        output["generated_case_results"] = {"A07": generated_case_results(evidence, output["blocks"])["A07"]}
     for keyname in ("prompt_tokens", "completion_tokens", "total_tokens"):
         output["token_usage"][keyname] = sum(b.get("usage", {}).get(keyname, 0) for b in output["blocks"])
     output["token_usage"]["reported_blocks"] = sum("usage" in b for b in output["blocks"])
@@ -530,7 +681,7 @@ def main(argv=None) -> int:
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--live", action="store_true", help="EXPLICIT: one pass of ten paid remote translation API calls")
+    parser.add_argument("--live", action="store_true", help="EXPLICIT: one paid block-4 first-request API call")
     args = parser.parse_args(argv)
     evidence = read_evidence()
     frozen = score(evidence)
@@ -549,7 +700,7 @@ def main(argv=None) -> int:
         output = json.loads(path.read_text(encoding="utf-8"))
         print(f"线上层：{output['status']}；API 尝试 {output['api_attempts']}；token 用量 {output['token_usage']}")
         print(f"单独存档：{path}")
-        return 0 if output["status"] == "complete_generated_only" else 2
+        return 0 if output["status"] == "complete_block4_generated_only" else 2
     return 0
 
 

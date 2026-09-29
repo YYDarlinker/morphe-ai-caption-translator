@@ -297,11 +297,12 @@ public class RebuildContractTest {
   }
 
   @Test
-  public void paragraphCannotBeMadeReady() throws Exception {
+  public void acceptedParagraphKeepsReviewRiskButRemainsDisplayable() throws Exception {
     RebuildSource s = source(String.join(" ", Collections.nCopies(30, "word")), 400);
     String text = String.join("", Collections.nCopies(70, "字")) + "。第二句。";
     RebuildProtocol.Plan p=RebuildProtocol.parse(reply(block(s), new JSONArray().put(event(0,29,text))),s,block(s));
-    assertTrue(RebuildReview.blocked(p,p.events.get(0)));
+    assertTrue(p.issues.stream().anyMatch(issue -> issue.code.equals("paragraph") && issue.repair));
+    assertFalse(RebuildReview.blocked(p,p.events.get(0)));
   }
 
   @Test

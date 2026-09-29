@@ -14,4 +14,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Scoreboard exited with code $LASTEXITCODE" }
     & $python (Join-Path $PSScriptRoot 'n9.py')
     if ($LASTEXITCODE -ne 0) { throw "N9 evidence mirror exited with code $LASTEXITCODE" }
+    & $python (Join-Path $PSScriptRoot 'n10.py')
+    if ($LASTEXITCODE -ne 0) { throw "N10 startup mirror exited with code $LASTEXITCODE" }
 } finally { Pop-Location }

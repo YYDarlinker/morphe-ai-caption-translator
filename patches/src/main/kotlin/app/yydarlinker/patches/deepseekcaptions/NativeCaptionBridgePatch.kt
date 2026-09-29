@@ -254,6 +254,17 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     val nativeList=classDefBy(listMethod.definingClass).methods.filter {
         it.parameterTypes.isEmpty() && it.returnType=="Ljava/util/List;" && it.name!=listMethod.name
     }.unique("native original track list")
+    // Observe the model's signed source descriptors as soon as the list is built. A returned
+    // list is only a candidate for source prewarm; NativeCaptionBridge still checks foreground
+    // ownership and translated ON intent before starting an invisible session.
+    mutable(nativeList).apply {
+        val returns=implementation!!.instructions.mapIndexedNotNull { i,ins ->
+            if(ins.opcode==Opcode.RETURN_OBJECT) i to (ins as OneRegisterInstruction).registerA else null }
+        for((i,r) in returns.reversed()) {
+            replaceInstruction(i,"invoke-static/range {v$r .. v$r}, $BRIDGE->onOriginalTrackList(Ljava/util/List;)V")
+            addInstructions(i+1,"return-object v$r")
+        }
+    }
     fun listAccessor(m:Method) = """
         check-cast p0, ${owner.type}
         iget-object v0, p0, ${modelField.id()}

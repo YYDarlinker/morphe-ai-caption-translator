@@ -765,6 +765,36 @@ public class RebuildIntegrationTest {
     assertTrue(s.position<7040);
     assertEquals(7040,s.plans[0].events.get(0).end);
   }
+  @Test public void rawSourceShowsOwnedCueBeforeEnginePlanExists()throws Exception {
+    engine.startMs=80;engine.duration=6960;
+    blockResponse=true;start(false);RebuildController.Session s=session();await(()->s.blocks!=null);
+    RebuildSource savedSource=s.source;
+    List<RebuildPlanner.Block> savedBlocks=s.blocks;
+    RebuildProtocol.Plan[] savedPlans=s.plans;
+    synchronized(s){
+      s.source=null;s.blocks=null;s.plans=null;s.position=92;s.lastShown="";
+    }
+    Method render=RebuildController.class.getDeclaredMethod("render",RebuildController.Session.class);
+    render.setAccessible(true);render.invoke(null,s);
+    assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:raw:80_7040"));
+    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] This is one complete sentence."));
+    assertFalse(s.lastShown,s.lastShown.contains("字幕准备中"));
+    synchronized(s){s.position=7040;s.lastShown="";}
+    render.invoke(null,s);
+    assertFalse(s.lastShown,s.lastShown.contains("This is one complete sentence."));
+    synchronized(s){s.source=savedSource;s.blocks=savedBlocks;s.plans=savedPlans;}
+  }
+  @Test public void lateReadySkipsExpiredFirstBlockAndRequestsCurrentBlock()throws Exception {
+    engine.fixtureBody=new JSONObject().put("events",new JSONArray()
+        .put(RebuildR2SourceTest.cue(80,6960,"This is the first sentence.",false))
+        .put(RebuildR2SourceTest.cue(7040,12960,"This is the current sentence.",false))).toString();
+    RebuildController.time(11420);blockResponse=true;start(false);
+    RebuildController.Session s=session();await(()->s.blocks!=null&&calls.get()==1);
+    assertEquals(0,s.attempts[0]);
+    assertEquals(1,s.attempts[1]);
+    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] This is the current sentence."));
+    assertTrue(CaptionDiagnostics.fullText(a).contains("skipped_due_to_late_ready"));
+  }
   @Test public void failedBlockShowsEachOriginalCueOnlyInItsOwnTime()throws Exception {
     engine.fixtureBody=new JSONObject().put("events",new JSONArray()
       .put(RebuildR2SourceTest.cue(80,6960,"This is the first sentence.",false))

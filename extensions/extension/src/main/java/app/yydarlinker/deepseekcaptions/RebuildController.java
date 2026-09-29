@@ -45,6 +45,7 @@ final class RebuildController {
     final String owner, identity, target;
     final DeepSeekConfig.Snapshot config;
     final boolean sourceOnly;
+    final long activatedAtMs = SystemClock.elapsedRealtime();
     volatile String url;
     volatile boolean visible, cancelled, loading, terminal;
     volatile long sourceRetry, position, providerRetry;
@@ -201,6 +202,10 @@ final class RebuildController {
     video = id;
     if (changed) {
       CLOCK.reset(SystemClock.elapsedRealtime());
+      Activity currentActivity = activity.get();
+      if (currentActivity != null)
+        CaptionDiagnostics.mark(currentActivity, "REBUILD_STARTUP_PHASE",
+            "phase=video_loaded;elapsed_ms=" + SystemClock.elapsedRealtime() + ";video=" + id);
       Session s = active;
       if (s != null && !id.equals(s.owner)) stop();
     }
@@ -329,6 +334,7 @@ final class RebuildController {
         c,
         "CAPTION_REBUILD_R2",
         "engine="+RebuildProtocol.VERSION+";session="+s.id+";video="+s.owner+";"+(original ? "source_passthrough" : "single_pass_events;source_owned_time;no_legacy_core"));
+    startup(s, "engine_session_created", "visible=" + s.visible);
     kick(s);
     scheduleTick();
   }
@@ -425,7 +431,10 @@ final class RebuildController {
         load = true;
       }
     }
-    if (load) IO.submit(() -> load(s));
+    if (load) {
+      startup(s, "source_worker_queued", "");
+      IO.submit(() -> load(s));
+    }
     if (s.blocks != null && !s.terminal && !s.sourceOnly && s.visible) schedule(s);
     render(s);
   }
@@ -433,9 +442,19 @@ final class RebuildController {
   private static void load(Session s) {
     Job control = new Job(s, -1, false);
     try {
+      startup(s, "source_load_start", "");
       RawCaptionSource.Source raw =
           RawCaptionSource.load(s.context, s.url, false, !s.sourceOnly, control);
       if (!current(s)) return;
+      synchronized (s) {
+        if (!current(s)) return;
+        s.raw = raw;
+        s.position = position();
+      }
+      startup(s, "source_available", "position_ms=" + s.position);
+      // The parsed source cues are already time-bounded. Show the current one while
+      // rebuilding/planning runs; translation requests still wait for the full plan.
+      render(s);
       long phase=SystemClock.elapsedRealtime();
       RebuildSource source = RebuildSource.read(raw.body, raw.document);
       CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=rebuild;ms="+(SystemClock.elapsedRealtime()-phase));
@@ -477,7 +496,6 @@ final class RebuildController {
       CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=cache;ms="+(SystemClock.elapsedRealtime()-phase));
       synchronized (s) {
         if (!current(s)) return;
-        s.raw = raw;
         s.source = source;
         s.cacheKey = key;
         s.plans = plans;
@@ -493,7 +511,13 @@ final class RebuildController {
         s.status = "";
         s.everReady = restored > 0;
         s.blocks = blocks;
+        s.position = position();
       }
+      startup(s, "engine_ready", "position_ms=" + s.position);
+      if (!blocks.isEmpty() && s.position >= blocks.get(0).end)
+        CaptionDiagnostics.mark(s.context, "REBUILD_STARTUP_SKIP",
+            "session=" + s.id + ";reason=skipped_due_to_late_ready;first_end_ms="
+                + blocks.get(0).end + ";position_ms=" + s.position);
       int precise = 0;
       for (RebuildSource.Word w : source.words)
         if (w.precision != RebuildSource.Precision.ESTIMATED) precise++;
@@ -516,6 +540,7 @@ final class RebuildController {
               + restored);
       TokenCostAudit.recordUnitCacheOutcome(Math.min(2,blocks.size()-focusIndex), restored, false);
       RawCaptionSource.publishSharedTimeline(s.owner, raw.document.cues());
+      render(s);
       kick(s);
     } catch (Exception e) {
       if (!current(s)) return;
@@ -759,6 +784,14 @@ final class RebuildController {
     return latest;
   }
 
+  private static void startup(Session s, String phase, String detail) {
+    long now = SystemClock.elapsedRealtime();
+    CaptionDiagnostics.mark(s.context, "REBUILD_STARTUP_PHASE",
+        "session=" + s.id + ";phase=" + phase + ";elapsed_ms=" + now
+            + ";since_activation_ms=" + (now - s.activatedAtMs)
+            + (detail.isEmpty() ? "" : ";" + detail));
+  }
+
   private static String original(Session s, long time, boolean label) {
     CaptionDocument.Cue cue = originalCue(s, time);
     return cue == null ? "" : (label ? "[原文 / Original] " : "") + cue.text;
@@ -817,7 +850,17 @@ final class RebuildController {
     synchronized (s) {
       generation = s.generation;
       selectedAt = s.position;
-      if (s.source == null) {
+      if (s.source == null && s.raw != null && !s.sourceOnly && !s.terminal) {
+        CaptionDocument.Cue cue = originalCue(s, s.position);
+        if (cue != null) {
+          text = "[原文 / Original] " + cue.text;
+          source = text;
+          eventId = "source:raw:" + cue.startMs + "_" + cue.endMs;
+          eventStart = cue.startMs;
+          eventEnd = cue.endMs;
+          fallbackReason = "pending_engine";
+        }
+      } else if (s.source == null) {
         text = s.status.isEmpty() ? "字幕准备中…" : s.status;
         status = true;
       } else if (s.sourceOnly) text = original(s, s.position, false);

@@ -2,6 +2,7 @@ package app.yydarlinker.deepseekcaptions;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.SystemClock;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -9,6 +10,19 @@ import java.util.*;
 /** Source transport only. RebuildSource owns all text/timing decisions. */
 final class RawCaptionSource {
   private static final int MAX_SOURCE_BYTES = 16 * 1024 * 1024;
+
+  private static long startupClock() {
+    return SystemClock.elapsedRealtime();
+  }
+
+  private static void startupStage(Context context, String stage, long began, String detail) {
+    long now = startupClock();
+    CaptionDiagnostics.mark(
+        context,
+        "SOURCE_STARTUP_STAGE",
+        "stage=" + stage + ";elapsed_realtime_ms=" + now + ";duration_ms=" + (now - began)
+            + (detail.isEmpty() ? "" : ";" + detail));
+  }
 
   static final class Source {
     final byte[] body;
@@ -42,6 +56,8 @@ final class RawCaptionSource {
       boolean translate,
       DeepSeekApiClient.RequestControl control)
       throws Exception {
+    long loadStarted = startupClock();
+    startupStage(c, "load_begin", loadStarted, "");
     String original = CaptionEngine.sourceCaptionUrl(url),
         preferred = translate ? SourceFormatPolicy.json3(original) : original;
     long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(12);
@@ -49,11 +65,16 @@ final class RawCaptionSource {
     try {
       t = loadTrack(c, preferred, "SOURCE", true, remaining(deadline), control);
     } catch (Exception error) {
-      if (preferred.equals(original) || !SourceRecoveryPolicy.formatFallback(error)) throw error;
+      if (preferred.equals(original) || !SourceRecoveryPolicy.formatFallback(error)) {
+        startupStage(c, "load_failed", loadStarted, "error=" + error.getClass().getSimpleName());
+        throw error;
+      }
+      startupStage(c, "format_retry", loadStarted, "error=" + error.getClass().getSimpleName());
       t = loadTrack(c, original, "SOURCE", true, remaining(deadline), control);
     }
     if (publish)
       publishSharedTimeline(PageCaptionController.videoIdFromUrl(url), t.document.cues());
+    startupStage(c, "load_end", loadStarted, "bytes=" + t.body.length);
     return new Source(t);
   }
 
@@ -96,16 +117,24 @@ final class RawCaptionSource {
       DeepSeekApiClient.RequestControl control)
       throws Exception {
     checkActive(control);
+    long cacheStarted = startupClock();
+    startupStage(context, "cache_lookup_begin", cacheStarted, "kind=" + diagnosticPrefix);
     String cacheKey =
         cacheAsPrimary ? SourceCaptionCache.key(url) : SourceCaptionCache.referenceKey(url);
     SourceCaptionCache.Entry cached = SourceCaptionCache.get(context, cacheKey);
+    startupStage(context, "cache_lookup_end", cacheStarted,
+        "kind=" + diagnosticPrefix + ";hit=" + (cached != null));
     if (cached != null) {
       try {
+        long parseStarted = startupClock();
         LoadedTrack valid = new LoadedTrack(cached.body, cached.contentType, url);
+        startupStage(context, "parse_end", parseStarted,
+            "kind=" + diagnosticPrefix + ";from_cache=true;bytes=" + cached.body.length);
         CaptionDiagnostics.mark(
             context,
             diagnosticPrefix + "_CACHE_HIT",
-            (cacheAsPrimary ? "复用原始字幕缓存 " : "复用时间锚缓存 ") + cached.body.length + " bytes");
+            (cacheAsPrimary ? "Reused source caption cache: " : "Reused timing reference cache: ")
+                + cached.body.length + " bytes");
         return valid;
       } catch (Exception invalid) {
         // Older releases cached 200/HTML and malformed tracks before parsing them.
@@ -114,20 +143,32 @@ final class RawCaptionSource {
       }
     }
     CaptionDiagnostics.mark(
-        context, diagnosticPrefix + "_FETCH", cacheAsPrimary ? "正在获取原始字幕" : "正在获取自动生成字幕时间锚");
+        context, diagnosticPrefix + "_FETCH",
+        cacheAsPrimary ? "Fetching source captions" : "Fetching ASR timing reference");
+    long fetchStarted = startupClock();
+    startupStage(context, "fetch_begin", fetchStarted, "kind=" + diagnosticPrefix);
     Fetch fetched =
         fetch(
+            context,
             url,
             false,
             System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(budgetMs),
             control);
+    startupStage(context, "fetch_end", fetchStarted,
+        "kind=" + diagnosticPrefix + ";bytes=" + fetched.body.length);
+    long parseStarted = startupClock();
     LoadedTrack valid = new LoadedTrack(fetched.body, fetched.contentType, url);
+    startupStage(context, "parse_end", parseStarted,
+        "kind=" + diagnosticPrefix + ";from_cache=false;bytes=" + fetched.body.length);
     checkActive(control);
+    long cacheWriteStarted = startupClock();
     SourceCaptionCache.put(context, cacheKey, fetched.body, fetched.contentType);
+    startupStage(context, "cache_write_end", cacheWriteStarted, "kind=" + diagnosticPrefix);
     CaptionDiagnostics.mark(
         context,
         diagnosticPrefix + "_OK",
-        (cacheAsPrimary ? "原始字幕 " : "时间锚 ") + fetched.body.length + " bytes");
+        (cacheAsPrimary ? "Source captions: " : "ASR timing reference: ")
+            + fetched.body.length + " bytes");
     return valid;
   }
 
@@ -143,18 +184,26 @@ final class RawCaptionSource {
   }
 
   private static Fetch fetch(
-      String sourceUrl, boolean refreshed, long deadline, DeepSeekApiClient.RequestControl control)
+      Context context, String sourceUrl, boolean refreshed, long deadline,
+      DeepSeekApiClient.RequestControl control)
       throws Exception {
     checkActive(control);
     if (!DeepSeekCaptionHook.isYouTubeTimedTextUrl(sourceUrl))
       throw new IllegalArgumentException("invalid_source_url");
+    long cookieStarted = startupClock();
     String cookies =
         refreshed ? FreshYouTubeCookies.refresh(deadline, control) : FreshYouTubeCookies.cached();
+    startupStage(context, "cookies_end", cookieStarted,
+        "refreshed=" + refreshed + ";available=" + !cookies.isEmpty());
     checkActive(control);
     remaining(deadline);
     URL url = new URL(sourceUrl);
+    long openStarted = startupClock();
+    startupStage(context, "connection_open_begin", openStarted, "refreshed=" + refreshed);
     HttpURLConnection connection = DeepSeekCaptionHook.openWithYouTubeCronet(url);
+    boolean cronet = connection != null;
     if (connection == null) connection = (HttpURLConnection) url.openConnection();
+    startupStage(context, "connection_open_end", openStarted, "cronet=" + cronet);
     boolean refresh = false;
     try (NetworkDeadline guard = new NetworkDeadline(connection, deadline)) {
       if (control != null) control.onConnection(connection);
@@ -171,7 +220,10 @@ final class RawCaptionSource {
         connection.setRequestProperty("Cookie", cookies);
       checkActive(control);
       connection.setReadTimeout(remaining(deadline));
+      long headersStarted = startupClock();
+      startupStage(context, "response_headers_begin", headersStarted, "refreshed=" + refreshed);
       int status = connection.getResponseCode();
+      startupStage(context, "response_headers_end", headersStarted, "status=" + status);
       checkActive(control);
       remaining(deadline);
       if ((status == 401 || status == 403) && !refreshed) {
@@ -181,6 +233,8 @@ final class RawCaptionSource {
       else {
         java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
         connection.setReadTimeout(remaining(deadline));
+        long bodyStarted = startupClock();
+        startupStage(context, "response_body_begin", bodyStarted, "");
         try (InputStream input = connection.getInputStream()) {
           byte[] buffer = new byte[8192];
           while (true) {
@@ -197,6 +251,7 @@ final class RawCaptionSource {
         remaining(deadline);
         if (bytes.size() == 0)
           throw new SourceRecoveryPolicy.Failure("empty_response", true, 0, null);
+        startupStage(context, "response_body_end", bodyStarted, "bytes=" + bytes.size());
         String type = connection.getContentType();
         return new Fetch(bytes.toByteArray(), type == null ? "application/octet-stream" : type);
       }
@@ -208,7 +263,8 @@ final class RawCaptionSource {
     if (refresh) {
       checkActive(control);
       remaining(deadline);
-      return fetch(sourceUrl, true, deadline, control);
+      startupStage(context, "auth_retry", startupClock(), "status=401_or_403");
+      return fetch(context, sourceUrl, true, deadline, control);
     }
     throw new IllegalStateException("source_unavailable");
   }

@@ -1,14 +1,73 @@
 package app.yydarlinker.deepseekcaptions;
 import android.content.Context;
+import android.os.SystemClock;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Typed host accessors are bound and structurally validated by the patch, not runtime reflection. */
 public final class NativeCaptionBridge {
     private static volatile Context context;
+    private static String lastTrackListMark = "", lastSourcePrewarm = "";
     private NativeCaptionBridge() {}
     static void initialize(Context value) { context=value.getApplicationContext(); }
     static boolean enabled() { return CaptionAddonSupport.aiInstalled() && context!=null && DeepSeekConfig.enabled(context); }
+
+    /** Called when the native model first exposes its signed source tracks. */
+    public static void onOriginalTrackList(List<?> tracks) {
+        Context c = context;
+        if (!CaptionAddonSupport.aiInstalled() || c == null || tracks == null || tracks.isEmpty()
+                || RebuildController.visible()) return;
+        String owner = "", sourceUrl = "";
+        Set<String> sources = new HashSet<>();
+        try {
+            for (Object track : tracks) {
+                String candidate = url(track);
+                if (!DeepSeekCaptionHook.isYouTubeTimedTextUrl(candidate)) continue;
+                String candidateOwner = PageCaptionController.videoIdFromUrl(candidate);
+                if (candidateOwner.isEmpty()) continue;
+                if (!owner.isEmpty() && !owner.equals(candidateOwner)) return;
+                owner = candidateOwner;
+                String source = CaptionEngine.sourceCaptionUrl(candidate);
+                sources.add(source);
+                sourceUrl = source;
+            }
+            if (owner.isEmpty()) return;
+            boolean foreground = owner.equals(PageCaptionController.currentVideoIdSnapshot());
+            String markKey = owner + ":" + foreground;
+            synchronized (SELECTION_LOCK) {
+                if (!markKey.equals(lastTrackListMark)) {
+                    lastTrackListMark = markKey;
+                    CaptionDiagnostics.mark(c, "NATIVE_TRACK_LIST_READY",
+                            "video=" + owner + ";foreground=" + foreground + ";tracks=" + tracks.size()
+                                    + ";sources=" + sources.size() + ";elapsed_realtime_ms=" + SystemClock.elapsedRealtime());
+                }
+                if (!foreground || sources.size() != 1 || !enabled() || !DeepSeekConfig.isReady(c)) return;
+                // An explicit Off always wins. Remembered intent is used only while the new
+                // video's native selection has not yet committed a current choice.
+                boolean chosen = CaptionChoice.known();
+                boolean translate = chosen
+                        ? CaptionChoice.isOn() && CaptionChoice.translates()
+                        : RememberedCaptionSelection.decision() == 1
+                                && RememberedCaptionSelection.translated();
+                if (!translate) return;
+                String target = chosen ? CaptionChoice.language() : RememberedCaptionSelection.language();
+                TargetLanguage language = TargetLanguage.fromCode(target);
+                if (language == null) return;
+                String key = owner + "|" + SourceCaptionCache.key(sourceUrl) + "|" + language.code;
+                if (key.equals(lastSourcePrewarm)) return;
+                lastSourcePrewarm = key;
+                CaptionDiagnostics.mark(c, "NATIVE_SOURCE_PREWARM",
+                        "video=" + owner + ";intent=" + (chosen ? "current" : "remembered")
+                                + ";elapsed_realtime_ms=" + SystemClock.elapsedRealtime());
+                // Invisible sessions fetch the source but cannot schedule API translation.
+                RebuildController.activate(c, TargetLanguage.withCode(sourceUrl, language.code), false, false);
+            }
+        } catch (Exception failure) {
+            CaptionDiagnostics.mark(c, "NATIVE_TRACK_LIST_FAILED", failure.getClass().getSimpleName());
+        }
+    }
 
     public static boolean suppressNativeDraw() {
         return enabled() && DynamicCaptionController.isVisibleActive();
@@ -117,8 +176,16 @@ public final class NativeCaptionBridge {
             if(video.isEmpty()&&!current.isEmpty())return;
             if(!off&&!DeepSeekCaptionHook.isYouTubeTimedTextUrl(url(track)))return;
             Selection value=new Selection(video,manager,track,origin,reason);
-            if(modelOwner!=null)CaptionDiagnostics.mark(context,"NATIVE_TRACK_APPLIED",
-                    "owner=caption_model;foreground="+video.equals(current)+";off="+off+";translated="+value.translated+";reason="+reason);
+            if(modelOwner!=null) {
+                CaptionDiagnostics.mark(context,"NATIVE_TRACK_APPLIED",
+                        "owner=caption_model;foreground="+video.equals(current)+";off="+off
+                                +";translated="+value.translated+";reason="+reason
+                                +";elapsed_realtime_ms="+SystemClock.elapsedRealtime());
+                if(video.equals(current) && !off)
+                    CaptionDiagnostics.mark(context,"NATIVE_OWNER_ESTABLISHED",
+                            "video="+video+";translated="+value.translated
+                                    +";elapsed_realtime_ms="+SystemClock.elapsedRealtime());
+            }
             selections.remove(video);selections.put(video,value);
             while(selections.size()>6)selections.remove(selections.keySet().iterator().next());
             if(!current.isEmpty()&&!current.equals(video)){

@@ -27,7 +27,9 @@ final class RebuildCache {
             .append('|')
             .append(c.fingerprint())
             .append('|')
-            .append(target);
+            .append(target)
+            .append('|')
+            .append(hash(RebuildApi.prompt(c, target)));
     for (RebuildSource.Word w : s.words)
       b.append('\n')
           .append(w.start)
@@ -65,9 +67,9 @@ final class RebuildCache {
     }
   }
 
-  static synchronized void write(
+  static synchronized boolean write(
       Context c, String key, RebuildPlanner.Block b, RebuildProtocol.Plan p) {
-    if(RebuildReview.score(p.issues)>0)return;
+    if(RebuildReview.score(p.issues)>0)return false;
     File dir = directory(c), dest = new File(dir, key + "-" + b.id() + ".json");
     File tmp = null;
     try {
@@ -82,14 +84,16 @@ final class RebuildCache {
           java.nio.file.StandardCopyOption.REPLACE_EXISTING,
           java.nio.file.StandardCopyOption.ATOMIC_MOVE);
       File[] all = dir.listFiles((x, n) -> n.endsWith(".json"));
-      if (all == null) return;
+      if (all == null) return true;
       Arrays.sort(all, Comparator.comparingLong(File::lastModified).reversed());
       long bytes = 0;
       for (int i = 0; i < all.length; i++) {
         bytes += all[i].length();
         if (i >= 256 || bytes > 64L * 1024 * 1024) all[i].delete();
       }
+      return true;
     } catch (Exception ignored) {
+      return false;
     } finally {
       if (tmp != null) tmp.delete();
     }

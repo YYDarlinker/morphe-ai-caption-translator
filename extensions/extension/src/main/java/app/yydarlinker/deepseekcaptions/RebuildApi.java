@@ -33,6 +33,15 @@ final class RebuildApi {
     negotiated.clear();
   }
 
+  static String prompt(DeepSeekConfig.Snapshot cfg, String lang) {
+    return RebuildProtocol.PROMPT
+        + RebuildProtocol.FIDELITY_PROMPT
+        + " Target language: "
+        + lang
+        + ". User translation preferences: "
+        + cfg.prompt;
+  }
+
   static RebuildProtocol.Plan translate(
       RebuildSource s,
       RebuildPlanner.Block b,
@@ -54,13 +63,7 @@ final class RebuildApi {
               .put(
                   "note",
                   "budget at preferred user font; split only at coherent source clauses, never summarize; minimum_size_columns is emergency capacity, not the target; source IDs determine timing"));
-    String prompt =
-        RebuildProtocol.PROMPT
-            + RebuildProtocol.FIDELITY_PROMPT
-            + " Target language: "
-            + lang
-            + ". User translation preferences: "
-            + cfg.prompt;
+    String prompt = prompt(cfg, lang);
     JSONObject request =
         ProviderRequestPolicy.request(
             cfg,

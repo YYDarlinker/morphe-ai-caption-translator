@@ -24,13 +24,6 @@ final class RebuildController {
             t.setDaemon(true);
             return t;
           });
-  private static final ExecutorService CACHE =
-      Executors.newSingleThreadExecutor(
-          r -> {
-            Thread t = new Thread(r, "CaptionRebuildCache");
-            t.setDaemon(true);
-            return t;
-          });
   private static final RebuildClock CLOCK = new RebuildClock();
   private static volatile Session active;
   private static volatile String video = "";
@@ -698,8 +691,12 @@ final class RebuildController {
         double cps=count*1000.0/Math.max(1,event.end-event.start);
         if(count>48 || cps>12)CaptionDiagnostics.mark(s.context,"REBUILD_READABILITY_WARNING","block="+b.index+";range="+event.from+"-"+event.to+";duration="+(event.end-event.start)+";characters="+count+";cps="+String.format(Locale.ROOT,"%.2f",cps)+";advisory_only=true");
       }
-      RebuildProtocol.Plan save = accepted;
-      CACHE.submit(() -> RebuildCache.write(s.context, s.cacheKey, b, save));
+      // Finish durable storage before reporting acceptance, so a new session cannot
+      // observe the accepted block while its cache write is still queued.
+      if (!restoredFromCache && RebuildReview.score(accepted.issues) == 0
+          && !RebuildCache.write(s.context, s.cacheKey, b, accepted))
+        CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_WRITE_FAILED",
+            "session=" + s.id + ";block=" + b.index);
       CaptionDiagnostics.mark(
           s.context,
           "REBUILD_EVENTS_ACCEPTED",

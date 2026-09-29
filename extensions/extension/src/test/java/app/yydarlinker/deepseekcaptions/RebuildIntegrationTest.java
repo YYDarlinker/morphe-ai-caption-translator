@@ -378,6 +378,88 @@ public class RebuildIntegrationTest {
   }
 
   @Test
+  public void acceptedResponseIsDurableBeforeImmediateRestart() throws Exception {
+    start(false);
+    RebuildController.Session first = session();
+    await(() -> CaptionDiagnostics.fullText(a).contains(
+        "REBUILD_EVENTS_ACCEPTED | block=0;events=1;session=" + first.id + ";"));
+    assertNotNull(first.plans[0]);
+    assertEquals(1, calls.get());
+
+    RebuildController.stop();
+    start(false);
+    RebuildController.Session replay = session();
+    await(() -> replay.plans != null && replay.plans[0] != null);
+    assertEquals(first.cacheKey, replay.cacheKey);
+    assertEquals(0, replay.attempts[0]);
+    assertEquals(1, calls.get());
+  }
+
+  @Test
+  public void promptModelAndSourceChangesInvalidateAcceptedBlock() throws Exception {
+    start(false);
+    RebuildController.Session first = session();
+    await(() -> first.plans != null && first.plans[0] != null);
+    assertEquals(1, calls.get());
+    String firstKey = first.cacheKey;
+    String blockId = first.blocks.get(0).id();
+
+    RebuildController.stop();
+    DeepSeekConfig.savePrompt(a, "N12 changed translation prompt");
+    start(false);
+    RebuildController.Session changedPrompt = session();
+    await(() -> changedPrompt.plans != null && changedPrompt.plans[0] != null);
+    assertEquals(blockId, changedPrompt.blocks.get(0).id());
+    assertNotEquals(firstKey, changedPrompt.cacheKey);
+    assertEquals(1, changedPrompt.attempts[0]);
+    assertEquals(2, calls.get());
+
+    RebuildController.stop();
+    DeepSeekConfig.saveModel(a, "fixture-n12-model");
+    start(false);
+    RebuildController.Session changedModel = session();
+    await(() -> changedModel.plans != null && changedModel.plans[0] != null);
+    assertEquals(blockId, changedModel.blocks.get(0).id());
+    assertNotEquals(changedPrompt.cacheKey, changedModel.cacheKey);
+    assertEquals(1, changedModel.attempts[0]);
+    assertEquals(3, calls.get());
+
+    RebuildSource changedSource = RebuildR2SourceTest.json(new JSONArray().put(
+        RebuildR2SourceTest.cue(0, 2400, "That is one complete sentence.", false)));
+    RebuildPlanner.Block changedBlock = RebuildPlanner.plan(changedSource).get(0);
+    String changedSourceKey = RebuildCache.identity(
+        changedSource, changedModel.config, changedModel.target);
+    assertEquals(blockId, changedBlock.id());
+    assertNotEquals(changedModel.cacheKey, changedSourceKey);
+    assertNull(RebuildCache.read(a, changedSourceKey, changedSource, changedBlock));
+    assertEquals(3, calls.get());
+  }
+
+  @Test
+  public void seekBackToGeneratedBlockDoesNotRequestAgain() throws Exception {
+    engine.fixtureBody = new JSONObject().put("events", new JSONArray()
+        .put(RebuildR2SourceTest.cue(0, 7000, "This is the first sentence.", false))
+        .put(RebuildR2SourceTest.cue(7000, 7000, "This is the second sentence.", false))
+        .put(RebuildR2SourceTest.cue(14000, 7000, "This is the third sentence.", false))
+        .put(RebuildR2SourceTest.cue(50000, 7000, "This is the distant sentence.", false)))
+        .toString();
+    start(false);
+    RebuildController.Session s = session();
+    await(() -> s.plans != null && s.plans[0] != null && s.plans[1] != null);
+    assertEquals(RebuildController.READY, s.states[1]);
+    int replayedBlockAttempts = s.attempts[1];
+
+    RebuildController.time(50050);
+    await(() -> s.plans[2] != null);
+    int callsBeforeReplay = calls.get();
+    RebuildController.time(7000);
+    advance(1500);
+    assertEquals(RebuildController.READY, s.states[1]);
+    assertEquals(replayedBlockAttempts, s.attempts[1]);
+    assertEquals(callsBeforeReplay, calls.get());
+  }
+
+  @Test
   public void corruptCacheIsNotAccepted() throws Exception {
     RebuildSource s = RebuildContractTest.source("hello world", 500);
     RebuildPlanner.Block b = RebuildContractTest.block(s);

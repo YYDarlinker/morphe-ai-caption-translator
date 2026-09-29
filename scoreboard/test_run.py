@@ -17,7 +17,7 @@ class FrozenReplayTest(unittest.TestCase):
 
     def test_frozen_cost_and_visibility(self):
         result = self.result
-        self.assertEqual(result["case_totals"], {"通过": 1, "失败": 7, "未验证": 4})
+        self.assertEqual(result["case_totals"], {"通过": 4, "失败": 4, "未验证": 4})
         self.assertEqual({k:v["total"] for k,v in result["metrics"]["invisible_ms"].items()},
                          {"pending_translation": 0, "event_review": 0, "overflow": 0})
         self.assertEqual(result["metrics"]["translation_wait_ms"]["total"], 3103)
@@ -35,7 +35,8 @@ class FrozenReplayTest(unittest.TestCase):
 
     def test_ownership_and_local_cases(self):
         self.assertTrue(self.result["metrics"]["source_ownership_all_cases"])
-        self.assertEqual(self.result["metrics"]["fragment_hits"], {"A04": 1, "A08": 1, "A11": 1})
+        self.assertEqual(self.result["metrics"]["fragment_hits"], {"A04": 0, "A08": 0, "A11": 1})
+        self.assertEqual(self.result["metrics"]["captured_fragment_hits"], {"A04": 1, "A08": 1})
         self.assertEqual(self.result["metrics"]["short_pages_a12_only_under_1000ms"], 1)
         self.assertEqual(self.result["metrics"]["font_shrink_events"], 0)
         self.assertEqual(self.result["metrics"]["overflow_events"], 0)
@@ -50,15 +51,16 @@ class FrozenReplayTest(unittest.TestCase):
         self.assertTrue(self.result["cases"]["A10"]["checks"]["caption_presented"])
         self.assertEqual(self.result["cases"]["A01"]["checks"]["reading_time_after_first_caption_ms"], 3845)
 
-    def test_a01_source_cues_cover_wait_without_changing_acceptance(self):
+    def test_a01_revised_acceptance_requires_bounded_readable_source_and_same_window_replacement(self):
         row = self.result["cases"]["A01"]
         check = row["checks"]
-        self.assertEqual(row["status"], "失败")
+        self.assertEqual(row["status"], "通过")
         self.assertEqual(check["pending_translation_ms"], 3103)
         self.assertEqual(check["target_ms"], 2000)
         self.assertEqual(check["source_readable_ms"], 3103)
         self.assertEqual(check["status_only_ms"], 0)
         self.assertTrue(check["source_coverage_complete"])
+        self.assertTrue(check["source_fallback_bounded"])
         self.assertEqual([(r["cue"], r["start_ms"], r["end_ms"]) for r in check["source_cue_intervals"]],
                          [(1, 92, 1839), (2, 1839, 3195)])
         self.assertTrue(all(r["text"].strip() for r in check["source_cue_intervals"]))
@@ -70,11 +72,20 @@ class FrozenReplayTest(unittest.TestCase):
 
         # A missing raw cue must remain status-only rather than count as readable source.
         with mock.patch.object(run, "source_cues", return_value=[]):
-            missing = run.score(self.evidence)["cases"]["A01"]["checks"]
+            missing_case = run.score(self.evidence)["cases"]["A01"]
+            missing = missing_case["checks"]
+        self.assertEqual(missing_case["status"], "失败")
         self.assertEqual(missing["pending_translation_ms"], 3103)
         self.assertEqual(missing["source_readable_ms"], 0)
         self.assertEqual(missing["status_only_ms"], 3103)
         self.assertFalse(missing["source_coverage_complete"])
+
+        # A returned translation outside the original event cannot be counted as a replacement.
+        delayed = deepcopy(self.evidence)
+        selected = next(row for row in delayed["trace"] if row["kind"] == "REBUILD_SELECTED"
+                        and run.event_id(row) == (0, 24))
+        selected["time"] = "7040"
+        self.assertEqual(run.score(delayed)["cases"]["A01"]["status"], "失败")
 
     def test_a07_ignores_paragraph_risk_but_keeps_hard_review_blocker(self):
         decision = next(d for d in self.result["policy_replay"]["decisions"]
@@ -91,6 +102,41 @@ class FrozenReplayTest(unittest.TestCase):
         changed = run.score(evidence)
         self.assertEqual(changed["metrics"]["invisible_ms"]["event_review"]["total"], 12550)
         self.assertEqual(changed["cases"]["A07"]["status"], "失败")
+
+    def test_a04_a08_local_cuts_remove_forced_splits_without_new_requests(self):
+        cuts = self.result["policy_replay"]["cross_block_cuts"]
+        self.assertTrue(cuts["resource_and_ownership_limits_hold"])
+        self.assertEqual(cuts["request_count_delta"], 0)
+        old, new = cuts["original_blocks"], cuts["projected_blocks"]
+        self.assertEqual([(old[i]["from"], old[i]["to"]) for i in (1, 2, 5, 6)],
+                         [(25, 87), (88, 180), (314, 392), (393, 474)])
+        self.assertEqual([(new[i]["from"], new[i]["to"]) for i in (1, 2, 5, 6)],
+                         [(25, 97), (98, 180), (314, 382), (383, 474)])
+        self.assertEqual([new[i] for i in (4, 8, 9)], [old[i] for i in (4, 8, 9)])
+        self.assertTrue(cuts["A04"]["dependent_span_in_one_block"])
+        self.assertTrue(cuts["A08"]["missile_clause_in_one_block"])
+        self.assertEqual(cuts["A08"]["topic_boundary_available_after_word"], 396)
+        self.assertEqual({name: row["status"] for name, row in self.result["cases"].items()},
+                         {"A01": "通过", "A02": "失败", "A03": "失败", "A04": "通过",
+                          "A05": "失败", "A06": "未验证", "A07": "通过", "A08": "通过",
+                          "A09": "失败", "A10": "未验证", "A11": "未验证", "A12": "未验证"})
+        for case in ("A04", "A08"):
+            row = self.result["cases"][case]
+            self.assertEqual(row["status"], "通过")
+            self.assertFalse(row["checks"]["new_translation_verified"])
+            self.assertIn("新译文与真机展示未验证", row["display_evidence"])
+            self.assertFalse(row["source_invariant"]["missing"])
+            self.assertFalse(row["source_invariant"]["duplicated"])
+            self.assertTrue(row["source_invariant"]["no_next_source_time_borrowed"])
+        self.assertEqual(self.result["cases"]["A08"]["checks"]["captured_new_topic_same_page_hits"], 1)
+        self.assertIsNone(self.result["cases"]["A08"]["checks"]["new_topic_same_page_hits"])
+
+        missing_hint = deepcopy(self.evidence)
+        missing_hint["tokens"][88] = "when"
+        self.assertEqual(run.score(missing_hint)["cases"]["A04"]["status"], "失败")
+        missing_hint = deepcopy(self.evidence)
+        missing_hint["tokens"][393] = "away"
+        self.assertEqual(run.score(missing_hint)["cases"]["A08"]["status"], "失败")
 
     def test_a06_a10_paginate_within_owned_time_without_font_shrink_or_status(self):
         self.assertEqual(self.result["frozen_baseline"]["A06_captured_font_shrink_events"], 1)

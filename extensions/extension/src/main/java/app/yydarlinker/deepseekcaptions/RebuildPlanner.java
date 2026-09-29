@@ -98,7 +98,8 @@ final class RebuildPlanner {
     if(i<0||i+1>=s.words.size()||boundary(s,i))return false;
     String left=s.words.get(i).key, right=s.words.get(i+1).key;
     String pair=left+" "+right;
-    if(matches(pair,"(?i)(modernization picture|out past|ballistic missiles?|cruise missiles?|surface-to-air missiles?|aircraft carriers?|fifth generation|5th generation|generation (fighters?|aircraft)|korean peninsula|purchasing power|power parity)"))return true;
+    // A direction particle belongs with its verb even when the time ceiling is near.
+    if(matches(pair,"(?i)(modernization picture|out past|range out|ballistic missiles?|cruise missiles?|surface-to-air missiles?|aircraft carriers?|fifth generation|5th generation|generation (fighters?|aircraft)|korean peninsula|purchasing power|power parity)"))return true;
     // ASR 'then' is left unchanged. Comparative context is a dependency hint, not a correction.
     if(matches(left,"than|then")&&s.text(Math.max(0,i-35),i).matches("(?s).*\\b(more|less|rather)\\b.*"))return true;
     if(left.equals("past") && matches(right,"[a-z][a-z-]+"))return true;
@@ -116,8 +117,11 @@ final class RebuildPlanner {
         || matches(left,"(?i)(a|an|the|of|to|with|without|and|or|not|no|very|particularly|more|less|than|as)")
         || matches(left,"[+-]?[0-9].*")) return -100;
     String next = s.text(i + 1, Math.min(s.words.size() - 1, i + 7)).toLowerCase(Locale.ROOT);
+    // A contrast pivot or dated proposition can start the next request without stranding
+    // the preceding conditional or verb phrase in the previous request.
     if (matches(next,"^(if|because|although|unless|but|while|however|whereas|instead|secondly|thirdly|finally)\\b.*")
-        || matches(next,"^and (then|so|finally|critically|yet|i|we|it|this|that)\\b.*")) return 60;
+        || matches(next,"^and (then|so|finally|critically|yet|i|we|it|this|that|while)\\b.*")
+        || matches(next,"^come [12][0-9]{3}\\b.*")) return 60;
     if (next.matches(
             "^(it|this|that|they|we|he|she|i)"
                 + " (is|was|were|are|has|have|had|will|would|can|could|do|did)\\b.*")

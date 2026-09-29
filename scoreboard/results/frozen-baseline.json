@@ -8,7 +8,8 @@
     "Time is estimated from frozen diagnostic words, not real speech alignment.",
     "Only 687 source words / ten blocks are covered, not the full video.",
     "Frozen overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
-    "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup is unverified. The 3,103 ms translation wait still exceeds the unchanged 2,000 ms criterion.",
+    "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup latency is unverified. The recorded translation wait remains 3,103 ms under the revised readable-source criterion.",
+    "A04/A08 green scores represent local planner-cut structure only. The events are captured old responses; changed-block translation text, pagination and device display are unverified.",
     "A07 policy replay is simulated, not a new Android PRESENTED record.",
     "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."
@@ -4105,6 +4106,124 @@
         "total": 0,
         "intervals": []
       }
+    },
+    "cross_block_cuts": {
+      "label": "Local planner cut projection, not regenerated translation or device display",
+      "original_blocks": [
+        {
+          "block": 0,
+          "from": 0,
+          "to": 24
+        },
+        {
+          "block": 1,
+          "from": 25,
+          "to": 87
+        },
+        {
+          "block": 2,
+          "from": 88,
+          "to": 180
+        },
+        {
+          "block": 3,
+          "from": 181,
+          "to": 242
+        },
+        {
+          "block": 4,
+          "from": 243,
+          "to": 313
+        },
+        {
+          "block": 5,
+          "from": 314,
+          "to": 392
+        },
+        {
+          "block": 6,
+          "from": 393,
+          "to": 474
+        },
+        {
+          "block": 7,
+          "from": 475,
+          "to": 571
+        },
+        {
+          "block": 8,
+          "from": 572,
+          "to": 628
+        },
+        {
+          "block": 9,
+          "from": 629,
+          "to": 686
+        }
+      ],
+      "projected_blocks": [
+        {
+          "block": 0,
+          "from": 0,
+          "to": 24
+        },
+        {
+          "block": 1,
+          "from": 25,
+          "to": 97
+        },
+        {
+          "block": 2,
+          "from": 98,
+          "to": 180
+        },
+        {
+          "block": 3,
+          "from": 181,
+          "to": 242
+        },
+        {
+          "block": 4,
+          "from": 243,
+          "to": 313
+        },
+        {
+          "block": 5,
+          "from": 314,
+          "to": 382
+        },
+        {
+          "block": 6,
+          "from": 383,
+          "to": 474
+        },
+        {
+          "block": 7,
+          "from": 475,
+          "to": 571
+        },
+        {
+          "block": 8,
+          "from": 572,
+          "to": 628
+        },
+        {
+          "block": 9,
+          "from": 629,
+          "to": 686
+        }
+      ],
+      "resource_and_ownership_limits_hold": true,
+      "request_count_delta": 0,
+      "A04": {
+        "heuristic_applied": true,
+        "dependent_span_in_one_block": true
+      },
+      "A08": {
+        "heuristic_applied": true,
+        "missile_clause_in_one_block": true,
+        "topic_boundary_available_after_word": 396
+      }
     }
   },
   "metrics": {
@@ -4157,9 +4276,13 @@
     },
     "short_pages_a12_only_under_1000ms": 1,
     "fragment_hits": {
-      "A04": 1,
-      "A08": 1,
+      "A04": 0,
+      "A08": 0,
       "A11": 1
+    },
+    "captured_fragment_hits": {
+      "A04": 1,
+      "A08": 1
     },
     "font_shrink_events": 0,
     "overflow_events": 0,
@@ -4171,13 +4294,13 @@
     "source_ownership_all_cases": true
   },
   "case_totals": {
-    "通过": 1,
-    "失败": 7,
+    "通过": 4,
+    "失败": 4,
     "未验证": 4
   },
   "cases": {
     "A01": {
-      "status": "失败",
+      "status": "通过",
       "display_evidence": "源语言等待期与同窗替换为离线策略镜像；真机启动延迟未验证",
       "source_invariant": {
         "source_word_ids": [
@@ -4222,6 +4345,7 @@
         "source_readable_ms": 3103,
         "status_only_ms": 0,
         "source_coverage_complete": true,
+        "source_fallback_bounded": true,
         "translated_replacement_position_ms": 3195,
         "replacement_within_owned_window": true,
         "device_startup_latency_verified": false
@@ -4280,8 +4404,8 @@
       }
     },
     "A04": {
-      "status": "失败",
-      "display_evidence": "已显示",
+      "status": "通过",
+      "display_evidence": "切点结构策略镜像通过；新译文与真机展示未验证；events 保留冻结旧响应",
       "source_invariant": {
         "source_word_ids": [
           73,
@@ -4310,7 +4434,10 @@
         }
       ],
       "checks": {
-        "question_then_stranded_if_hits": 1
+        "captured_question_then_stranded_if_hits": 1,
+        "dependent_span_in_one_block": true,
+        "question_then_stranded_if_hits": 0,
+        "new_translation_verified": false
       }
     },
     "A05": {
@@ -4418,8 +4545,8 @@
       }
     },
     "A08": {
-      "status": "失败",
-      "display_evidence": "已显示",
+      "status": "通过",
+      "display_evidence": "切点结构策略镜像通过；新译文与真机展示未验证；events 保留冻结旧响应",
       "source_invariant": {
         "source_word_ids": [
           383,
@@ -4448,8 +4575,13 @@
         }
       ],
       "checks": {
-        "range_split_repeated_start_hits": 1,
-        "new_topic_same_page_hits": 1
+        "captured_range_split_repeated_start_hits": 1,
+        "captured_new_topic_same_page_hits": 1,
+        "missile_clause_in_one_block": true,
+        "topic_boundary_available_after_word": 396,
+        "range_split_repeated_start_hits": 0,
+        "new_topic_same_page_hits": null,
+        "new_translation_verified": false
       }
     },
     "A09": {

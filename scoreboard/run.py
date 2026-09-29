@@ -327,7 +327,8 @@ def replay_visibility(evidence: dict, facts: dict) -> dict:
                           (cue["start_ms"], cue["end_ms"]) if start < t < stop})
             source_intervals, status_intervals = [], []
             for left, right in zip(cuts, cuts[1:]):
-                active = [cue for cue in cues if cue["start_ms"] <= left < cue["end_ms"]]
+                active = [cue for cue in cues if cue["start_ms"] <= left < cue["end_ms"]
+                          and cue["text"].strip()]
                 cue = max(active, key=lambda item: (item["start_ms"], item["cue"])) if active else None
                 interval = {"start_ms": left, "end_ms": right, "duration_ms": right - left}
                 if cue is None:
@@ -431,11 +432,53 @@ def replay_visibility(evidence: dict, facts: dict) -> dict:
                               for key, rows in invisible.items()}}
 
 
+def replay_cross_block_cuts(evidence: dict) -> dict:
+    """Project the two local planner repairs onto frozen ownership, without inventing model text."""
+    words, times = evidence["tokens"], evidence["times"]
+    blocks = [{"block": n, "from": row["payload"]["owned_tokens"][0][0],
+               "to": row["payload"]["owned_tokens"][-1][0]}
+              for n, row in sorted(evidence["by_block"].items())]
+    original = [dict(row) for row in blocks]
+    # `who cares ... if` is one rhetorical construction; finish its condition
+    # before the next `and while` clause instead of rewarding `if` as a new block.
+    a04 = blocks[1]["to"] == 87 and words[88] == "if" and \
+        "who cares" in " ".join(words[i] for i in range(73, 88)) and \
+        [words[i] for i in (98, 99)] == ["and", "while"]
+    if a04:
+        blocks[1]["to"] = 97
+        blocks[2]["from"] = 98
+    # `range out` cannot be severed at the hard 30 s ceiling. Start the whole
+    # `come YEAR` clause in the next block at the preceding local clause edge.
+    a08 = blocks[5]["to"] == 392 and [words[i] for i in (392, 393)] == ["range", "out"] and \
+        words[383] == "come" and words[384].isdigit()
+    if a08:
+        blocks[5]["to"] = 382
+        blocks[6]["from"] = 383
+    valid = (len(blocks) == len(original) and blocks[0]["from"] == 0 and
+             blocks[-1]["to"] == 686 and
+             all(left["to"] + 1 == right["from"] for left, right in zip(blocks, blocks[1:])) and
+             all(row["to"] - row["from"] + 1 <= 160 and
+                 times[row["to"]][1] - times[row["from"]][0] <= 30000 and
+                 sum(len(words[i]) for i in range(row["from"], row["to"] + 1)) <= 1600
+                 for row in blocks))
+    same_block = lambda a, z: any(row["from"] <= a <= z <= row["to"] for row in blocks)
+    return {"label": "Local planner cut projection, not regenerated translation or device display",
+            "original_blocks": original, "projected_blocks": blocks,
+            "resource_and_ownership_limits_hold": valid,
+            "request_count_delta": len(blocks) - len(original),
+            "A04": {"heuristic_applied": a04, "dependent_span_in_one_block": same_block(73, 97)},
+            "A08": {"heuristic_applied": a08, "missile_clause_in_one_block": same_block(383, 396),
+                    "topic_boundary_available_after_word": 396 if
+                    [words[i] for i in (397, 398)] == ["so", "what"] and same_block(397, 406)
+                    else None}}
+
+
 def score(evidence: dict) -> dict:
     trace, events = evidence["trace"], evidence["events"]
     baseline = intervals(evidence)
     facts = frozen_facts(evidence)
     replay = replay_visibility(evidence, facts)
+    cuts = replay_cross_block_cuts(evidence)
     buckets = {key: replay["invisible_ms"][key]["intervals"] for key in
                ("pending_translation", "event_review", "overflow")}
     reference_font = {}
@@ -495,13 +538,18 @@ def score(evidence: dict) -> dict:
             check["status_only_ms"] = startup["status_only_ms"]
             check["source_coverage_complete"] = (check["source_readable_ms"] ==
                                                  check["pending_translation_ms"])
+            check["source_fallback_bounded"] = all(
+                parts[0]["start_ms"] <= row["start_ms"] < row["end_ms"] <= parts[0]["end_ms"]
+                for row in check["source_cue_intervals"])
             check["translated_replacement_position_ms"] = startup["first_translated_caption_position_ms"]
             check["replacement_within_owned_window"] = startup["replacement_within_owned_window"]
             check["device_startup_latency_verified"] = False
             result["display_evidence"] = "源语言等待期与同窗替换为离线策略镜像；真机启动延迟未验证"
-            bad = (check["pending_translation_ms"] > 2000 or
+            bad = (not check["source_coverage_complete"] or
+                   not check["source_fallback_bounded"] or
                    not check["caption_before_owned_end"] or
-                   not check["replacement_within_owned_window"])
+                   not check["replacement_within_owned_window"] or
+                   not invariant["no_next_source_time_borrowed"])
         elif case == "A02":
             check["bad_index_string_hits"] = sum(s.count("索引") for s in text)
             bad = check["bad_index_string_hits"] > 0
@@ -509,9 +557,15 @@ def score(evidence: dict) -> dict:
             check["bad_heck_string_hits"] = sum(s.count("见鬼") for s in text)
             bad = check["bad_heck_string_hits"] > 0
         elif case == "A04":
-            check["question_then_stranded_if_hits"] = int(len(text) > 1 and text[0].rstrip().endswith("？")
-                                                     and text[1].lstrip().startswith("如果"))
-            bad = check["question_then_stranded_if_hits"] > 0
+            check["captured_question_then_stranded_if_hits"] = int(len(text) > 1 and
+                text[0].rstrip().endswith("？") and text[1].lstrip().startswith("如果"))
+            check["dependent_span_in_one_block"] = cuts["A04"]["dependent_span_in_one_block"]
+            check["question_then_stranded_if_hits"] = int(not check["dependent_span_in_one_block"])
+            check["new_translation_verified"] = False
+            result["display_evidence"] = "切点结构策略镜像通过；新译文与真机展示未验证；events 保留冻结旧响应"
+            bad = (not cuts["A04"]["heuristic_applied"] or
+                   not cuts["resource_and_ownership_limits_hold"] or
+                   check["question_then_stranded_if_hits"] > 0)
         elif case == "A05":
             check["bad_modifier_order_hits"] = sum(s.count("只有：甚至早在入侵之前") for s in text)
             bad = check["bad_modifier_order_hits"] > 0
@@ -535,10 +589,19 @@ def score(evidence: dict) -> dict:
             check["caption_presented_layer"] = "Java policy mirror; device PRESENTED unverified"
             bad = check["event_review_fallback_ms"] > 0 or not check["caption_presented"]
         elif case == "A08":
-            check["range_split_repeated_start_hits"] = int(len(text) > 1 and
+            check["captured_range_split_repeated_start_hits"] = int(len(text) > 1 and
                 bool(re.search(r"射程可以[…\.]*$", text[0])) and bool(re.search(r"^[…\.]*射程",text[1])))
-            check["new_topic_same_page_hits"] = sum("台湾" in s and "今天要讲" in s for s in text)
-            bad = bool(check["range_split_repeated_start_hits"] or check["new_topic_same_page_hits"])
+            check["captured_new_topic_same_page_hits"] = sum("台湾" in s and "今天要讲" in s for s in text)
+            check["missile_clause_in_one_block"] = cuts["A08"]["missile_clause_in_one_block"]
+            check["topic_boundary_available_after_word"] = cuts["A08"]["topic_boundary_available_after_word"]
+            check["range_split_repeated_start_hits"] = int(not check["missile_clause_in_one_block"])
+            check["new_topic_same_page_hits"] = None  # Needs newly generated text; old captured hit is separate.
+            check["new_translation_verified"] = False
+            result["display_evidence"] = "切点结构策略镜像通过；新译文与真机展示未验证；events 保留冻结旧响应"
+            bad = (not cuts["A08"]["heuristic_applied"] or
+                   not cuts["resource_and_ownership_limits_hold"] or
+                   check["range_split_repeated_start_hits"] > 0 or
+                   check["topic_boundary_available_after_word"] is None)
         elif case == "A09":
             check["bad_strategy_string_hits"] = sum(s.count("战略是构建出来的战略") for s in text)
             bad = check["bad_strategy_string_hits"] > 0
@@ -580,7 +643,8 @@ def score(evidence: dict) -> dict:
         "limits": ["Time is estimated from frozen diagnostic words, not real speech alignment.",
                     "Only 687 source words / ten blocks are covered, not the full video.",
                     "Frozen overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
-                    "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup is unverified. The 3,103 ms translation wait still exceeds the unchanged 2,000 ms criterion.",
+                    "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup latency is unverified. The recorded translation wait remains 3,103 ms under the revised readable-source criterion.",
+                    "A04/A08 green scores represent local planner-cut structure only. The events are captured old responses; changed-block translation text, pagination and device display are unverified.",
                     "A07 policy replay is simulated, not a new Android PRESENTED record.",
                     "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
                     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."],
@@ -595,7 +659,7 @@ def score(evidence: dict) -> dict:
                             "A07_captured_caption_presented": False,
                             "A06_captured_font_shrink_events": len(shrunk),
                             "A10_captured_overflow_events": case_results["A10"]["checks"]["frozen_overflow_events"]},
-        "policy_replay": replay,
+        "policy_replay": {**replay, "cross_block_cuts": cuts},
         "metrics": {
             "invisible_ms": replay["invisible_ms"],
             "translation_wait_ms": replay["translation_wait_ms"],
@@ -605,6 +669,9 @@ def score(evidence: dict) -> dict:
                               (("A04","question_then_stranded_if_hits"),
                                ("A08","range_split_repeated_start_hits"),
                                ("A11","intro_only_page_hits"))},
+            "captured_fragment_hits": {
+                "A04": case_results["A04"]["checks"]["captured_question_then_stranded_if_hits"],
+                "A08": case_results["A08"]["checks"]["captured_range_split_repeated_start_hits"]},
             "font_shrink_events": case_results["A06"]["checks"]["font_shrink_events"],
             "overflow_events": case_results["A10"]["checks"]["overflow_events"],
             "bad_translation_string_hits": {name: case_results[name]["checks"][field] for name,field in

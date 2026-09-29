@@ -35,16 +35,20 @@ class FrozenReplayTest(unittest.TestCase):
 
     def test_ownership_and_local_cases(self):
         self.assertTrue(self.result["metrics"]["source_ownership_all_cases"])
-        self.assertEqual(self.result["metrics"]["fragment_hits"], {"A04": 0, "A08": 0, "A11": 1})
+        self.assertEqual(self.result["metrics"]["fragment_hits"], {"A04": 0, "A08": 0, "A11": 0})
         self.assertEqual(self.result["metrics"]["captured_fragment_hits"], {"A04": 1, "A08": 1})
-        self.assertEqual(self.result["metrics"]["short_pages_a12_only_under_1000ms"], 1)
+        self.assertEqual(self.result["metrics"]["raw_generated_fragment_hits"], {"A11": 1, "A12": 1})
+        self.assertEqual(self.result["metrics"]["short_pages_a12_only_under_1000ms"], 0)
+        self.assertEqual(self.result["metrics"]["raw_short_pages_a12_only_under_1000ms"], 1)
         self.assertEqual(self.result["metrics"]["font_shrink_events"], 0)
         self.assertEqual(self.result["metrics"]["overflow_events"], 0)
         self.assertEqual(self.result["metrics"]["bad_translation_string_hits"],
                          {"A02": 1, "A03": 1, "A09": 1})
         for case in ("A11", "A12"):
             self.assertEqual(self.result["cases"][case]["status"], "未验证")
-            self.assertTrue(self.result["cases"][case]["generated_layer_alarm"])
+            self.assertFalse(self.result["cases"][case]["generated_layer_alarm"])
+            self.assertTrue(self.result["cases"][case]["raw_generated_layer_alarm"])
+            self.assertTrue(self.result["cases"][case]["checks"]["display_merge"]["merged"])
             self.assertEqual(self.result["cases"][case]["display_evidence"], "仅生成")
         self.assertTrue(self.result["cases"]["A07"]["checks"]["caption_presented"])
         self.assertIn("mirror", self.result["cases"]["A07"]["checks"]["caption_presented_layer"])
@@ -174,7 +178,21 @@ class FrozenReplayTest(unittest.TestCase):
         self.assertEqual(set(generated), set(run.CASES))
         self.assertTrue(all(row["display_status"] == "未验证" for row in generated.values()))
         self.assertTrue(all(row["source_ownership_complete_once"] for row in generated.values()))
-        self.assertEqual(generated["A12"]["generated_layer_alarms"]["638-641独立短页"], 1)
+        self.assertEqual(generated["A12"]["generated_layer_alarms"]["638-641独立短页"], 0)
+        self.assertEqual(generated["A12"]["raw_generated_layer_alarms"]["638-641独立短页"], 1)
+        self.assertTrue(generated["A12"]["display_projection"]["merged"])
+    def test_local_display_merge_keeps_union_timing_and_bounds_long_pages(self):
+        a11 = self.result["cases"]["A11"]["checks"]["display_merge"]["events"][0]
+        self.assertEqual([a11["from"], a11["to"], a11["start_ms"], a11["end_ms"]], [622, 637, 194800, 198806])
+        self.assertLessEqual(len(a11["text"]) * 1000, (a11["end_ms"] - a11["start_ms"]) * 12)
+        a12 = self.result["cases"]["A12"]["checks"]["display_merge"]["events"][0]
+        self.assertEqual([a12["from"], a12["to"], a12["start_ms"], a12["end_ms"]], [629, 641, 196620, 199692])
+        self.assertLessEqual(len(a12["text"]) * 1000, (a12["end_ms"] - a12["start_ms"]) * 12)
+        long_event = {"from": 527, "to": 556, "start_ms": 165680, "end_ms": 173023,
+                      "text": "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，而是因为会计标准不同，以及纳入和排除的项目不同。"}
+        short_event = {"from": 557, "to": 558, "start_ms": 173023, "end_ms": 173523, "text": "下一句？"}
+        self.assertIsNone(run.local_display_merge(long_event, short_event))
+
     def test_dropped_source_word_is_not_accepted_as_covered(self):
         evidence = deepcopy(self.evidence)
         event = next(e for e in evidence["events"] if e["from"] == 25)

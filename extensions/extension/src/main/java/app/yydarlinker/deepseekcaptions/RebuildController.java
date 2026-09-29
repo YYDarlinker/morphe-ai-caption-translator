@@ -773,6 +773,38 @@ final class RebuildController {
   static boolean lateUnreadable(RebuildProtocol.Event e,long position) {
     return position-e.start>1000 && e.end-position<1000 && e.text.codePointCount(0,e.text.length())>12;
   }
+  private static RebuildProtocol.Event adjacentEvent(Session s, RebuildProtocol.Event event,
+      boolean next) {
+    if (s.plans == null || event == null) return null;
+    RebuildProtocol.Event found = null;
+    int sourceId = next ? event.to + 1 : event.from - 1;
+    for (RebuildProtocol.Plan plan : s.plans) {
+      if (plan == null) continue;
+      for (RebuildProtocol.Event candidate : plan.events) {
+        if (next ? candidate.from != sourceId : candidate.to != sourceId) continue;
+        if (next && candidate.start < event.end || !next && candidate.end > event.start) continue;
+        if (found == null || (next ? candidate.from < found.from : candidate.to > found.to))
+          found = candidate;
+      }
+    }
+    return found;
+  }
+
+  private static RebuildDisplayMerge.Merged displayMergeForCurrent(Session s,
+      RebuildProtocol.Event event) {
+    if (s.source == null || event == null) return null;
+    if (RebuildDisplayMerge.isLead(event)) {
+      RebuildProtocol.Event next = adjacentEvent(s, event, true);
+      RebuildDisplayMerge.Merged deferred = RebuildDisplayMerge.merge(s.source, event, next);
+      if (deferred != null && s.position < deferred.right.start) return deferred;
+    }
+    RebuildProtocol.Event previous = adjacentEvent(s, event, false);
+    if (previous != null && (RebuildDisplayMerge.isLead(previous)
+        || RebuildDisplayMerge.isShort(event)))
+      return RebuildDisplayMerge.merge(s.source, previous, event);
+    return null;
+  }
+
   private static void render(Session s) {
     if (!current(s) || !s.visible) return;
     String text = "", source = "";
@@ -808,15 +840,33 @@ final class RebuildController {
             eventEnd = e.end;
             text = RebuildReview.uncertainNumbers(p,e) ? "〔原字幕数字存疑〕"+e.text : e.text;
             boolean blocked = RebuildReview.semanticBlocked(p,e);
-            boolean late = !eventId.equals(s.displayedEvent) && (eventId.equals(s.withheldEvent) ||
-                lateUnreadable(e,s.position));
-            if(blocked || late) {
-              text = s.states[i]==READY || s.states[i]==FAILED ? "字幕暂不可用" : "字幕校正中…";
-              status=true; fallbackReason=blocked?"event_review":"late_unreadable";
-              if(late && !eventId.equals(s.withheldEvent))CaptionDiagnostics.mark(s.context,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
-              if(late)s.withheldEvent=eventId;
-            } else s.displayedEvent=eventId;
-            source = "[原文 / Original] " + s.source.text(e.from, e.to);
+            RebuildDisplayMerge.Merged merged = blocked ? null : displayMergeForCurrent(s,e);
+            boolean deferredLead = merged != null && RebuildDisplayMerge.isLead(e)
+                && merged.left == e && s.position < merged.right.start;
+            if (deferredLead) {
+              // Do not show the lead by itself, and do not reveal the continuation early.
+              eventId = "deferred:" + i + ":" + e.from + "-" + e.to;
+              text = "";
+              source = "";
+            } else {
+              if (merged != null) {
+                eventId = merged.id();
+                eventStart = merged.start;
+                eventEnd = merged.end;
+                text = merged.text;
+                source = "[原文 / Original] " + s.source.text(merged.from, merged.to);
+              } else {
+                source = "[原文 / Original] " + s.source.text(e.from, e.to);
+              }
+              boolean late = merged == null && !eventId.equals(s.displayedEvent)
+                  && (eventId.equals(s.withheldEvent) || lateUnreadable(e,s.position));
+              if(blocked || late) {
+                text = s.states[i]==READY || s.states[i]==FAILED ? "字幕暂不可用" : "字幕校正中…";
+                status=true; fallbackReason=blocked?"event_review":"late_unreadable";
+                if(late && !eventId.equals(s.withheldEvent))CaptionDiagnostics.mark(s.context,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
+                if(late)s.withheldEvent=eventId;
+              } else s.displayedEvent=eventId;
+            }
           } else if (p == null) {
             text = s.states[i]==FAILED ? "字幕暂不可用" : "字幕翻译中…";
             status = true;

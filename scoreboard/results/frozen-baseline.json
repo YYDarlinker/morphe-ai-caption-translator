@@ -12,7 +12,8 @@
     "A04/A08 green scores represent local planner-cut structure only. The events are captured old responses; changed-block translation text, pagination and device display are unverified.",
     "A07 policy replay is simulated, not a new Android PRESENTED record.",
     "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
-    "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."
+    "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests.",
+    "A11/A12 alarm counts use the bounded local display projection; raw accepted events and source ownership remain recorded separately. No new API request was made; the prompt was unchanged."
   ],
   "source_srt_cues": 1484,
   "covered_source_word_ids": [
@@ -4274,15 +4275,20 @@
         }
       ]
     },
-    "short_pages_a12_only_under_1000ms": 1,
+    "short_pages_a12_only_under_1000ms": 0,
+    "raw_short_pages_a12_only_under_1000ms": 1,
     "fragment_hits": {
       "A04": 0,
       "A08": 0,
-      "A11": 1
+      "A11": 0
     },
     "captured_fragment_hits": {
       "A04": 1,
       "A08": 1
+    },
+    "raw_generated_fragment_hits": {
+      "A11": 1,
+      "A12": 1
     },
     "font_shrink_events": 0,
     "overflow_events": 0,
@@ -4692,10 +4698,27 @@
         }
       ],
       "checks": {
-        "intro_only_page_hits": 1,
+        "raw_intro_only_page_hits": 1,
+        "intro_only_page_hits": 0,
+        "display_merge": {
+          "raw_event_count": 2,
+          "projected_event_count": 1,
+          "merged": true,
+          "events": [
+            {
+              "from": 622,
+              "to": 637,
+              "start_ms": 194800,
+              "end_ms": 198806,
+              "text": "我要问的问题是预算是否全面？有没有遗漏？"
+            }
+          ]
+        },
         "presentation_verified": false
       },
-      "generated_layer_alarm": true
+      "generated_layer_alarm": false,
+      "raw_generated_layer_alarm": true,
+      "generated_layer_alarm_basis": "bounded_local_display_projection"
     },
     "A12": {
       "status": "未验证",
@@ -4728,11 +4751,29 @@
         }
       ],
       "checks": {
-        "short_638_641_pages_under_1000ms": 1,
-        "split_question_hits": 1,
+        "raw_short_638_641_pages_under_1000ms": 1,
+        "short_638_641_pages_under_1000ms": 0,
+        "raw_split_question_hits": 1,
+        "split_question_hits": 0,
+        "display_merge": {
+          "raw_event_count": 2,
+          "projected_event_count": 1,
+          "merged": true,
+          "events": [
+            {
+              "from": 629,
+              "to": 641,
+              "start_ms": 196620,
+              "end_ms": 199692,
+              "text": "预算是否全面？有没有遗漏？有没有应该纳入的内容？"
+            }
+          ]
+        },
         "presentation_verified": false
       },
-      "generated_layer_alarm": true
+      "generated_layer_alarm": false,
+      "raw_generated_layer_alarm": true,
+      "generated_layer_alarm_basis": "bounded_local_display_projection"
     }
   }
 }

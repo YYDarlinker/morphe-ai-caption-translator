@@ -40,6 +40,81 @@ LAYOUT_MAX_PAGES = 3
 LAYOUT_MIN_PAGE_MS = 1000
 LAYOUT_MAX_CPS = 12
 
+# Local display-only repair for accepted adjacent events. These bounds mirror the Java policy.
+DISPLAY_MERGE_SHORT_MS = 1000
+DISPLAY_MERGE_MAX_MS = 5000
+DISPLAY_MERGE_MAX_CODE_POINTS = 48
+DISPLAY_MERGE_MAX_CPS = 12
+
+
+def _display_normalize(text: str) -> str:
+    return re.sub(r"\s+$", "", text or "").strip()
+
+
+def _display_is_lead(event: dict) -> bool:
+    text = _display_normalize(event.get("text", ""))
+    return bool(text) and len(text) <= 12 and not re.search(r"[。！？!?;；]$", text)
+
+
+def _display_is_short(event: dict) -> bool:
+    return 0 < event.get("end_ms", 0) - event.get("start_ms", 0) < DISPLAY_MERGE_SHORT_MS
+
+
+def _display_join(left: str, right: str) -> str:
+    a, b = (left or "").strip(), (right or "").strip()
+    if not a:
+        return b
+    if not b:
+        return a
+    if a[-1].isalnum() and b[0].isalnum() and ord(a[-1]) < 128 and ord(b[0]) < 128:
+        return a + " " + b
+    return a + b
+
+
+def local_display_merge(left: dict, right: dict) -> dict | None:
+    """Return a bounded display projection; never edits accepted source ownership."""
+    if left.get("to", -1) + 1 != right.get("from", -2):
+        return None
+    if left.get("start_ms", 0) >= left.get("end_ms", 0) or right.get("start_ms", 0) >= right.get("end_ms", 0):
+        return None
+    if right["start_ms"] - left["end_ms"] != 0:
+        return None
+    if not _display_is_lead(left) and not _display_is_short(right):
+        return None
+    text = _display_join(left.get("text", ""), right.get("text", ""))
+    start_ms, end_ms = left["start_ms"], right["end_ms"]
+    duration = end_ms - start_ms
+    code_points = len(text)
+    if (duration <= 0 or duration > DISPLAY_MERGE_MAX_MS or
+            code_points > DISPLAY_MERGE_MAX_CODE_POINTS or
+            code_points * 1000 > duration * DISPLAY_MERGE_MAX_CPS):
+        return None
+    return {"from": left["from"], "to": right["to"], "start_ms": start_ms,
+            "end_ms": end_ms, "text": text,
+            "merged_ranges": [[left["from"], left["to"]], [right["from"], right["to"]]],
+            "display_only": True}
+
+
+def local_display_projection(events: list[dict]) -> list[dict]:
+    projected = []
+    i = 0
+    while i < len(events):
+        merged = local_display_merge(events[i], events[i + 1]) if i + 1 < len(events) else None
+        if merged is not None:
+            projected.append(merged)
+            i += 2
+        else:
+            projected.append(dict(events[i]))
+            i += 1
+    return projected
+
+
+def display_projection_audit(raw: list[dict], projected: list[dict]) -> dict:
+    return {"raw_event_count": len(raw), "projected_event_count": len(projected),
+            "merged": len(projected) < len(raw),
+            "events": [{k: e[k] for k in ("from", "to", "start_ms", "end_ms", "text")}
+                       for e in projected]}
+
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -491,11 +566,12 @@ def score(evidence: dict) -> dict:
     shrunk = list({row["id"]: row for row in shrunk}.values())
     a10 = next(e for e in events if e["from"] == 527 and e["to"] == 556)
     ensure(reference_font["2025"] == 21.4, "Cannot reproduce A06 normal-size reference")
-    short_a12 = [e for e in event_for(evidence, 638, 641)
-                 if e["from"] == 638 and e["to"] == 641 and e["end_ms"] - e["start_ms"] < 1000]
+    raw_short_a12 = [e for e in event_for(evidence, 638, 641)
+                     if e["from"] == 638 and e["to"] == 641 and e["end_ms"] - e["start_ms"] < 1000]
     case_results = {}
     for case, (a, z) in CASES.items():
         parts = event_for(evidence, a, z)
+        projected_parts = local_display_projection(parts) if case in ("A11", "A12") else parts
         owners = Counter(i for e in parts for i in range(e["from"], e["to"] + 1) if a <= i <= z)
         selected = [r for r in trace if r["kind"] == "REBUILD_SELECTED" and
                     event_id(r) in {(e["from"], e["to"]) for e in parts}]
@@ -523,6 +599,7 @@ def score(evidence: dict) -> dict:
                              for e in parts], "checks": {}}
         check = result["checks"]
         text = [e["text"] for e in parts]
+        projected_text = [e["text"] for e in projected_parts]
         if case == "A01":
             startup = next(d for d in replay["decisions"] if d["reason"] == "pending_translation"
                            and d["range"] == [a, z])
@@ -619,13 +696,22 @@ def score(evidence: dict) -> dict:
             check["device_layout_verified"] = decision["device_layout_verified"]
             bad = check["overflow_events"] > 0 or not check["caption_presented"]
         elif case == "A11":
-            check["intro_only_page_hits"] = sum(bool(re.sub(r"[\s，。！？：.!?]+$", "", s) == "我要问的问题是") for s in text)
+            raw_intro = sum(bool(re.sub(r"[\s，。！？：.!?]+$", "", s) == "我要问的问题是") for s in text)
+            check["raw_intro_only_page_hits"] = raw_intro
+            check["intro_only_page_hits"] = sum(bool(re.sub(r"[\s，。！？：.!?]+$", "", s) == "我要问的问题是") for s in projected_text)
+            check["display_merge"] = display_projection_audit(parts, projected_parts)
             check["presentation_verified"] = False
             bad = bool(check["intro_only_page_hits"])
         else:  # A12: threshold is explicitly local; not a global short-page standard.
-            check["short_638_641_pages_under_1000ms"] = len(short_a12)
-            check["split_question_hits"] = int(len(text) > 1 and "有没有遗漏？" in text[0]
-                                               and text[1].startswith("有没有应该纳入的内容"))
+            check["raw_short_638_641_pages_under_1000ms"] = len(raw_short_a12)
+            check["short_638_641_pages_under_1000ms"] = sum(
+                e["from"] == 638 and e["to"] == 641 and e["end_ms"] - e["start_ms"] < 1000
+                for e in projected_parts)
+            check["raw_split_question_hits"] = int(len(text) > 1 and "有没有遗漏？" in text[0]
+                                                    and text[1].startswith("有没有应该纳入的内容"))
+            check["split_question_hits"] = int(len(projected_text) > 1 and "有没有遗漏？" in projected_text[0]
+                                               and projected_text[1].startswith("有没有应该纳入的内容"))
+            check["display_merge"] = display_projection_audit(parts, projected_parts)
             check["presentation_verified"] = False
             bad = bool(check["short_638_641_pages_under_1000ms"] or check["split_question_hits"])
         ensure(is_shown == (case not in ("A11", "A12")), f"{case}: display evidence classification drift")
@@ -635,6 +721,11 @@ def score(evidence: dict) -> dict:
             result["status"] = "失败"
         if case in ("A11", "A12"):
             result["generated_layer_alarm"] = bad
+            result["raw_generated_layer_alarm"] = bool(
+                check.get("raw_intro_only_page_hits", 0)
+                or check.get("raw_short_638_641_pages_under_1000ms", 0)
+                or check.get("raw_split_question_hits", 0))
+            result["generated_layer_alarm_basis"] = "bounded_local_display_projection"
         result["checks"] = check
         case_results[case] = result
     status = Counter(c["status"] for c in case_results.values())
@@ -647,7 +738,8 @@ def score(evidence: dict) -> dict:
                     "A04/A08 green scores represent local planner-cut structure only. The events are captured old responses; changed-block translation text, pagination and device display are unverified.",
                     "A07 policy replay is simulated, not a new Android PRESENTED record.",
                     "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
-                    "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."],
+                    "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests.",
+                     "A11/A12 alarm counts use the bounded local display projection; raw accepted events and source ownership remain recorded separately. No new API request was made; the prompt was unchanged."],
         "source_srt_cues": evidence["srt_cues"], "covered_source_word_ids": [0, 686],
         "frozen_request_attempts": len(evidence["records"]),
         "frozen_accepted_blocks": len(evidence["by_block"]),
@@ -664,7 +756,8 @@ def score(evidence: dict) -> dict:
             "invisible_ms": replay["invisible_ms"],
             "translation_wait_ms": replay["translation_wait_ms"],
             "readable_source_ms": replay["readable_source_ms"],
-            "short_pages_a12_only_under_1000ms": len(short_a12),
+            "short_pages_a12_only_under_1000ms": case_results["A12"]["checks"]["short_638_641_pages_under_1000ms"],
+            "raw_short_pages_a12_only_under_1000ms": len(raw_short_a12),
             "fragment_hits": {name: case_results[name]["checks"][field] for name,field in
                               (("A04","question_then_stranded_if_hits"),
                                ("A08","range_split_repeated_start_hits"),
@@ -672,6 +765,9 @@ def score(evidence: dict) -> dict:
             "captured_fragment_hits": {
                 "A04": case_results["A04"]["checks"]["captured_question_then_stranded_if_hits"],
                 "A08": case_results["A08"]["checks"]["captured_range_split_repeated_start_hits"]},
+            "raw_generated_fragment_hits": {
+                "A11": case_results["A11"]["checks"]["raw_intro_only_page_hits"],
+                "A12": case_results["A12"]["checks"]["raw_short_638_641_pages_under_1000ms"]},
             "font_shrink_events": case_results["A06"]["checks"]["font_shrink_events"],
             "overflow_events": case_results["A10"]["checks"]["overflow_events"],
             "bad_translation_string_hits": {name: case_results[name]["checks"][field] for name,field in
@@ -744,12 +840,21 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def generated_case_results(evidence: dict, blocks: list[dict]) -> dict:
     """Live text/ownership proxies only: there is no live device display trace."""
-    events = [event for row in blocks for event in row.get("response", {}).get("events", [])]
+    events = []
+    for row in blocks:
+        for event in row.get("response", {}).get("events", []):
+            timed = dict(event)
+            if event["from"] in evidence["times"] and event["to"] in evidence["times"]:
+                timed["start_ms"], timed["end_ms"] = evidence["times"][event["from"]][0], evidence["times"][event["to"]][1]
+            events.append(timed)
     result = {}
     for case, (a, z) in CASES.items():
         relevant = [e for e in events if e["to"] >= a and e["from"] <= z]
+        projected = local_display_projection(relevant) if case in ("A11", "A12") else relevant
         owned = Counter(i for e in relevant for i in range(max(a, e["from"]), min(z, e["to"]) + 1))
         texts = [e["text"] for e in relevant]
+        projected_texts = [e["text"] for e in projected]
+        raw_alarms = {}
         alarms = {}
         if case == "A02": alarms["索引"] = sum(t.count("索引") for t in texts)
         elif case == "A03": alarms["见鬼"] = sum(t.count("见鬼") for t in texts)
@@ -759,16 +864,23 @@ def generated_case_results(evidence: dict, blocks: list[dict]) -> dict:
             texts[0].endswith("？") and texts[1].startswith("如果"))
         elif case == "A08": alarms["射程硬断"] = int(len(texts) > 1 and
             bool(re.search(r"射程可以[…\.]*$", texts[0])) and bool(re.search(r"^[…\.]*射程", texts[1])))
-        elif case == "A11": alarms["引导语独页"] = sum(
-            re.sub(r"[\s，。！？：.!?]+$", "", t) == "我要问的问题是" for t in texts)
-        elif case == "A12": alarms["638-641独立短页"] = sum(e["from"] == 638 and e["to"] == 641
-            and evidence["times"][641][1] - evidence["times"][638][0] < 1000 for e in relevant)
+        elif case == "A11":
+            raw_alarms["引导语独页"] = sum(re.sub(r"[\s，。！？：.!?]+$", "", t) == "我要问的问题是" for t in texts)
+            alarms["引导语独页"] = sum(re.sub(r"[\s，。！？：.!?]+$", "", t) == "我要问的问题是" for t in projected_texts)
+        elif case == "A12":
+            raw_alarms["638-641独立短页"] = sum(e["from"] == 638 and e["to"] == 641
+                and e.get("end_ms", 0) - e.get("start_ms", 0) < 1000 for e in relevant)
+            alarms["638-641独立短页"] = sum(e["from"] == 638 and e["to"] == 641
+                and e.get("end_ms", 0) - e.get("start_ms", 0) < 1000 for e in projected)
         result[case] = {
             "display_status": "未验证", "source_word_ids": [a, z],
             "source_ownership_complete_once": all(owned[i] == 1 for i in range(a, z + 1)),
             "generated_layer_alarms": alarms,
             "timing_layout_semantics": "未验证：无线上真机展示/字体数据；字串报警不代表自然度验收",
         }
+        if case in ("A11", "A12"):
+            result[case]["raw_generated_layer_alarms"] = raw_alarms
+            result[case]["display_projection"] = display_projection_audit(relevant, projected)
     return result
 
 def live_once(evidence: dict, block: int = 4) -> Path:

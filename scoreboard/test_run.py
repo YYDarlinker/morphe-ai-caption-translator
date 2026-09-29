@@ -19,7 +19,9 @@ class FrozenReplayTest(unittest.TestCase):
         result = self.result
         self.assertEqual(result["case_totals"], {"通过": 1, "失败": 7, "未验证": 4})
         self.assertEqual({k:v["total"] for k,v in result["metrics"]["invisible_ms"].items()},
-                         {"pending_translation": 3103, "event_review": 0, "overflow": 0})
+                         {"pending_translation": 0, "event_review": 0, "overflow": 0})
+        self.assertEqual(result["metrics"]["translation_wait_ms"]["total"], 3103)
+        self.assertEqual(result["metrics"]["readable_source_ms"]["total"], 3103)
         self.assertEqual({k:v["total"] for k,v in result["frozen_baseline"]["invisible_ms"].items()},
                          {"pending_translation": 3103, "event_review": 12550, "overflow": 7332})
         self.assertIn("Java policy mirror", result["policy_replay"]["label"])
@@ -47,6 +49,32 @@ class FrozenReplayTest(unittest.TestCase):
         self.assertIn("mirror", self.result["cases"]["A07"]["checks"]["caption_presented_layer"])
         self.assertTrue(self.result["cases"]["A10"]["checks"]["caption_presented"])
         self.assertEqual(self.result["cases"]["A01"]["checks"]["reading_time_after_first_caption_ms"], 3845)
+
+    def test_a01_source_cues_cover_wait_without_changing_acceptance(self):
+        row = self.result["cases"]["A01"]
+        check = row["checks"]
+        self.assertEqual(row["status"], "失败")
+        self.assertEqual(check["pending_translation_ms"], 3103)
+        self.assertEqual(check["target_ms"], 2000)
+        self.assertEqual(check["source_readable_ms"], 3103)
+        self.assertEqual(check["status_only_ms"], 0)
+        self.assertTrue(check["source_coverage_complete"])
+        self.assertEqual([(r["cue"], r["start_ms"], r["end_ms"]) for r in check["source_cue_intervals"]],
+                         [(1, 92, 1839), (2, 1839, 3195)])
+        self.assertTrue(all(r["text"].strip() for r in check["source_cue_intervals"]))
+        self.assertEqual(check["translated_replacement_position_ms"], 3195)
+        self.assertTrue(check["replacement_within_owned_window"])
+        self.assertEqual(row["events"][0]["end_ms"], 7040)
+        self.assertFalse(check["device_startup_latency_verified"])
+        self.assertIn("真机启动延迟未验证", row["display_evidence"])
+
+        # A missing raw cue must remain status-only rather than count as readable source.
+        with mock.patch.object(run, "source_cues", return_value=[]):
+            missing = run.score(self.evidence)["cases"]["A01"]["checks"]
+        self.assertEqual(missing["pending_translation_ms"], 3103)
+        self.assertEqual(missing["source_readable_ms"], 0)
+        self.assertEqual(missing["status_only_ms"], 3103)
+        self.assertFalse(missing["source_coverage_complete"])
 
     def test_a07_ignores_paragraph_risk_but_keeps_hard_review_blocker(self):
         decision = next(d for d in self.result["policy_replay"]["decisions"]
@@ -175,6 +203,38 @@ class FrozenReplayTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(truncated["blocks"][0]["finish_reason"], "length")
         self.assertEqual(truncated["blocks"][0]["contract"], "output_truncated")
+
+    def test_a01_probe_is_one_block0_request_with_wall_and_tokens(self):
+        accepted = self.evidence["by_block"][0]["plan"]
+        reply = {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(accepted)}}],
+                 "usage": {"prompt_tokens": 250, "completion_tokens": 90, "total_tokens": 340}}
+        calls = []
+
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *_args): return False
+            def read(self, _limit): return json.dumps(reply).encode()
+
+        class Opener:
+            def open(self, request, timeout):
+                calls.append((json.loads(request.data), timeout))
+                return Response()
+
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(run, "RESULT", pathlib.Path(directory) / "score.json"), \
+             mock.patch.object(run.urllib.request, "build_opener", return_value=Opener()), \
+             mock.patch.dict(run.os.environ, {"MORPHE_P4_API_KEY": "test-key",
+                                             "MORPHE_P4_BASE_URL": "https://api.openai.com/v1",
+                                             "MORPHE_P4_MODEL": "test-model"}):
+            result = json.loads(run.live_once(self.evidence, 0).read_text(encoding="utf-8"))
+        self.assertEqual(result["api_attempts"], 1)
+        self.assertEqual(result["status"], "complete_block0_generated_only")
+        self.assertEqual(result["token_usage"]["total_tokens"], 340)
+        self.assertEqual(result["blocks"][0]["source_ids"], [0, 24])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1], 10)
+        self.assertIn("http_wall_ms", result["blocks"][0])
+        self.assertIn("end_to_end_wall_ms", result["blocks"][0])
 
 
 if __name__ == "__main__":

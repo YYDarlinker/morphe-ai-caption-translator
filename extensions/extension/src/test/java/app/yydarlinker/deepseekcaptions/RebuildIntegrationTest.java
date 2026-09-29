@@ -750,12 +750,20 @@ public class RebuildIntegrationTest {
     }
   }
 
-  @Test public void r28WaitingDoesNotSelectOriginalEnglish()throws Exception {
+  @Test public void a01ColdWaitShowsTimedSourceThenReplacesWithinOwnedWindow()throws Exception {
+    engine.startMs=80;engine.duration=6960;
     blockResponse=true; start(false);await(()->calls.get()==1);
+    RebuildController.time(92);
     RebuildController.Session s=session();
-    assertTrue(s.lastShown.startsWith("status:"));
-    assertFalse(s.lastShown.contains("[原文 / Original]"));
-    assertTrue(s.lastShown.contains("字幕翻译中"));
+    assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:0:80_7040"));
+    assertTrue(s.lastShown.contains("[原文 / Original] This is one complete sentence."));
+    assertEquals("",s.displayedEvent);
+    release.countDown();await(()->s.plans[0]!=null);
+    RebuildController.time(3195);
+    assertTrue(s.lastShown,s.lastShown.contains("这是一条完整的测试字幕。"));
+    assertTrue(s.lastShown,s.lastShown.startsWith("caption:0:0-"));
+    assertTrue(s.position<7040);
+    assertEquals(7040,s.plans[0].events.get(0).end);
   }
   @Test public void r28LateReadabilityDoesNotInventOrExtendTimes() {
     RebuildProtocol.Event e=new RebuildProtocol.Event(0,20,80,7040,"在2月24日之前，你只需在网上稍作搜索，就能找到声称俄罗斯拥有世界第二强军事力量的人");

@@ -750,13 +750,18 @@ final class RebuildController {
     }
   }
 
-  private static String original(Session s, long time, boolean label) {
-    if (s.raw == null) return "";
+  private static CaptionDocument.Cue originalCue(Session s, long time) {
+    if (s.raw == null) return null;
     CaptionDocument.Cue latest = null;
     for (CaptionDocument.Cue c : s.raw.document.cues())
       if (time >= c.startMs && time < c.endMs && (latest == null || c.startMs >= latest.startMs))
         latest = c;
-    return latest == null ? "" : (label ? "[原文 / Original] " : "") + latest.text;
+    return latest;
+  }
+
+  private static String original(Session s, long time, boolean label) {
+    CaptionDocument.Cue cue = originalCue(s, time);
+    return cue == null ? "" : (label ? "[原文 / Original] " : "") + cue.text;
   }
 
   private static void endFallback(Session s,long position,String cause) {
@@ -818,6 +823,22 @@ final class RebuildController {
             source = text;
             fallbackReason = s.states[i]==FAILED ? "failed:"+s.reasons[i]
                 : s.attempts[i]>1 ? "retrying" : "pending_translation";
+            // A01 cold start: show the active source cue while the first plan is in flight.
+            // Keep the wait diagnostic and never mark the translated event as displayed.
+            if(i==0 && s.states[i]!=FAILED) {
+              CaptionDocument.Cue cue=originalCue(s,s.position);
+              RebuildPlanner.Block block=s.blocks.get(i);
+              if(cue!=null && cue.startMs<block.end && cue.endMs>block.start) {
+                eventStart=Math.max(cue.startMs,block.start);
+                eventEnd=Math.min(cue.endMs,block.end);
+                if(eventStart<=s.position && s.position<eventEnd) {
+                  text="[原文 / Original] "+cue.text;
+                  source=text;
+                  eventId="source:"+i+":"+eventStart+"_"+eventEnd;
+                  status=false;
+                }
+              }
+            }
           }
         }
       }

@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -57,6 +58,22 @@ def srt_words() -> list[str]:
     cues = re.split(r"\n\s*\n", SRT.read_text(encoding="utf-8-sig").replace("\r\n", "\n").strip())
     ensure(all(re.match(r"^\d+\n\d\d:\d\d:\d\d,\d{3} -->", cue) for cue in cues), "Bad source SRT cue")
     return re.findall(r"[a-z]+|\d+", " ".join(cue.split("\n", 2)[2] for cue in cues).lower())
+
+
+def source_cues() -> list[dict]:
+    """Frozen SRT proxy for the raw cue selection used by RebuildController.original()."""
+    def millis(stamp: str) -> int:
+        hours, minutes, rest = stamp.split(":")
+        seconds, fraction = rest.split(",")
+        return ((int(hours) * 60 + int(minutes)) * 60 + int(seconds)) * 1000 + int(fraction)
+
+    cues = []
+    for block in re.split(r"\n\s*\n", SRT.read_text(encoding="utf-8-sig").replace("\r\n", "\n").strip()):
+        number, timing, *lines = block.splitlines()
+        start, end = timing.split(" --> ")
+        cues.append({"cue": int(number), "start_ms": millis(start), "end_ms": millis(end),
+                     "text": " ".join(lines).strip()})
+    return cues
 
 
 def read_evidence() -> dict:
@@ -282,6 +299,9 @@ def replay_visibility(evidence: dict, facts: dict) -> dict:
     accepted = {block: requests[record["request"]] for block, record in evidence["by_block"].items()}
     decisions = []
     invisible = {key: [] for key in ("pending_translation", "event_review", "overflow")}
+    translation_wait = []
+    readable_source = []
+    cues = source_cues()
 
     # Playback probes are frozen, but their meaning is determined from accepted
     # response availability and the policy below, never from old fallback totals.
@@ -294,12 +314,41 @@ def replay_visibility(evidence: dict, facts: dict) -> dict:
                     event_id(r) == (event["from"], event["to"]) and r["at"] >= ready]
         end = min(int(r["time"]) for r in selected) if selected else event["end_ms"]
         duration = max(0, end - start)
-        decisions.append({"reason": "pending_translation", "range": [event["from"], event["to"]],
-                          "position_ms": start, "decision": "status_until_accepted_plan",
-                          "first_caption_position_ms": end})
-        if duration:
-            invisible["pending_translation"].append({"start_ms": start,
-                                                       "end_ms": end, "duration_ms": duration})
+        translation_wait.append({"range": [event["from"], event["to"]], "start_ms": start,
+                                 "end_ms": end, "duration_ms": duration})
+        decision = {"reason": "pending_translation", "range": [event["from"], event["to"]],
+                    "position_ms": start, "first_translated_caption_position_ms": end,
+                    "replacement_within_owned_window": event["start_ms"] <= end < event["end_ms"]}
+        if event["block"] == 0:
+            # The proposed Java path picks the latest active raw cue while block 0 waits.
+            # Clip every estimate to the recorded wait and accepted event ownership.
+            stop = min(end, event["end_ms"])
+            cuts = sorted({start, stop} | {t for cue in cues for t in
+                          (cue["start_ms"], cue["end_ms"]) if start < t < stop})
+            source_intervals, status_intervals = [], []
+            for left, right in zip(cuts, cuts[1:]):
+                active = [cue for cue in cues if cue["start_ms"] <= left < cue["end_ms"]]
+                cue = max(active, key=lambda item: (item["start_ms"], item["cue"])) if active else None
+                interval = {"start_ms": left, "end_ms": right, "duration_ms": right - left}
+                if cue is None:
+                    status_intervals.append(interval)
+                else:
+                    source_intervals.append({**interval, "cue": cue["cue"], "text": cue["text"]})
+            if stop < end:
+                status_intervals.append({"start_ms": stop, "end_ms": end, "duration_ms": end - stop})
+            readable_source.extend(source_intervals)
+            invisible["pending_translation"].extend(status_intervals)
+            decision.update({"decision": "source_cue_until_accepted_plan",
+                             "source_cue_intervals": source_intervals,
+                             "source_readable_ms": sum(row["duration_ms"] for row in source_intervals),
+                             "status_only_ms": sum(row["duration_ms"] for row in status_intervals),
+                             "first_caption_position_ms": source_intervals[0]["start_ms"] if source_intervals else end})
+        else:
+            decision.update({"decision": "status_until_accepted_plan", "first_caption_position_ms": end})
+            if duration:
+                invisible["pending_translation"].append({"start_ms": start,
+                                                           "end_ms": end, "duration_ms": duration})
+        decisions.append(decision)
 
     # Re-evaluate the old review probe against the accepted plan. Paragraph is an
     # advisory segmentation risk in Java; semantic and measured-layout blockers remain.
@@ -372,10 +421,14 @@ def replay_visibility(evidence: dict, facts: dict) -> dict:
                                           "method": "selected_position_to_owned_event_end",
                                           "owned_event_duration_ms": end - event["start_ms"]})
     return {"label": "Java policy mirror; offline simulated display decisions, not device PRESENTED evidence",
-            "policy": "paragraph advisory; bounded layout pagination inside owned event time; semantic blockers unchanged",
+            "policy": "A01 timed source cue while translation waits; paragraph advisory; bounded layout pagination inside owned event time; semantic blockers unchanged",
             "decisions": decisions,
+            "translation_wait_ms": {"total": sum(x["duration_ms"] for x in translation_wait),
+                                    "intervals": translation_wait},
+            "readable_source_ms": {"total": sum(x["duration_ms"] for x in readable_source),
+                                   "intervals": readable_source},
             "invisible_ms": {key: {"total": sum(x["duration_ms"] for x in rows), "intervals": rows}
-                             for key, rows in invisible.items()}}
+                              for key, rows in invisible.items()}}
 
 
 def score(evidence: dict) -> dict:
@@ -428,12 +481,27 @@ def score(evidence: dict) -> dict:
         check = result["checks"]
         text = [e["text"] for e in parts]
         if case == "A01":
-            check["pending_translation_ms"] = sum(x["duration_ms"] for x in buckets["pending_translation"])
+            startup = next(d for d in replay["decisions"] if d["reason"] == "pending_translation"
+                           and d["range"] == [a, z])
+            check["pending_translation_ms"] = sum(x["duration_ms"] for x in
+                                                  replay["translation_wait_ms"]["intervals"]
+                                                  if x["range"] == [a, z])
             check["target_ms"] = 2000
             check["caption_before_owned_end"] = any(r.get("mode") == "caption" for r in displayed(trace,a,z))
             caption_selection = [int(r["time"]) for r in selected if r.get("text") == parts[0]["text"]]
             check["reading_time_after_first_caption_ms"] = (parts[0]["end_ms"] - min(caption_selection)) if caption_selection else None
-            bad = check["pending_translation_ms"] > 2000 or not check["caption_before_owned_end"]
+            check["source_cue_intervals"] = startup["source_cue_intervals"]
+            check["source_readable_ms"] = startup["source_readable_ms"]
+            check["status_only_ms"] = startup["status_only_ms"]
+            check["source_coverage_complete"] = (check["source_readable_ms"] ==
+                                                 check["pending_translation_ms"])
+            check["translated_replacement_position_ms"] = startup["first_translated_caption_position_ms"]
+            check["replacement_within_owned_window"] = startup["replacement_within_owned_window"]
+            check["device_startup_latency_verified"] = False
+            result["display_evidence"] = "源语言等待期与同窗替换为离线策略镜像；真机启动延迟未验证"
+            bad = (check["pending_translation_ms"] > 2000 or
+                   not check["caption_before_owned_end"] or
+                   not check["replacement_within_owned_window"])
         elif case == "A02":
             check["bad_index_string_hits"] = sum(s.count("索引") for s in text)
             bad = check["bad_index_string_hits"] > 0
@@ -512,6 +580,7 @@ def score(evidence: dict) -> dict:
         "limits": ["Time is estimated from frozen diagnostic words, not real speech alignment.",
                     "Only 687 source words / ten blocks are covered, not the full video.",
                     "Frozen overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
+                    "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup is unverified. The 3,103 ms translation wait still exceeds the unchanged 2,000 ms criterion.",
                     "A07 policy replay is simulated, not a new Android PRESENTED record.",
                     "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
                     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."],
@@ -529,6 +598,8 @@ def score(evidence: dict) -> dict:
         "policy_replay": replay,
         "metrics": {
             "invisible_ms": replay["invisible_ms"],
+            "translation_wait_ms": replay["translation_wait_ms"],
+            "readable_source_ms": replay["readable_source_ms"],
             "short_pages_a12_only_under_1000ms": len(short_a12),
             "fragment_hits": {name: case_results[name]["checks"][field] for name,field in
                               (("A04","question_then_stranded_if_hits"),
@@ -633,14 +704,15 @@ def generated_case_results(evidence: dict, blocks: list[dict]) -> dict:
         }
     return result
 
-def live_once(evidence: dict) -> Path:
+def live_once(evidence: dict, block: int = 4) -> Path:
+    ensure(block in (0, 4), "Live probe supports only block 0 or 4")
     key, base, model = (os.environ.get("MORPHE_P4_" + name, "").strip()
                         for name in ("API_KEY", "BASE_URL", "MODEL"))
     ensure(key and base and model, "--live needs MORPHE_P4_API_KEY, MORPHE_P4_BASE_URL, MORPHE_P4_MODEL")
     endpoint, host = api_endpoint(base)
     prompt = current_prompt()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    target = RESULT.parent / f"live-{stamp}.json"
+    target = RESULT.parent / f"live-{'a01-' if block == 0 else ''}{stamp}.json"
     ensure(not target.exists(), "Live result already exists at this timestamp; no repeat request was made")
     digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     output = {"layer": "live_explicit_separate", "captured_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -650,7 +722,7 @@ def live_once(evidence: dict) -> Path:
               "prompt_source": "current checked-in RebuildProtocol plus DeepSeekConfig.DEFAULT_PROMPT; device custom preference unknown",
               "endpoint_sha256": hashlib.sha256(endpoint.encode()).hexdigest(),
               "model": model, "format": "OpenAI-compatible chat completions",
-               "policy": "Block 4 first request only; one API attempt, no retry or redirects",
+               "policy": f"Block {block} first request only; one API attempt, no retry or redirects",
                "display_evidence": "none; generated responses only", "blocks": [],
               "api_attempts": 0, "status": "in_progress", "token_usage": {}}
     opener = urllib.request.build_opener(NoRedirect())
@@ -661,10 +733,9 @@ def live_once(evidence: dict) -> Path:
         temp.write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temp.replace(target)
     save()
-    for block in (4,):
-        # Validate the first request only. A second block-4 attempt would conceal
-        # output_truncated, and the other nine blocks add no evidence for A07.
-        record = evidence["records"][4]
+    for block in (block,):
+        # One cold request only. Repeating it would hide first-request latency.
+        record = evidence["records"][4] if block == 4 else evidence["by_block"][0]
         payload = {k: v for k, v in record["payload"].items() if not k.startswith("diagnostic_only_")}
         ensure("repair" not in payload, "First live attempt cannot contain a past repair")
         limit = min(3072, max(1000, len(payload["source_text"]) * 2 + 600))
@@ -699,10 +770,12 @@ def live_once(evidence: dict) -> Path:
                "output_budget_tokens": limit,
                "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()}
         output["api_attempts"] += 1
+        started_ns = time.monotonic_ns()
         try:
             with opener.open(req, timeout=10 if block == 0 else 16) as response:
                 raw = response.read(2 * 1024 * 1024 + 1)
                 ensure(len(raw) <= 2 * 1024 * 1024, "API response exceeds 2 MiB")
+            row["http_wall_ms"] = round((time.monotonic_ns() - started_ns) / 1_000_000, 1)
             reply = json.loads(raw)
             usage = reply.get("usage", {})
             row["usage"] = usage
@@ -728,18 +801,21 @@ def live_once(evidence: dict) -> Path:
                 row["contract"] = "output_truncated" if row.get("finish_reason") == "length" else \
                                   "invalid_generated_response: " + str(exc)[:160]
                 row["response_text"] = content[:10000]
+            row["end_to_end_wall_ms"] = round((time.monotonic_ns() - started_ns) / 1_000_000, 1)
             output["blocks"].append(row)
             if row["contract"] != "source_ownership_ok":
                 output["status"] = "partial_invalid_generated_response"
                 save()
                 break
         except urllib.error.HTTPError as exc:
+            row["end_to_end_wall_ms"] = round((time.monotonic_ns() - started_ns) / 1_000_000, 1)
             row["error"] = "http_" + str(exc.code)
             output["blocks"].append(row)
             output["status"] = "partial_http_failure"
             save()
             break
         except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+            row["end_to_end_wall_ms"] = round((time.monotonic_ns() - started_ns) / 1_000_000, 1)
             row["error"] = type(exc).__name__
             output["blocks"].append(row)
             output["status"] = "partial_transport_failure"
@@ -747,9 +823,10 @@ def live_once(evidence: dict) -> Path:
             break
         save()
     if len(output["blocks"]) == 1 and output["blocks"][0].get("contract") == "source_ownership_ok":
-        output["status"] = "complete_block4_generated_only"
+        output["status"] = f"complete_block{block}_generated_only"
     if output["blocks"] and "response" in output["blocks"][0]:
-        output["generated_case_results"] = {"A07": generated_case_results(evidence, output["blocks"])["A07"]}
+        case = "A01" if block == 0 else "A07"
+        output["generated_case_results"] = {case: generated_case_results(evidence, output["blocks"])[case]}
     for keyname in ("prompt_tokens", "completion_tokens", "total_tokens"):
         output["token_usage"][keyname] = sum(b.get("usage", {}).get(keyname, 0) for b in output["blocks"])
     output["token_usage"]["reported_blocks"] = sum("usage" in b for b in output["blocks"])
@@ -761,7 +838,9 @@ def main(argv=None) -> int:
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--live", action="store_true", help="EXPLICIT: one paid block-4 first-request API call")
+    live = parser.add_mutually_exclusive_group()
+    live.add_argument("--live", action="store_true", help="EXPLICIT: one paid block-4 first-request API call")
+    live.add_argument("--live-a01", action="store_true", help="EXPLICIT: one paid block-0 cold API call")
     args = parser.parse_args(argv)
     evidence = read_evidence()
     frozen = score(evidence)
@@ -775,12 +854,13 @@ def main(argv=None) -> int:
     print("不可见时长(ms)：pending_translation={pending_translation}；event_review={event_review}；"
           "overflow(按归属时间估算)={overflow}".format(**{k: v["total"] for k, v in missing.items()}))
     print(f"JSON: {RESULT}")
-    if args.live:
-        path = live_once(evidence)
+    if args.live or args.live_a01:
+        block = 0 if args.live_a01 else 4
+        path = live_once(evidence, block)
         output = json.loads(path.read_text(encoding="utf-8"))
         print(f"线上层：{output['status']}；API 尝试 {output['api_attempts']}；token 用量 {output['token_usage']}")
         print(f"单独存档：{path}")
-        return 0 if output["status"] == "complete_block4_generated_only" else 2
+        return 0 if output["status"] == f"complete_block{block}_generated_only" else 2
     return 0
 
 

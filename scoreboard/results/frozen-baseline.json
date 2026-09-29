@@ -8,6 +8,7 @@
     "Time is estimated from frozen diagnostic words, not real speech alignment.",
     "Only 687 source words / ten blocks are covered, not the full video.",
     "Frozen overflow duration is attributed from selection position to source-owned end; no fallback BEGIN/END was logged.",
+    "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup is unverified. The 3,103 ms translation wait still exceeds the unchanged 2,000 ms criterion.",
     "A07 policy replay is simulated, not a new Android PRESENTED record.",
     "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests."
@@ -3929,7 +3930,7 @@
   },
   "policy_replay": {
     "label": "Java policy mirror; offline simulated display decisions, not device PRESENTED evidence",
-    "policy": "paragraph advisory; bounded layout pagination inside owned event time; semantic blockers unchanged",
+    "policy": "A01 timed source cue while translation waits; paragraph advisory; bounded layout pagination inside owned event time; semantic blockers unchanged",
     "decisions": [
       {
         "reason": "pending_translation",
@@ -3938,8 +3939,28 @@
           24
         ],
         "position_ms": 92,
-        "decision": "status_until_accepted_plan",
-        "first_caption_position_ms": 3195
+        "first_translated_caption_position_ms": 3195,
+        "replacement_within_owned_window": true,
+        "decision": "source_cue_until_accepted_plan",
+        "source_cue_intervals": [
+          {
+            "start_ms": 92,
+            "end_ms": 1839,
+            "duration_ms": 1747,
+            "cue": 1,
+            "text": "before february 24th you didn't have to"
+          },
+          {
+            "start_ms": 1839,
+            "end_ms": 3195,
+            "duration_ms": 1356,
+            "cue": 2,
+            "text": "go far on the internet to find people"
+          }
+        ],
+        "source_readable_ms": 3103,
+        "status_only_ms": 0,
+        "first_caption_position_ms": 92
       },
       {
         "reason": "event_review",
@@ -4038,16 +4059,43 @@
         }
       }
     ],
+    "translation_wait_ms": {
+      "total": 3103,
+      "intervals": [
+        {
+          "range": [
+            0,
+            24
+          ],
+          "start_ms": 92,
+          "end_ms": 3195,
+          "duration_ms": 3103
+        }
+      ]
+    },
+    "readable_source_ms": {
+      "total": 3103,
+      "intervals": [
+        {
+          "start_ms": 92,
+          "end_ms": 1839,
+          "duration_ms": 1747,
+          "cue": 1,
+          "text": "before february 24th you didn't have to"
+        },
+        {
+          "start_ms": 1839,
+          "end_ms": 3195,
+          "duration_ms": 1356,
+          "cue": 2,
+          "text": "go far on the internet to find people"
+        }
+      ]
+    },
     "invisible_ms": {
       "pending_translation": {
-        "total": 3103,
-        "intervals": [
-          {
-            "start_ms": 92,
-            "end_ms": 3195,
-            "duration_ms": 3103
-          }
-        ]
+        "total": 0,
+        "intervals": []
       },
       "event_review": {
         "total": 0,
@@ -4062,14 +4110,8 @@
   "metrics": {
     "invisible_ms": {
       "pending_translation": {
-        "total": 3103,
-        "intervals": [
-          {
-            "start_ms": 92,
-            "end_ms": 3195,
-            "duration_ms": 3103
-          }
-        ]
+        "total": 0,
+        "intervals": []
       },
       "event_review": {
         "total": 0,
@@ -4079,6 +4121,39 @@
         "total": 0,
         "intervals": []
       }
+    },
+    "translation_wait_ms": {
+      "total": 3103,
+      "intervals": [
+        {
+          "range": [
+            0,
+            24
+          ],
+          "start_ms": 92,
+          "end_ms": 3195,
+          "duration_ms": 3103
+        }
+      ]
+    },
+    "readable_source_ms": {
+      "total": 3103,
+      "intervals": [
+        {
+          "start_ms": 92,
+          "end_ms": 1839,
+          "duration_ms": 1747,
+          "cue": 1,
+          "text": "before february 24th you didn't have to"
+        },
+        {
+          "start_ms": 1839,
+          "end_ms": 3195,
+          "duration_ms": 1356,
+          "cue": 2,
+          "text": "go far on the internet to find people"
+        }
+      ]
     },
     "short_pages_a12_only_under_1000ms": 1,
     "fragment_hits": {
@@ -4103,7 +4178,7 @@
   "cases": {
     "A01": {
       "status": "失败",
-      "display_evidence": "已显示",
+      "display_evidence": "源语言等待期与同窗替换为离线策略镜像；真机启动延迟未验证",
       "source_invariant": {
         "source_word_ids": [
           0,
@@ -4127,7 +4202,29 @@
         "pending_translation_ms": 3103,
         "target_ms": 2000,
         "caption_before_owned_end": true,
-        "reading_time_after_first_caption_ms": 3845
+        "reading_time_after_first_caption_ms": 3845,
+        "source_cue_intervals": [
+          {
+            "start_ms": 92,
+            "end_ms": 1839,
+            "duration_ms": 1747,
+            "cue": 1,
+            "text": "before february 24th you didn't have to"
+          },
+          {
+            "start_ms": 1839,
+            "end_ms": 3195,
+            "duration_ms": 1356,
+            "cue": 2,
+            "text": "go far on the internet to find people"
+          }
+        ],
+        "source_readable_ms": 3103,
+        "status_only_ms": 0,
+        "source_coverage_complete": true,
+        "translated_replacement_position_ms": 3195,
+        "replacement_within_owned_window": true,
+        "device_startup_latency_verified": false
       }
     },
     "A02": {

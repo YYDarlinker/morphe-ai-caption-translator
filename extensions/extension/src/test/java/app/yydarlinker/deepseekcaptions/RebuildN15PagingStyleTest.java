@@ -11,11 +11,38 @@ public class RebuildN15PagingStyleTest {
     return s -> s.codePointCount(0,s.length())<=count;
   }
 
-  @Test public void noPunctuationDoesNotAuthorizeArbitraryCharacterCuts() {
+  @Test public void nonPunctuationCutsOnlyRescueAnOtherwiseUnpageableEvent() {
     String unbroken=String.join("",java.util.Collections.nCopies(44,"字"));
-    assertTrue(RebuildPageLayout.plan(unbroken,1000,13000,capacity(30),capacity(15)).isEmpty());
+    List<RebuildPageLayout.Page> rescued=RebuildPageLayout.plan(unbroken,1000,13000,
+        capacity(30),capacity(15));
+    assertTrue(rescued.size()>1);
+    assertEquals(unbroken,rescued.stream().map(p->p.text).reduce("",String::concat));
+    for(RebuildPageLayout.Page page:rescued)
+      assertTrue(RebuildPageLayout.displayHalfCells(page.text)>=16);
     String finished=unbroken+"。";
-    assertTrue(RebuildPageLayout.plan(finished,1000,13000,capacity(30),capacity(15)).isEmpty());
+    assertFalse(RebuildPageLayout.plan(finished,1000,13000,
+        capacity(30),capacity(15)).isEmpty());
+  }
+
+  @Test public void diagnosticOrphanPagesUseCjkDisplayCells() {
+    String longEvent="的印象，远不如对中国白手起家建立航母编队、除美国外率先列装五代机、并在过去二十年间全面现代化其军事能力";
+    String dated="到了2017年，部署在中国大陆的防空导弹就能覆盖台湾本岛";
+    assertEquals(12,RebuildPageLayout.displayHalfCells("到了2017年，"));
+    for (String value:new String[]{longEvent,dated}) {
+      long end=value==longEvent?99736:131280;
+      long start=value==longEvent?84110:125559;
+      List<RebuildPageLayout.Page> pages=RebuildPageLayout.plan(value,start,end,
+          capacity(48),capacity(25));
+      assertFalse(pages.isEmpty());
+      assertEquals(value,pages.stream().map(p->p.text).reduce("",String::concat));
+      for (RebuildPageLayout.Page page:pages) {
+        assertTrue("no short page",RebuildPageLayout.displayHalfCells(page.text)>=16);
+        assertTrue("two-line capacity",capacity(48).test(page.text));
+        assertTrue("time",page.end-page.start>=1200);
+        assertTrue("cps",page.text.codePointCount(0,page.text.length())*1000L
+            <=8*(page.end-page.start));
+      }
+    }
   }
 
   @Test public void cpsFailsClosedEvenForAOneLineTranslation() {

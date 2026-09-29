@@ -48,7 +48,9 @@ public class RebuildN3PaginationTest {
   public void pageCapAndReadableTimeFailClosedWithoutChangingText() {
     Predicate<String> tenCharacters = text -> text.codePointCount(0, text.length()) <= 10;
     String sixty = String.join("", java.util.Collections.nCopies(60, "字"));
-    assertTrue(RebuildPageLayout.plan(sixty, 0, 10000, tenCharacters).isEmpty());
+    assertEquals(6, RebuildPageLayout.plan(sixty, 0, 10000, tenCharacters).size());
+    assertTrue("insufficient owned time still fails closed",
+        RebuildPageLayout.plan(sixty, 0, 5000, tenCharacters).isEmpty());
     assertTrue(RebuildPageLayout.plan(A10, 165680, 167180,
         text -> text.codePointCount(0, text.length()) <= 36).isEmpty());
     assertTrue("an unreadable 886ms translation uses its source fallback",

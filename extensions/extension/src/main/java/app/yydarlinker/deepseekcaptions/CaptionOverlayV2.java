@@ -432,7 +432,7 @@ final class CaptionOverlay {
               + ";sp="
               + size
               + ";lines="
-              + lines(a, pendingText, size, inner)
+              + lines(a, shown, size, inner)
               + (shownPage >= 0 ? ";page=" + (shownPage + 1) + "/" + pendingPages.size()
                   + ";page_range=" + pendingPages.get(shownPage).start + "-"
                   + pendingPages.get(shownPage).end

@@ -43,6 +43,19 @@ final class RebuildPageLayout {
     int[] offset = new int[count + 1];
     for (int i = 0; i < count; i++) offset[i + 1] = text.offsetByCodePoints(offset[i], 1);
     List<Integer> seams = semanticSeams(text, offset);
+    List<Page> semantic = choose(text, start, end, fitsTwo, fitsOne, offset, seams, false);
+    if (!semantic.isEmpty()) return semantic;
+    // Only a failed punctuation-only plan may use a measured non-punctuation seam.
+    return choose(text, start, end, fitsTwo, fitsOne, offset,
+        expandedSeams(text, offset), true);
+  }
+
+  private static List<Page> choose(String text, long start, long end,
+      Predicate<String> fitsTwo, Predicate<String> fitsOne, int[] offset,
+      List<Integer> seams, boolean fallback) {
+    int count = offset.length - 1;
+    long duration = end - start;
+    boolean minimumApplies = displayHalfCells(text) >= 16;
     int last = seams.size() - 1;
     long nominal = duration / MIN_PAGE_MS + (duration % MIN_PAGE_MS == 0 ? 0 : 1);
     int pageCap = (int) Math.min(last, nominal);
@@ -56,10 +69,13 @@ final class RebuildPageLayout {
         for (int next = at + 1; next <= last; next++) {
           int from = seams.get(at), to = seams.get(next);
           String part = text.substring(offset[from], offset[to]);
+          if (minimumApplies && displayHalfCells(part) < 16) continue;
           if (!fitsTwo.test(part)) continue;
           long required = minimumMs(to - from);
           int lines = fitsOne.test(part) ? 1 : 2;
-          long cost = styleCost(to - from, lines) + (next == last ? 0 : seamCost(text, offset[to]));
+          long cost = styleCost(to - from, lines) + (next == last ? 0 :
+              seamCost(text, offset[to])
+                  + (fallback && !isPunctuationSeam(text, offset[to]) ? 5000 : 0));
           for (State previous : states[at][pages]) {
             long total = previous.required + required;
             // Nominal ceil is only an enumeration cap: actual pages still need full minimums.
@@ -129,6 +145,38 @@ final class RebuildPageLayout {
     }
     seams.add(count);
     return seams;
+  }
+
+  private static List<Integer> expandedSeams(String text, int[] offset) {
+    List<Integer> seams = new ArrayList<>();
+    seams.add(0);
+    int count = offset.length - 1;
+    for (int cut = 1; cut < count; cut++) {
+      int before = text.codePointBefore(offset[cut]);
+      int after = text.codePointAt(offset[cut]);
+      // Never divide an ASCII number or word merely to satisfy a page preference.
+      if (before < 128 && after < 128
+          && Character.isLetterOrDigit(before) && Character.isLetterOrDigit(after)) continue;
+      seams.add(cut);
+    }
+    seams.add(count);
+    return seams;
+  }
+
+  private static boolean isPunctuationSeam(String text, int offset) {
+    return "，。！？；：,!?;:".indexOf(text.codePointBefore(offset)) >= 0;
+  }
+
+  /** Approximate display width in half-CJK cells, without rounding up short pages. */
+  static int displayHalfCells(String text) {
+    int whole = 0, half = 0;
+    for (int at = 0; at < text.length();) {
+      int cp = text.codePointAt(at);
+      if (cp >= 0x20 && cp <= 0x7e) half++;
+      else whole++;
+      at += Character.charCount(cp);
+    }
+    return whole * 2 + half;
   }
 
   private static long styleCost(int length, int lines) {

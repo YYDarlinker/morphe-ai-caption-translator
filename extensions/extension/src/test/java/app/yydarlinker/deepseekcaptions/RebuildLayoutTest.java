@@ -310,6 +310,30 @@ public class RebuildLayoutTest {
     assertTrue(history.contains("duration_exception=owned_window_lt_1200"));
   }
   @SuppressWarnings("unchecked")
+  @Test public void presentedLinesDescribeEachShownPage() throws Exception {
+    CaptionDiagnostics.clear(a);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a, true);
+    bounds = new Rect(0, 0, 600, 340);
+    String caption = "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，而是因为会计标准不同，以及纳入和排除的项目不同。";
+    CaptionOverlay.showEvent(caption, () -> true, () -> "", "n17a-lines", 165680, 173023, 165680);
+    java.util.List<RebuildPageLayout.Page> pages =
+        (java.util.List<RebuildPageLayout.Page>) field("pendingPages");
+    assertTrue(pages.size() > 1);
+    for (int i = 0; i < pages.size(); i++) {
+      CaptionOverlay.position(pages.get(i).start);
+      assertEquals(pages.get(i).text, text().getText().toString());
+      int actualLines = text().getLayout().getLineCount();
+      assertTrue(actualLines <= 2);
+      String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
+          .getString("history", "");
+      assertTrue("page " + (i + 1) + " should log its displayed line count",
+          history.contains("id=n17a-lines;mode=caption_page;")
+              && history.contains(";lines=" + actualLines + ";page=" + (i + 1) + "/" + pages.size()
+                  + ";page_range=" + pages.get(i).start + "-" + pages.get(i).end));
+    }
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a, false);
+  }
+  @SuppressWarnings("unchecked")
   private void assertTimedPages(String caption, long start, long end, int expectedPages) throws Exception {
     CaptionOverlay.showEvent(caption, () -> true, () -> "", "n3", start, end, start);
     java.util.List<RebuildPageLayout.Page> pages =

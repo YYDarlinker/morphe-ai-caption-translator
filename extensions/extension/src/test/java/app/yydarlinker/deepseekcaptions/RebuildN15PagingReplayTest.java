@@ -89,6 +89,8 @@ public class RebuildN15PagingReplayTest {
         if(text.isEmpty())continue;
         long start=e.getLong("start"),end=e.getLong("end");
         List<RebuildPageLayout.Page> pages=RebuildPageLayout.plan(text,start,end,fitsTwo,fitsOne);
+        assertFalse("N15r accepted event must remain displayable: "
+            +e.getInt("from")+"-"+e.getInt("to"),pages.isEmpty());
         JSONObject row=new JSONObject().put("block",i).put("from",e.getInt("from"))
             .put("to",e.getInt("to")).put("start",start).put("end",end)
             .put("text",text).put("event_lines",lines(text));
@@ -101,6 +103,10 @@ public class RebuildN15PagingReplayTest {
           StringBuilder joined=new StringBuilder();
           long at=start;
           for(RebuildPageLayout.Page page:pages) {
+            if (RebuildPageLayout.displayHalfCells(text)>=16)
+              assertTrue("no page below eight CJK display cells: "
+                  +e.getInt("from")+"-"+e.getInt("to"),
+                  RebuildPageLayout.displayHalfCells(page.text)>=16);
             assertEquals(at,page.start);
             assertTrue(page.end>page.start);
             assertTrue(page.end-page.start>=RebuildPageLayout.MIN_PAGE_MS ||

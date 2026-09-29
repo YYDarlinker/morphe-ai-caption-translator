@@ -11,7 +11,7 @@
     "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup latency is unverified. The recorded translation wait remains 3,103 ms under the revised readable-source criterion.",
     "A04/A08 green scores represent local planner-cut structure only. The events are captured old responses; changed-block translation text, pagination and device display are unverified.",
     "A07 policy replay is simulated, not a new Android PRESENTED record.",
-    "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
+    "A06/A10 frozen two-page capacity is an old illustration, not N15r: injected Java semantic paging now predicts A06=3/A10=4 within owned windows; neither result is a new device measurement. A06 still has no captured line count at preferred 21.4sp.",
     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests.",
     "A11/A12 alarm counts use the bounded local display projection; raw accepted events and source ownership remain recorded separately. No new API request was made; the prompt was unchanged."
   ],
@@ -4474,7 +4474,7 @@
     },
     "A06": {
       "status": "未验证",
-      "display_evidence": "离线容量预测两页；切点仅作示意，真机排版未验证",
+      "display_evidence": "冻结旧镜像仍为两页示意；N15r Java 注入容量 A06=3页/A10=4页，真机排版未验证",
       "source_invariant": {
         "source_word_ids": [
           211,
@@ -4498,6 +4498,7 @@
         "frozen_font_shrink_events": 1,
         "font_shrink_events": 0,
         "normal_font_sp": 21.4,
+        "n15r_java_mirror_note": "RebuildN3PaginationTest: A06 three semantic pages at injected normal capacity; frozen two-page cut stays illustrative",
         "planned_font_sp": 21.4,
         "page_plan": [
           {
@@ -4618,7 +4619,7 @@
     },
     "A10": {
       "status": "未验证",
-      "display_evidence": "离线容量预测两页；切点仅作示意，真机排版未验证",
+      "display_evidence": "冻结旧镜像仍为两页示意；N15r Java 注入容量 A06=3页/A10=4页，真机排版未验证",
       "source_invariant": {
         "source_word_ids": [
           527,
@@ -4645,6 +4646,7 @@
         "selected_text": "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，而是因为会计标准不同，以及纳入和排除的项目不同。",
         "caption_presented": true,
         "caption_presented_layer": "Java policy mirror; device PRESENTED unverified",
+        "n15r_java_mirror_note": "RebuildN3PaginationTest: A10 four semantic pages at injected normal capacity; frozen two-page cut stays illustrative",
         "page_plan": [
           {
             "index": 1,

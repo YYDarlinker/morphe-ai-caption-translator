@@ -262,14 +262,14 @@ public class RebuildLayoutTest {
     bounds = new Rect(0, 0, 600, 340);
     assertTimedPages(
         "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，而是因为会计标准不同，以及纳入和排除的项目不同。",
-        165680, 173023);
+        165680, 173023, 4);
   }
 
   @Test public void a06LongEventKeepsPreferredFontAcrossPages() throws Exception {
     bounds = new Rect(0, 0, 1000, 560);
     assertTimedPages(
         "这就让人不禁要问：如果中国国防开支如此之少，那么这些隐形战斗机、航空母舰、高超音速导弹和反舰弹道导弹都从何而来？",
-        65002, 76092);
+        65002, 76092, 3);
   }
 
   @Test public void eventBeyondReadablePageBudgetRecordsUnresolvedFallback() throws Exception {
@@ -285,23 +285,54 @@ public class RebuildLayoutTest {
     assertTrue(history.contains("pagination_unresolved=true"));
   }
 
+  @Test public void cpsFailureUsesOriginalEvenWhenTranslationFitsTwoLines() throws Exception {
+    CaptionDiagnostics.clear(a);
+    String caption = "这一条译文虽然很短，但时间窗口更短。";
+    CaptionOverlay.showEvent(caption, () -> true, () -> "Original", "n15-cps", 0, 1200, 0);
+    assertEquals("Original", text().getText().toString());
+    String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
+        .getString("history", "");
+    assertTrue(history.contains("REBUILD_LAYOUT_FALLBACK"));
+    assertTrue(history.contains("pagination_unresolved=true"));
+  }
+
+  @Test public void ownedShortWindowIsLoggedWithoutExtendingItsTime() throws Exception {
+    CaptionDiagnostics.clear(a);
+    CaptionOverlay.showEvent("短句。", () -> true, () -> "Original", "n15-short", 500, 1386, 500);
+    assertEquals("短句。", text().getText().toString());
+    java.util.List<RebuildPageLayout.Page> pages =
+        (java.util.List<RebuildPageLayout.Page>) field("pendingPages");
+    assertEquals(1, pages.size());
+    assertEquals(500, pages.get(0).start);
+    assertEquals(1386, pages.get(0).end);
+    String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
+        .getString("history", "");
+    assertTrue(history.contains("duration_exception=owned_window_lt_1200"));
+  }
   @SuppressWarnings("unchecked")
-  private void assertTimedPages(String caption, long start, long end) throws Exception {
+  private void assertTimedPages(String caption, long start, long end, int expectedPages) throws Exception {
     CaptionOverlay.showEvent(caption, () -> true, () -> "", "n3", start, end, start);
     java.util.List<RebuildPageLayout.Page> pages =
         (java.util.List<RebuildPageLayout.Page>) field("pendingPages");
-    assertEquals(2, pages.size());
-    assertEquals(pages.get(0).text, text().getText().toString());
+    assertEquals(expectedPages, pages.size());
     float density = a.getResources().getDisplayMetrics().density;
     float expected = SubtitleStyleMetrics.scaledSp(
         DeepSeekConfig.displayStyle(a).captionTextSize, bounds.width() / density)
         * a.getResources().getDisplayMetrics().scaledDensity;
-    assertEquals("no font shrink", expected, text().getTextSize(), .1f);
-    CaptionOverlay.position(pages.get(1).start);
-    assertEquals(pages.get(1).text, text().getText().toString());
-    assertEquals("no font shrink on second page", expected, text().getTextSize(), .1f);
-    assertEquals(caption, pages.get(0).text + pages.get(1).text);
-    assertEquals(start, pages.get(0).start);
-    assertEquals(end, pages.get(1).end);
+    StringBuilder joined = new StringBuilder();
+    long cursor = start;
+    for (RebuildPageLayout.Page page : pages) {
+      CaptionOverlay.position(page.start);
+      assertEquals(page.text, text().getText().toString());
+      assertEquals("preferred font, no shrink", expected, text().getTextSize(), .1f);
+      assertEquals(cursor, page.start);
+      assertTrue(page.end - page.start >= 1200);
+      assertTrue(page.text.codePointCount(0, page.text.length()) * 1000L
+          <= 8 * (page.end - page.start));
+      joined.append(page.text);
+      cursor = page.end;
+    }
+    assertEquals(caption, joined.toString());
+    assertEquals(end, cursor);
   }
 }

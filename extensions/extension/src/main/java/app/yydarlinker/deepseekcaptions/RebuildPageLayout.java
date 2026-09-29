@@ -5,11 +5,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 
-/** Bounded presentation pages inside one accepted event; source ownership never changes. */
+/** Presentation-only pages inside one accepted event; never changes source ownership. */
 final class RebuildPageLayout {
-  static final int MAX_PAGES = 3;
-  static final long MIN_PAGE_MS = 1000;
-  static final int MAX_CPS = 12; // Existing readability diagnostic threshold.
+  static final long MIN_PAGE_MS = 1200;
+  static final int MAX_CPS = 8;
 
   static final class Page {
     final String text;
@@ -22,68 +21,141 @@ final class RebuildPageLayout {
     }
   }
 
-  static List<Page> plan(String text, long start, long end, Predicate<String> fits) {
-    if (text == null || text.isEmpty() || fits == null || end <= start) return Collections.emptyList();
-    int count = text.codePointCount(0, text.length());
+  /** Legacy callers have only two-line evidence; the one-line estimate is conservative. */
+  static List<Page> plan(String text, long start, long end, Predicate<String> fitsTwo) {
+    return plan(text, start, end, fitsTwo,
+        value -> fitsTwo != null && fitsTwo.test(value)
+            && value.codePointCount(0, value.length()) <= 18);
+  }
+
+  static List<Page> plan(String text, long start, long end,
+      Predicate<String> fitsTwo, Predicate<String> fitsOne) {
+    if (text == null || text.isEmpty() || fitsTwo == null || fitsOne == null || end <= start)
+      return Collections.emptyList();
     long duration = end - start;
+    int count = text.codePointCount(0, text.length());
+    if (count * 1000L > duration * MAX_CPS) return Collections.emptyList();
+    // Only the entire owned window may force a sub-1.2s translated page.
+    if (duration < MIN_PAGE_MS)
+      return fitsTwo.test(text) ? Collections.singletonList(new Page(text, start, end))
+          : Collections.emptyList();
+
     int[] offset = new int[count + 1];
     for (int i = 0; i < count; i++) offset[i + 1] = text.offsetByCodePoints(offset[i], 1);
-    // Existing one-page events retain their current timing; the floor governs added pages.
-    if (fits.test(text))
-      return Collections.singletonList(new Page(text, start, end));
-    if (count * 1000L > duration * MAX_CPS) return Collections.emptyList();
-    for (int pages = 2; pages <= MAX_PAGES; pages++) {
-      if (duration < pages * MIN_PAGE_MS) break;
-      int[] cuts = new int[pages + 1];
-      cuts[0] = 0;
-      cuts[pages] = count;
-      Choice choice = new Choice();
-      search(text, offset, fits, cuts, 1, pages, duration, choice);
-      if (choice.cuts != null) return allocate(text, offset, choice.cuts, start, end);
+    List<Integer> seams = semanticSeams(text, offset);
+    int last = seams.size() - 1;
+    long nominal = duration / MIN_PAGE_MS + (duration % MIN_PAGE_MS == 0 ? 0 : 1);
+    int pageCap = (int) Math.min(last, nominal);
+    @SuppressWarnings("unchecked")
+    List<State>[][] states = new List[last + 1][pageCap + 1];
+    states[0][0] = new ArrayList<>();
+    states[0][0].add(new State(null, 0, 0, 0, 0));
+    for (int at = 0; at < last; at++) {
+      for (int pages = 0; pages < pageCap; pages++) {
+        if (states[at][pages] == null) continue;
+        for (int next = at + 1; next <= last; next++) {
+          int from = seams.get(at), to = seams.get(next);
+          String part = text.substring(offset[from], offset[to]);
+          if (!fitsTwo.test(part)) continue;
+          long required = minimumMs(to - from);
+          int lines = fitsOne.test(part) ? 1 : 2;
+          long cost = styleCost(to - from, lines) + (next == last ? 0 : seamCost(text, offset[to]));
+          for (State previous : states[at][pages]) {
+            long total = previous.required + required;
+            // Nominal ceil is only an enumeration cap: actual pages still need full minimums.
+            if (total > duration || (pages + 1L) * MIN_PAGE_MS > duration) continue;
+            State candidate = new State(previous, next, pages + 1, total,
+                previous.penalty + cost);
+            if (states[next][pages + 1] == null) states[next][pages + 1] = new ArrayList<>();
+            addUndominated(states[next][pages + 1], candidate);
+          }
+        }
+      }
     }
-    return Collections.emptyList();
+    List<Page> best = Collections.emptyList();
+    long bestCost = Long.MAX_VALUE;
+    for (int pages = 1; pages <= pageCap; pages++) {
+      if (states[last][pages] == null) continue;
+      for (State state : states[last][pages]) {
+        int[] cuts = new int[pages + 1];
+        cuts[pages] = count;
+        State cursor = state;
+        for (int i = pages - 1; i >= 0; i--) {
+          cursor = cursor.previous;
+          cuts[i] = seams.get(cursor.at);
+        }
+        List<Page> proposed = allocate(text, offset, cuts, start, end);
+        long score = state.penalty + pages * 100L + timingCost(proposed);
+        if (score < bestCost) { bestCost = score; best = proposed; }
+      }
+    }
+    return best;
+  }
+
+  private static final class State {
+    final State previous;
+    final int at, pages;
+    final long required, penalty;
+    State(State prior, int index, int n, long min, long cost) {
+      previous = prior; at = index; pages = n; required = min; penalty = cost;
+    }
+  }
+
+  private static void addUndominated(List<State> choices, State candidate) {
+    for (State existing : choices)
+      if (existing.required <= candidate.required && existing.penalty <= candidate.penalty) return;
+    choices.removeIf(existing -> candidate.required <= existing.required
+        && candidate.penalty <= existing.penalty);
+    choices.add(candidate);
+  }
+
+  private static List<Integer> semanticSeams(String text, int[] offset) {
+    List<Integer> seams = new ArrayList<>();
+    seams.add(0);
+    int count = offset.length - 1;
+    for (int cut = 1; cut < count; cut++) {
+      int before = text.codePointBefore(offset[cut]);
+      if ("，。！？；：,!?;:".indexOf(before) < 0) continue;
+      int after = text.codePointAt(offset[cut]);
+      if (cut > 1 && Character.isDigit(text.codePointBefore(offset[cut - 1]))
+          && Character.isDigit(after) && (before == ',' || before == ':')) continue;
+      // Closing quotation marks belong to the clause just ended; retain exact text.
+      int adjusted = cut;
+      while (adjusted < count - 1 && "”’\"'）)]".indexOf(text.codePointAt(offset[adjusted])) >= 0)
+        adjusted++;
+      while (adjusted < count - 1 && Character.isWhitespace(text.codePointAt(offset[adjusted])))
+        adjusted++;
+      if (adjusted < count && adjusted > seams.get(seams.size() - 1)) seams.add(adjusted);
+    }
+    seams.add(count);
+    return seams;
+  }
+
+  private static long styleCost(int length, int lines) {
+    long outside = length < 12 ? 650L * (12 - length)
+        : length > 18 ? 850L * (length - 18) : 0;
+    // Avoid making a tiny introductory fragment its own page just to save a line.
+    return outside + (length < 8 ? 30000 : 0)
+        + (lines == 1 ? 0 : 18000) + 8L * Math.abs(length - 15);
+  }
+
+  private static long seamCost(String text, int offset) {
+    int prior = text.codePointBefore(offset);
+    return "。！？；!?;".indexOf(prior) >= 0 ? 0 : 20;
+  }
+
+  private static long timingCost(List<Page> pages) {
+    long cost = 0;
+    for (Page page : pages) {
+      long ms = page.end - page.start;
+      if (ms < 2000) cost += (2000 - ms) / 10;
+      else if (ms > 3500) cost += (ms - 3500) / 10;
+    }
+    return cost;
   }
 
   private static long minimumMs(int codePoints) {
     return Math.max(MIN_PAGE_MS, (codePoints * 1000L + MAX_CPS - 1) / MAX_CPS);
-  }
-
-  private static final class Choice {
-    int[] cuts;
-    long penalty = Long.MAX_VALUE;
-  }
-
-  private static void search(String text, int[] offset, Predicate<String> fits, int[] cuts,
-      int depth, int pages, long duration, Choice best) {
-    int count = offset.length - 1;
-    if (depth == pages) {
-      int from = cuts[depth - 1];
-      if (!fits.test(text.substring(offset[from], offset[count]))) return;
-      long required = 0, penalty = 0;
-      for (int i = 0; i < pages; i++) {
-        int length = cuts[i + 1] - cuts[i];
-        required += minimumMs(length);
-        long difference = (long) length * pages - count;
-        penalty += difference * difference;
-      }
-      if (required > duration) return;
-      // At equal balance, prefer a page break after sentence or clause punctuation.
-      for (int i = 1; i < pages; i++) {
-        int prior = text.codePointBefore(offset[cuts[i]]);
-        if ("。！？!?；;，,".indexOf(prior) >= 0) penalty -= 2;
-      }
-      if (penalty < best.penalty) {
-        best.penalty = penalty;
-        best.cuts = cuts.clone();
-      }
-      return;
-    }
-    int from = cuts[depth - 1];
-    for (int cut = from + 1; cut <= count - (pages - depth); cut++) {
-      if (!fits.test(text.substring(offset[from], offset[cut]))) break;
-      cuts[depth] = cut;
-      search(text, offset, fits, cuts, depth + 1, pages, duration, best);
-    }
   }
 
   private static List<Page> allocate(String text, int[] offset, int[] cuts, long start, long end) {

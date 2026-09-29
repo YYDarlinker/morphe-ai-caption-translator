@@ -396,19 +396,21 @@ final class CaptionOverlay {
     float preferred = SubtitleStyleMetrics.scaledSp(cfg.captionTextSize, b.width()/a.getResources().getDisplayMetrics().density), size = preferred;
     String shown = pendingText;
     String mode = pendingStatus ? "status" : "caption";
-    pendingPages = !pendingStatus && pendingStart >= 0 && pendingEnd > pendingStart
+    boolean ownedCaption = !pendingStatus && pendingStart >= 0 && pendingEnd > pendingStart;
+    pendingPages = ownedCaption
         ? RebuildPageLayout.plan(pendingText, pendingStart, pendingEnd,
-            value -> lines(a, value, preferred, inner) <= 2)
+            value -> lines(a, value, preferred, inner) <= 2,
+            value -> lines(a, value, preferred, inner) <= 1)
         : Collections.emptyList();
     shownPage = RebuildPageLayout.indexAt(pendingPages, pendingPosition);
     if (shownPage >= 0) {
       shown = pendingPages.get(shownPage).text;
       if (pendingPages.size() > 1) mode = "caption_page";
-    } else {
-      // Only events beyond the bounded time/page budget use the old shrink/fallback path.
+    } else if (!ownedCaption) {
       while (size > 12 && lines(a, shown, size, inner) > 2) size = Math.max(12, size - .5f);
     }
-    if (shownPage < 0 && lines(a, shown, size, inner) > 2) {
+    // A failed time/CPS/seam gate must not show the invalid translation as a single page.
+    if (shownPage < 0 && (ownedCaption || lines(a, shown, size, inner) > 2)) {
       mode = "original_fallback";
       shown = fallback == null ? "" : fallback.get();
       if (shown == null || shown.isEmpty() || lines(a, shown, size, inner) > 2) {
@@ -433,7 +435,12 @@ final class CaptionOverlay {
               + lines(a, pendingText, size, inner)
               + (shownPage >= 0 ? ";page=" + (shownPage + 1) + "/" + pendingPages.size()
                   + ";page_range=" + pendingPages.get(shownPage).start + "-"
-                  + pendingPages.get(shownPage).end : ";pagination_unresolved=true");
+                  + pendingPages.get(shownPage).end
+                  + (pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS
+                      ? ";duration_exception=owned_window_lt_1200" : "")
+                  : ";pagination_unresolved=true");
+      if (shownPage >= 0 && pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS)
+        CaptionDiagnostics.mark(a, "REBUILD_LAYOUT_TIME_EXCEPTION", detail);
       if (mode.equals("original_fallback") || mode.equals("overflow_status"))
         CaptionDiagnostics.mark(a, "REBUILD_LAYOUT_FALLBACK", detail);
       if (DeepSeekConfig.displayTextDebugEnabled(a))

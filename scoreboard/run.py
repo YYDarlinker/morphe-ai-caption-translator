@@ -592,7 +592,7 @@ def score(evidence: dict) -> dict:
                     r.get("text") == "字幕暂不可用" for r in trace))
         result = {"status": "未验证" if case in ("A06", "A10", "A11", "A12") else "通过",
                   "display_evidence": "仅生成" if case in ("A11", "A12") else
-                      ("离线容量预测两页；切点仅作示意，真机排版未验证" if case in ("A06", "A10") else
+                      ("冻结旧镜像仍为两页示意；N15r Java 注入容量 A06=3页/A10=4页，真机排版未验证" if case in ("A06", "A10") else
                        "策略镜像预测正文显示；真机未验证" if case == "A07" else "已显示"),
                   "source_invariant": invariant,
                   "events": [{k: e[k] for k in ("from", "to", "start_ms", "end_ms", "source", "text")}
@@ -652,6 +652,7 @@ def score(evidence: dict) -> dict:
             check["frozen_font_shrink_events"] = sum(a <= (event_id(r) or (-1,-1))[0] <= z for r in shrunk)
             check["font_shrink_events"] = 0 if decision["decision"] == "caption_pages" else check["frozen_font_shrink_events"]
             check["normal_font_sp"] = reference_font["2025"]
+            check["n15r_java_mirror_note"] = "RebuildN3PaginationTest: A06 three semantic pages at injected normal capacity; frozen two-page cut stays illustrative"
             check["planned_font_sp"] = decision["normal_font_sp"]
             check["page_plan"] = decision["pages"]
             check["page_plan_kind"] = decision["page_plan_kind"]
@@ -691,6 +692,7 @@ def score(evidence: dict) -> dict:
             check["selected_text"] = a10["text"]
             check["caption_presented"] = decision["decision"] == "caption_pages"
             check["caption_presented_layer"] = "Java policy mirror; device PRESENTED unverified"
+            check["n15r_java_mirror_note"] = "RebuildN3PaginationTest: A10 four semantic pages at injected normal capacity; frozen two-page cut stays illustrative"
             check["page_plan"] = decision["pages"]
             check["page_plan_kind"] = decision["page_plan_kind"]
             check["device_layout_verified"] = decision["device_layout_verified"]
@@ -737,7 +739,7 @@ def score(evidence: dict) -> dict:
                     "A01 source-cue coverage and same-window replacement are offline policy estimates from the frozen SRT; device startup latency is unverified. The recorded translation wait remains 3,103 ms under the revised readable-source criterion.",
                     "A04/A08 green scores represent local planner-cut structure only. The events are captured old responses; changed-block translation text, pagination and device display are unverified.",
                     "A07 policy replay is simulated, not a new Android PRESENTED record.",
-                    "A06/A10 two-page capacity is predicted from captured width/sp/lines; illustrative cuts are not Java/device page boundaries. A06 has no captured line count at preferred 21.4sp.",
+                    "A06/A10 frozen two-page capacity is an old illustration, not N15r: injected Java semantic paging now predicts A06=3/A10=4 within owned windows; neither result is a new device measurement. A06 still has no captured line count at preferred 21.4sp.",
                     "A11/A12 have generated responses but no PRESENTED evidence; Android font and native/AI switching require device tests.",
                      "A11/A12 alarm counts use the bounded local display projection; raw accepted events and source ownership remain recorded separately. No new API request was made; the prompt was unchanged."],
         "source_srt_cues": evidence["srt_cues"], "covered_source_word_ids": [0, 686],

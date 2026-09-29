@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 import run
+import live_n7
 
 
 class FrozenReplayTest(unittest.TestCase):
@@ -222,6 +223,28 @@ class FrozenReplayTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid OpenAI-compatible"):
             run.api_endpoint("file:///tmp/no-download")
         self.assertIn("Target language: zh-Hans", run.current_prompt())
+
+    def test_java_prompt_extraction_keeps_semicolons_inside_strings(self):
+        self.assertEqual(run.java_string('static final String X = "one; two" + " three";', "X"),
+                         "one; two three")
+        self.assertIn("Resolve polysemous words by the subject matter", run.current_prompt())
+        self.assertIn("If the plan would contain many short events", run.current_prompt())
+
+    def test_n7_live_contract_rejects_quote_and_ownership_errors(self):
+        payload = self.evidence["by_block"][0]["payload"]
+        plan = deepcopy(self.evidence["by_block"][0]["plan"])
+        live_n7.validate(plan, payload)
+        plan["events"][0]["source"] += " invented"
+        with self.assertRaisesRegex(ValueError, "source quote mismatch"):
+            live_n7.validate(plan, payload)
+        plan = deepcopy(self.evidence["by_block"][0]["plan"])
+        plan["events"][0]["to"] += 1
+        with self.assertRaisesRegex(ValueError, "source quote mismatch|source ownership gap"):
+            live_n7.validate(plan, payload)
+        plan = deepcopy(self.evidence["by_block"][0]["plan"])
+        plan["events"][0]["text"] = " "
+        with self.assertRaisesRegex(ValueError, "empty translation"):
+            live_n7.validate(plan, payload)
 
     def test_live_sends_only_block4_first_request(self):
         accepted = self.evidence["by_block"][4]["plan"]

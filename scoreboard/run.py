@@ -783,9 +783,26 @@ def score(evidence: dict) -> dict:
 
 # Live mode is intentionally outside score(): it never replaces a frozen response.
 def java_string(source: str, name: str) -> str:
-    match = re.search(r"(?:static )?final String " + re.escape(name) + r"\s*=\s*(.*?);", source, re.S)
+    match = re.search(r"(?:static )?final String " + re.escape(name) + r"\s*=\s*", source)
     ensure(match is not None, f"Java prompt constant missing: {name}")
-    chunks = re.findall(r'"(?:\\.|[^"\\])*"', match.group(1))
+    start, quoted, escaped = match.end(), False, False
+    end = None
+    for i in range(start, len(source)):
+        char = source[i]
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char == ";":
+            end = i
+            break
+    ensure(end is not None, f"Java prompt constant unterminated: {name}")
+    chunks = re.findall(r'"(?:\\.|[^"\\])*"', source[start:end])
     ensure(bool(chunks), f"Java prompt constant empty: {name}")
     return "".join(json.loads(chunk) for chunk in chunks)
 

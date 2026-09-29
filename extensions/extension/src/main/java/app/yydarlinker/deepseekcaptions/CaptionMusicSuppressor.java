@@ -165,7 +165,7 @@ final class CaptionMusicSuppressor {
             CaptionDiagnostics.mark(
                     activity,
                     "NATIVE_RENDERER_VIEW_NOT_FOUND",
-                    "TimedText 已被不可见化，但当前播放器未发现可直接隐藏的 YouTube 原生字幕窗口"
+                    "TimedText is invisible, but no YouTube native caption window was found to hide in this player"
             );
         }
     }
@@ -289,7 +289,7 @@ final class CaptionMusicSuppressor {
         CaptionDiagnostics.mark(
                 activity,
                 "NATIVE_RENDERER_VIEW_MASKED",
-                "已直接隐藏 YouTube 原生字幕绘制窗口；class=" + view.getClass().getName()
+                "YouTube native caption window hidden directly;class=" + view.getClass().getName()
         );
     }
 

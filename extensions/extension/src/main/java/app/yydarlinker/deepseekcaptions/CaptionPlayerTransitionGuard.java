@@ -126,9 +126,9 @@ final class CaptionPlayerTransitionGuard {
             CaptionDiagnostics.mark(
                     activity,
                     "PLAYER_TRANSITION_STABLE",
-                    "播放器转场已稳定；" +
-                            (delayedOverlayRestore ? "单次恢复 AI 字幕显示" : "解除 AI 字幕轨保护") +
-                            "（观察 " + observedFrames + " 帧）"
+                    "Player transition stable; " +
+                            (delayedOverlayRestore ? "restoring AI caption display once" : "releasing AI caption-track guard") +
+                            " (observed " + observedFrames + " frames)"
             );
         }
     }

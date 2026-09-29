@@ -129,7 +129,7 @@ public final class DeepSeekCaptionHook {
                 CaptionDiagnostics.mark(
                         initialContext,
                         "CONTEXTUAL_OWNER_UNRESOLVED_PASSTHROUGH",
-                        "当前请求缺少可验证 video owner；保持 YouTube timed-text 原生直连"
+                        "Current request lacks a verifiable video owner; keeping YouTube timed-text native passthrough"
                 );
             }
             DynamicCaptionController.observeTimedTextUrl(selectedUrl);

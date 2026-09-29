@@ -325,7 +325,7 @@ final class RebuildController {
     }
     CaptionDiagnostics.mark(
         c,
-        "CAPTION_REBUILD_R2",
+        "CAPTION_REBUILD",
         "engine="+RebuildProtocol.VERSION+";session="+s.id+";video="+s.owner+";"+(original ? "source_passthrough" : "single_pass_events;source_owned_time;no_legacy_core"));
     startup(s, "engine_session_created", "visible=" + s.visible);
     kick(s);
@@ -841,6 +841,13 @@ final class RebuildController {
     return null;
   }
 
+  // A retry is still the same unresolved caption, not a new fallback phase.
+  // Rejection details and attempt counts remain in REBUILD_EVENTS_REJECTED.
+  static String unresolvedPhase(int state, String reason) {
+    if (state == READY) return "";
+    return state == FAILED ? "failed:" + reason : "pending_translation";
+  }
+
   private static void render(Session s) {
     if (!current(s) || !s.visible) return;
     String text = "", source = "";
@@ -917,8 +924,7 @@ final class RebuildController {
               } else s.displayedEvent=eventId;
             }
           } else if (p == null) {
-            fallbackReason = s.states[i]==FAILED ? "failed:"+s.reasons[i]
-                : s.attempts[i]>1 ? "retrying" : "pending_translation";
+            fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
             // Use the A01 timed source cue for every unresolved block, including final
             // failure. A block-wide status would announce a later cue before its onset.
             CaptionDocument.Cue cue=originalCue(s,s.position);

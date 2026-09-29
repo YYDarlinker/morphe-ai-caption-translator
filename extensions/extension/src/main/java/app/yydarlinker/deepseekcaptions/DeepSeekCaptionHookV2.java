@@ -89,8 +89,8 @@ public final class DeepSeekCaptionHookV2 {
                 CaptionDiagnostics.mark(
                         context,
                         "VIDEO_DEFAULT_AI_RESTORED",
-                        "切换到新视频后恢复默认 AI 字幕" +
-                                (target == null ? "" : "；目标 " + target.promptLabel())
+                        "Default AI captions restored after switching videos" +
+                                (target == null ? "" : ";target=" + target.promptLabel())
                 );
             }
         }

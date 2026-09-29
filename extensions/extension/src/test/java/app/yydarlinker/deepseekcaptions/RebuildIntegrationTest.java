@@ -689,8 +689,8 @@ public class RebuildIntegrationTest {
     RebuildController.Session s = session();
     await(() -> s.plans != null && s.plans[0] != null);
     String audit = TokenCostAudit.uiText(a);
-    assertTrue(audit, audit.contains("当前优先：1 个逻辑请求 / 1 次 API"));
-    assertTrue(audit, audit.contains("Event rebuild R2"));
+    assertTrue(audit, audit.contains("Current priority: 1 logical request / 1 API call"));
+    assertTrue(audit, audit.contains("Event rebuild / " + RebuildProtocol.VERSION));
   }
 
   @Test

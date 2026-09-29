@@ -811,8 +811,11 @@ def current_prompt() -> str:
     path = ROOT / "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions"
     protocol = (path / "RebuildProtocol.java").read_text(encoding="utf-8")
     config = (path / "DeepSeekConfig.java").read_text(encoding="utf-8")
-    ensure('static final String VERSION = "event-rebuild-r2.12"' in protocol,
-           "Current prompt has a different event protocol")
+    build = (ROOT / "extensions/extension/build.gradle.kts").read_text(encoding="utf-8")
+    ensure('static final String VERSION = app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION;' in protocol
+           and 'buildConfigField("String", "CAPTION_PATCH_VERSION"' in build
+           and '${rootProject.version}' in build,
+           "Event protocol must follow the Gradle-generated product version")
     return (java_string(protocol, "PROMPT") + java_string(protocol, "FIDELITY_PROMPT")
             + " Target language: zh-Hans. User translation preferences: "
             + java_string(config, "DEFAULT_PROMPT"))

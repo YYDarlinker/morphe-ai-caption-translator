@@ -63,33 +63,34 @@ final class CaptionDiagnostics {
             String detail = p.getString(DETAIL, "");
             long time = p.getLong(TIME, 0L);
             String audit = TokenCostAudit.uiText(context);
-            String header = "引擎：Event rebuild / " + RebuildProtocol.VERSION + "\n当前模式：" + (CaptionChoice.translates() ? "自动翻译" : "原字幕（零翻译 API）") + "\n显示文本调试：" +
-                    CaptionStrings.localize(context,DeepSeekConfig.displayTextDebugEnabled(context) ? "开" : "关");
+            String header = "Engine: Event rebuild / " + RebuildProtocol.VERSION + "\nMode: "
+                    + (CaptionChoice.translates() ? "automatic translation" : "original captions (no translation API)")
+                    + "\nDisplay text debug: " + (DeepSeekConfig.displayTextDebugEnabled(context) ? "on" : "off");
             if (stage == null || stage.isEmpty()) {
-                String base = "尚未捕获到自动翻译请求。启用并填写 API Key 后，播放视频并从“自动翻译”选择任意目标语言，再回来点“刷新诊断”。";
-                return CaptionStrings.localize(context,audit == null || audit.isEmpty()
+                String base = "No automatic translation request captured yet. Enable translation, set an API key, play a video, select a target language, then refresh diagnostics.";
+                return audit == null || audit.isEmpty()
                         ? header + "\n" + base
-                        : header + "\n" + base + "\n\n" + audit);
+                        : header + "\n" + base + "\n\n" + audit;
             }
             long seconds = time <= 0 ? -1 : Math.max(0L, (System.currentTimeMillis() - time) / 1000L);
-            String age = seconds < 0 ? "" : "（约 " + seconds + " 秒前）";
+            String age = seconds < 0 ? "" : " (about " + seconds + " seconds ago)";
             StringBuilder text = new StringBuilder();
-            text.append(CaptionStrings.localize(context,header)).append("\n");
-            text.append(CaptionStrings.localize(context,"最近阶段：")).append(stage).append(CaptionStrings.localize(context,age));
+            text.append(header).append("\n");
+            text.append("Latest stage: ").append(stage).append(age);
             if (detail != null && !detail.isEmpty()) text.append("\n").append(detail);
             if (audit != null && !audit.isEmpty()) {
                 text.append("\n\n").append(audit);
             }
             String decisions=p.getString(DECISIONS, "");
-            if(!decisions.isEmpty())text.append(CaptionStrings.localize(context,"\n\n时间参照与异常（独立保留，含时间戳）：\n")).append(decisions);
+            if(!decisions.isEmpty())text.append("\n\nTiming decisions and errors (preserved with timestamps):\n").append(decisions);
             String history = p.getString(HISTORY, "");
             if (history != null && !history.isEmpty()) {
-                text.append(CaptionStrings.localize(context,"\n\n最近链路：\n")).append(history);
+                text.append("\n\nRecent trace:\n").append(history);
             }
             text.append(CaptionQualityTrace.text(context));
             return text.toString(); // Recorded source/translation/provider evidence must remain verbatim.
         } catch (Throwable error) {
-            return CaptionStrings.localize(context,"读取诊断状态失败：") + error.getClass().getSimpleName();
+            return "Failed to read diagnostics: " + error.getClass().getSimpleName();
         }
     }
 

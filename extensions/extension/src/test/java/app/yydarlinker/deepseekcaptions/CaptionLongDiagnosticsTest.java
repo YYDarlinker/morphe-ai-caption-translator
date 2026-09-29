@@ -41,7 +41,9 @@ public class CaptionLongDiagnosticsTest {
     CaptionDiagnostics.mark(a,"REBUILD_TEST","test");
     String report=CaptionDiagnostics.fullText(a);
     assertTrue(report.contains("ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION));
-    assertTrue(report.contains("engine=event-rebuild-r2.12"));
+    assertTrue(report.contains("engine=" + app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION));
+    assertTrue(report.contains("ui=" + RebuildProtocol.VERSION + "; engine=" + RebuildProtocol.VERSION));
+    assertTrue(report.contains("Engine: Event rebuild / " + RebuildProtocol.VERSION));
     assertTrue(report.contains("history_records=1"));
     assertTrue(report.contains("quality_records=0"));
     assertTrue(report.contains("completeness=bounded_not_guaranteed"));

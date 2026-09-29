@@ -462,92 +462,92 @@ final class TokenCostAudit {
             long attempts = value(totalAll, "attempts");
             long totalTokens = value(totalAll, "total_tokens");
             if (attempts == 0L && totalTokens == 0L) {
-                return "Token 成本审计：尚无 API 用量。播放一段 AI 字幕后会在这里显示精确 usage、缓存命中、用途分摊与每分钟成本。";
+                return "Token cost audit: no API usage yet. Play AI captions to see usage, cache hits, request purposes, and cost per viewing minute.";
             }
 
             StringBuilder out = new StringBuilder(1500);
-            out.append("Token 成本审计（自上次清空）");
+            out.append("Token cost audit (since last reset)");
             String model = session.optString("model", "").trim();
-            if (!model.isEmpty()) out.append("\n当前模型：").append(model);
-            out.append("\n当前 Core：").append(
+            if (!model.isEmpty()) out.append("\nCurrent model: ").append(model);
+            out.append("\nCurrent engine: ").append(
                     "event_rebuild_r2".equals(session.optString("active_core", ""))
-                            ? "Event rebuild R2"
-                            : "历史核心"
+                            ? "Event rebuild / " + RebuildProtocol.VERSION
+                            : "legacy engine"
             );
-            out.append("\nAPI：").append(format(value(totalAll, "attempts"))).append(" 次尝试")
-                    .append(" · ").append(format(value(totalAll, "http_ok"))).append(" 次 2xx")
-                    .append(" · ").append(format(value(totalAll, "failures"))).append(" 次失败")
-                    .append(" · 内部重试 ").append(format(value(totalAll, "internal_retries"))).append(" 次");
+            out.append("\nAPI: ").append(format(value(totalAll, "attempts"))).append(" attempts")
+                    .append(" · ").append(format(value(totalAll, "http_ok"))).append(" successful (2xx)")
+                    .append(" · ").append(format(value(totalAll, "failures"))).append(" failures")
+                    .append(" · internal retries ").append(format(value(totalAll, "internal_retries")));
             appendFailureBreakdown(out, totalAll);
             long accepted=value(totalAll,"accepted_caption_units"),rejected=value(totalAll,"rejected_caption_units");
-            if(accepted+rejected>0)out.append("\n").append("结构及确定性规则校验：接受 / 拒绝（非语义验收）")
+            if(accepted+rejected>0)out.append("\n").append("Structural and deterministic checks: accepted / rejected (not semantic acceptance)")
                     .append(": ").append(accepted).append(" / ").append(rejected)
                     .append(" (").append(value(totalAll,"quality_rejected_units")).append(")");
-            out.append("\nTokens：").append(format(totalTokens))
-                    .append(" = 输入 ").append(format(value(totalAll, "prompt_tokens")))
-                    .append(" + 输出 ").append(format(value(totalAll, "completion_tokens")));
+            out.append("\nTokens: ").append(format(totalTokens))
+                    .append(" = input ").append(format(value(totalAll, "prompt_tokens")))
+                    .append(" + output ").append(format(value(totalAll, "completion_tokens")));
 
             long hit = value(totalAll, "cache_hit_tokens");
             long miss = value(totalAll, "cache_miss_tokens");
             long knownInput = hit + miss;
             if (knownInput > 0L) {
-                out.append("\n输入缓存：命中 ").append(format(hit))
-                        .append(" / 未命中 ").append(format(miss))
-                        .append(" · 命中率 ").append(percent(hit, knownInput));
+                out.append("\nInput cache: hit ").append(format(hit))
+                        .append(" / miss ").append(format(miss))
+                        .append(" · hit rate ").append(percent(hit, knownInput));
             } else {
-                out.append("\n输入缓存：当前 provider 未返回可识别的 hit/miss 明细");
+                out.append("\nInput cache: provider did not report recognizable hit/miss details");
             }
 
-            appendCost(out, totalAll, "\nV4 Flash 当前 Provider 估算：");
-            out.append("\n用途分摊：");
-            appendBucketLine(out, state, "priority", "当前优先");
-            appendBucketLine(out, state, "priority_current", "  当前锚点");
-            appendBucketLine(out, state, "priority_gap_rescue", "  缺口抢修");
-            appendBucketLine(out, state, "background", "后台预取");
-            appendBucketLine(out, state, "background_page", "  页级合并");
-            appendBucketLine(out, state, "background_block", "  块级(fallback)");
-            appendBucketLine(out, state, "background_alt", "  边界二次观察");
-            appendBucketLine(out, state, "unit_realtime", "时间锚·当前批次");
-            appendBucketLine(out, state, "unit_background", "时间锚·后台批次");
-            appendBucketLine(out, state, "core_semantic_ledger_v2", "Core·Semantic Ledger v2");
-            appendBucketLine(out, state, "core_contextual_unit_v1", "Core·Contextual Unit v1");
-            appendBucketLine(out, state, "display", "显示切片");
+            appendCost(out, totalAll, "\nV4 Flash current provider estimate: ");
+            out.append("\nRequests by purpose:");
+            appendBucketLine(out, state, "priority", "Current priority");
+            appendBucketLine(out, state, "priority_current", "  Current anchor");
+            appendBucketLine(out, state, "priority_gap_rescue", "  Gap rescue");
+            appendBucketLine(out, state, "background", "Background prefetch");
+            appendBucketLine(out, state, "background_page", "  Page merge");
+            appendBucketLine(out, state, "background_block", "  Block (fallback)");
+            appendBucketLine(out, state, "background_alt", "  Boundary recheck");
+            appendBucketLine(out, state, "unit_realtime", "Time anchor / current batch");
+            appendBucketLine(out, state, "unit_background", "Time anchor / background batch");
+            appendBucketLine(out, state, "core_semantic_ledger_v2", "Core: Semantic Ledger v2");
+            appendBucketLine(out, state, "core_contextual_unit_v1", "Core: Contextual Unit v1");
+            appendBucketLine(out, state, "display", "Display slicing");
 
             JSONObject totalsMetrics = metricsLocked(state);
-            appendPageEfficiencyLine(out, state, "background_page", "页级合并");
-            appendPageEfficiencyLine(out, state, "background_block", "块级(fallback)");
-            appendPageEfficiencyLine(out, state, "background_alt", "边界二次观察");
+            appendPageEfficiencyLine(out, state, "background_page", "Page merge");
+            appendPageEfficiencyLine(out, state, "background_block", "Block (fallback)");
+            appendPageEfficiencyLine(out, state, "background_alt", "Boundary recheck");
 
             JSONObject pageBucket = bucketLocked(state, "background_page");
             long pageRequests = value(pageBucket, "logical_requests");
             long pageBlocksCompleted = value(pageBucket, "blocks_completed");
             if (pageRequests > 0L) {
-                out.append("\n页级合并推进：").append(format(pageBlocksCompleted))
-                        .append(" 个固定块由 ").append(format(pageRequests))
-                        .append(" 个页级请求完成（每请求 ")
+                out.append("\nPage merge progress: ").append(format(pageBlocksCompleted))
+                        .append(" fixed blocks completed by ").append(format(pageRequests))
+                        .append(" page requests (")
                         .append(oneDecimal(pageBlocksCompleted / (double) pageRequests))
-                        .append(" 块；<1.0 表示存在无推进的重复请求）");
+                        .append(" blocks/request; <1.0 means repeated requests without progress)");
             }
             long altArmed = value(totalsMetrics, "background_alt_armed");
             if (altArmed > 0L) {
                 JSONObject altBucket = bucketLocked(state, "background_alt");
-                out.append("\n边界二次观察：已触发 ").append(format(altArmed))
-                        .append(" 次（每页至多 1 次）· 实际发出 ")
+                out.append("\nBoundary recheck: triggered ").append(format(altArmed))
+                        .append(" times (at most once/page) · sent ")
                         .append(format(value(altBucket, "logical_requests")))
-                        .append(" 次 · 补回 ").append(format(value(altBucket, "committed_atoms")))
-                        .append(" 个 atom");
+                        .append(" requests · recovered ").append(format(value(altBucket, "committed_atoms")))
+                        .append(" atoms");
             }
             long pageFallback = value(totalsMetrics, "background_page_fallback_events");
             if (pageFallback > 0L) {
-                out.append("\n页级降级：已有 ").append(format(pageFallback))
-                        .append(" 个缓存页连续失败超过阈值，降级为逐块 fallback 请求");
+                out.append("\nPage fallback: ").append(format(pageFallback))
+                        .append(" cached pages exceeded failure threshold; falling back to block requests");
             }
             long sunkPrompts = value(totalAll, "sunk_prompts");
             if (sunkPrompts > 0L) {
-                out.append("\n已发出但未读取的请求：").append(format(sunkPrompts))
-                        .append(" 次 · ").append(format(value(totalAll, "sunk_prompt_bytes")))
-                        .append(" bytes。provider 是否处理或计费尚未确认；下方 token/成本不包含这些未知用量，")
-                        .append("不能据此确定实际支出。");
+                out.append("\nSent but unread requests: ").append(format(sunkPrompts))
+                        .append(" requests · ").append(format(value(totalAll, "sunk_prompt_bytes")))
+                        .append(" bytes. Provider processing/billing is unknown; token and cost totals below exclude this usage,")
+                        .append(" so actual spend cannot be determined.");
             }
 
             long localSuccess = value(totalsMetrics, "display_local_success");
@@ -555,30 +555,30 @@ final class TokenCostAudit {
             long localWholeSentence = value(totalsMetrics, "display_local_whole_sentence");
             if (localSuccess + localInconclusive + localWholeSentence > 0L) {
                 JSONObject displayBucket = bucketLocked(state, "display");
-                out.append("\n显示切片通道：本地零 Token 直接达标 ").append(format(localSuccess)).append(" 次");
+                out.append("\nDisplay slicing: local zero-token successes ").append(format(localSuccess)).append(" times");
                 if (localWholeSentence > 0L) {
-                    out.append(" · 本地未切分保持整句 ").append(format(localWholeSentence)).append(" 次");
+                    out.append(" · kept whole sentences ").append(format(localWholeSentence)).append(" times");
                 }
                 if (localInconclusive > 0L) {
-                    out.append(" · 本地未达标转 AI ").append(format(localInconclusive)).append(" 次")
-                            .append("（AI 实际调用 ").append(format(value(displayBucket, "attempts")))
-                            .append(" 次 · 成功 ").append(format(value(displayBucket, "usage_responses")))
-                            .append(" 次 · 失败 ").append(format(value(displayBucket, "failures"))).append(" 次）");
+                    out.append(" · handed off to AI ").append(format(localInconclusive)).append(" times")
+                            .append(" (AI calls ").append(format(value(displayBucket, "attempts")))
+                            .append(" · with usage ").append(format(value(displayBucket, "usage_responses")))
+                            .append(" · failures ").append(format(value(displayBucket, "failures"))).append(")");
                 }
             }
 
-            appendBucketLine(out, state, "core_event_rebuild_r2", "Core·Event rebuild R2");
+            appendBucketLine(out, state, "core_event_rebuild_r2", "Core: Event rebuild / " + RebuildProtocol.VERSION);
             long viewed = value(session, "viewed_ms");
             long sessionTokens = value(sessionAll, "total_tokens");
-            out.append("\n当前视频：已计观看 ").append(seconds1(viewed / 1000d)).append(" 秒")
+            out.append("\nCurrent video: viewed ").append(seconds1(viewed / 1000d)).append(" s")
                     .append(" · ").append(format(sessionTokens)).append(" tokens");
             if (viewed >= 5_000L) {
                 double minutes = viewed / 60_000d;
                 long perMinute = Math.round(sessionTokens / Math.max(0.001d, minutes));
-                out.append(" · ").append(format(perMinute)).append(" tokens/观看分钟");
+                out.append(" · ").append(format(perMinute)).append(" tokens/viewing minute");
                 long sessionCost = value(sessionAll, "cost_nano_cny");
                 if (sessionCost > 0L) {
-                    out.append(" · ¥").append(money(sessionCost / 1_000_000_000d / minutes)).append("/分钟");
+                    out.append(" · ¥").append(money(sessionCost / 1_000_000_000d / minutes)).append("/minute");
                 }
             }
 
@@ -587,9 +587,9 @@ final class TokenCostAudit {
             long outsideAtoms = value(metrics, "semantic_outside_atoms");
             if (coreAtoms > 0L) {
                 double exposure = (windowAtoms + outsideAtoms) / (double) coreAtoms;
-                out.append("\n语义窗口：核心 ").append(format(coreAtoms))
-                        .append(" atoms · 实际暴露 ").append(format(windowAtoms + outsideAtoms))
-                        .append(" atoms · 上下文暴露倍率 ")
+                out.append("\nSemantic window: core ").append(format(coreAtoms))
+                        .append(" atoms · exposed ").append(format(windowAtoms + outsideAtoms))
+                        .append(" atoms · context exposure ratio ")
                         .append(String.format(Locale.US, "%.2fx", exposure));
             }
             long targetUnits = value(metrics, "unit_target_units");
@@ -597,35 +597,35 @@ final class TokenCostAudit {
             long targetChars = value(metrics, "unit_target_chars");
             long contextChars = value(metrics, "unit_context_chars");
             if (targetUnits > 0L) {
-                out.append("\n请求块累计：目标 ").append(format(targetUnits))
-                        .append(" blocks · 只读上下文 ").append(format(contextUnits))
-                        .append(" sections · 上下文段/请求块计数比 ")
+                out.append("\nRequest blocks: target ").append(format(targetUnits))
+                        .append(" blocks · read-only context ").append(format(contextUnits))
+                        .append(" sections · context sections/block ")
                         .append(String.format(Locale.US, "%.2fx", contextUnits / (double) targetUnits));
                 if (targetChars > 0L) {
-                    out.append(" · 字符暴露比 ")
+                    out.append(" · character exposure ratio ")
                             .append(String.format(Locale.US, "%.2fx", contextChars / (double) targetChars));
                 }
             }
             long cacheLookups = value(metrics, "unit_cache_lookups");
             if (cacheLookups > 0L) {
-                out.append("\n请求块磁盘缓存：lookup ").append(format(cacheLookups))
-                        .append(" · 命中 blocks ").append(format(value(metrics, "unit_cache_hit_units")))
-                        .append(" · 未命中 units ").append(format(value(metrics, "unit_cache_miss_units")))
-                        .append(" · 当前 block 命中 ").append(format(value(metrics, "unit_cache_current_hits")));
+                out.append("\nRequest-block disk cache: lookups ").append(format(cacheLookups))
+                        .append(" · hit blocks ").append(format(value(metrics, "unit_cache_hit_units")))
+                        .append(" · missed units ").append(format(value(metrics, "unit_cache_miss_units")))
+                        .append(" · current block hits ").append(format(value(metrics, "unit_cache_current_hits")));
             }
-            appendCoreRate(out, session, metrics, "semantic_ledger_v2", "历史核心");
-            appendCoreRate(out, session, metrics, "contextual_unit_v1", "历史兼容核心");
-            appendCoreRate(out, session, metrics, "event_rebuild_r2", "Event rebuild R2");
+            appendCoreRate(out, session, metrics, "semantic_ledger_v2", "legacy engine");
+            appendCoreRate(out, session, metrics, "contextual_unit_v1", "Legacy compatibility engine");
+            appendCoreRate(out, session, metrics, "event_rebuild_r2", "Event rebuild / " + RebuildProtocol.VERSION);
             long requestBytes = value(sessionAll, "request_bytes");
             long sessionAttempts = value(sessionAll, "attempts");
             if (sessionAttempts > 0L) {
-                out.append("\n请求体：累计 ").append(format(requestBytes)).append(" bytes")
-                        .append(" · 平均 ").append(format(requestBytes / sessionAttempts)).append(" bytes/API 尝试");
+                out.append("\nRequest body: total ").append(format(requestBytes)).append(" bytes")
+                        .append(" · average ").append(format(requestBytes / sessionAttempts)).append(" bytes/API attempt");
             }
             long noUsage = value(totalAll, "responses_without_usage");
             if (noUsage > 0L) {
-                out.append("\n注意：有 ").append(format(noUsage))
-                        .append(" 次 2xx 响应未提供 usage，因此这部分只能计请求次数，不能计精确 token。");
+                out.append("\nNote: ").append(format(noUsage))
+                        .append(" 2xx responses lacked usage; only request counts, not exact tokens, are known for these.");
             }
             return out.toString();
         }
@@ -642,42 +642,43 @@ final class TokenCostAudit {
         JSONObject bucket = bucketLocked(session, "core_" + core);
         long tokens = value(bucket, "total_tokens");
         if (viewed <= 0L && tokens <= 0L) return;
-        out.append("\n  ").append(label).append("：观看 ")
-                .append(seconds1(viewed / 1000d)).append(" 秒 · ")
+        out.append("\n  ").append(label).append(": viewed ")
+                .append(seconds1(viewed / 1000d)).append(" s · ")
                 .append(format(tokens)).append(" tok");
         if (viewed >= 5_000L) {
             double minutes = viewed / 60_000d;
             out.append(" · ").append(format(Math.round(tokens / Math.max(0.001d, minutes))))
-                    .append(" tok/观看分钟");
+                    .append(" tok/viewing minute");
             long cost = value(bucket, "cost_nano_cny");
             if (cost > 0L) {
-                out.append(" · ¥").append(money(cost / 1_000_000_000d / minutes)).append("/分钟");
+                out.append(" · ¥").append(money(cost / 1_000_000_000d / minutes)).append("/minute");
             }
         }
     }
     private static void appendFailureBreakdown(StringBuilder out, JSONObject bucket) {
         if (value(bucket, "failures") <= 0L) return;
-        out.append("\n失败明细：429 ").append(format(value(bucket, "http_429_failures")))
+        out.append("\nFailure breakdown: 429 ").append(format(value(bucket, "http_429_failures")))
                 .append(" · 5xx ").append(format(value(bucket, "http_5xx_failures")))
-                .append(" · 其他4xx ").append(format(value(bucket, "http_4xx_failures")))
-                .append(" · 超时 ").append(format(value(bucket, "timeout_failures")))
-                .append(" · 网络 ").append(format(value(bucket, "network_failures")))
-                .append(" · 取消/中断 ").append(format(value(bucket, "cancelled_failures")))
-                .append(" · 其他 ").append(format(
+                .append(" · other 4xx ").append(format(value(bucket, "http_4xx_failures")))
+                .append(" · timeout ").append(format(value(bucket, "timeout_failures")))
+                .append(" · network ").append(format(value(bucket, "network_failures")))
+                .append(" · cancelled/interrupted ").append(format(value(bucket, "cancelled_failures")))
+                .append(" · other ").append(format(
                         value(bucket, "other_failures") + value(bucket, "http_other_failures")
                 ));
     }
 
     private static void appendBucketLine(StringBuilder out, JSONObject parent, String key, String label) {
         JSONObject bucket = bucketLocked(parent, key);
-        out.append("\n  ").append(label).append("：")
-                .append(format(value(bucket, "logical_requests"))).append(" 个逻辑请求 / ")
-                .append(format(value(bucket, "attempts"))).append(" 次 API · ")
+        long requests = value(bucket, "logical_requests"), attempts = value(bucket, "attempts");
+        out.append("\n  ").append(label).append(": ")
+                .append(format(requests)).append(requests == 1 ? " logical request / " : " logical requests / ")
+                .append(format(attempts)).append(attempts == 1 ? " API call · " : " API calls · ")
                 .append(format(value(bucket, "total_tokens"))).append(" tok");
         long focusMiss = value(bucket, "focus_miss_results");
         long deferred = value(bucket, "local_deferrals");
-        if (focusMiss > 0L) out.append(" · 焦点未命中 ").append(format(focusMiss));
-        if (deferred > 0L) out.append(" · 本地熔断 ").append(format(deferred));
+        if (focusMiss > 0L) out.append(" · focus misses ").append(format(focusMiss));
+        if (deferred > 0L) out.append(" · local circuit breakers ").append(format(deferred));
         appendCost(out, bucket, " · ");
     }
 
@@ -689,9 +690,9 @@ final class TokenCostAudit {
         if (committed <= 0L) return;
         long input = value(bucket, "prompt_tokens");
         long miss = value(bucket, "cache_miss_tokens");
-        out.append("\n  ").append(label).append(" 效率：新增 ").append(format(committed))
-                .append(" 个核心 atom · 每 atom 输入 ").append(oneDecimal(input / (double) committed))
-                .append(" tok · 每 atom 未命中输入 ").append(oneDecimal(miss / (double) committed))
+        out.append("\n  ").append(label).append(" efficiency: added ").append(format(committed))
+                .append(" core atoms · input per atom ").append(oneDecimal(input / (double) committed))
+                .append(" tok · cache-miss input per atom ").append(oneDecimal(miss / (double) committed))
                 .append(" tok");
     }
 
@@ -701,7 +702,7 @@ final class TokenCostAudit {
         if (priced <= 0L) return;
         out.append(prefix).append("¥").append(money(nano / 1_000_000_000d));
         long usage = value(bucket, "usage_responses");
-        if (priced < usage) out.append("（仅统计可按内置 V4 Flash 价格计价的响应）");
+        if (priced < usage) out.append(" (only responses priced by built-in V4 Flash rates)");
     }
 
     private static void incrementLogicalRequestLocked(Request request) {

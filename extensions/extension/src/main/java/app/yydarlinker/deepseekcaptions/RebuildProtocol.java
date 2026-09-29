@@ -7,7 +7,7 @@ import org.json.*;
 
 /** Single source-owned event contract. No post-translation concatenation or hidden resplit. */
 final class RebuildProtocol {
-  static final String VERSION = "event-rebuild-r2.12";
+  static final String VERSION = app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION;
   static final String PROMPT =
       "You create faithful live subtitles. Read the complete source and read-only context before"
           + " translating. Preserve all spoken meaning, negation and its scope, conditions,"

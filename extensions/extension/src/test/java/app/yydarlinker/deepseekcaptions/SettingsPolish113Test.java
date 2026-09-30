@@ -61,7 +61,7 @@ public class SettingsPolish113Test {
         String current=CaptionStrings.settings(root.getContext(),keys[selected]);
         assertTrue(slider.getContentDescription().toString().contains(current));
         assertTrue(names.getContentDescription().toString().contains(current));
-        float tolerance=CaptionSettingsStyle.dp(root.getContext(),2);
+        float tolerance=1f;
         Bitmap rail=Bitmap.createBitmap(slider.getWidth(),slider.getHeight(),Bitmap.Config.ARGB_8888);slider.draw(new Canvas(rail));
         android.graphics.drawable.Drawable thumb=slider.getThumb(),track=slider.getProgressDrawable();int thumbOffset=slider.getThumbOffset();
         float nativeThumbCenter=thumb.getBounds().exactCenterX()+slider.getPaddingLeft()-thumbOffset;
@@ -81,7 +81,8 @@ public class SettingsPolish113Test {
             float labelCenter=names.getLeft()+label.getLeft()+label.getWidth()/2f;
             assertEquals("tier label center must align with its tick",slider.getLeft()+slider.tickCenterX(tier),labelCenter,tolerance);
             maxAlignmentError=Math.max(maxAlignmentError,Math.abs(slider.getLeft()+slider.tickCenterX(tier)-labelCenter));
-            assertEquals("native tick raster must use the tier color",expected,rail.getPixel(Math.round(slider.tickCenterX(tier)),y));
+            int tickColor=tier==selected?CaptionSettingsStyle.primary(root.getContext()):CaptionSettingsStyle.sliderUnfilled(root.getContext());
+            assertEquals("native tick raster must use the rail color",tickColor,rail.getPixel(Math.round(slider.tickCenterX(tier)),y));
         }
         slider.setThumb(thumb);slider.setThumbOffset(thumbOffset);slider.setProgressDrawable(track);
         rail.recycle();
@@ -137,7 +138,15 @@ public class SettingsPolish113Test {
             root.measure(View.MeasureSpec.makeMeasureSpec(420,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,420,root.getMeasuredHeight());
             Bitmap bitmap=Bitmap.createBitmap(420,root.getHeight(),Bitmap.Config.ARGB_8888);root.draw(new Canvas(bitmap));
             float alignmentError=assertTierRail(root,tier);
-            System.out.println("N20_TIER_RAIL theme="+(dark?"dark":"light")+" tier="+tier+" max_label_tick_error_px="+alignmentError);
+            SeekBar size=(SeekBar)root.findViewWithTag("ai_size_tier_slider"),opacity=(SeekBar)root.findViewWithTag("ai_opacity_slider");
+            assertEquals(size.getWidth(),opacity.getWidth());assertEquals(size.getLeft(),opacity.getLeft());
+            assertEquals(size.getPaddingLeft(),opacity.getPaddingLeft());assertEquals(size.getPaddingRight(),opacity.getPaddingRight());
+            assertEquals(size.getThumbOffset(),opacity.getThumbOffset());
+            assertEquals(size.getThumb().getIntrinsicWidth(),opacity.getThumb().getIntrinsicWidth());
+            assertEquals(size.getProgressTintList(),opacity.getProgressTintList());
+            assertEquals(size.getProgressBackgroundTintList(),opacity.getProgressBackgroundTintList());
+            assertEquals(size.getThumbTintList(),opacity.getThumbTintList());
+            System.out.println("N23_TIER_RAIL theme="+(dark?"dark":"light")+" tier="+tier+" max_label_tick_error_px="+alignmentError+" rail_width_delta_px=0 padding_delta_px=0 thumb_travel_delta_px=0");
             assertTrue(root.getHeight()>500);assertEquals(previewRow.getWidth()-previewRow.getPaddingLeft()-previewRow.getPaddingRight(),preview.getWidth());assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getHeight());
             String output=System.getenv("CAPTION_UI_PREVIEW_OUTPUT");if(output!=null){File file=new File(output,"settings-"+(dark?"dark":"light")+"-"+(tier==2?"standard":"xl")+"-landscape.png");file.getParentFile().mkdirs();try(FileOutputStream out=new FileOutputStream(file)){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}
                 if(!dark&&tier==CaptionFontSize.DEFAULT_TIER){try(FileOutputStream out=new FileOutputStream(new File(output,"settings-size-tiers.png"))){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}}

@@ -42,7 +42,7 @@ final class RebuildReview {
         out.add(new Issue(e.from,e.to,"possible_polarity_change","Not always means not in every case, not usually not. Preserve the quantifier scope.",true));
       if(english&&zh&&RebuildSemantics.has("(?i)a product of",source)&&RebuildSemantics.has("乘积|相乘",text)&&!RebuildSemantics.has("(?i)multiply|multiplication|equation|mathematical",source))
         out.add(new Issue(e.from,e.to,"possible_arithmetic_misread","Product of may express dependence rather than multiplication. Read the revenue/sales relationship in context.",true));
-      if(english&&zh&&source.matches("(?is).*\\bwould follow [a-z'-]+ reduced\\b.*")&&RebuildSemantics.has("之后|之後",text))
+      if(english&&zh&&source.matches("(?is).*\\bwould follow [a-z'-]+ reduced\\b.*"))
         out.add(new Issue(e.from,e.to,"possible_subject_attachment","A new subject followed by reduced may start a new clause after would follow. Preserve the actor of the reduction; do not attach that actor to the prior relative clause.",true));
       if(english&&zh&&text.matches("(?s).*(?:延伸至|延伸到|达到|取决于)[，。；]?$")&&e.to+1<s.words.size())
         out.add(new Issue(e.from,e.to,"open_complement","The target ends with an incomplete relation. Retain its source-owned complement, using neighboring context only to understand it.",true));
@@ -67,6 +67,9 @@ final class RebuildReview {
       if(english&&zh&&RebuildSemantics.has("\\blicensed or unlicensed\\b",source)
           &&RebuildSemantics.has("合法.*非法|非法.*合法",text))
         out.add(new Issue(e.from,e.to,"possible_authorization_expansion","Licensed/unlicensed means authorized/unauthorized, not necessarily legal/illegal; check source meaning and repair the wording if needed.",true));
+      if(english&&zh&&RebuildSemantics.has("\\blicensed or unlicensed\\b",source)
+          &&!RebuildSemantics.has("仿制|仿製|复制|複製|衍生|型号|型號",text))
+        out.add(new Issue(e.from,e.to,"possible_omission","Licensed or unlicensed copies or derivatives must retain the copied design or derivative model; check the source head noun and repair the omitted meaning.",true));
       if(english&&zh&&RebuildSemantics.has("\\btank fleet\\b",source)
           &&RebuildSemantics.has("坦克舰队|坦克艦隊",text))
         out.add(new Issue(e.from,e.to,"possible_equipment_term","Tank fleet means the tanks as a force, not a naval fleet; preserve the intended military unit and repair the wording.",true));

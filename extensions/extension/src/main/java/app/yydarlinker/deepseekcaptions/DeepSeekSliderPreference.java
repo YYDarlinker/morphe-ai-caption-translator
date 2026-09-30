@@ -99,6 +99,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
 
         boolean sizeSlider = KEY_TEXT_SIZE.equals(getKey());
         SeekBar slider = sizeSlider ? new SizeTierSeekBar(context) : new SeekBar(context);
+        CaptionSettingsStyle.slider(slider);
         slider.setTag(sizeSlider ? "ai_size_tier_slider" : "ai_opacity_slider");
         slider.setMinimumHeight(dp(48));
         slider.setContentDescription(getTitle());
@@ -154,12 +155,21 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     }
 
     private LinearLayout tierNames(SeekBar slider) {
-        LinearLayout names = new LinearLayout(getContext());
+        LinearLayout names = new LinearLayout(getContext()) {
+            @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+                super.onLayout(changed, left, top, right, bottom);
+                for (int i = 0; i < getChildCount(); i++) {
+                    View label = getChildAt(i);
+                    float center = ((SizeTierSeekBar) slider).tickCenterX(i);
+                    int x = Math.round(center - label.getMeasuredWidth() / 2f);
+                    label.layout(x, label.getTop(), x + label.getMeasuredWidth(), label.getBottom());
+                }
+            }
+        };
         names.setTag("ai_size_tier_names");
         names.setOrientation(LinearLayout.HORIZONTAL);
-        // With half a cell of additional rail inset, each cell center is a thumb position.
-        int inset = slider.getThumbOffset();
-        names.setPadding(inset, 0, inset, dp(4));
+        names.setPadding(0, 0, 0, dp(4));
+        names.setClipChildren(false);
         names.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         for (String key : SIZE_TIER_KEYS) {
             TextView name = new TextView(getContext());
@@ -190,24 +200,16 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     /** Five native thumb positions, with visible ticks even when the theme omits tick marks. */
     static final class SizeTierSeekBar extends SeekBar {
         private final Paint tickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final float nativeHalfThumb;
 
         SizeTierSeekBar(Context context) {
             super(context);
+            nativeHalfThumb = getThumb() == null ? getThumbOffset() : getThumb().getIntrinsicWidth() / 2f;
             setTickMark(null);
         }
 
-        @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
-            float halfThumb = getThumb() == null ? getThumbOffset()
-                    : getThumb().getIntrinsicWidth() / 2f;
-            float cellWidth = (width - 2f * getThumbOffset()) / CaptionFontSize.COUNT;
-            int inset = Math.round(getThumbOffset() + cellWidth / 2f
-                    + getThumbOffset() - halfThumb);
-            setPadding(inset, getPaddingTop(), inset, getPaddingBottom());
-            super.onSizeChanged(width, height, oldWidth, oldHeight);
-        }
-
         float tickCenterX(int tier) {
-            float halfThumb = getThumb() == null ? getThumbOffset()
+            float halfThumb = getThumb() == null ? nativeHalfThumb
                     : getThumb().getIntrinsicWidth() / 2f;
             float trackWidth = getWidth() - getPaddingLeft() - getPaddingRight()
                     + 2f * getThumbOffset() - 2f * halfThumb;
@@ -223,7 +225,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
             float radius = CaptionSettingsStyle.dp(getContext(), 3);
             for (int tier = 0; tier < CaptionFontSize.COUNT; tier++) {
                 tickPaint.setColor(tier == getProgress() ? CaptionSettingsStyle.primary(getContext())
-                        : CaptionSettingsStyle.secondary(getContext()));
+                        : CaptionSettingsStyle.sliderUnfilled(getContext()));
                 canvas.drawCircle(tickCenterX(tier), centerY, radius, tickPaint);
             }
         }

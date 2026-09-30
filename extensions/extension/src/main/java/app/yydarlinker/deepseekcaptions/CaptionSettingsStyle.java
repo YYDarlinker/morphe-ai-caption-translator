@@ -13,6 +13,15 @@ import android.widget.TextView;
 
 /** Small theme-derived refinements; native widgets, host typography and accessibility remain in charge. */
 final class CaptionSettingsStyle {
+    static int sliderUnfilled(Context c){return tint(primary(c),64);}
+    static void slider(android.widget.SeekBar view){
+        Context c=view.getContext();
+        view.setProgressTintList(android.content.res.ColorStateList.valueOf(primary(c)));
+        view.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(sliderUnfilled(c)));
+        view.setThumbTintList(android.content.res.ColorStateList.valueOf(primary(c)));
+        // Keep both native rails identical, with each endpoint half a thumb inside the padding.
+        view.setThumbOffset(0);
+    }
     static int dp(Context c,float value){return Math.round(value*c.getResources().getDisplayMetrics().density);}
     static int color(Context c,int attr,int fallback){
         TypedArray a=c.obtainStyledAttributes(new int[]{attr});

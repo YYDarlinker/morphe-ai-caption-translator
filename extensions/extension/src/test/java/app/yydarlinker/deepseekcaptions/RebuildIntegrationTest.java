@@ -1039,6 +1039,35 @@ public class RebuildIntegrationTest {
             SystemClock.elapsedRealtime()).build());
   }
 
+  @Test public void n23SeekStormPausesPrefetchButDispatchesFocusWithoutDuplicate() throws Exception {
+    blockResponse=true;
+    RebuildController.Session s=new RebuildController.Session(a, "", "rebuild0001", "n23-storm", "zh-Hans", config(), false, true);
+    s.source=new RebuildSource(Arrays.asList(
+        new RebuildSource.Word("First complete sentence",0,6000,0,RebuildSource.Precision.NATIVE),
+        new RebuildSource.Word("Second complete sentence",6000,12000,1,RebuildSource.Precision.NATIVE),
+        new RebuildSource.Word("Third complete sentence",12000,18000,2,RebuildSource.Precision.NATIVE)));
+    s.blocks=Arrays.asList(new RebuildPlanner.Block(0,0,0,s.source),new RebuildPlanner.Block(1,1,1,s.source),new RebuildPlanner.Block(2,2,2,s.source));
+    s.plans=new RebuildProtocol.Plan[3];s.pendingPlans=new RebuildProtocol.Plan[3];
+    s.states=new int[3];s.attempts=new int[3];s.retryAt=new long[3];s.reasons=new String[]{"","",""};
+    s.jobs=new RebuildController.Job[3];s.cacheChecked=new boolean[]{true,true,true};s.position=6500;
+    Field active=RebuildController.class.getDeclaredField("active");active.setAccessible(true);active.set(null,s);
+    long now=SystemClock.elapsedRealtime();s.noteSeek(now);s.noteSeek(now+1000);
+    assertEquals(now+1000+RebuildController.SEEK_STORM_PAUSE_MS,s.prefetchPausedUntil);
+    Method schedule=RebuildController.class.getDeclaredMethod("schedule",RebuildController.Session.class);schedule.setAccessible(true);
+    schedule.invoke(null,s);await(()->s.jobs[1]!=null&&s.jobs[1].sent&&calls.get()==1);
+    assertTrue(s.jobs[1].priority);assertEquals(1,calls.get());
+    for(int i=0;i<5;i++)schedule.invoke(null,s);
+    assertEquals("in-flight focus must not be duplicated",1,calls.get());
+    assertNull("storm must not dispatch new prefetch",s.jobs[2]);
+    release.countDown();await(()->s.plans[1]!=null);
+    assertTrue(CaptionDiagnostics.fullText(a).contains("REBUILD_PREFETCH_PAUSED"));
+    await(()->CaptionDiagnostics.fullText(a).contains("REBUILD_WAIT_BREAKDOWN"));
+    assertTrue(CaptionDiagnostics.fullText(a).contains("slot_wait_ms="));
+    assertTrue(CaptionDiagnostics.fullText(a).contains("validation_repair_retries="));
+    RebuildController.time(6500);s.prefetchPausedUntil=0;schedule.invoke(null,s);
+    await(()->s.plans[2]!=null);assertEquals(2,calls.get());
+  }
+
   private RebuildController.Session readyPagedSession(MediaController controller) throws Exception {
     RebuildLayoutTest.shorts = false;
     RebuildLayoutTest.bounds = new android.graphics.Rect(0, 0, 600, 340);

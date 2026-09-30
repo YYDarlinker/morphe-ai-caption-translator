@@ -193,6 +193,8 @@ final class LoopbackCaptionServer {
      * translation scheduler.
      */
     private EmptyTrack ownershipTrackFor(String translatedUrl) {
+        // Invisible TimedText can still allocate a native background window.
+        CaptionMusicSuppressor.forceNativeRendererScan();
         String sourceKey = "";
         try {
             String sourceUrl = CaptionEngine.sourceCaptionUrl(translatedUrl);
@@ -232,6 +234,7 @@ final class LoopbackCaptionServer {
                                 CaptionDiagnostics.errorDetail(failure)
                 );
             }
+            CaptionMusicSuppressor.forceNativeRendererScan();
             return emptyTrackFor(translatedUrl);
         }
 
@@ -243,6 +246,7 @@ final class LoopbackCaptionServer {
                     "Source track not ready within the short wait window; falling back to invisible ownership track"
             );
         }
+        CaptionMusicSuppressor.forceNativeRendererScan();
         return emptyTrackFor(translatedUrl);
     }
 

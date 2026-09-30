@@ -17,13 +17,23 @@ final class RebuildController {
       new java.util.concurrent.atomic.AtomicLong();
   static final int WAITING = 0, RUNNING = 1, READY = 2, FAILED = 3;
   private static final Handler MAIN = new Handler(Looper.getMainLooper());
-  private static final ExecutorService IO =
-      Executors.newCachedThreadPool(
-          r -> {
-            Thread t = new Thread(r, "CaptionRebuildIO");
-            t.setDaemon(true);
-            return t;
-          });
+  static final int MAX_PREFETCH_CONCURRENCY = 2;
+  static final long SEEK_STORM_WINDOW_MS = 3000, SEEK_STORM_PAUSE_MS = 5000;
+  private static final ExecutorService SOURCE_IO = lane("CaptionSourceIO", 1);
+  private static final ExecutorService PRIORITY_IO = lane("CaptionPriorityIO", 1);
+  private static final ExecutorService PREFETCH_IO = lane("CaptionPrefetchIO", MAX_PREFETCH_CONCURRENCY);
+
+  private static ExecutorService lane(String name, int concurrency) {
+    return Executors.newFixedThreadPool(concurrency, r -> {
+      Thread t = new Thread(r, name);
+      t.setDaemon(true);
+      return t;
+    });
+  }
+
+  static void dispatch(boolean priority, Runnable work) {
+    (priority ? PRIORITY_IO : PREFETCH_IO).submit(work);
+  }
   private static final RebuildClock CLOCK = new RebuildClock();
   private static volatile Session active;
   private static volatile String video = "";
@@ -42,6 +52,7 @@ final class RebuildController {
     volatile String url;
     volatile boolean visible, cancelled, loading, terminal;
     volatile long sourceRetry, position, providerRetry;
+    long lastSeekAt = -1, prefetchPausedUntil;
     volatile long pausedDisplayPosition = -1;
     private PlaybackState pausedHookState;
     volatile String status = "";
@@ -100,6 +111,15 @@ final class RebuildController {
         connections.clear();
       }
     }
+
+    void noteSeek(long now) {
+      if (lastSeekAt >= 0 && now - lastSeekAt <= SEEK_STORM_WINDOW_MS) {
+        prefetchPausedUntil = now + SEEK_STORM_PAUSE_MS;
+        CaptionDiagnostics.mark(context, "REBUILD_PREFETCH_PAUSED",
+            "session=" + id + ";pause_ms=" + SEEK_STORM_PAUSE_MS + ";until_ms=" + prefetchPausedUntil);
+      }
+      lastSeekAt = now;
+    }
   }
 
   static final class Job implements DeepSeekApiClient.RequestControl {
@@ -109,6 +129,9 @@ final class RebuildController {
     final boolean priority;
     volatile HttpURLConnection connection;
     volatile boolean cancelled, sent;
+    final long queuedAt = SystemClock.elapsedRealtime();
+    long slotWaitMs, httpStartedAt, networkMs;
+    int httpRounds;
 
     Job(Session s, int i) {
       this(s, i, false);
@@ -138,6 +161,13 @@ final class RebuildController {
     }
 
     void trace(String stage,String detail) {
+      long now = SystemClock.elapsedRealtime();
+      if (stage.equals("REBUILD_HTTP_BEGIN")) { httpStartedAt = now; httpRounds++; }
+      if (stage.equals("REBUILD_HTTP_RESPONSE") || stage.equals("REBUILD_HTTP_FAILURE")) {
+        long roundTrip = now - httpStartedAt;
+        networkMs += roundTrip;
+        detail += ";network_round_trip_ms=" + roundTrip;
+      }
       CaptionDiagnostics.mark(session.context,stage,"session="+session.id+";request="+traceId+";block="+index+";"+detail);
     }
 
@@ -181,6 +211,11 @@ final class RebuildController {
   static boolean visible() {
     Session s = active;
     return current(s) && s.visible;
+  }
+
+  static boolean ownsNativeTrack() {
+    Session s = active;
+    return current(s) && !s.sourceOnly;
   }
 
   static String activeUrl() {
@@ -334,6 +369,7 @@ final class RebuildController {
         "CAPTION_REBUILD",
         "engine="+RebuildProtocol.VERSION+";session="+s.id+";video="+s.owner+";"+(original ? "source_passthrough" : "single_pass_events;source_owned_time;no_legacy_core"));
     startup(s, "engine_session_created", "visible=" + s.visible);
+    CaptionMusicSuppressor.forceNativeRendererScan();
     kick(s);
     scheduleTick();
   }
@@ -352,6 +388,7 @@ final class RebuildController {
           ? Math.max(0, ms) : -1;
       s.pausedHookState = s.pausedDisplayPosition >= 0 ? state : null;
       if (seek) {
+        s.noteSeek(now);
         s.generation++;
         s.lastShown = "";
         s.displayedEvent=""; s.withheldEvent="";
@@ -458,6 +495,7 @@ final class RebuildController {
 
   private static void kick(Session s) {
     if (!current(s)) return;
+    CaptionMusicSuppressor.kick();
     boolean load = false;
     synchronized (s) {
       if (s.source == null
@@ -470,7 +508,7 @@ final class RebuildController {
     }
     if (load) {
       startup(s, "source_worker_queued", "");
-      IO.submit(() -> load(s));
+      SOURCE_IO.submit(() -> load(s));
     }
     if (s.blocks != null && !s.terminal && !s.sourceOnly && s.visible) schedule(s);
     render(s);
@@ -621,8 +659,6 @@ final class RebuildController {
       int index = blockAt(s, s.position);
       if (index < 0) index = 0;
       else if (!covers(s.blocks.get(index), s.position) && index + 1 < s.blocks.size()) index++;
-      int running = 0;
-      for (int st : s.states) if (st == RUNNING) running++;
       int backgroundRunning = 0;
       for (Job j : s.jobs)
         if (j != null && s.states[j.index] == RUNNING && !covers(s.blocks.get(j.index), s.position))
@@ -632,13 +668,31 @@ final class RebuildController {
               || s.states[index] == FAILED
               || (s.jobs[index] != null && s.jobs[index].sent))
               && backgroundRunning == 0
+              && now >= s.prefetchPausedUntil
               && !paused()
               && CLOCK.fresh(now);
-      for (int i = index; i < s.blocks.size() && running < 2; i++) {
+      int prefetchRunning = 0;
+      for (Job j : s.jobs) if (j != null && !j.priority && s.states[j.index] == RUNNING) prefetchRunning++;
+      for (int i = index; i < s.blocks.size(); i++) {
         RebuildPlanner.Block b = s.blocks.get(i);
         if (b.start > s.position + 30000) break;
         if (i > index && !allowAhead) break;
+        if (i > index && prefetchRunning >= MAX_PREFETCH_CONCURRENCY) break;
         if (s.states[i] != WAITING || s.retryAt[i] > now) continue;
+        // A ready memory plan wins first; lazy disk restoration never waits for a network lane.
+        if (s.plans[i] == null && s.cacheChecked != null && !s.cacheChecked[i]) {
+          s.cacheChecked[i] = true;
+          RebuildProtocol.Plan cached = RebuildCache.read(s.context, s.cacheKey, s.source, b);
+          TokenCostAudit.recordUnitCacheOutcome(1, cached == null ? 0 : 1);
+          if (cached != null) {
+            s.plans[i] = cached;
+            s.states[i] = READY;
+            s.everReady = true;
+            CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_RESTORED",
+                "session=" + s.id + ";block=" + b.index + ";network_calls=0");
+            continue;
+          }
+        }
         int maxAttempts =
             RebuildReview.hasSemanticRepairRisk(s.plans[i])
                 ? RebuildReview.MAX_SEMANTIC_ATTEMPTS
@@ -665,7 +719,7 @@ final class RebuildController {
         Job job = new Job(s, i, focus);
         s.jobs[i] = job;
         start.add(job);
-        running++;
+        if (!focus) prefetchRunning++;
         if (i > index || !s.everReady) break;
       }
     }
@@ -687,7 +741,7 @@ final class RebuildController {
               + b.start
               + "-"
               + b.end);
-      IO.submit(() -> translate(j));
+      dispatch(j.priority, () -> translate(j));
     }
   }
 
@@ -696,14 +750,9 @@ final class RebuildController {
     RebuildPlanner.Block b = s.blocks.get(job.index);
     RebuildProtocol.Plan accepted = null;
     try {
+      job.slotWaitMs = SystemClock.elapsedRealtime() - job.queuedAt;
+      RawCaptionSource.checkActive(job);
       boolean restoredFromCache=false;
-      if(s.cacheChecked!=null && !s.cacheChecked[job.index]) {
-        s.cacheChecked[job.index]=true;
-        accepted=RebuildCache.read(s.context,s.cacheKey,s.source,b);
-        restoredFromCache=accepted!=null;
-        TokenCostAudit.recordUnitCacheOutcome(1,restoredFromCache?1:0);
-        if(restoredFromCache)CaptionDiagnostics.mark(s.context,"REBUILD_CACHE_RESTORED","session="+s.id+";block="+b.index+";network_calls=0");
-      }
       if(accepted==null) accepted =
           RebuildApi.translate(
               s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index]);
@@ -818,6 +867,11 @@ final class RebuildController {
         }
       }
     } finally {
+      job.trace("REBUILD_WAIT_BREAKDOWN", "purpose=" + (job.priority ? "focus" : "prefetch")
+          + ";slot_wait_ms=" + job.slotWaitMs + ";network_ms=" + job.networkMs
+          + ";validation_ms=" + Math.max(0, SystemClock.elapsedRealtime() - job.queuedAt - job.slotWaitMs - job.networkMs)
+          + ";validation_repair_retries=" + Math.max(0, s.attempts[job.index] - 1)
+          + ";http_rounds=" + job.httpRounds + ";cancelled=" + job.cancelled);
       if (current(s)) kick(s);
     }
   }

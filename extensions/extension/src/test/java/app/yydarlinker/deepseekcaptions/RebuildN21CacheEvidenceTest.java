@@ -166,7 +166,7 @@ public class RebuildN21CacheEvidenceTest {
       checked[index] = true;
       reads++;
     }
-    TokenCostAudit.recordUnitCacheOutcome(2, 0, false);
+    TokenCostAudit.recordUnitCacheOutcome(2, 0);
     int expectedRequest = 3;
     for (JSONObject entry : quality(fixture)) {
       int requestId = entry.getInt("request");
@@ -182,7 +182,7 @@ public class RebuildN21CacheEvidenceTest {
         checked[block.index] = true;
         coldRead(fixture, key, source, block, ++auditCalls, "lazy_first_translation", requestTrace);
         reads++;
-        TokenCostAudit.recordUnitCacheOutcome(1, 0, false);
+        TokenCostAudit.recordUnitCacheOutcome(1, 0);
       } else if (accepted.containsKey(block.index)) {
         retries++;
         assertTrue(block.index == 4 || block.index == 10);
@@ -212,7 +212,7 @@ public class RebuildN21CacheEvidenceTest {
     assertEquals(12, metrics.getInt("unit_cache_lookups"));
     assertEquals(13, metrics.getInt("unit_cache_miss_units"));
     assertEquals(0, metrics.optLong("unit_cache_hit_units"));
-    assertEquals(0, metrics.optLong("unit_cache_current_hits"));
+    assertFalse(metrics.has("unit_cache_current_hits"));
     assertEquals("recording cache evidence sends no requests", 0,
         audit.getJSONObject("buckets").getJSONObject("all").optLong("attempts"));
     System.out.println("N21_AUDIT=" + metrics);

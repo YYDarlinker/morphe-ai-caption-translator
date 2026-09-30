@@ -42,6 +42,8 @@ final class RebuildController {
     volatile String url;
     volatile boolean visible, cancelled, loading, terminal;
     volatile long sourceRetry, position, providerRetry;
+    volatile long pausedDisplayPosition = -1;
+    private PlaybackState pausedHookState;
     volatile String status = "";
     int sourceFailures, repairCount;
     volatile int generation;
@@ -82,7 +84,11 @@ final class RebuildController {
     }
 
     void cancel() {
-      synchronized(this){endFallback(this,position,"session_end");}
+      synchronized(this){
+        endFallback(this,position,"session_end");
+        pausedDisplayPosition = -1;
+        pausedHookState = null;
+      }
       cancelled = true;
       generation++;
       synchronized (connections) {
@@ -318,7 +324,7 @@ final class RebuildController {
         CaptionOverlay.clear();
       }
     }
-    s.position = position();
+    s.position = position(s);
     if (!original && !cfg.ready()) {
       s.terminal = true;
       s.status = CaptionStrings.get(c, "configure_api");
@@ -337,9 +343,14 @@ final class RebuildController {
     boolean seek = CLOCK.update(ms, now);
     Session s = active;
     if (!current(s)) return;
+    PlaybackState state = playbackState();
     synchronized (s) {
       if(seek){endFallback(s,s.position,"seek"); CaptionDiagnostics.mark(s.context,"REBUILD_SEEK","session="+s.id+";from="+s.position+";to="+ms); }
       s.position = CLOCK.presentation(now);
+      // Explicit hooks take precedence over paused media jitter, including a small rewind.
+      s.pausedDisplayPosition = state != null && state.getState() == PlaybackState.STATE_PAUSED
+          ? Math.max(0, ms) : -1;
+      s.pausedHookState = s.pausedDisplayPosition >= 0 ? state : null;
       if (seek) {
         s.generation++;
         s.lastShown = "";
@@ -353,28 +364,61 @@ final class RebuildController {
       }
     }
     if (seek) CaptionOverlay.hide();
-    CaptionOverlay.position(s.position);
+    CaptionOverlay.position(displayPosition(s));
     kick(s);
     scheduleTick();
   }
 
-  private static long position() {
-    long now = SystemClock.elapsedRealtime();
+  private static PlaybackState playbackState() {
     Activity a = activity.get();
     try {
       MediaController c = a == null ? null : a.getMediaController();
-      PlaybackState state =
-          c == null || !a.getPackageName().equals(c.getPackageName()) ? null : c.getPlaybackState();
-      if (state != null)
-        return CLOCK.position(
-            now,
-            state.getPosition(),
-            state.getLastPositionUpdateTime(),
-            state.getPlaybackSpeed(),
-            state.getState());
+      return c == null || !a.getPackageName().equals(c.getPackageName())
+          ? null : c.getPlaybackState();
     } catch (Exception ignored) {
     }
-    return CLOCK.position(now, -1, 0, 0, 0);
+    return null;
+  }
+
+  private static long position() {
+    return position(null);
+  }
+
+  private static long position(Session s) {
+    long now = SystemClock.elapsedRealtime();
+    PlaybackState state = playbackState();
+    long reported = state == null ? -1 : state.getPosition();
+    long regular = CLOCK.position(now, reported,
+        state == null ? 0 : state.getLastPositionUpdateTime(),
+        state == null ? 0 : state.getPlaybackSpeed(),
+        state == null ? 0 : state.getState());
+    if (s != null) {
+      synchronized (s) {
+        if (state == null || state.getState() != PlaybackState.STATE_PAUSED) {
+          s.pausedDisplayPosition = -1;
+          s.pausedHookState = null;
+        } else {
+          // Read the raw report only for the first pause and the real-change safety valve.
+          // A report already seen by an explicit hook cannot undo that hook's seek.
+          boolean oldHookReport = s.pausedHookState != null
+              && reported == s.pausedHookState.getPosition()
+              && state.getLastPositionUpdateTime() == s.pausedHookState.getLastPositionUpdateTime();
+          if (!oldHookReport) s.pausedHookState = null;
+          if (s.pausedDisplayPosition >= 0 && reported >= 0
+              && !oldHookReport
+              && Math.abs(reported - s.pausedDisplayPosition) > 1500)
+            s.pausedDisplayPosition = -1;
+          if (s.pausedDisplayPosition < 0)
+            s.pausedDisplayPosition = reported >= 0 ? reported : regular;
+        }
+      }
+    }
+    return regular;
+  }
+
+  private static long displayPosition(Session s) {
+    long frozen = s.pausedDisplayPosition;
+    return frozen >= 0 ? frozen : s.position;
   }
 
   private static boolean paused() {
@@ -405,9 +449,9 @@ final class RebuildController {
     // Surface detection must also run while a former miniplayer has hidden the overlay.
     CaptionOverlay.refreshSurface();
     synchronized (s) {
-      s.position = position();
+      s.position = position(s);
     }
-    CaptionOverlay.position(s.position);
+    CaptionOverlay.position(displayPosition(s));
     kick(s);
     scheduleTick();
   }
@@ -442,7 +486,7 @@ final class RebuildController {
       synchronized (s) {
         if (!current(s)) return;
         s.raw = raw;
-        s.position = position();
+        s.position = position(s);
       }
       startup(s, "source_available", "position_ms=" + s.position);
       // The parsed source cues are already time-bounded. Show the current one while
@@ -504,7 +548,7 @@ final class RebuildController {
         s.status = "";
         s.everReady = restored > 0;
         s.blocks = blocks;
-        s.position = position();
+        s.position = position(s);
       }
       startup(s, "engine_ready", "position_ms=" + s.position);
       if (!blocks.isEmpty() && s.position >= blocks.get(0).end)
@@ -531,7 +575,7 @@ final class RebuildController {
               + blocks.size()
               + ";cache_hits="
               + restored);
-      TokenCostAudit.recordUnitCacheOutcome(Math.min(2,blocks.size()-focusIndex), restored, false);
+      TokenCostAudit.recordUnitCacheOutcome(Math.min(2,blocks.size()-focusIndex), restored);
       RawCaptionSource.publishSharedTimeline(s.owner, raw.document.cues());
       render(s);
       kick(s);
@@ -657,7 +701,7 @@ final class RebuildController {
         s.cacheChecked[job.index]=true;
         accepted=RebuildCache.read(s.context,s.cacheKey,s.source,b);
         restoredFromCache=accepted!=null;
-        TokenCostAudit.recordUnitCacheOutcome(1,restoredFromCache?1:0,false);
+        TokenCostAudit.recordUnitCacheOutcome(1,restoredFromCache?1:0);
         if(restoredFromCache)CaptionDiagnostics.mark(s.context,"REBUILD_CACHE_RESTORED","session="+s.id+";block="+b.index+";network_calls=0");
       }
       if(accepted==null) accepted =
@@ -827,12 +871,12 @@ final class RebuildController {
   }
 
   private static RebuildDisplayMerge.Merged displayMergeForCurrent(Session s,
-      RebuildProtocol.Event event) {
+      RebuildProtocol.Event event, long position) {
     if (s.source == null || event == null) return null;
     if (RebuildDisplayMerge.isLead(event)) {
       RebuildProtocol.Event next = adjacentEvent(s, event, true);
       RebuildDisplayMerge.Merged deferred = RebuildDisplayMerge.merge(s.source, event, next);
-      if (deferred != null && s.position < deferred.right.start) return deferred;
+      if (deferred != null && position < deferred.right.start) return deferred;
     }
     RebuildProtocol.Event previous = adjacentEvent(s, event, false);
     if (previous != null && (RebuildDisplayMerge.isLead(previous)
@@ -850,21 +894,22 @@ final class RebuildController {
 
   private static void render(Session s) {
     if (!current(s) || !s.visible) return;
-    String text = "", source = "";
+    String text = "";
     String fallbackReason = "";
     boolean status = false;
     int generation;
-    long revision, selectedAt;
+    long revision, selectedAt, observedAt;
     String eventId = "none";
     long eventStart = -1, eventEnd = -1;
     synchronized (s) {
       generation = s.generation;
-      selectedAt = s.position;
+      observedAt = s.position;
+      selectedAt = displayPosition(s);
       if (s.source == null && !s.status.isEmpty()) {
         text = s.status;
         status = true;
       } else if (s.source == null && s.raw != null && !s.sourceOnly && !s.terminal) {
-        CaptionDocument.Cue cue = originalCue(s, s.position);
+        CaptionDocument.Cue cue = originalCue(s, selectedAt);
         if (cue != null) {
           text = CaptionStrings.get(s.context, "caption_translating");
           eventId = "source:raw:" + cue.startMs + "_" + cue.endMs;
@@ -875,34 +920,33 @@ final class RebuildController {
       } else if (s.source == null) {
         text = s.status.isEmpty() ? CaptionStrings.get(s.context, "caption_translating") : s.status;
         status = true;
-      } else if (s.sourceOnly) text = original(s, s.position);
+      } else if (s.sourceOnly) text = original(s, selectedAt);
       else if (s.terminal) {
         text = s.status;
         status = true;
       } else {
-        int i = blockAt(s, s.position);
-        if (i >= 0 && covers(s.blocks.get(i), s.position)) {
+        int i = blockAt(s, selectedAt);
+        if (i >= 0 && covers(s.blocks.get(i), selectedAt)) {
           if(s.pendingPlans!=null && s.pendingPlans[i]!=null) {
-            RebuildProtocol.Event previous=s.plans[i]==null?null:s.plans[i].at(s.position);
+            RebuildProtocol.Event previous=s.plans[i]==null?null:s.plans[i].at(selectedAt);
             String previousId=previous==null?"":i+":"+previous.from+"-"+previous.to;
             if(previous==null || !previousId.equals(s.displayedEvent)) {s.plans[i]=s.pendingPlans[i];s.pendingPlans[i]=null;}
           }
           RebuildProtocol.Plan p = s.plans[i];
-          RebuildProtocol.Event e = p == null ? null : p.at(s.position);
+          RebuildProtocol.Event e = p == null ? null : p.at(selectedAt);
           if (e != null) {
             eventId = i + ":" + e.from + "-" + e.to;
             eventStart = e.start;
             eventEnd = e.end;
             text = RebuildReview.uncertainNumbers(p,e) ? "〔原字幕数字存疑〕"+e.text : e.text;
             boolean blocked = RebuildReview.semanticBlocked(p,e);
-            RebuildDisplayMerge.Merged merged = blocked ? null : displayMergeForCurrent(s,e);
+            RebuildDisplayMerge.Merged merged = blocked ? null : displayMergeForCurrent(s,e,selectedAt);
             boolean deferredLead = merged != null && RebuildDisplayMerge.isLead(e)
-                && merged.left == e && s.position < merged.right.start;
+                && merged.left == e && selectedAt < merged.right.start;
             if (deferredLead) {
               // Do not show the lead by itself, and do not reveal the continuation early.
               eventId = "deferred:" + i + ":" + e.from + "-" + e.to;
               text = "";
-              source = "";
             } else {
               if (merged != null) {
                 eventId = merged.id();
@@ -911,7 +955,7 @@ final class RebuildController {
                 text = merged.text;
               }
               boolean late = merged == null && !eventId.equals(s.displayedEvent)
-                  && (eventId.equals(s.withheldEvent) || lateUnreadable(e,s.position));
+                  && (eventId.equals(s.withheldEvent) || lateUnreadable(e,selectedAt));
               if(blocked || late) {
                 if(late && !eventId.equals(s.withheldEvent))CaptionDiagnostics.mark(s.context,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
                 if(late)s.withheldEvent=eventId;
@@ -925,12 +969,12 @@ final class RebuildController {
             fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
             // Waiting and blank failure displays retain each source cue's own window.
             // A block-wide display must not announce a later cue before its onset.
-            CaptionDocument.Cue cue=originalCue(s,s.position);
+            CaptionDocument.Cue cue=originalCue(s,selectedAt);
             RebuildPlanner.Block block=s.blocks.get(i);
             if(cue!=null && cue.startMs<block.end && cue.endMs>block.start) {
               eventStart=Math.max(cue.startMs,block.start);
               eventEnd=Math.min(cue.endMs,block.end);
-              if(eventStart<=s.position && s.position<eventEnd) {
+              if(eventStart<=selectedAt && selectedAt<eventEnd) {
                 text=s.states[i]==FAILED ? "" : CaptionStrings.get(s.context, "caption_translating");
                 eventId="source:"+i+":"+eventStart+"_"+eventEnd;
               }
@@ -944,14 +988,13 @@ final class RebuildController {
         if(!fallbackReason.isEmpty())CaptionDiagnostics.mark(s.context,"REBUILD_FALLBACK_BEGIN",
             "session="+s.id+";position="+s.position+";reason="+CaptionQualityTrace.redact(fallbackReason,s.config.apiKey,400));
       }
-      String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|" + source;
+      String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
       if (signature.equals(s.lastShown)) return;
       s.lastShown = signature;
       revision = ++s.renderRevision;
     }
     CaptionOverlay.RenderGuard guard =
         () -> current(s) && s.generation == generation && s.renderRevision == revision && s.visible;
-    String fallback = source;
     if (status) CaptionOverlay.showStatus(text, guard);
     else if (text.isEmpty() && fallbackReason.isEmpty()) CaptionOverlay.hide(guard);
     else if (fallbackReason.equals("pending_engine") || fallbackReason.equals("pending_translation")
@@ -960,7 +1003,7 @@ final class RebuildController {
           eventStart, eventEnd, selectedAt);
     else
       CaptionOverlay.showEvent(
-          text, guard, () -> s.sourceOnly ? fallback : "", s.id + ":" + generation + ":" + eventId,
+          text, guard, () -> "", s.id + ":" + generation + ":" + eventId,
           eventStart, eventEnd, selectedAt);
     if (DeepSeekConfig.displayTextDebugEnabled(s.context))
       CaptionDiagnostics.mark(
@@ -973,7 +1016,7 @@ final class RebuildController {
               + ":"
               + eventId
               + ";time="
-              + selectedAt
+              + observedAt
               + ";range="
               + eventStart
               + "-"

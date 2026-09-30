@@ -179,6 +179,65 @@ public class RebuildLayoutTest {
     DeepSeekConfig.saveDisplayTextDebugEnabled(a,false);
   }
 
+  private void preDraw() throws Exception {
+    Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(120));
+    FrameLayout host=(FrameLayout)((WeakReference<?>)field("hostRef")).get();
+    host.getViewTreeObserver().dispatchOnPreDraw();
+  }
+
+  @Test public void blankPreDrawSkipsTextWorkButNewCueStyleAndGeometryStillRender()throws Exception {
+    CaptionDiagnostics.clear(a);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a,true);
+    CaptionOverlay.showEvent("",()->true,null,"n21b-blank:0",0,5000,0);
+    CaptionOverlay.LayoutBudget first=CaptionOverlay.budget();
+    assertNotNull(first);
+    text().setText("untouched probe");
+    for(int n=0;n<8;n++)preDraw();
+    // A full render replaces the budget before measuring text and then clears this probe.
+    assertSame(first,CaptionOverlay.budget());
+    assertEquals("untouched probe",text().getText().toString());
+    assertEquals(View.GONE,anchor().getVisibility());
+    assertEquals(1,presentationHistory().split("REBUILD_PRESENTED",-1).length-1);
+
+    CaptionOverlay.showEvent("",()->true,null,"n21b-blank:1",5000,10000,5000);
+    assertNotSame(first,CaptionOverlay.budget());
+    assertEquals("",text().getText().toString());
+    assertEquals(2,presentationHistory().split("REBUILD_PRESENTED",-1).length-1);
+    CaptionOverlay.LayoutBudget beforeStyle=CaptionOverlay.budget();
+    text().setText("style probe");
+    CaptionOverlay.refreshStyle(a);
+    assertNotSame(beforeStyle,CaptionOverlay.budget());
+    assertEquals("",text().getText().toString());
+
+    CaptionOverlay.LayoutBudget beforeGeometry=CaptionOverlay.budget();
+    text().setText("geometry probe");
+    bounds=new Rect(0,0,640,360);
+    preDraw();
+    assertNotSame(beforeGeometry,CaptionOverlay.budget());
+    assertEquals("",text().getText().toString());
+    bounds=null;
+    preDraw();
+    assertNull(CaptionOverlay.budget());
+    bounds=new Rect(0,0,640,360);
+    preDraw();
+    assertNotNull("missing geometry cannot freeze the blank layout budget",CaptionOverlay.budget());
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a,false);
+  }
+
+  @Test public void blankPreDrawStillAllowsExplicitFallbackShowWithSameIdentity()throws Exception {
+    bounds=new Rect(0,0,240,400);
+    String overflow=String.join("",java.util.Collections.nCopies(120,"字"));
+    CaptionOverlay.showEvent(overflow,()->true,null,"n21b-fallback",0,5000,0);
+    assertEquals(View.GONE,anchor().getVisibility());
+    CaptionOverlay.LayoutBudget beforeFallback=CaptionOverlay.budget();
+    preDraw();
+    assertSame(beforeFallback,CaptionOverlay.budget());
+    CaptionOverlay.showEvent(overflow,()->true,()->"Original","n21b-fallback",0,5000,0);
+    assertNotSame(beforeFallback,CaptionOverlay.budget());
+    assertEquals("Original",text().getText().toString());
+    assertEquals(View.VISIBLE,anchor().getVisibility());
+  }
+
   @Test public void waitingPlaceholderIsVisibleEvenWhenCueTimeCannotFitTranslation()throws Exception {
     CaptionDiagnostics.clear(a);
     String waiting=CaptionStrings.get(a,"caption_translating");

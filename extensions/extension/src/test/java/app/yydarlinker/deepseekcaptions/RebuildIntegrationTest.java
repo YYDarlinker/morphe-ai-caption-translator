@@ -4,6 +4,9 @@ import static org.junit.Assert.*;
 
 import android.app.Activity;
 import android.content.Context;
+import android.media.session.MediaController;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 import android.os.*;
 import android.view.*;
 import android.widget.*;
@@ -43,6 +46,7 @@ public class RebuildIntegrationTest {
   volatile int mode;
   volatile boolean blockResponse;
   CountDownLatch release;
+  MediaSession mediaSession;
 
   @Before
   public void setup() throws Exception {
@@ -134,6 +138,7 @@ public class RebuildIntegrationTest {
   public void cleanup() throws Exception {
     release.countDown();
     RebuildController.stop();
+    if (mediaSession != null) mediaSession.release();
     Field f = DeepSeekCaptionHook.class.getDeclaredField("youtubeCronetEngine");
     f.setAccessible(true);
     f.set(null, oldEngine);
@@ -1018,5 +1023,254 @@ public class RebuildIntegrationTest {
     RebuildCache.write(a,s.cacheKey,b,RebuildProtocol.parseBound(json,s.source,b));int before=calls.get();
     RebuildController.time(50050);await(()->s.plans[2]!=null);
     assertEquals(before,calls.get());assertEquals(0,s.attempts[2]);assertTrue(s.cacheChecked[2]);
+  }
+
+  private MediaController pausedMedia() {
+    mediaSession = new MediaSession(a, "paused-caption-fixture");
+    MediaController controller = mediaSession.getController();
+    Shadows.shadowOf(controller).setPackageName(a.getPackageName());
+    a.setMediaController(controller);
+    return controller;
+  }
+
+  private void reportMedia(MediaController controller, int state, long position) {
+    Shadows.shadowOf(controller).setPlaybackState(new PlaybackState.Builder()
+        .setState(state, position, state == PlaybackState.STATE_PLAYING ? 1 : 0,
+            SystemClock.elapsedRealtime()).build());
+  }
+
+  private RebuildController.Session readyPagedSession(MediaController controller) throws Exception {
+    RebuildLayoutTest.shorts = false;
+    RebuildLayoutTest.bounds = new android.graphics.Rect(0, 0, 600, 340);
+    a.getResources().getDisplayMetrics().widthPixels = 1264;
+    a.getResources().getDisplayMetrics().heightPixels = 2736;
+    DeepSeekConfig.saveCaptionSizeTier(a, 2);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a, true);
+    CaptionOverlay.clear();
+    CaptionOverlay.setActivity(a);
+    RebuildController.Session s = new RebuildController.Session(a,
+        "https://www.youtube.com/api/timedtext?v=rebuild0001&lang=en&tlang=zh-Hans",
+        "rebuild0001", "paused-ready-fixture", "zh-Hans", config(), false, true);
+    s.source = new RebuildSource(Collections.singletonList(new RebuildSource.Word(
+        "A complete source sentence.", 0, 12000, 0, RebuildSource.Precision.NATIVE)));
+    RebuildPlanner.Block block = RebuildContractTest.block(s.source);
+    s.blocks = Collections.singletonList(block);
+    String caption = "第一，中国的国防预算实际上比你以为的更大；这不是因为他们想隐瞒，"
+        + "而是因为会计标准不同，以及纳入和排除的项目不同。";
+    s.plans = new RebuildProtocol.Plan[]{new RebuildProtocol.Plan(Collections.singletonList(
+        new RebuildProtocol.Event(block.from, block.to, block.start, block.end, caption)),
+        "{}", Collections.emptyList())};
+    s.pendingPlans = new RebuildProtocol.Plan[1];
+    s.states = new int[]{RebuildController.READY};
+    s.attempts = new int[1];
+    s.retryAt = new long[1];
+    s.reasons = new String[]{""};
+    s.jobs = new RebuildController.Job[1];
+    s.cacheChecked = new boolean[]{true};
+    s.everReady = true;
+    Field active = RebuildController.class.getDeclaredField("active");
+    active.setAccessible(true);
+    active.set(null, s);
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 0);
+    RebuildController.time(0);
+    assertTrue("fixture must exercise a real page boundary", overlayPages().size() > 1);
+    assertEquals("ready fixture must not request translation", 0, calls.get());
+    return s;
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<RebuildPageLayout.Page> overlayPages() throws Exception {
+    return (List<RebuildPageLayout.Page>) field(null, CaptionOverlay.class, "pendingPages");
+  }
+
+  private long overlayPosition() throws Exception {
+    return (long) field(null, CaptionOverlay.class, "pendingPosition");
+  }
+
+  private int overlayPage() throws Exception {
+    return (int) field(null, CaptionOverlay.class, "shownPage");
+  }
+
+  private int presentationCount() {
+    return CaptionDiagnostics.fullText(a).split("REBUILD_PRESENTED", -1).length - 1;
+  }
+
+  @Test
+  @Config(shadows = {Keys.class, RebuildLayoutTest.Geometry.class})
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  public void pausedMediaJitterKeepsPositionPageAndRenderStable() throws Exception {
+    MediaController controller = pausedMedia();
+    RebuildController.Session s = readyPagedSession(controller);
+    long frozen = overlayPages().get(0).end - 8;
+    assertEquals(0, RebuildPageLayout.indexAt(overlayPages(), frozen));
+    assertEquals(1, RebuildPageLayout.indexAt(overlayPages(), frozen + 16));
+    reportMedia(controller, PlaybackState.STATE_NONE, frozen);
+    RebuildController.time(frozen);
+    assertEquals("a non-paused hook must not establish a freeze", -1, s.pausedDisplayPosition);
+    reportMedia(controller, PlaybackState.STATE_PAUSED, frozen);
+    advance(80);
+    assertEquals("first paused tick must capture the reported position", frozen, s.pausedDisplayPosition);
+    assertEquals(frozen, overlayPosition());
+    long revision = s.renderRevision;
+    int presented = presentationCount();
+    int maintenanceScans = 0;
+    for (int i = 0; i < 10; i++) {
+      List<RebuildPageLayout.Page> pages = overlayPages();
+      long previousScan = (long) field(null, CaptionOverlay.class, "lastScan");
+      long reported = frozen + (i % 2 == 0 ? 16 : 0);
+      reportMedia(controller, PlaybackState.STATE_PAUSED, reported);
+      advance(80);
+      assertEquals("ordinary clock must remain available to scheduling", reported, s.position);
+      assertEquals(frozen, s.pausedDisplayPosition);
+      assertEquals(frozen, overlayPosition());
+      assertEquals(0, overlayPage());
+      assertEquals("same event must not issue another controller render", revision, s.renderRevision);
+      if (previousScan == (long) field(null, CaptionOverlay.class, "lastScan"))
+        assertSame("jitter must not replan pages between existing surface scans", pages, overlayPages());
+      else maintenanceScans++;
+      assertEquals("jitter must not generate another presentation", presented, presentationCount());
+    }
+    assertTrue("the existing surface maintenance must still run while paused", maintenanceScans > 0);
+    assertEquals(0, calls.get());
+  }
+
+  @Test
+  @Config(shadows = {Keys.class, RebuildLayoutTest.Geometry.class})
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  public void resumedPlaybackClearsPauseFreezeAndAdvancesPage() throws Exception {
+    MediaController controller = pausedMedia();
+    RebuildController.Session s = readyPagedSession(controller);
+    long frozen = overlayPages().get(0).end - 8;
+    reportMedia(controller, PlaybackState.STATE_PAUSED, frozen);
+    RebuildController.time(frozen);
+    assertEquals(0, overlayPage());
+    reportMedia(controller, PlaybackState.STATE_PLAYING, frozen + 16);
+    advance(80);
+    assertEquals(-1, s.pausedDisplayPosition);
+    assertTrue("playing clock must advance again", s.position > frozen + 16);
+    assertEquals(s.position, overlayPosition());
+    assertEquals(1, overlayPage());
+    assertEquals(0, calls.get());
+  }
+
+  @Test
+  @Config(shadows = {Keys.class, RebuildLayoutTest.Geometry.class})
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  public void pausedExplicitSeekAndSmallBackwardCallbackTakeEffectImmediately() throws Exception {
+    MediaController controller = pausedMedia();
+    RebuildController.Session s = readyPagedSession(controller);
+    List<RebuildPageLayout.Page> pages = overlayPages();
+    long frozen = pages.get(pages.size() - 1).start + 300;
+    reportMedia(controller, PlaybackState.STATE_PAUSED, frozen);
+    RebuildController.time(frozen);
+    int generation = s.generation;
+    RebuildController.time(frozen - 3000);
+    assertEquals(generation + 1, s.generation);
+    assertEquals(frozen - 3000, s.pausedDisplayPosition);
+    assertEquals(frozen - 3000, overlayPosition());
+    assertEquals(RebuildPageLayout.indexAt(overlayPages(), frozen - 3000), overlayPage());
+    assertTrue(CaptionDiagnostics.fullText(a).contains("REBUILD_SEEK"));
+    advance(80);
+    assertEquals("the older paused snapshot must not undo an explicit seek beyond 1500 ms",
+        frozen - 3000, overlayPosition());
+    RebuildController.time(frozen - 3016);
+    assertEquals("small explicit movement keeps normal seek threshold", generation + 1, s.generation);
+    assertEquals(frozen - 3016, s.pausedDisplayPosition);
+    assertEquals("small backward hook must outrank the clock's monotonic presentation",
+        frozen - 3016, overlayPosition());
+    advance(80);
+    assertEquals("stale paused report must not undo the explicit callback",
+        frozen - 3016, overlayPosition());
+    long newlyReported = frozen - 3016 + 1601;
+    reportMedia(controller, PlaybackState.STATE_PAUSED, newlyReported);
+    advance(80);
+    assertEquals("a changed report must still activate the safety valve after a hook",
+        newlyReported, s.pausedDisplayPosition);
+    assertEquals(newlyReported, overlayPosition());
+    assertEquals(0, calls.get());
+  }
+
+  @Test
+  @Config(shadows = {Keys.class, RebuildLayoutTest.Geometry.class})
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  public void replacementSessionDoesNotInheritPauseFreeze() throws Exception {
+    MediaController controller = pausedMedia();
+    RebuildController.Session old = readyPagedSession(controller);
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 1000);
+    RebuildController.time(1000);
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 1016);
+    start(true);
+    RebuildController.Session next = session();
+    assertNotSame(old, next);
+    assertEquals("cancel must discard the old session's freeze", -1, old.pausedDisplayPosition);
+    assertEquals("replacement must capture its own first paused report", 1016, next.pausedDisplayPosition);
+    await(() -> next.source != null);
+    advance(80);
+    assertEquals(1016, overlayPosition());
+    assertEquals(0, calls.get());
+  }
+
+  @Test
+  @Config(shadows = {Keys.class, RebuildLayoutTest.Geometry.class})
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  public void pausedPositionSafetyValveUsesRawReportAndStrict1500msLimit() throws Exception {
+    MediaController controller = pausedMedia();
+    RebuildController.Session s = readyPagedSession(controller);
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 1000);
+    RebuildController.time(1000);
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 2500);
+    advance(80);
+    assertEquals("exactly 1500 ms remains frozen", 1000, s.pausedDisplayPosition);
+    assertEquals(1000, overlayPosition());
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 2501);
+    advance(80);
+    assertEquals("1501 ms is a real position change", 2501, s.pausedDisplayPosition);
+    assertEquals(2501, overlayPosition());
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 5000);
+    advance(80);
+    assertEquals("large raw change must bypass the ordinary clock's evidence guard",
+        5000, s.pausedDisplayPosition);
+    assertEquals(5000, overlayPosition());
+    assertNotEquals("display freeze must not rewrite the scheduling clock", 5000, s.position);
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 5016);
+    advance(80);
+    assertEquals(5000, overlayPosition());
+    assertEquals(0, calls.get());
+  }
+
+  @Test
+  @Config(shadows = {Keys.class, RebuildLayoutTest.Geometry.class})
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  public void everyNonPausedOrUnavailableMediaStateClearsDisplayFreeze() throws Exception {
+    MediaController controller = pausedMedia();
+    RebuildController.Session s = readyPagedSession(controller);
+    int[] states = {PlaybackState.STATE_NONE, PlaybackState.STATE_STOPPED,
+        PlaybackState.STATE_PLAYING, PlaybackState.STATE_FAST_FORWARDING,
+        PlaybackState.STATE_REWINDING, PlaybackState.STATE_BUFFERING, PlaybackState.STATE_ERROR,
+        PlaybackState.STATE_CONNECTING, PlaybackState.STATE_SKIPPING_TO_PREVIOUS,
+        PlaybackState.STATE_SKIPPING_TO_NEXT, PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM, 99};
+    for (int state : states) {
+      reportMedia(controller, PlaybackState.STATE_PAUSED, 1000);
+      RebuildController.time(1000);
+      assertEquals(1000, s.pausedDisplayPosition);
+      reportMedia(controller, state, 1100);
+      advance(80);
+      assertEquals("state " + state + " must clear the pause freeze", -1, s.pausedDisplayPosition);
+      assertEquals(s.position, overlayPosition());
+    }
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 1000);
+    RebuildController.time(1000);
+    Shadows.shadowOf(controller).setPlaybackState(null);
+    advance(80);
+    assertEquals("missing state must clear the pause freeze", -1, s.pausedDisplayPosition);
+    assertEquals(s.position, overlayPosition());
+    reportMedia(controller, PlaybackState.STATE_PAUSED, 1000);
+    RebuildController.time(1000);
+    Shadows.shadowOf(controller).setPackageName("another.player");
+    advance(80);
+    assertEquals("another player's media evidence must clear the pause freeze",
+        -1, s.pausedDisplayPosition);
+    assertEquals(s.position, overlayPosition());
+    assertEquals(0, calls.get());
   }
 }

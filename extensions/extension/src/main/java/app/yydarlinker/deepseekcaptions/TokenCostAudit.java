@@ -173,7 +173,7 @@ final class TokenCostAudit {
         }
     }
 
-    static void recordUnitCacheOutcome(int totalUnits, int restoredUnits, boolean currentUnitHit) {
+    static void recordUnitCacheOutcome(int totalUnits, int restoredUnits) {
         synchronized (LOCK) {
             stateLocked();
             int total = Math.max(0, totalUnits);
@@ -186,10 +186,6 @@ final class TokenCostAudit {
             add(sessionMetrics, "unit_cache_hit_units", restored);
             add(totalsMetrics, "unit_cache_miss_units", total - restored);
             add(sessionMetrics, "unit_cache_miss_units", total - restored);
-            if (currentUnitHit) {
-                add(totalsMetrics, "unit_cache_current_hits", 1L);
-                add(sessionMetrics, "unit_cache_current_hits", 1L);
-            }
             persistLocked();
         }
     }
@@ -610,8 +606,7 @@ final class TokenCostAudit {
             if (cacheLookups > 0L) {
                 out.append("\nRequest-block disk cache: lookups ").append(format(cacheLookups))
                         .append(" · hit blocks ").append(format(value(metrics, "unit_cache_hit_units")))
-                        .append(" · missed units ").append(format(value(metrics, "unit_cache_miss_units")))
-                        .append(" · current block hits ").append(format(value(metrics, "unit_cache_current_hits")));
+                        .append(" · missed units ").append(format(value(metrics, "unit_cache_miss_units")));
             }
             appendCoreRate(out, session, metrics, "semantic_ledger_v2", "legacy engine");
             appendCoreRate(out, session, metrics, "contextual_unit_v1", "Legacy compatibility engine");

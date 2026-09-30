@@ -86,6 +86,7 @@ final class CaptionOverlay {
   }
 
   private static String pendingText = "", pendingIdentity = "", lastNotice = "";
+  private static String lastBlankIdentity;
   private static long pendingStart = -1, pendingEnd = -1, pendingPosition = -1;
   private static List<RebuildPageLayout.Page> pendingPages = Collections.emptyList();
   private static int shownPage = -1;
@@ -321,6 +322,7 @@ final class CaptionOverlay {
   }
 
   private static void hideView() {
+    lastBlankIdentity = null;
     FrameLayout a = anchorRef.get();
     if (a != null) a.setVisibility(View.GONE);
   }
@@ -338,6 +340,7 @@ final class CaptionOverlay {
     lastScan = -500;
     lastLayout = 0;
     lastNotice = "";
+    lastBlankIdentity = null;
     layoutBudget = null;
     pendingPages = Collections.emptyList();
     shownPage = -1;
@@ -421,7 +424,9 @@ final class CaptionOverlay {
         && screenWidth == previousScreenWidth
         && shorts == previousShorts
         && fullScreen == previousFullScreen
-        && anchor.getVisibility() == View.VISIBLE) return;
+        && (anchor.getVisibility() == View.VISIBLE
+            || anchor.getVisibility() == View.GONE
+                && pendingIdentity.equals(lastBlankIdentity))) return;
     previousShorts = shorts;
     previousFullScreen = fullScreen;
     dirty = false;
@@ -530,8 +535,10 @@ final class CaptionOverlay {
     text.setText(shown);
     if (shown.isEmpty()) {
       hideView();
+      lastBlankIdentity = pendingIdentity;
       return;
     }
+    lastBlankIdentity = null;
     text.setSingleLine(false);
     text.setMaxLines(2);
     text.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);

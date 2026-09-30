@@ -57,7 +57,7 @@
 | 11 | b11_777_850 | L459；r17 |
 | 12 | b12_851_899 | L504；r18 |
 
-启动 1 次统计查 2 块，后续 11 次各查 1 块，精确得到 **12/0/13**。r8/r9 是 b4 修复，r16 是 b10 修复，三次不新增 lookup。D:L512 的 seek 后只有在途 b12 接受（L516），没有新查盘路径。R2 的两处记账均传 `currentUnitHit=false`（Controller `534,660`），所以 **current block hits 恒为 0**，不能用它判定盘命中失败。
+启动 1 次统计查 2 块，后续 11 次各查 1 块，精确得到 **12/0/13**。r8/r9 是 b4 修复，r16 是 b10 修复，三次不新增 lookup。D:L512 的 seek 后只有在途 b12 接受（L516），没有新查盘路径。R2 的两处记账均传 `currentUnitHit=false`（Controller `534,660`），所以 **current block hits 恒为 0**，不能用它判定盘命中失败。N21b 已移除该死计数器，命中判读改用 cache_hits / REBUILD_CACHE_RESTORED / hit blocks。
 
 新增 `RebuildN21CacheEvidenceTest` 与 `n21/device-140013-cache-evidence.json` 从原件提取原词 0–899、16 次请求/响应与 trace。空临时 cacheDir 同序回放逐次打印 `N21_LOOKUP` JSON（`audit_call`、完整 `identity`/`filename`、`miss_reason=file_not_present`），调用真实 read/记账代码复现 12/0/13；修复打印 `N21_RETRY_NO_LOOKUP;cache_checked=true`。还以真实零风险响应在测试临时目录写入后由独立读取器重新读取，证明同 namespace 可命中，并核对 key 字段变化与 b4 有风险计划拒写。**打印的 namespace 是部分 source 的 replay key，绝非设备全片 key；file_not_present 仅是回放的实际判因。** 设备日志只证明当时 read 未返回有效 plan，不区分缺文件、I/O、读后校验失败或完整 key 不同。
 
@@ -73,7 +73,7 @@
 
 1. 同包先看 b0/b1 至 `REBUILD_EVENTS_ACCEPTED;review_risks=0` 且无 `REBUILD_CACHE_WRITE_FAILED`，导出一次诊断记录基线。可先拖回确认译文复用；仅此动作不保证盘读取。
 2. 保留 app 数据与缓存，重启同一 app 再进同一视频，或离开视频再进入，确认有**新的 engine session/启动链**。保持模型、base URL、prompt、目标语言与源轨；新安装/清缓存会破坏此次验证的前提。
-3. 首两块看新的 `REBUILD_SOURCE_READY.cache_hits > 0`；懒读取看 `REBUILD_CACHE_RESTORED;block=...;network_calls=0`。汇总 `Request-block disk cache.hit blocks` 必须 **>0**，同一计数作用域复看前后应增加；若重新切换了计数作用域则看新作用域值。不能用提供商 cached tokens、current block hits 或仅 REBUILD_REQUEST 判断盘命中；懒读命中也可能先记录 REBUILD_REQUEST，但不发 HTTP。
+3. 首两块看新的 `REBUILD_SOURCE_READY.cache_hits > 0`；懒读取看 `REBUILD_CACHE_RESTORED;block=...;network_calls=0`。汇总 `Request-block disk cache.hit blocks` 必须 **>0**，同一计数作用域复看前后应增加；若重新切换了计数作用域则看新作用域值。不能用提供商 cached tokens、current block hits 或仅 REBUILD_REQUEST 判断盘命中；懒读命中也可能先记录 REBUILD_REQUEST，但不发 HTTP。N21b 已移除该死计数器，命中判读改用 cache_hits / REBUILD_CACHE_RESTORED / hit blocks。
 4. 新 session 确实查到此前零风险成功块后，`cache_hits=0`、无 RESTORED、hit blocks 无增加且同块重新 `REBUILD_HTTP_BEGIN`，才说明本次没有复用；记录 session/block/prompt hash 与 WRITE_FAILED/ACCEPTED/HTTP。保持原 `hit blocks >0` 门槛，未触发新读取的同 session 拖回标为“未执行盘命中验证”，不改判据、不翻绿。
 
 验证：Zulu JDK 21 + ANDROID_HOME，`gradlew.bat test --offline --no-daemon` 全套 **405/405**（新增 3 项，失败/错误/跳过均 0）；Robolectric 强制 offline，只使用本机既有 SDK 28/35 instrumented jars。Python 单测 **27/27**；`scoreboard/run.ps1` 保持 **4 通过 / 4 既有失败 / 4 未验证**，三类不可见时长全 **0**。ACCEPTANCE.md 与 scoreboard/ 全部 61 个文件复跑前后逐文件 SHA-256 相同。新增 live API **0**，新增输入/输出 token **0/0**；本轮原件既有 37,663 tok 不记入本卡增量。不改产品逻辑、验收判据或冻结证据；建议不执行修复、清缓存、建包或真机。

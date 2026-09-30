@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"진단 기록 지우기"</string>
     <string name="cap_preview" formatted="false">"자막 미리보기"</string>
     <string name="cap_landscape" formatted="false">"가로"</string>
-    <string name="cap_portrait" formatted="false">"세로"</string>
-    <string name="cap_to_landscape" formatted="false">"가로로 전환"</string>
-    <string name="cap_to_portrait" formatted="false">"세로로 전환"</string>
     <string name="cap_refresh" formatted="false">"새로고침"</string>
     <string name="cap_copy" formatted="false">"복사"</string>
     <string name="cap_expand" formatted="false">"펼치기"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"API 키 입력"</string>
     <string name="cap_key_saved" formatted="false">"암호화되어 저장됨. 입력하면 교체됩니다"</string>
     <string name="cap_model_hint" formatted="false">"모델을 선택하거나 ID 입력"</string>
-    <string name="cap_preview_hint" formatted="false">"화면을 눌러 방향 전환, 스타일은 실시간 반영"</string>
+    <string name="cap_preview_hint" formatted="false">"글자 크기와 배경 설정이 실시간으로 반영됩니다"</string>
     <string name="cap_size_hint" formatted="false">"Shorts / 동영상 상세 글자 높이(px); 화면 너비의 1.5%–3.0%, 기본값 2.03%; 전체 화면에서 비례 확대하고 영상이 좁아지면 비례 축소"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 투명, 100% 불투명. 놓으면 저장"</string>
     <string name="cap_diagnostic_hint" formatted="false">"펼쳐서 진단 기록 확인 및 복사"</string>

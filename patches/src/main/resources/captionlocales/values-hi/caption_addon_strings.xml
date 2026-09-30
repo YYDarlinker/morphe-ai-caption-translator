@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"निदान साफ़ करें"</string>
     <string name="cap_preview" formatted="false">"उपशीर्षक पूर्वावलोकन"</string>
     <string name="cap_landscape" formatted="false">"लैंडस्केप"</string>
-    <string name="cap_portrait" formatted="false">"पोर्ट्रेट"</string>
-    <string name="cap_to_landscape" formatted="false">"लैंडस्केप में बदलें"</string>
-    <string name="cap_to_portrait" formatted="false">"पोर्ट्रेट में बदलें"</string>
     <string name="cap_refresh" formatted="false">"रीफ़्रेश"</string>
     <string name="cap_copy" formatted="false">"कॉपी"</string>
     <string name="cap_expand" formatted="false">"विस्तार करें"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"API कुंजी दर्ज करें"</string>
     <string name="cap_key_saved" formatted="false">"एन्क्रिप्ट करके सहेजी गई; बदलने के लिए दर्ज करें"</string>
     <string name="cap_model_hint" formatted="false">"मॉडल चुनें या उसका ID दर्ज करें"</string>
-    <string name="cap_preview_hint" formatted="false">"दिशा बदलने के लिए चित्र पर टैप करें; शैली तुरंत दिखती है"</string>
+    <string name="cap_preview_hint" formatted="false">"अक्षर आकार और पृष्ठभूमि तुरंत पूर्वावलोकन में दिखते हैं"</string>
     <string name="cap_size_hint" formatted="false">"Shorts / वीडियो विवरण में अक्षर ऊँचाई (px); स्क्रीन चौड़ाई का 1.5%–3.0%, डिफ़ॉल्ट 2.03%; पूर्ण स्क्रीन में अनुपात में बढ़ती है और वीडियो संकरा होने पर घटती है"</string>
     <string name="cap_opacity_hint" formatted="false">"0% पारदर्शी, 100% अपारदर्शी; छोड़ने पर सहेजें"</string>
     <string name="cap_diagnostic_hint" formatted="false">"निदान रिकॉर्ड देखने और कॉपी करने के लिए विस्तार करें"</string>

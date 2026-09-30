@@ -21,6 +21,7 @@ public class CaptionSizeRangeTest {
                     .putInt("caption_text_size_tenths", 270).apply();
             assertEquals(203, DeepSeekConfig.displayStyle(activity).captionGlyphHeightRatioBps);
             assertEquals(203, DeepSeekConfig.load(activity).captionGlyphHeightRatioBps);
+            assertEquals(203, new SubtitleStylePreview.Preview(activity).ratioBps);
             assertFalse(activity.getSharedPreferences("deepseek_caption_translator", 0)
                     .contains("caption_glyph_height_ratio_bps"));
             // Even legacy values of incompatible preference types must not be accessed.
@@ -42,8 +43,16 @@ public class CaptionSizeRangeTest {
             assertEquals(203, DeepSeekConfig.displayStyle(activity).captionGlyphHeightRatioBps);
             DeepSeekConfig.saveCaptionGlyphHeightRatioBps(activity, 1);
             assertEquals(150, DeepSeekConfig.displayStyle(activity).captionGlyphHeightRatioBps);
+            SubtitleStylePreview.Preview minimumPreview = new SubtitleStylePreview.Preview(activity);
+            assertEquals(150, minimumPreview.ratioBps);
+            assertEquals(41.04f, SubtitleStyleMetrics.targetGlyphHeightPx(minimumPreview.ratioBps,
+                    SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX), .001f);
             DeepSeekConfig.saveCaptionGlyphHeightRatioBps(activity, 999);
             assertEquals(300, DeepSeekConfig.displayStyle(activity).captionGlyphHeightRatioBps);
+            SubtitleStylePreview.Preview maximumPreview = new SubtitleStylePreview.Preview(activity);
+            assertEquals(300, maximumPreview.ratioBps);
+            assertEquals(82.08f, SubtitleStyleMetrics.targetGlyphHeightPx(maximumPreview.ratioBps,
+                    SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX), .001f);
             DeepSeekConfig.saveCaptionGlyphHeightRatioBps(activity, 232);
             assertEquals(232, DeepSeekConfig.displayStyle(activity).captionGlyphHeightRatioBps);
             assertEquals(232, activity.getSharedPreferences("deepseek_caption_translator", 0)

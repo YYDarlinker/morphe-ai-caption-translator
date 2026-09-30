@@ -19,9 +19,6 @@ API Key	cap_api_key
 清空诊断记录	cap_clear_diagnostics
 字幕预览	cap_preview
 横屏	cap_landscape
-竖屏	cap_portrait
-切换为横屏	cap_to_landscape
-切换为竖屏	cap_to_portrait
 刷新	cap_refresh
 复制	cap_copy
 展开	cap_expand
@@ -33,7 +30,7 @@ API Key	cap_api_key
 请输入 API Key	cap_enter_key
 已加密保存；输入可替换	cap_key_saved
 选择模型或输入模型 ID	cap_model_hint
-点按画面切换方向，样式实时预览	cap_preview_hint
+字号与背景设置实时预览	cap_preview_hint
 相对字号 8–15，随画面比例缩放	cap_size_hint
 0% 为透明，100% 为不透明；松手保存	cap_opacity_hint
 展开查看并复制诊断记录	cap_diagnostic_hint
@@ -52,10 +49,7 @@ API Key	cap_api_key
 已自动加密保存	cap_saved
 模型已自动保存	cap_saved
 填写兼容接口地址，停止输入后自动保存	cap_autosave
-点按画面切换方向 · 字号与背景设置实时预览	cap_preview_hint
-竖屏字幕示例	cap_preview
 这是字幕样式预览	cap_preview
-字幕预览，点击切换方向	cap_preview_hint
 排查翻译或时间问题时，可展开查看并复制记录	cap_diagnostic_hint
 展开查看，可手动刷新或复制	cap_diagnostic_hint
 字幕链路诊断	cap_diagnostics

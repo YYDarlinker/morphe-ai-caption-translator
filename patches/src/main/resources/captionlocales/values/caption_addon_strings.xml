@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"Clear diagnostics"</string>
     <string name="cap_preview" formatted="false">"Caption preview"</string>
     <string name="cap_landscape" formatted="false">"Landscape"</string>
-    <string name="cap_portrait" formatted="false">"Portrait"</string>
-    <string name="cap_to_landscape" formatted="false">"Switch to landscape"</string>
-    <string name="cap_to_portrait" formatted="false">"Switch to portrait"</string>
     <string name="cap_refresh" formatted="false">"Refresh"</string>
     <string name="cap_copy" formatted="false">"Copy"</string>
     <string name="cap_expand" formatted="false">"Expand"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"Enter API Key"</string>
     <string name="cap_key_saved" formatted="false">"Stored encrypted; enter to replace"</string>
     <string name="cap_model_hint" formatted="false">"Select a model or enter its ID"</string>
-    <string name="cap_preview_hint" formatted="false">"Tap the image to switch orientation; style updates live"</string>
+    <string name="cap_preview_hint" formatted="false">"Font size and background update live"</string>
     <string name="cap_size_hint" formatted="false">"Glyph height in Shorts / video details (px); 1.5%–3.0% of screen width, default 2.03%; scales proportionally in full screen and when the video narrows"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparent, 100% opaque; saved on release"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Expand to inspect and copy diagnostic records"</string>

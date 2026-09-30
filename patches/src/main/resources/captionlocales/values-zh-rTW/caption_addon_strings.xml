@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"清除診斷記錄"</string>
     <string name="cap_preview" formatted="false">"字幕預覽"</string>
     <string name="cap_landscape" formatted="false">"橫向"</string>
-    <string name="cap_portrait" formatted="false">"直向"</string>
-    <string name="cap_to_landscape" formatted="false">"切換為橫向"</string>
-    <string name="cap_to_portrait" formatted="false">"切換為直向"</string>
     <string name="cap_refresh" formatted="false">"重新整理"</string>
     <string name="cap_copy" formatted="false">"複製"</string>
     <string name="cap_expand" formatted="false">"展開"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"請輸入 API Key"</string>
     <string name="cap_key_saved" formatted="false">"已加密儲存；輸入可取代"</string>
     <string name="cap_model_hint" formatted="false">"選擇模型或輸入模型 ID"</string>
-    <string name="cap_preview_hint" formatted="false">"點按畫面切換方向，樣式即時預覽"</string>
+    <string name="cap_preview_hint" formatted="false">"字號與背景設定即時預覽"</string>
     <string name="cap_size_hint" formatted="false">"Shorts / 影片詳情頁字高（px）；螢幕寬度的 1.5%–3.0%，預設 2.03%；全螢幕等比例放大，畫面縮窄時同比縮小"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 為透明，100% 為不透明；放開儲存"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展開查看並複製診斷記錄"</string>

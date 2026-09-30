@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"مسح التشخيص"</string>
     <string name="cap_preview" formatted="false">"معاينة الترجمة النصية"</string>
     <string name="cap_landscape" formatted="false">"أفقي"</string>
-    <string name="cap_portrait" formatted="false">"عمودي"</string>
-    <string name="cap_to_landscape" formatted="false">"التبديل إلى الأفقي"</string>
-    <string name="cap_to_portrait" formatted="false">"التبديل إلى العمودي"</string>
     <string name="cap_refresh" formatted="false">"تحديث"</string>
     <string name="cap_copy" formatted="false">"نسخ"</string>
     <string name="cap_expand" formatted="false">"توسيع"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"أدخل مفتاح API"</string>
     <string name="cap_key_saved" formatted="false">"محفوظ مشفّرًا؛ أدخل مفتاحًا لاستبداله"</string>
     <string name="cap_model_hint" formatted="false">"اختر نموذجًا أو أدخل معرّفه"</string>
-    <string name="cap_preview_hint" formatted="false">"اضغط على الصورة لتغيير الاتجاه؛ معاينة فورية"</string>
+    <string name="cap_preview_hint" formatted="false">"تحديث فوري لحجم الخط والخلفية"</string>
     <string name="cap_size_hint" formatted="false">"ارتفاع الحروف في Shorts / تفاصيل الفيديو (px)؛ 1.5%–3.0% من عرض الشاشة، الافتراضي 2.03%؛ يكبر تناسبيًا في ملء الشاشة ويصغر عند تضييق الفيديو"</string>
     <string name="cap_opacity_hint" formatted="false">"0% شفاف، 100% معتم؛ يُحفظ عند الإفلات"</string>
     <string name="cap_diagnostic_hint" formatted="false">"وسّع لعرض سجلات التشخيص ونسخها"</string>

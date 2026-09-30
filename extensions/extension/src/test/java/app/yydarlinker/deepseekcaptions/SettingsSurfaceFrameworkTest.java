@@ -26,7 +26,22 @@ public class SettingsSurfaceFrameworkTest {
     shorts.setVisibility(View.GONE);CaptionSurface.discover(host,new HashSet<>(Arrays.asList(40,41)));assertFalse(CaptionSurface.isShorts());a.finish();
  }
  @Test public void diagnosticsHasScrollableFullTextAndExplicitButtons(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();DeepSeekDiagnosticsPreference p=new DeepSeekDiagnosticsPreference(a);LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));ScrollView scroll=(ScrollView)root.findViewWithTag("ai_diagnostics_scroll");assertNotNull(scroll);assertTrue(scroll.getChildAt(0) instanceof TextView);assertEquals(View.GONE,((View)scroll.getParent()).getVisibility());root.findViewWithTag("ai_diagnostics_toggle").performClick();assertEquals(View.VISIBLE,((View)scroll.getParent()).getVisibility());assertTrue(scroll.getLayoutParams().height>0);a.finish();}
- @Test public void singlePreviewSwitchesWithoutChangingSharedStyle(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();SubtitleStylePreview p=new SubtitleStylePreview(a);LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));assertEquals(3,root.getChildCount());SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");assertFalse(preview.portrait);SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,200);SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);preview.performClick();assertTrue(preview.portrait);assertEquals(200,preview.ratioBps);assertEquals(35,preview.opacity);preview.performClick();assertFalse(preview.portrait);a.finish();}
+ @Test public void singleLandscapePreviewHasNoOrientationControlAndUpdatesSharedStyle(){
+    Activity a=Robolectric.buildActivity(Activity.class).setup().get();
+    SubtitleStylePreview p=new SubtitleStylePreview(a);
+    LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));
+    assertEquals(3,root.getChildCount());
+    assertTrue(root.getChildAt(0) instanceof TextView);assertFalse(root.getChildAt(0) instanceof Button);
+    assertTrue(root.getChildAt(2) instanceof TextView);assertFalse(root.getChildAt(2) instanceof Button);
+    SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");
+    assertSame(preview,root.getChildAt(1));
+    assertFalse(preview.isClickable());assertFalse(preview.hasOnClickListeners());
+    assertEquals(CaptionStrings.settings(a,"preview"),preview.getContentDescription().toString());
+    SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,200);
+    SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);
+    assertEquals(200,preview.ratioBps);assertEquals(35,preview.opacity);
+    a.finish();
+ }
  @Test public void protocolEvidenceSurvivesDisplayNoiseAndCanBeCleared(){
     Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionDiagnostics.clear(a);
     CaptionDiagnostics.mark(a,"ANCHOR_RESPONSE_REJECTED","unit=12;reason=protocol_json");

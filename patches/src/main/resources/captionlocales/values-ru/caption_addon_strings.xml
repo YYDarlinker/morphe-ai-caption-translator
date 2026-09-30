@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"Очистить диагностику"</string>
     <string name="cap_preview" formatted="false">"Предпросмотр субтитров"</string>
     <string name="cap_landscape" formatted="false">"Альбомная"</string>
-    <string name="cap_portrait" formatted="false">"Портретная"</string>
-    <string name="cap_to_landscape" formatted="false">"Альбомная ориентация"</string>
-    <string name="cap_to_portrait" formatted="false">"Портретная ориентация"</string>
     <string name="cap_refresh" formatted="false">"Обновить"</string>
     <string name="cap_copy" formatted="false">"Копировать"</string>
     <string name="cap_expand" formatted="false">"Развернуть"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"Введите ключ API"</string>
     <string name="cap_key_saved" formatted="false">"Сохранён в зашифрованном виде; введите новый для замены"</string>
     <string name="cap_model_hint" formatted="false">"Выберите модель или введите её ID"</string>
-    <string name="cap_preview_hint" formatted="false">"Нажмите на изображение для смены ориентации; стиль обновляется сразу"</string>
+    <string name="cap_preview_hint" formatted="false">"Размер текста и фон обновляются сразу"</string>
     <string name="cap_size_hint" formatted="false">"Высота текста Shorts / сведений о видео (px); 1.5%–3.0% ширины экрана, по умолчанию 2.03%; пропорциональное масштабирование при полном экране и сужении видео"</string>
     <string name="cap_opacity_hint" formatted="false">"0% — прозрачный, 100% — непрозрачный; сохранение при отпускании"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Разверните для просмотра и копирования диагностики"</string>

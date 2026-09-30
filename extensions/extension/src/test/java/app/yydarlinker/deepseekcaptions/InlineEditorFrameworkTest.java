@@ -53,20 +53,18 @@ public class InlineEditorFrameworkTest {
         assertEquals(3,root.getChildCount());
         SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");
         assertTrue(preview.getLeft()>0);assertTrue(preview.getRight()<root.getWidth());
-        assertEquals(Math.round(SubtitleStylePreview.stageHeight(preview.getWidth(),activity.getResources().getDisplayMetrics().heightPixels,activity.getResources().getDisplayMetrics().density,false)),preview.getHeight());
+        assertEquals(root.getPaddingLeft(),preview.getLeft());
+        assertEquals(root.getWidth()-root.getPaddingRight(),preview.getRight());
+        assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getHeight());
+        assertFalse(preview.isClickable());assertFalse(preview.hasOnClickListeners());
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,240);
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);
         assertEquals(240,preview.ratioBps);assertEquals(35,preview.opacity);
-        int height=preview.getMeasuredHeight();assertFalse(preview.portrait);
-        assertTrue(preview.performClick());assertTrue(preview.portrait);
-        assertTrue(preview.getContentDescription().toString().contains(CaptionStrings.localize(activity,"竖屏")));
         preview.measure(View.MeasureSpec.makeMeasureSpec(preview.getWidth(),View.MeasureSpec.EXACTLY),0);
-        assertTrue(preview.getMeasuredHeight()>height);
-        assertEquals(Math.round(SubtitleStylePreview.stageHeight(preview.getWidth(),
-                activity.getResources().getDisplayMetrics().heightPixels,
-                activity.getResources().getDisplayMetrics().density,true)),preview.getMeasuredHeight());
+        assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getMeasuredHeight());
+        assertEquals(CaptionStrings.settings(activity,"preview"),preview.getContentDescription().toString());
         assertEquals(240,preview.ratioBps);assertEquals(35,preview.opacity);
-        preview.performClick();assertFalse(preview.portrait);activity.finish();
+        activity.finish();
     }
 
 }

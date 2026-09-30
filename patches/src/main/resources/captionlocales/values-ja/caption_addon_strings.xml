@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"診断記録を消去"</string>
     <string name="cap_preview" formatted="false">"字幕プレビュー"</string>
     <string name="cap_landscape" formatted="false">"横向き"</string>
-    <string name="cap_portrait" formatted="false">"縦向き"</string>
-    <string name="cap_to_landscape" formatted="false">"横向きに切り替え"</string>
-    <string name="cap_to_portrait" formatted="false">"縦向きに切り替え"</string>
     <string name="cap_refresh" formatted="false">"更新"</string>
     <string name="cap_copy" formatted="false">"コピー"</string>
     <string name="cap_expand" formatted="false">"展開"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"API キーを入力"</string>
     <string name="cap_key_saved" formatted="false">"暗号化して保存済み。入力すると置き換わります"</string>
     <string name="cap_model_hint" formatted="false">"モデルを選択するか ID を入力"</string>
-    <string name="cap_preview_hint" formatted="false">"画像をタップして向きを変更。スタイルは即時反映"</string>
+    <string name="cap_preview_hint" formatted="false">"文字サイズと背景設定をリアルタイムでプレビュー"</string>
     <string name="cap_size_hint" formatted="false">"Shorts / 動画詳細の文字高（px）。画面幅の 1.5%–3.0%、既定 2.03%。全画面では同比率で拡大し、動画幅が狭くなると同比率で縮小"</string>
     <string name="cap_opacity_hint" formatted="false">"0% は透明、100% は不透明。指を離すと保存"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展開して診断記録を確認・コピー"</string>

@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"Xóa chẩn đoán"</string>
     <string name="cap_preview" formatted="false">"Xem trước phụ đề"</string>
     <string name="cap_landscape" formatted="false">"Ngang"</string>
-    <string name="cap_portrait" formatted="false">"Dọc"</string>
-    <string name="cap_to_landscape" formatted="false">"Chuyển sang ngang"</string>
-    <string name="cap_to_portrait" formatted="false">"Chuyển sang dọc"</string>
     <string name="cap_refresh" formatted="false">"Làm mới"</string>
     <string name="cap_copy" formatted="false">"Sao chép"</string>
     <string name="cap_expand" formatted="false">"Mở rộng"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"Nhập khóa API"</string>
     <string name="cap_key_saved" formatted="false">"Đã lưu mã hóa; nhập để thay thế"</string>
     <string name="cap_model_hint" formatted="false">"Chọn mô hình hoặc nhập ID"</string>
-    <string name="cap_preview_hint" formatted="false">"Chạm hình để đổi hướng; xem trước tức thì"</string>
+    <string name="cap_preview_hint" formatted="false">"Cỡ chữ và nền được cập nhật tức thì"</string>
     <string name="cap_size_hint" formatted="false">"Chiều cao chữ Shorts / chi tiết video (px); 1.5%–3.0% chiều rộng màn hình, mặc định 2.03%; tăng theo tỷ lệ khi toàn màn hình và giảm khi video thu hẹp"</string>
     <string name="cap_opacity_hint" formatted="false">"0% trong suốt, 100% đục; thả để lưu"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Mở rộng để xem và sao chép chẩn đoán"</string>

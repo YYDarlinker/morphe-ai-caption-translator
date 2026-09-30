@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"清空诊断记录"</string>
     <string name="cap_preview" formatted="false">"字幕预览"</string>
     <string name="cap_landscape" formatted="false">"横屏"</string>
-    <string name="cap_portrait" formatted="false">"竖屏"</string>
-    <string name="cap_to_landscape" formatted="false">"切换为横屏"</string>
-    <string name="cap_to_portrait" formatted="false">"切换为竖屏"</string>
     <string name="cap_refresh" formatted="false">"刷新"</string>
     <string name="cap_copy" formatted="false">"复制"</string>
     <string name="cap_expand" formatted="false">"展开"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"请输入 API Key"</string>
     <string name="cap_key_saved" formatted="false">"已加密保存；输入可替换"</string>
     <string name="cap_model_hint" formatted="false">"选择模型或输入模型 ID"</string>
-    <string name="cap_preview_hint" formatted="false">"点按画面切换方向，样式实时预览"</string>
+    <string name="cap_preview_hint" formatted="false">"字号与背景设置实时预览"</string>
     <string name="cap_size_hint" formatted="false">"Shorts / 视频详情页字高（px）；屏幕宽度的 1.5%–3.0%，默认 2.03%；全屏等比例放大，画面收窄时同比缩小"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 为透明，100% 为不透明；松手保存"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展开查看并复制诊断记录"</string>

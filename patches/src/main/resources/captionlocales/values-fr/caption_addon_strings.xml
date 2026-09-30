@@ -21,9 +21,6 @@
     <string name="cap_clear_diagnostics" formatted="false">"Effacer le diagnostic"</string>
     <string name="cap_preview" formatted="false">"Aperçu des sous-titres"</string>
     <string name="cap_landscape" formatted="false">"Paysage"</string>
-    <string name="cap_portrait" formatted="false">"Portrait"</string>
-    <string name="cap_to_landscape" formatted="false">"Passer en paysage"</string>
-    <string name="cap_to_portrait" formatted="false">"Passer en portrait"</string>
     <string name="cap_refresh" formatted="false">"Actualiser"</string>
     <string name="cap_copy" formatted="false">"Copier"</string>
     <string name="cap_expand" formatted="false">"Développer"</string>
@@ -35,7 +32,7 @@
     <string name="cap_enter_key" formatted="false">"Saisissez la clé API"</string>
     <string name="cap_key_saved" formatted="false">"Stockée chiffrée ; saisir pour remplacer"</string>
     <string name="cap_model_hint" formatted="false">"Choisissez un modèle ou saisissez son ID"</string>
-    <string name="cap_preview_hint" formatted="false">"Touchez l’image pour changer d’orientation ; aperçu en direct"</string>
+    <string name="cap_preview_hint" formatted="false">"La taille du texte et le fond sont mis à jour en direct"</string>
     <string name="cap_size_hint" formatted="false">"Hauteur du texte Shorts / détails vidéo (px) ; 1.5%–3.0% de la largeur de l’écran, 2.03% par défaut ; agrandissement proportionnel en plein écran et réduction si la vidéo se rétrécit"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparent, 100% opaque ; enregistré au relâchement"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Développez pour consulter et copier le diagnostic"</string>

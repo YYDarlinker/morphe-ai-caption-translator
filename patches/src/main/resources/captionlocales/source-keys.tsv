@@ -132,3 +132,5 @@ API 配置方案	cap_profiles_title
 各方案独立保存；清空恢复随界面语言变化的默认要求	cap_prompt_summary
 清除本方案的 API Key	cap_profile_clear_key
 相对字号 8–15；13sp 为舒适基准，随画面比例缩放	cap_size_hint
+Shorts / 视频详情页字高	cap_size
+Shorts / 视频详情页字高（px）；屏幕宽度的 1.5%–3.0%，默认 2.03%；全屏等比例放大，画面收窄时同比缩小	cap_size_hint

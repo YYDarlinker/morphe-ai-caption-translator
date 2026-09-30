@@ -95,6 +95,7 @@ final class CaptionOverlay {
   private static Supplier<String> fallback;
   private static Rect previous = new Rect();
   private static int normalVideoWidth;
+  private static int previousScreenWidth;
   private static boolean referenceShorts, referenceLandscape;
   private static String playerType = "";
   private static long lastScan, lastLayout;
@@ -319,6 +320,7 @@ final class CaptionOverlay {
     anchorRef = new WeakReference<>(null);
     textRef = new WeakReference<>(null);
     previous.setEmpty();
+    previousScreenWidth = 0;
     lastScan = -500;
     lastLayout = 0;
     lastNotice = "";
@@ -395,13 +397,17 @@ final class CaptionOverlay {
       return;
     }
     boolean shorts = CaptionSurface.isShorts();
+    android.util.DisplayMetrics metrics = a.getResources().getDisplayMetrics();
+    int screenWidth = metrics.widthPixels;
     if (!dirty
         && b.equals(previous)
+        && screenWidth == previousScreenWidth
         && shorts == previousShorts
         && anchor.getVisibility() == View.VISIBLE) return;
     previousShorts = shorts;
     dirty = false;
     previous.set(b);
+    previousScreenWidth = screenWidth;
     DeepSeekConfig.Snapshot cfg = DeepSeekConfig.displayStyle(a);
     boolean landscapeHost = host.getWidth() > host.getHeight();
     if (normalVideoWidth == 0 || shorts != referenceShorts
@@ -412,44 +418,47 @@ final class CaptionOverlay {
     } else {
       normalVideoWidth = Math.max(normalVideoWidth, b.width());
     }
-    float preferred = SubtitleStyleMetrics.renderedSp(
-        cfg.captionTextSize,b.width(),normalVideoWidth);
+    float targetGlyphHeight = SubtitleStyleMetrics.renderedGlyphHeightPx(
+        cfg.captionGlyphHeightRatioBps,screenWidth,b.width(),normalVideoWidth);
+    float preferred = SubtitleStyleMetrics.textSizePxForGlyphHeight(text.getPaint(),targetGlyphHeight);
+    float minimum = SubtitleStyleMetrics.textSizePxForGlyphHeight(text.getPaint(),
+        SubtitleStyleMetrics.renderedGlyphHeightPx(
+            DeepSeekConfig.MIN_CAPTION_GLYPH_HEIGHT_RATIO_BPS,screenWidth,b.width(),normalVideoWidth));
     int width = Math.max(1, Math.round(b.width() * (CaptionSurface.isShorts() ? .78f : .92f)));
     int inner = Math.max(1, width - text.getPaddingLeft() - text.getPaddingRight());
     layoutBudget =
-        new LayoutBudget(
-            inner,
-            TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_SP, 12, a.getResources().getDisplayMetrics()),
-            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, preferred,
-                a.getResources().getDisplayMetrics()));
+        new LayoutBudget(inner,minimum,preferred);
     float size = preferred;
     String shown = pendingText;
     String mode = pendingStatus ? "status" : "caption";
     boolean ownedCaption = !pendingStatus && pendingStart >= 0 && pendingEnd > pendingStart;
     pendingPages = ownedCaption
         ? RebuildPageLayout.plan(pendingText, pendingStart, pendingEnd,
-            value -> lines(a, value, preferred, inner) <= 2,
-            value -> lines(a, value, preferred, inner) <= 1)
+            value -> linesPx(value, preferred, inner) <= 2,
+            value -> linesPx(value, preferred, inner) <= 1)
         : Collections.emptyList();
     shownPage = RebuildPageLayout.indexAt(pendingPages, pendingPosition);
     if (shownPage >= 0) {
       shown = pendingPages.get(shownPage).text;
       if (pendingPages.size() > 1) mode = "caption_page";
     } else if (!ownedCaption) {
-      while (size > 12 && lines(a, shown, size, inner) > 2) size = Math.max(12, size - .5f);
+      while (size > minimum && linesPx(shown, size, inner) > 2)
+        size = Math.max(minimum, size - .5f);
     }
     // A failed time/CPS/seam gate must not show the invalid translation as a single page.
-    if (shownPage < 0 && (ownedCaption || lines(a, shown, size, inner) > 2)) {
+    if (shownPage < 0 && (ownedCaption || linesPx(shown, size, inner) > 2)) {
       mode = "original_fallback";
       shown = fallback == null ? "" : fallback.get();
-      if (shown == null || shown.isEmpty() || lines(a, shown, size, inner) > 2) {
+      if (shown == null || shown.isEmpty() || linesPx(shown, size, inner) > 2) {
         mode = "overflow_status";
         shown = CaptionStrings.get(a, "caption_overflow");
       }
-      if (lines(a, shown, size, inner) > 2) shown = "…";
+      if (linesPx(shown, size, inner) > 2) shown = "…";
     }
-    String notice = pendingIdentity + "|" + pendingText + "|" + mode + "|" + inner + "|" + size + "|" + shownPage;
+    text.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
+    String notice = pendingIdentity + "|" + pendingText + "|" + mode + "|" + inner + "|" + size
+        + "|" + shownPage + "|" + screenWidth + "|" + b.width()
+        + "|" + metrics.density + "|" + a.getResources().getConfiguration().fontScale;
     if (!notice.equals(lastNotice)) {
       lastNotice = notice;
       String detail =
@@ -459,10 +468,21 @@ final class CaptionOverlay {
               + mode
               + ";width="
               + inner
-              + ";sp="
+              + ";sp=" + size / metrics.scaledDensity
+              + ";text_size_px="
               + size
+              + ";target_glyph_height_px=" + targetGlyphHeight
+              + ";rendered_glyph_target_px=" + targetGlyphHeight * size / preferred
+              + ";glyph_height_px=" + SubtitleStyleMetrics.measuredGlyphHeightPx(text.getPaint())
+              + ";font_metrics_height_px=" + SubtitleStyleMetrics.fontMetricsHeightPx(text.getPaint())
+              + ";screen_width_px=" + screenWidth
+              + ";video_width_px=" + b.width()
+              + ";normal_video_width_px=" + normalVideoWidth
+              + ";ratio_bps=" + cfg.captionGlyphHeightRatioBps
+              + ";density=" + metrics.density
+              + ";fontScale=" + a.getResources().getConfiguration().fontScale
               + ";lines="
-              + lines(a, shown, size, inner)
+              + linesPx(shown, size, inner)
               + (shownPage >= 0 ? ";page=" + (shownPage + 1) + "/" + pendingPages.size()
                   + ";page_range=" + pendingPages.get(shownPage).start + "-"
                   + pendingPages.get(shownPage).end
@@ -485,9 +505,8 @@ final class CaptionOverlay {
     text.setSingleLine(false);
     text.setMaxLines(2);
     text.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
-    text.setTextSize(TypedValue.COMPLEX_UNIT_SP, size);
     text.setTextColor(pendingStatus ? 0xE6FFFFFF : Color.WHITE);
-    int compact = compactWidth(a, shown, size, inner) + text.getPaddingLeft() + text.getPaddingRight();
+    int compact = compactWidthPx(shown, size, inner) + text.getPaddingLeft() + text.getPaddingRight();
     text.setMaxWidth(compact);
     text.getLayoutParams().width = compact;
     GradientDrawable bg = new GradientDrawable();
@@ -517,17 +536,25 @@ final class CaptionOverlay {
   }
 
   static int compactWidth(Context a, String value, float sp, int maximum) {
-    int target = lines(a,value,sp,maximum), low=1, high=maximum;
-    while(low<high){int mid=(low+high)/2;if(lines(a,value,sp,mid)<=target)high=mid;else low=mid+1;}
+    return compactWidthPx(value,TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_SP,sp,a.getResources().getDisplayMetrics()),maximum);
+  }
+
+  static int compactWidthPx(String value, float sizePx, int maximum) {
+    int target = linesPx(value,sizePx,maximum), low=1, high=maximum;
+    while(low<high){int mid=(low+high)/2;if(linesPx(value,sizePx,mid)<=target)high=mid;else low=mid+1;}
     return Math.min(maximum,low+1); // one pixel rounding guard; never omit text
   }
 
   static int lines(Context a, String s, float sp, int width) {
+    return linesPx(s,TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_SP,sp,a.getResources().getDisplayMetrics()),width);
+  }
+
+  static int linesPx(String s, float sizePx, int width) {
     android.text.TextPaint paint = new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
     paint.setTypeface(Typeface.DEFAULT);
-    paint.setTextSize(
-        TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_SP, sp, a.getResources().getDisplayMetrics()));
+    paint.setTextSize(sizePx);
     return StaticLayout.Builder.obtain(s, 0, s.length(), paint, Math.max(1, width))
         .setIncludePad(false)
         .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)

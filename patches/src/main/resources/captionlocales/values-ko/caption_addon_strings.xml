@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"번역"</string>
     <string name="cap_translation_requirements" formatted="false">"번역 지침"</string>
     <string name="cap_style" formatted="false">"자막 스타일"</string>
-    <string name="cap_size" formatted="false">"자막 크기"</string>
+    <string name="cap_size" formatted="false">"Shorts / 동영상 상세 글자 높이"</string>
     <string name="cap_opacity" formatted="false">"배경 불투명도"</string>
     <string name="cap_reset_position" formatted="false">"자막 위치 초기화"</string>
     <string name="cap_cache_diagnostics" formatted="false">"캐시 및 진단"</string>
@@ -36,7 +36,7 @@
     <string name="cap_key_saved" formatted="false">"암호화되어 저장됨. 입력하면 교체됩니다"</string>
     <string name="cap_model_hint" formatted="false">"모델을 선택하거나 ID 입력"</string>
     <string name="cap_preview_hint" formatted="false">"화면을 눌러 방향 전환, 스타일은 실시간 반영"</string>
-    <string name="cap_size_hint" formatted="false">"상대 크기 8–15, 영상 크기에 맞게 조정"</string>
+    <string name="cap_size_hint" formatted="false">"Shorts / 동영상 상세 글자 높이(px); 화면 너비의 1.5%–3.0%, 기본값 2.03%; 전체 화면에서 비례 확대하고 영상이 좁아지면 비례 축소"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 투명, 100% 불투명. 놓으면 저장"</string>
     <string name="cap_diagnostic_hint" formatted="false">"펼쳐서 진단 기록 확인 및 복사"</string>
     <string name="cap_use_youtube" formatted="false">"YouTube 사용"</string>

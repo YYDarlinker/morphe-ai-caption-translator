@@ -56,7 +56,7 @@ public class InlineEditorFrameworkTest {
         assertEquals(Math.round(SubtitleStylePreview.stageHeight(preview.getWidth(),activity.getResources().getDisplayMetrics().heightPixels,activity.getResources().getDisplayMetrics().density,false)),preview.getHeight());
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,240);
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);
-        assertEquals(24f,preview.size,.001f);assertEquals(35,preview.opacity);
+        assertEquals(240,preview.ratioBps);assertEquals(35,preview.opacity);
         int height=preview.getMeasuredHeight();assertFalse(preview.portrait);
         assertTrue(preview.performClick());assertTrue(preview.portrait);
         assertTrue(preview.getContentDescription().toString().contains(CaptionStrings.localize(activity,"竖屏")));
@@ -65,7 +65,7 @@ public class InlineEditorFrameworkTest {
         assertEquals(Math.round(SubtitleStylePreview.stageHeight(preview.getWidth(),
                 activity.getResources().getDisplayMetrics().heightPixels,
                 activity.getResources().getDisplayMetrics().density,true)),preview.getMeasuredHeight());
-        assertEquals(24f,preview.size,.001f);assertEquals(35,preview.opacity);
+        assertEquals(240,preview.ratioBps);assertEquals(35,preview.opacity);
         preview.performClick();assertFalse(preview.portrait);activity.finish();
     }
 

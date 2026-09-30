@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"翻译"</string>
     <string name="cap_translation_requirements" formatted="false">"翻译要求"</string>
     <string name="cap_style" formatted="false">"字幕样式"</string>
-    <string name="cap_size" formatted="false">"字幕大小"</string>
+    <string name="cap_size" formatted="false">"Shorts / 视频详情页字高"</string>
     <string name="cap_opacity" formatted="false">"背景不透明度"</string>
     <string name="cap_reset_position" formatted="false">"恢复字幕默认位置"</string>
     <string name="cap_cache_diagnostics" formatted="false">"缓存与诊断"</string>
@@ -36,7 +36,7 @@
     <string name="cap_key_saved" formatted="false">"已加密保存；输入可替换"</string>
     <string name="cap_model_hint" formatted="false">"选择模型或输入模型 ID"</string>
     <string name="cap_preview_hint" formatted="false">"点按画面切换方向，样式实时预览"</string>
-    <string name="cap_size_hint" formatted="false">"相对字号 8–15，随画面比例缩放"</string>
+    <string name="cap_size_hint" formatted="false">"Shorts / 视频详情页字高（px）；屏幕宽度的 1.5%–3.0%，默认 2.03%；全屏等比例放大，画面收窄时同比缩小"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 为透明，100% 为不透明；松手保存"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展开查看并复制诊断记录"</string>
     <string name="cap_use_youtube" formatted="false">"使用 YouTube"</string>

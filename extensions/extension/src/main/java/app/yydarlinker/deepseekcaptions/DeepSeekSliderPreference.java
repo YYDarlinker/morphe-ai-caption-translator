@@ -133,29 +133,31 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     }
 
     private int minimum() {
-        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MIN_CAPTION_TEXT_SIZE_TENTHS : 0;
+        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MIN_CAPTION_GLYPH_HEIGHT_RATIO_BPS : 0;
     }
 
     private int maximum() {
-        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MAX_CAPTION_TEXT_SIZE_TENTHS : 100;
+        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MAX_CAPTION_GLYPH_HEIGHT_RATIO_BPS : 100;
     }
 
     private int currentValue() {
         DeepSeekConfig.Snapshot current = DeepSeekConfig.displayStyle(getContext());
         return KEY_TEXT_SIZE.equals(getKey())
-                ? Math.round(current.captionTextSize * 10f)
+                ? current.captionGlyphHeightRatioBps
                 : current.backgroundOpacity;
     }
 
     private String format(int value) {
-        return KEY_TEXT_SIZE.equals(getKey())
-                ? String.format(java.util.Locale.ROOT, "%.1f sp", value / 10f)
-                : value + "%";
+        if (!KEY_TEXT_SIZE.equals(getKey())) return value + "%";
+        android.util.DisplayMetrics d = getContext().getResources().getDisplayMetrics();
+        float portraitScreenWidthPx = Math.min(d.widthPixels, d.heightPixels);
+        return String.format(java.util.Locale.ROOT, "%.1f px · %.2f%%",
+                SubtitleStyleMetrics.targetGlyphHeightPx(value, portraitScreenWidthPx), value / 100f);
     }
 
     private void saveValue(int value) {
         if (KEY_TEXT_SIZE.equals(getKey())) {
-            DeepSeekConfig.saveCaptionTextSize(getContext(), value / 10f);
+            DeepSeekConfig.saveCaptionGlyphHeightRatioBps(getContext(), value);
         } else {
             DeepSeekConfig.saveBackgroundOpacity(getContext(), value);
         }

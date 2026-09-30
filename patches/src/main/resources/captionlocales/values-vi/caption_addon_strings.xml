@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Dịch"</string>
     <string name="cap_translation_requirements" formatted="false">"Yêu cầu dịch"</string>
     <string name="cap_style" formatted="false">"Kiểu phụ đề"</string>
-    <string name="cap_size" formatted="false">"Cỡ phụ đề"</string>
+    <string name="cap_size" formatted="false">"Chiều cao chữ Shorts / chi tiết video"</string>
     <string name="cap_opacity" formatted="false">"Độ đục nền"</string>
     <string name="cap_reset_position" formatted="false">"Đặt lại vị trí phụ đề"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Bộ nhớ đệm và chẩn đoán"</string>
@@ -36,7 +36,7 @@
     <string name="cap_key_saved" formatted="false">"Đã lưu mã hóa; nhập để thay thế"</string>
     <string name="cap_model_hint" formatted="false">"Chọn mô hình hoặc nhập ID"</string>
     <string name="cap_preview_hint" formatted="false">"Chạm hình để đổi hướng; xem trước tức thì"</string>
-    <string name="cap_size_hint" formatted="false">"Cỡ tương đối 8–15, theo kích thước video"</string>
+    <string name="cap_size_hint" formatted="false">"Chiều cao chữ Shorts / chi tiết video (px); 1.5%–3.0% chiều rộng màn hình, mặc định 2.03%; tăng theo tỷ lệ khi toàn màn hình và giảm khi video thu hẹp"</string>
     <string name="cap_opacity_hint" formatted="false">"0% trong suốt, 100% đục; thả để lưu"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Mở rộng để xem và sao chép chẩn đoán"</string>
     <string name="cap_use_youtube" formatted="false">"Dùng YouTube"</string>

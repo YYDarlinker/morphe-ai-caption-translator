@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"अनुवाद"</string>
     <string name="cap_translation_requirements" formatted="false">"अनुवाद निर्देश"</string>
     <string name="cap_style" formatted="false">"उपशीर्षक शैली"</string>
-    <string name="cap_size" formatted="false">"Shorts / वीडियो विवरण में अक्षर ऊँचाई"</string>
+    <string name="cap_size" formatted="false">"अक्षर आकार (वीडियो विवरण)"</string>
     <string name="cap_opacity" formatted="false">"पृष्ठभूमि की अपारदर्शिता"</string>
     <string name="cap_reset_position" formatted="false">"स्थिति रीसेट करें"</string>
     <string name="cap_cache_diagnostics" formatted="false">"कैश और निदान"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"API कुंजी दर्ज करें"</string>
     <string name="cap_key_saved" formatted="false">"एन्क्रिप्ट करके सहेजी गई; बदलने के लिए दर्ज करें"</string>
     <string name="cap_model_hint" formatted="false">"मॉडल चुनें या उसका ID दर्ज करें"</string>
-    <string name="cap_preview_hint" formatted="false">"अक्षर आकार और पृष्ठभूमि तुरंत पूर्वावलोकन में दिखते हैं"</string>
-    <string name="cap_size_hint" formatted="false">"Shorts / वीडियो विवरण में अक्षर ऊँचाई (px); स्क्रीन चौड़ाई का 1.5%–3.0%, डिफ़ॉल्ट 2.03%; पूर्ण स्क्रीन में अनुपात में बढ़ती है और वीडियो संकरा होने पर घटती है"</string>
+    <string name="cap_preview_hint" formatted="false">"शैली पूर्वावलोकन"</string>
+    <string name="cap_size_hint" formatted="false">"मानक: वीडियो विवरण 44.5px · पूर्ण स्क्रीन 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% पारदर्शी, 100% अपारदर्शी; छोड़ने पर सहेजें"</string>
     <string name="cap_diagnostic_hint" formatted="false">"निदान रिकॉर्ड देखने और कॉपी करने के लिए विस्तार करें"</string>
     <string name="cap_use_youtube" formatted="false">"YouTube इस्तेमाल करें"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"मूल उपशीर्षक उपलब्ध नहीं हैं। उपशीर्षक ट्रैक फिर चुनें।"</string>
     <string name="cap_caption_overflow" formatted="false">"उपशीर्षक बहुत लंबा है — मूल पाठ उपलब्ध नहीं"</string>
     <string name="cap_quality_outcome" formatted="false">"स्थानीय जाँच: स्वीकार / अस्वीकार (गुणवत्ता)"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s: वीडियो विवरण %2$spx · पूर्ण स्क्रीन %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"बहुत छोटा"</string>
+    <string name="cap_size_tier_s" formatted="false">"छोटा"</string>
+    <string name="cap_size_tier_standard" formatted="false">"मानक"</string>
+    <string name="cap_size_tier_l" formatted="false">"बड़ा"</string>
+    <string name="cap_size_tier_xl" formatted="false">"बहुत बड़ा"</string>
 </resources>

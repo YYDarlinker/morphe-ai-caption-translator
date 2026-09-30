@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Tradução"</string>
     <string name="cap_translation_requirements" formatted="false">"Instruções de tradução"</string>
     <string name="cap_style" formatted="false">"Estilo das legendas"</string>
-    <string name="cap_size" formatted="false">"Altura do texto em Shorts / detalhes"</string>
+    <string name="cap_size" formatted="false">"Tamanho da fonte (detalhes)"</string>
     <string name="cap_opacity" formatted="false">"Opacidade do fundo"</string>
     <string name="cap_reset_position" formatted="false">"Restaurar posição"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Cache e diagnóstico"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"Insira a chave da API"</string>
     <string name="cap_key_saved" formatted="false">"Armazenada com criptografia; digite para substituir"</string>
     <string name="cap_model_hint" formatted="false">"Selecione um modelo ou insira seu ID"</string>
-    <string name="cap_preview_hint" formatted="false">"O tamanho do texto e o fundo são atualizados em tempo real"</string>
-    <string name="cap_size_hint" formatted="false">"Altura do texto em Shorts / detalhes do vídeo (px); 1.5%–3.0% da largura da tela, padrão 2.03%; escala proporcionalmente em tela cheia e quando o vídeo fica mais estreito"</string>
+    <string name="cap_preview_hint" formatted="false">"Prévia do estilo"</string>
+    <string name="cap_size_hint" formatted="false">"Padrão: detalhes 44.5px · tela cheia 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparente, 100% opaco; salvo ao soltar"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Expanda para consultar e copiar o diagnóstico"</string>
     <string name="cap_use_youtube" formatted="false">"Usar YouTube"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"Legendas de origem indisponíveis. Selecione a faixa novamente."</string>
     <string name="cap_caption_overflow" formatted="false">"Legenda longa demais — original indisponível"</string>
     <string name="cap_quality_outcome" formatted="false">"Validação local: aceitos / rejeitados (qualidade)"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s: detalhes %2$spx · tela cheia %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Muito pequeno"</string>
+    <string name="cap_size_tier_s" formatted="false">"Pequeno"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Padrão"</string>
+    <string name="cap_size_tier_l" formatted="false">"Grande"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Muito grande"</string>
 </resources>

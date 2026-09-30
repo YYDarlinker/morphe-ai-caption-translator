@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"翻訳"</string>
     <string name="cap_translation_requirements" formatted="false">"翻訳への指示"</string>
     <string name="cap_style" formatted="false">"字幕のスタイル"</string>
-    <string name="cap_size" formatted="false">"Shorts / 動画詳細の文字高"</string>
+    <string name="cap_size" formatted="false">"文字サイズ（動画詳細）"</string>
     <string name="cap_opacity" formatted="false">"背景の不透明度"</string>
     <string name="cap_reset_position" formatted="false">"字幕の位置をリセット"</string>
     <string name="cap_cache_diagnostics" formatted="false">"キャッシュと診断"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"API キーを入力"</string>
     <string name="cap_key_saved" formatted="false">"暗号化して保存済み。入力すると置き換わります"</string>
     <string name="cap_model_hint" formatted="false">"モデルを選択するか ID を入力"</string>
-    <string name="cap_preview_hint" formatted="false">"文字サイズと背景設定をリアルタイムでプレビュー"</string>
-    <string name="cap_size_hint" formatted="false">"Shorts / 動画詳細の文字高（px）。画面幅の 1.5%–3.0%、既定 2.03%。全画面では同比率で拡大し、動画幅が狭くなると同比率で縮小"</string>
+    <string name="cap_preview_hint" formatted="false">"スタイルプレビュー"</string>
+    <string name="cap_size_hint" formatted="false">"標準：動画詳細 44.5px · 全画面 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% は透明、100% は不透明。指を離すと保存"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展開して診断記録を確認・コピー"</string>
     <string name="cap_use_youtube" formatted="false">"YouTube を使用"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"元の字幕を取得できません。字幕トラックを選び直してください。"</string>
     <string name="cap_caption_overflow" formatted="false">"字幕が長すぎます。原文を表示できません"</string>
     <string name="cap_quality_outcome" formatted="false">"ローカル検証：採用 / 拒否（品質）"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s：動画詳細 %2$spx · 全画面 %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"極小"</string>
+    <string name="cap_size_tier_s" formatted="false">"小"</string>
+    <string name="cap_size_tier_standard" formatted="false">"標準"</string>
+    <string name="cap_size_tier_l" formatted="false">"大"</string>
+    <string name="cap_size_tier_xl" formatted="false">"特大"</string>
 </resources>

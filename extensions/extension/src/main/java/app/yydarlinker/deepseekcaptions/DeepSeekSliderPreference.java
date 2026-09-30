@@ -3,7 +3,6 @@ package app.yydarlinker.deepseekcaptions;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
-import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -15,6 +14,9 @@ import android.widget.TextView;
 public final class DeepSeekSliderPreference extends android.preference.Preference {
     static final String KEY_TEXT_SIZE = "deepseek_caption_text_size";
     static final String KEY_OPACITY = "deepseek_caption_background_opacity";
+    private static final String[] SIZE_TIER_KEYS = {
+            "size_tier_xs", "size_tier_s", "size_tier_standard", "size_tier_l", "size_tier_xl"
+    };
 
     public DeepSeekSliderPreference(Context context) {
         super(context);
@@ -106,9 +108,9 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
-        CharSequence summaryText = getSummary();
+        CharSequence summaryText = KEY_TEXT_SIZE.equals(getKey()) ? tierDescription(current) : getSummary();
+        TextView summary = new TextView(context);
         if (summaryText != null && summaryText.length() > 0) {
-            TextView summary = new TextView(context);
             summary.setText(summaryText);
             CaptionSettingsStyle.caption(summary);
             root.addView(summary, new LinearLayout.LayoutParams(
@@ -120,6 +122,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 valueLabel.setText(format(minimum + progress));
+                if (KEY_TEXT_SIZE.equals(getKey())) summary.setText(tierDescription(minimum + progress));
                 if(fromUser) SubtitleStylePreview.update(getKey(),minimum+progress);
             }
 
@@ -133,31 +136,40 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     }
 
     private int minimum() {
-        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MIN_CAPTION_GLYPH_HEIGHT_RATIO_BPS : 0;
+        return 0;
     }
 
     private int maximum() {
-        return KEY_TEXT_SIZE.equals(getKey()) ? DeepSeekConfig.MAX_CAPTION_GLYPH_HEIGHT_RATIO_BPS : 100;
+        return KEY_TEXT_SIZE.equals(getKey()) ? CaptionFontSize.COUNT - 1 : 100;
     }
 
     private int currentValue() {
         DeepSeekConfig.Snapshot current = DeepSeekConfig.displayStyle(getContext());
         return KEY_TEXT_SIZE.equals(getKey())
-                ? current.captionGlyphHeightRatioBps
+                ? current.captionSizeTier
                 : current.backgroundOpacity;
     }
 
     private String format(int value) {
         if (!KEY_TEXT_SIZE.equals(getKey())) return value + "%";
-        android.util.DisplayMetrics d = getContext().getResources().getDisplayMetrics();
-        float portraitScreenWidthPx = Math.min(d.widthPixels, d.heightPixels);
-        return String.format(java.util.Locale.ROOT, "%.1f px · %.2f%%",
-                SubtitleStyleMetrics.targetGlyphHeightPx(value, portraitScreenWidthPx), value / 100f);
+        return pixels(CaptionFontSize.detailGlyphHeightPx(value)) + " px";
+    }
+
+    private String tierDescription(int tier) {
+        return String.format(java.util.Locale.ROOT, CaptionStrings.settings(getContext(), "size_tier_hint"),
+                CaptionStrings.settings(getContext(), SIZE_TIER_KEYS[CaptionFontSize.clampTier(tier)]),
+                pixels(CaptionFontSize.detailGlyphHeightPx(tier)),
+                pixels(CaptionFontSize.fullScreenGlyphHeightPx(tier)));
+    }
+
+    private static String pixels(float value) {
+        return value == Math.round(value) ? Integer.toString(Math.round(value))
+                : String.format(java.util.Locale.ROOT, "%.1f", value);
     }
 
     private void saveValue(int value) {
         if (KEY_TEXT_SIZE.equals(getKey())) {
-            DeepSeekConfig.saveCaptionGlyphHeightRatioBps(getContext(), value);
+            DeepSeekConfig.saveCaptionSizeTier(getContext(), value);
         } else {
             DeepSeekConfig.saveBackgroundOpacity(getContext(), value);
         }

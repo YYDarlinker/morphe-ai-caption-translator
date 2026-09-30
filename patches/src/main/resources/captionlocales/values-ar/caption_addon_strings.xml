@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"الترجمة"</string>
     <string name="cap_translation_requirements" formatted="false">"تعليمات الترجمة"</string>
     <string name="cap_style" formatted="false">"نمط الترجمة النصية"</string>
-    <string name="cap_size" formatted="false">"ارتفاع الحروف في Shorts / تفاصيل الفيديو"</string>
+    <string name="cap_size" formatted="false">"حجم الخط (تفاصيل الفيديو)"</string>
     <string name="cap_opacity" formatted="false">"عتامة الخلفية"</string>
     <string name="cap_reset_position" formatted="false">"إعادة ضبط الموضع"</string>
     <string name="cap_cache_diagnostics" formatted="false">"ذاكرة التخزين والتشخيص"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"أدخل مفتاح API"</string>
     <string name="cap_key_saved" formatted="false">"محفوظ مشفّرًا؛ أدخل مفتاحًا لاستبداله"</string>
     <string name="cap_model_hint" formatted="false">"اختر نموذجًا أو أدخل معرّفه"</string>
-    <string name="cap_preview_hint" formatted="false">"تحديث فوري لحجم الخط والخلفية"</string>
-    <string name="cap_size_hint" formatted="false">"ارتفاع الحروف في Shorts / تفاصيل الفيديو (px)؛ 1.5%–3.0% من عرض الشاشة، الافتراضي 2.03%؛ يكبر تناسبيًا في ملء الشاشة ويصغر عند تضييق الفيديو"</string>
+    <string name="cap_preview_hint" formatted="false">"معاينة النمط"</string>
+    <string name="cap_size_hint" formatted="false">"قياسي: تفاصيل الفيديو 44.5px · ملء الشاشة 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% شفاف، 100% معتم؛ يُحفظ عند الإفلات"</string>
     <string name="cap_diagnostic_hint" formatted="false">"وسّع لعرض سجلات التشخيص ونسخها"</string>
     <string name="cap_use_youtube" formatted="false">"استخدام YouTube"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"الترجمة الأصلية غير متاحة. أعد اختيار مسار الترجمة."</string>
     <string name="cap_caption_overflow" formatted="false">"الترجمة طويلة جدًا — النص الأصلي غير متاح"</string>
     <string name="cap_quality_outcome" formatted="false">"التحقق المحلي: مقبول / مرفوض (الجودة)"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s: تفاصيل الفيديو %2$spx · ملء الشاشة %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"صغير جدًا"</string>
+    <string name="cap_size_tier_s" formatted="false">"صغير"</string>
+    <string name="cap_size_tier_standard" formatted="false">"قياسي"</string>
+    <string name="cap_size_tier_l" formatted="false">"كبير"</string>
+    <string name="cap_size_tier_xl" formatted="false">"كبير جدًا"</string>
 </resources>

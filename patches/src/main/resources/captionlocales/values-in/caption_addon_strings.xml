@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Terjemahan"</string>
     <string name="cap_translation_requirements" formatted="false">"Instruksi terjemahan"</string>
     <string name="cap_style" formatted="false">"Gaya subtitel"</string>
-    <string name="cap_size" formatted="false">"Tinggi huruf Shorts / detail video"</string>
+    <string name="cap_size" formatted="false">"Ukuran huruf (detail video)"</string>
     <string name="cap_opacity" formatted="false">"Opasitas latar"</string>
     <string name="cap_reset_position" formatted="false">"Reset posisi subtitel"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Cache dan diagnostik"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"Masukkan kunci API"</string>
     <string name="cap_key_saved" formatted="false">"Disimpan terenkripsi; masukkan untuk mengganti"</string>
     <string name="cap_model_hint" formatted="false">"Pilih model atau masukkan ID"</string>
-    <string name="cap_preview_hint" formatted="false">"Ukuran huruf dan latar diperbarui langsung"</string>
-    <string name="cap_size_hint" formatted="false">"Tinggi huruf Shorts / detail video (px); 1.5%–3.0% lebar layar, default 2.03%; membesar proporsional saat layar penuh dan mengecil saat video menyempit"</string>
+    <string name="cap_preview_hint" formatted="false">"Pratinjau gaya"</string>
+    <string name="cap_size_hint" formatted="false">"Standar: detail video 44.5px · layar penuh 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparan, 100% buram; disimpan saat dilepas"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Perluas untuk melihat dan menyalin diagnostik"</string>
     <string name="cap_use_youtube" formatted="false">"Gunakan YouTube"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"Subtitel sumber tidak tersedia. Pilih kembali trek subtitel."</string>
     <string name="cap_caption_overflow" formatted="false">"Subtitel terlalu panjang — teks asli tidak tersedia"</string>
     <string name="cap_quality_outcome" formatted="false">"Validasi lokal: diterima / ditolak (kualitas)"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s: detail video %2$spx · layar penuh %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Sangat kecil"</string>
+    <string name="cap_size_tier_s" formatted="false">"Kecil"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Standar"</string>
+    <string name="cap_size_tier_l" formatted="false">"Besar"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Sangat besar"</string>
 </resources>

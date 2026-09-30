@@ -89,7 +89,7 @@ final class CaptionOverlay {
   private static long pendingStart = -1, pendingEnd = -1, pendingPosition = -1;
   private static List<RebuildPageLayout.Page> pendingPages = Collections.emptyList();
   private static int shownPage = -1;
-  private static boolean previousShorts;
+  private static boolean previousShorts, previousFullScreen;
   private static boolean pendingStatus, suppressed, guardedExpansion;
   private static RenderGuard currentGuard;
   private static Supplier<String> fallback;
@@ -399,12 +399,17 @@ final class CaptionOverlay {
     boolean shorts = CaptionSurface.isShorts();
     android.util.DisplayMetrics metrics = a.getResources().getDisplayMetrics();
     int screenWidth = metrics.widthPixels;
+    // Mode callbacks can precede the orientation layout. Use current screen geometry
+    // for the calibrated portrait-details / landscape-full-screen modes.
+    boolean fullScreen = !shorts && metrics.widthPixels > metrics.heightPixels;
     if (!dirty
         && b.equals(previous)
         && screenWidth == previousScreenWidth
         && shorts == previousShorts
+        && fullScreen == previousFullScreen
         && anchor.getVisibility() == View.VISIBLE) return;
     previousShorts = shorts;
+    previousFullScreen = fullScreen;
     dirty = false;
     previous.set(b);
     previousScreenWidth = screenWidth;
@@ -419,11 +424,11 @@ final class CaptionOverlay {
       normalVideoWidth = Math.max(normalVideoWidth, b.width());
     }
     float targetGlyphHeight = SubtitleStyleMetrics.renderedGlyphHeightPx(
-        cfg.captionGlyphHeightRatioBps,screenWidth,b.width(),normalVideoWidth);
+        cfg.captionSizeTier,screenWidth,fullScreen,b.width(),normalVideoWidth);
     float preferred = SubtitleStyleMetrics.textSizePxForGlyphHeight(text.getPaint(),targetGlyphHeight);
     float minimum = SubtitleStyleMetrics.textSizePxForGlyphHeight(text.getPaint(),
         SubtitleStyleMetrics.renderedGlyphHeightPx(
-            DeepSeekConfig.MIN_CAPTION_GLYPH_HEIGHT_RATIO_BPS,screenWidth,b.width(),normalVideoWidth));
+            0,screenWidth,fullScreen,b.width(),normalVideoWidth));
     int width = Math.max(1, Math.round(b.width() * (CaptionSurface.isShorts() ? .78f : .92f)));
     int inner = Math.max(1, width - text.getPaddingLeft() - text.getPaddingRight());
     layoutBudget =
@@ -457,7 +462,7 @@ final class CaptionOverlay {
     }
     text.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
     String notice = pendingIdentity + "|" + pendingText + "|" + mode + "|" + inner + "|" + size
-        + "|" + shownPage + "|" + screenWidth + "|" + b.width()
+        + "|" + shownPage + "|" + screenWidth + "|" + b.width() + "|" + fullScreen
         + "|" + metrics.density + "|" + a.getResources().getConfiguration().fontScale;
     if (!notice.equals(lastNotice)) {
       lastNotice = notice;
@@ -478,7 +483,14 @@ final class CaptionOverlay {
               + ";screen_width_px=" + screenWidth
               + ";video_width_px=" + b.width()
               + ";normal_video_width_px=" + normalVideoWidth
-              + ";ratio_bps=" + cfg.captionGlyphHeightRatioBps
+              + ";size_tier=" + cfg.captionSizeTier
+              + ";size_mode=" + (fullScreen ? "full_screen" : "detail")
+              + ";detail_glyph_height_px=" + CaptionFontSize.detailGlyphHeightPx(cfg.captionSizeTier)
+              + ";full_screen_glyph_height_px=" + CaptionFontSize.fullScreenGlyphHeightPx(cfg.captionSizeTier)
+              + ";glyph_height_ratio=" + (fullScreen
+                  ? CaptionFontSize.fullScreenRatio(cfg.captionSizeTier)
+                  : CaptionFontSize.detailRatio(cfg.captionSizeTier))
+              + ";effective_glyph_height_ratio=" + targetGlyphHeight / Math.max(1,screenWidth)
               + ";density=" + metrics.density
               + ";fontScale=" + a.getResources().getConfiguration().fontScale
               + ";lines="

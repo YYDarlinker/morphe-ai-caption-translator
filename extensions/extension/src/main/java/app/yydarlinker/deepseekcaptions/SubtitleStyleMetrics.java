@@ -10,13 +10,14 @@ final class SubtitleStyleMetrics {
 
     static int alpha(int opacity){return Math.round(255f*Math.max(0,Math.min(100,opacity))/100f);}
 
-    static float targetGlyphHeightPx(int ratioBps,float screenWidthPx) {
-        return ratioBps * screenWidthPx / 10000f;
+    static float targetGlyphHeightPx(int tier,float screenWidthPx,boolean fullScreen) {
+        return screenWidthPx * (fullScreen
+                ? CaptionFontSize.fullScreenRatio(tier) : CaptionFontSize.detailRatio(tier));
     }
 
-    static float renderedGlyphHeightPx(int ratioBps,float screenWidthPx,
+    static float renderedGlyphHeightPx(int tier,float screenWidthPx,boolean fullScreen,
             float videoWidthPx,float normalVideoWidthPx) {
-        float target = targetGlyphHeightPx(ratioBps,screenWidthPx);
+        float target = targetGlyphHeightPx(tier,screenWidthPx,fullScreen);
         if (normalVideoWidthPx > 0 && videoWidthPx < normalVideoWidthPx * .8f)
             target *= videoWidthPx / normalVideoWidthPx;
         return target;
@@ -63,8 +64,7 @@ final class SubtitleStyleMetrics {
         return fm.descent - fm.ascent;
     }
 
-    static float previewGlyphHeightPx(int ratioBps,float screenWidthPx,
-            float actualVideoWidthPx,float previewWidth) {
-        return targetGlyphHeightPx(ratioBps,screenWidthPx)*previewWidth/Math.max(1,actualVideoWidthPx);
+    static float previewGlyphHeightPx(int tier,float previewWidth) {
+        return CaptionFontSize.fullScreenRatio(tier) * previewWidth;
     }
 }

@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"翻译"</string>
     <string name="cap_translation_requirements" formatted="false">"翻译要求"</string>
     <string name="cap_style" formatted="false">"字幕样式"</string>
-    <string name="cap_size" formatted="false">"Shorts / 视频详情页字高"</string>
+    <string name="cap_size" formatted="false">"字号（详情页）"</string>
     <string name="cap_opacity" formatted="false">"背景不透明度"</string>
     <string name="cap_reset_position" formatted="false">"恢复字幕默认位置"</string>
     <string name="cap_cache_diagnostics" formatted="false">"缓存与诊断"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"请输入 API Key"</string>
     <string name="cap_key_saved" formatted="false">"已加密保存；输入可替换"</string>
     <string name="cap_model_hint" formatted="false">"选择模型或输入模型 ID"</string>
-    <string name="cap_preview_hint" formatted="false">"字号与背景设置实时预览"</string>
-    <string name="cap_size_hint" formatted="false">"Shorts / 视频详情页字高（px）；屏幕宽度的 1.5%–3.0%，默认 2.03%；全屏等比例放大，画面收窄时同比缩小"</string>
+    <string name="cap_preview_hint" formatted="false">"样式预览"</string>
+    <string name="cap_size_hint" formatted="false">"标准：详情页 44.5px · 全屏 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 为透明，100% 为不透明；松手保存"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展开查看并复制诊断记录"</string>
     <string name="cap_use_youtube" formatted="false">"使用 YouTube"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"暂时无法获取原字幕，请重新选择字幕轨道。"</string>
     <string name="cap_caption_overflow" formatted="false">"字幕过长，原文暂不可用"</string>
     <string name="cap_quality_outcome" formatted="false">"本地校验：接受 / 拒绝（其中质量问题）"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s：详情页 %2$spx · 全屏 %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"超小"</string>
+    <string name="cap_size_tier_s" formatted="false">"小"</string>
+    <string name="cap_size_tier_standard" formatted="false">"标准"</string>
+    <string name="cap_size_tier_l" formatted="false">"大"</string>
+    <string name="cap_size_tier_xl" formatted="false">"超大"</string>
 </resources>

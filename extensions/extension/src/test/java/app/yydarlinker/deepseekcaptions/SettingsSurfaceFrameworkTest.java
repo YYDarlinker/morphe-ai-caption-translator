@@ -37,9 +37,9 @@ public class SettingsSurfaceFrameworkTest {
     assertSame(preview,root.getChildAt(1));
     assertFalse(preview.isClickable());assertFalse(preview.hasOnClickListeners());
     assertEquals(CaptionStrings.settings(a,"preview"),preview.getContentDescription().toString());
-    SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,200);
+    SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,1);
     SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);
-    assertEquals(200,preview.ratioBps);assertEquals(35,preview.opacity);
+    assertEquals(1,preview.sizeTier);assertEquals(35,preview.opacity);
     a.finish();
  }
  @Test public void protocolEvidenceSurvivesDisplayNoiseAndCanBeCleared(){

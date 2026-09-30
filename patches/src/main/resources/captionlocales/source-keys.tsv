@@ -128,3 +128,12 @@ API 配置方案	cap_profiles_title
 相对字号 8–15；13sp 为舒适基准，随画面比例缩放	cap_size_hint
 Shorts / 视频详情页字高	cap_size
 Shorts / 视频详情页字高（px）；屏幕宽度的 1.5%–3.0%，默认 2.03%；全屏等比例放大，画面收窄时同比缩小	cap_size_hint
+字号（详情页）	cap_size
+样式预览	cap_preview_hint
+标准：详情页 44.5px · 全屏 55.5px	cap_size_hint
+超小	cap_size_tier_xs
+小	cap_size_tier_s
+标准	cap_size_tier_standard
+大	cap_size_tier_l
+超大	cap_size_tier_xl
+%1$s：详情页 %2$spx · 全屏 %3$spx	cap_size_tier_hint

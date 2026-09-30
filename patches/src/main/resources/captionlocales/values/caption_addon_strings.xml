@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Translation"</string>
     <string name="cap_translation_requirements" formatted="false">"Translation instructions"</string>
     <string name="cap_style" formatted="false">"Caption style"</string>
-    <string name="cap_size" formatted="false">"Shorts / video details glyph height"</string>
+    <string name="cap_size" formatted="false">"Font size (video details)"</string>
     <string name="cap_opacity" formatted="false">"Background opacity"</string>
     <string name="cap_reset_position" formatted="false">"Reset caption position"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Cache and diagnostics"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"Enter API Key"</string>
     <string name="cap_key_saved" formatted="false">"Stored encrypted; enter to replace"</string>
     <string name="cap_model_hint" formatted="false">"Select a model or enter its ID"</string>
-    <string name="cap_preview_hint" formatted="false">"Font size and background update live"</string>
-    <string name="cap_size_hint" formatted="false">"Glyph height in Shorts / video details (px); 1.5%–3.0% of screen width, default 2.03%; scales proportionally in full screen and when the video narrows"</string>
+    <string name="cap_preview_hint" formatted="false">"Style preview"</string>
+    <string name="cap_size_hint" formatted="false">"Standard: video details 44.5px · full screen 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparent, 100% opaque; saved on release"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Expand to inspect and copy diagnostic records"</string>
     <string name="cap_use_youtube" formatted="false">"Use YouTube"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"Source captions unavailable. Try selecting the caption track again."</string>
     <string name="cap_caption_overflow" formatted="false">"Caption too long — original unavailable"</string>
     <string name="cap_quality_outcome" formatted="false">"Local validation: accepted / rejected (quality)"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s: video details %2$spx · full screen %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Extra small"</string>
+    <string name="cap_size_tier_s" formatted="false">"Small"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Standard"</string>
+    <string name="cap_size_tier_l" formatted="false">"Large"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Extra large"</string>
 </resources>

@@ -12,8 +12,9 @@ final class DeepSeekConfig {
     private static final String BASE_URL = "base_url";
     private static final String MODEL = "model";
     private static final String PROMPT = "prompt";
-    // Glyph height / screen width in basis points. Previous relative and absolute-sp
-    // preferences have different units and remain obsolete; neither is ever read.
+    private static final String CAPTION_SIZE_TIER = "caption_size_tier";
+    // Upgrade only the immediately preceding continuous screen-width ratio setting.
+    // Earlier relative and absolute-sp preferences use different units and stay obsolete.
     private static final String CAPTION_GLYPH_HEIGHT_RATIO_BPS = "caption_glyph_height_ratio_bps";
     private static final String BACKGROUND_OPACITY = "background_opacity";
     private static final String POSITION_PORTRAIT_Y = "position_portrait_y";
@@ -25,10 +26,6 @@ final class DeepSeekConfig {
             "忠实、自然、简洁地翻译成简体中文；优先符合中文表达习惯；保留人名、专有名词、数字、语气和必要的标点；不要增加原文没有的解释。";
     static final String DEFAULT_PROMPT =
             "忠实、自然、简洁；优先符合目标语言的母语表达习惯；保留人名、专有名词、数字、语气和必要的标点；不要增加原文没有的解释。";
-    // Bilibili full-screen glyph 55.5px / screen width 2736px, rounded to basis points.
-    static final int DEFAULT_CAPTION_GLYPH_HEIGHT_RATIO_BPS = 203;
-    static final int MIN_CAPTION_GLYPH_HEIGHT_RATIO_BPS = 150;
-    static final int MAX_CAPTION_GLYPH_HEIGHT_RATIO_BPS = 300;
     static final int DEFAULT_BACKGROUND_OPACITY = 70;
     static final boolean DEFAULT_CONTEXTUAL_UNIT_CORE = true;
     static final boolean DEFAULT_DISPLAY_TEXT_DEBUG = false;
@@ -48,7 +45,7 @@ final class DeepSeekConfig {
     static Snapshot displayStyle(Context context) {
         SharedPreferences p=prefs(context);
         return new Snapshot(p.getBoolean(ENABLED,false),"","","",
-            glyphHeightRatioBps(p),
+            captionSizeTier(p),
             clampOpacity(p.getInt(BACKGROUND_OPACITY,DEFAULT_BACKGROUND_OPACITY)),"");
     }
     static Snapshot load(Context context) {
@@ -64,7 +61,7 @@ final class DeepSeekConfig {
                 safe(p.getString(BASE_URL, DEFAULT_BASE_URL), DEFAULT_BASE_URL),
                 p.getString(MODEL, DEFAULT_MODEL),
                 prompt,
-                glyphHeightRatioBps(global),
+                captionSizeTier(global),
                 clampOpacity(global.getInt(BACKGROUND_OPACITY, DEFAULT_BACKGROUND_OPACITY)),
                 SecureApiKey.load(context)
         );
@@ -121,9 +118,11 @@ final class DeepSeekConfig {
         }
     }
 
-    static void saveCaptionGlyphHeightRatioBps(Context context, int value) {
-        prefs(context).edit().putInt(CAPTION_GLYPH_HEIGHT_RATIO_BPS,
-                clampGlyphHeightRatioBps(value)).apply();
+    static void saveCaptionSizeTier(Context context, int value) {
+        SharedPreferences p = prefs(context);
+        synchronized (p) {
+            p.edit().putInt(CAPTION_SIZE_TIER, CaptionFontSize.clampTier(value)).apply();
+        }
     }
 
     static void saveBackgroundOpacity(Context context, int value) {
@@ -150,14 +149,16 @@ final class DeepSeekConfig {
         return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
-    private static int glyphHeightRatioBps(SharedPreferences p) {
-        return clampGlyphHeightRatioBps(p.getInt(CAPTION_GLYPH_HEIGHT_RATIO_BPS,
-                DEFAULT_CAPTION_GLYPH_HEIGHT_RATIO_BPS));
-    }
-
-    private static int clampGlyphHeightRatioBps(int value) {
-        return Math.max(MIN_CAPTION_GLYPH_HEIGHT_RATIO_BPS,
-                Math.min(MAX_CAPTION_GLYPH_HEIGHT_RATIO_BPS, value));
+    private static int captionSizeTier(SharedPreferences p) {
+        synchronized (p) {
+            if (p.contains(CAPTION_SIZE_TIER))
+                return CaptionFontSize.clampTier(p.getInt(CAPTION_SIZE_TIER, CaptionFontSize.DEFAULT_TIER));
+            if (!p.contains(CAPTION_GLYPH_HEIGHT_RATIO_BPS)) return CaptionFontSize.DEFAULT_TIER;
+            float oldDetailGlyphHeightPx = p.getInt(CAPTION_GLYPH_HEIGHT_RATIO_BPS, 0) * 1264f / 10000f;
+            int migrated = CaptionFontSize.nearestTierForDetailGlyphHeight(oldDetailGlyphHeightPx);
+            p.edit().putInt(CAPTION_SIZE_TIER, migrated).apply();
+            return migrated;
+        }
     }
 
     private static int clampOpacity(int value) {
@@ -203,7 +204,7 @@ final class DeepSeekConfig {
         final String baseUrl;
         final String model;
         final String prompt;
-        final int captionGlyphHeightRatioBps;
+        final int captionSizeTier;
         final int backgroundOpacity;
         final String apiKey;
 
@@ -212,7 +213,7 @@ final class DeepSeekConfig {
                 String baseUrl,
                 String model,
                 String prompt,
-                int captionGlyphHeightRatioBps,
+                int captionSizeTier,
                 int backgroundOpacity,
                 String apiKey
         ) {
@@ -220,7 +221,7 @@ final class DeepSeekConfig {
             this.baseUrl = baseUrl;
             this.model = model;
             this.prompt = prompt;
-            this.captionGlyphHeightRatioBps = captionGlyphHeightRatioBps;
+            this.captionSizeTier = CaptionFontSize.clampTier(captionSizeTier);
             this.backgroundOpacity = backgroundOpacity;
             this.apiKey = apiKey == null ? "" : apiKey;
         }

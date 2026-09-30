@@ -50,7 +50,7 @@ public class RebuildLayoutTest {
     a = Robolectric.buildActivity(Activity.class).setup().visible().get();
     a.getResources().getDisplayMetrics().widthPixels = 1264;
     a.getResources().getDisplayMetrics().heightPixels = 2736;
-    DeepSeekConfig.saveCaptionGlyphHeightRatioBps(a, 203);
+    DeepSeekConfig.saveCaptionSizeTier(a, 2);
     CaptionOverlay.clear();
     CaptionOverlay.setActivity(a);
   }
@@ -92,7 +92,7 @@ public class RebuildLayoutTest {
     assertEquals("[Original] source", text().getText().toString());
     assertEquals(longText, field("pendingText"));
     float minimum = SubtitleStyleMetrics.textSizePxForGlyphHeight(text().getPaint(),
-        SubtitleStyleMetrics.targetGlyphHeightPx(150,1264));
+        SubtitleStyleMetrics.targetGlyphHeightPx(0,1264,false));
     assertTrue(text().getTextSize() >= minimum);
   }
 
@@ -231,21 +231,25 @@ public class RebuildLayoutTest {
   }
 
   @Test public void twoLinesUseCompactBackgroundRatherThanMaximumVideoWidth() throws Exception {
-    bounds=new Rect(0,0,360,203);
+    // Keep the same two explicit lines readable at the larger N19 default glyph size.
+    bounds=new Rect(0,0,640,360);
     String caption="This is the first line\nAnd this is the second";
     CaptionOverlay.showCaption(caption,()->true);
     assertEquals(caption,text().getText().toString());
     assertTrue(text().getMeasuredWidth()<Math.round(bounds.width()*.92f)-20);
     assertEquals(2,text().getLayout().getLineCount());
   }
-  @Test public void screenWidthScalesDetailFullscreenAndShortsFont() throws Exception {
+  @Test public void bilibiliScaleAppliesToDetailFullscreenAndShortsFont() throws Exception {
     bounds=new Rect(0,0,360,203);CaptionOverlay.showCaption("Short caption",()->true);
     float inline=text().getTextSize();
+    float detailGlyph=SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint());
+    assertEquals(44.5f,detailGlyph,.5f);
     CaptionOverlay.setPlayerType("FULLSCREEN");
     a.getResources().getDisplayMetrics().widthPixels=2736;
     a.getResources().getDisplayMetrics().heightPixels=1264;
     bounds=new Rect(0,0,640,360);CaptionOverlay.refreshStyle(a);
-    assertEquals(55.5408f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    assertEquals(55.5f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    assertEquals(55.5f/44.5f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint())/detailGlyph,.03f);
     CaptionOverlay.setPlayerType("WATCH");
     a.getResources().getDisplayMetrics().widthPixels=1264;
     a.getResources().getDisplayMetrics().heightPixels=2736;
@@ -258,13 +262,14 @@ public class RebuildLayoutTest {
     bounds=new Rect(0,0,640,360);CaptionOverlay.showCaption("Short caption",()->true);
     float normal=text().getTextSize();
     bounds=new Rect(0,0,360,203);CaptionOverlay.refreshStyle(a);
-    assertEquals(SubtitleStyleMetrics.targetGlyphHeightPx(203,1264)*360f/640f,
+    assertEquals(SubtitleStyleMetrics.targetGlyphHeightPx(2,1264,false)*360f/640f,
         SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),1f);
     bounds=new Rect(0,0,640,360);CaptionOverlay.refreshStyle(a);
     assertEquals(normal,text().getTextSize(),.1f);
   }
   @Test public void longWrappedTextKeepsAllCharactersAtCompactWidth() throws Exception {
-    bounds=new Rect(0,0,600,340);
+    // The original 600px fixture was calibrated for the former 25.6px glyph default.
+    bounds=new Rect(0,0,1040,585);
     String caption="The complete sentence should wrap naturally across two readable lines.";
     CaptionOverlay.showCaption(caption,()->true);
     assertEquals(caption,text().getText().toString());
@@ -272,11 +277,61 @@ public class RebuildLayoutTest {
     assertEquals(2,layout.getLineCount());
     assertEquals(caption.length(),layout.getLineEnd(layout.getLineCount()-1));
   }
-  @Test public void previewAndRendererShareScreenRatioSizing() {
-    float screenWidth=2736,actualWidth=1920,previewWidth=600;
-    float actual=SubtitleStyleMetrics.targetGlyphHeightPx(203,screenWidth);
-    float preview=SubtitleStyleMetrics.previewGlyphHeightPx(203,screenWidth,actualWidth,previewWidth);
-    assertEquals(actual*previewWidth/actualWidth,preview,.001f);
+  @Test public void previewAndRendererShareFullscreenReferenceSizing() {
+    float screenWidth=2736,previewWidth=600;
+    float actual=SubtitleStyleMetrics.targetGlyphHeightPx(2,screenWidth,true);
+    float preview=SubtitleStyleMetrics.previewGlyphHeightPx(2,previewWidth);
+    assertEquals(actual*previewWidth/screenWidth,preview,.001f);
+  }
+
+  @Test public void earlyPlayerModeCallbackKeepsFontUntilScreenGeometryActuallyChanges() throws Exception {
+    bounds=new Rect(0,0,640,360);
+    CaptionOverlay.setPlayerType("WATCH");
+    CaptionOverlay.showCaption("字幕",()->true);
+    assertEquals(44.5f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    CaptionOverlay.setPlayerType("WATCH_WHILE_FULLSCREEN");
+    CaptionOverlay.refreshStyle(a);
+    assertEquals("mode callback arrives before rotation",44.5f,
+        SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    a.getResources().getDisplayMetrics().widthPixels=2736;
+    a.getResources().getDisplayMetrics().heightPixels=1264;
+    CaptionOverlay.refreshStyle(a);
+    assertEquals(55.5f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    CaptionOverlay.setPlayerType("WATCH_WHILE_MAXIMIZED");
+    CaptionOverlay.refreshStyle(a);
+    assertEquals("exit callback also arrives before rotation",55.5f,
+        SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    a.getResources().getDisplayMetrics().widthPixels=1264;
+    a.getResources().getDisplayMetrics().heightPixels=2736;
+    CaptionOverlay.refreshStyle(a);
+    assertEquals(44.5f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+  }
+
+  @Test public void shortsAlwaysUseDetailRatioAheadOfFullscreenModeAndOrientation() throws Exception {
+    a.getResources().getDisplayMetrics().widthPixels=2736;
+    a.getResources().getDisplayMetrics().heightPixels=1264;
+    bounds=new Rect(0,0,1000,563);
+    CaptionOverlay.setPlayerType("WATCH_WHILE_FULLSCREEN");
+    shorts=true;
+    CaptionOverlay.showCaption("字幕",()->true);
+    assertEquals(SubtitleStyleMetrics.targetGlyphHeightPx(2,2736,false),
+        SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    shorts=false;
+    CaptionOverlay.refreshStyle(a);
+    assertEquals(55.5f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+  }
+
+  @Test public void largerDefaultKeepsOverflowSafetyAtFormerSmallWrappingFixture() throws Exception {
+    bounds=new Rect(0,0,600,340);
+    String caption="The complete sentence should wrap naturally across two readable lines.";
+    CaptionOverlay.showCaption(caption,()->true,()->"Original");
+    assertEquals("Original",text().getText().toString());
+    assertEquals(caption,field("pendingText"));
+    assertEquals(SubtitleStyleMetrics.textSizePxForGlyphHeight(text().getPaint(),44.5f),
+        CaptionOverlay.budget().preferredPx,.001f);
+    // Existing explicit-original fallback is allowed to use the smallest approved tier.
+    assertEquals(34f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    assertTrue(text().getLayout().getLineCount()<=2);
   }
 
   @Test public void videoAspectRatioDoesNotChangeScreenBasedFont() throws Exception {
@@ -295,10 +350,10 @@ public class RebuildLayoutTest {
     bounds=new Rect(0,0,1012,569);CaptionOverlay.refreshStyle(a); // under 20% contraction
     assertEquals(before,text().getTextSize(),.001f);
     bounds=new Rect(0,0,632,355);CaptionOverlay.refreshStyle(a);
-    assertEquals(SubtitleStyleMetrics.targetGlyphHeightPx(203,632),
+    assertEquals(SubtitleStyleMetrics.targetGlyphHeightPx(2,632,false),
         SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
-    assertEquals(SubtitleStyleMetrics.targetGlyphHeightPx(203,632),
-        SubtitleStyleMetrics.renderedGlyphHeightPx(203,1264,632,1264),.001f);
+    assertEquals(SubtitleStyleMetrics.targetGlyphHeightPx(2,632,false),
+        SubtitleStyleMetrics.renderedGlyphHeightPx(2,1264,false,632,1264),.001f);
     bounds=new Rect(0,0,1264,711);CaptionOverlay.refreshStyle(a);
     assertEquals(before,text().getTextSize(),.001f);
   }
@@ -320,7 +375,7 @@ public class RebuildLayoutTest {
     Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(150));
     FrameLayout host=(FrameLayout)((WeakReference<?>)field("hostRef")).get();
     host.getViewTreeObserver().dispatchOnPreDraw();
-    assertEquals(55.5408f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
+    assertEquals(44.5f*2736f/1264f,SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint()),.5f);
   }
 
   @Test public void presentedPixelMetricsMatchActualTextPaintAndGeometry() throws Exception {
@@ -328,10 +383,10 @@ public class RebuildLayoutTest {
     bounds=new Rect(0,0,1264,711);CaptionOverlay.showCaption("字幕",()->true);
     String history=a.getSharedPreferences("deepseek_caption_diagnostics",0).getString("history","");
     assertTrue(history.contains(";width="+CaptionOverlay.budget().width+";"));
-    assertTrue(history.contains(";target_glyph_height_px="+SubtitleStyleMetrics.targetGlyphHeightPx(203,1264)));
+    assertTrue(history.contains(";target_glyph_height_px="+SubtitleStyleMetrics.targetGlyphHeightPx(2,1264,false)));
     assertTrue(history.contains(";glyph_height_px="+SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint())));
     assertTrue(history.contains(";font_metrics_height_px="+SubtitleStyleMetrics.fontMetricsHeightPx(text().getPaint())));
-    assertTrue(history.contains(";screen_width_px=1264;video_width_px=1264;normal_video_width_px=1264;ratio_bps=203;"));
+    assertTrue(history.contains(";screen_width_px=1264;video_width_px=1264;normal_video_width_px=1264;size_tier=2;size_mode=detail;"));
     assertTrue(history.contains(";density="));assertTrue(history.contains(";fontScale="));
     assertEquals(CaptionOverlay.budget().preferredPx,text().getTextSize(),.001f);
     DeepSeekConfig.saveDisplayTextDebugEnabled(a,false);
@@ -419,8 +474,8 @@ public class RebuildLayoutTest {
         (java.util.List<RebuildPageLayout.Page>) field("pendingPages");
     assertEquals(expectedPages, pages.size());
     float expected = SubtitleStyleMetrics.textSizePxForGlyphHeight(text().getPaint(),
-        SubtitleStyleMetrics.targetGlyphHeightPx(DeepSeekConfig.displayStyle(a).captionGlyphHeightRatioBps,
-            a.getResources().getDisplayMetrics().widthPixels));
+        SubtitleStyleMetrics.targetGlyphHeightPx(DeepSeekConfig.displayStyle(a).captionSizeTier,
+            a.getResources().getDisplayMetrics().widthPixels,false));
     StringBuilder joined = new StringBuilder();
     long cursor = start;
     for (RebuildPageLayout.Page page : pages) {

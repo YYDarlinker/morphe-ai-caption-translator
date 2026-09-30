@@ -110,12 +110,12 @@ public class ProfileUiRegressionTest {
         assertFalse(a.getSharedPreferences("deepseek_caption_secret",0).contains("api_key_ciphertext"));assertEquals(b,ApiProfiles.active(a));
     }
     @Test public void deletingLegacyPreservesGlobalPreferencesAndCannotResurrectOnRelaunch(){
-        DeepSeekConfig.saveEnabled(a,true);DeepSeekConfig.saveCaptionGlyphHeightRatioBps(a,200);DeepSeekConfig.saveFlyoutMenuEnabled(a,false);
+        DeepSeekConfig.saveEnabled(a,true);DeepSeekConfig.saveCaptionSizeTier(a,3);DeepSeekConfig.saveFlyoutMenuEnabled(a,false);
         DeepSeekConfig.savePrompt(a,"old custom");DeepSeekConfig.saveBaseUrl(a,"https://old.example");
         String b=ApiProfiles.create(a,"B","https://b.example");
         a.getSharedPreferences("deepseek_caption_secret",0).edit().putString("api_key_ciphertext","A").putString("api_key_ciphertext_"+b,"B").apply();
         ApiProfiles.delete(a,"default");
-        assertEquals(b,ApiProfiles.active(a));assertTrue(DeepSeekConfig.enabled(a));assertEquals(200,DeepSeekConfig.load(a).captionGlyphHeightRatioBps);
+        assertEquals(b,ApiProfiles.active(a));assertTrue(DeepSeekConfig.enabled(a));assertEquals(3,DeepSeekConfig.load(a).captionSizeTier);
         assertFalse(DeepSeekConfig.flyoutMenuEnabled(a));assertFalse(ApiProfiles.values(a,"default").contains("prompt"));
         assertFalse(ApiProfiles.list(a.getApplicationContext()).containsKey("default"));assertTrue(SecureApiKey.hasSavedValue(a));
     }

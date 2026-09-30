@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Перевод"</string>
     <string name="cap_translation_requirements" formatted="false">"Инструкции для перевода"</string>
     <string name="cap_style" formatted="false">"Стиль субтитров"</string>
-    <string name="cap_size" formatted="false">"Высота текста Shorts / сведений о видео"</string>
+    <string name="cap_size" formatted="false">"Размер шрифта (сведения)"</string>
     <string name="cap_opacity" formatted="false">"Непрозрачность фона"</string>
     <string name="cap_reset_position" formatted="false">"Сбросить положение"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Кэш и диагностика"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"Введите ключ API"</string>
     <string name="cap_key_saved" formatted="false">"Сохранён в зашифрованном виде; введите новый для замены"</string>
     <string name="cap_model_hint" formatted="false">"Выберите модель или введите её ID"</string>
-    <string name="cap_preview_hint" formatted="false">"Размер текста и фон обновляются сразу"</string>
-    <string name="cap_size_hint" formatted="false">"Высота текста Shorts / сведений о видео (px); 1.5%–3.0% ширины экрана, по умолчанию 2.03%; пропорциональное масштабирование при полном экране и сужении видео"</string>
+    <string name="cap_preview_hint" formatted="false">"Предпросмотр стиля"</string>
+    <string name="cap_size_hint" formatted="false">"Стандартный: сведения 44.5px · полный экран 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% — прозрачный, 100% — непрозрачный; сохранение при отпускании"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Разверните для просмотра и копирования диагностики"</string>
     <string name="cap_use_youtube" formatted="false">"Использовать YouTube"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"Исходные субтитры недоступны. Выберите дорожку ещё раз."</string>
     <string name="cap_caption_overflow" formatted="false">"Субтитр слишком длинный — оригинал недоступен"</string>
     <string name="cap_quality_outcome" formatted="false">"Локальная проверка: принято / отклонено (качество)"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s: сведения %2$spx · полный экран %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Очень маленький"</string>
+    <string name="cap_size_tier_s" formatted="false">"Маленький"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Стандартный"</string>
+    <string name="cap_size_tier_l" formatted="false">"Большой"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Очень большой"</string>
 </resources>

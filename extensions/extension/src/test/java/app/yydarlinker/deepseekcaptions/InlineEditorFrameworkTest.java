@@ -57,13 +57,13 @@ public class InlineEditorFrameworkTest {
         assertEquals(root.getWidth()-root.getPaddingRight(),preview.getRight());
         assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getHeight());
         assertFalse(preview.isClickable());assertFalse(preview.hasOnClickListeners());
-        SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,240);
+        SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,3);
         SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);
-        assertEquals(240,preview.ratioBps);assertEquals(35,preview.opacity);
+        assertEquals(3,preview.sizeTier);assertEquals(35,preview.opacity);
         preview.measure(View.MeasureSpec.makeMeasureSpec(preview.getWidth(),View.MeasureSpec.EXACTLY),0);
         assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getMeasuredHeight());
         assertEquals(CaptionStrings.settings(activity,"preview"),preview.getContentDescription().toString());
-        assertEquals(240,preview.ratioBps);assertEquals(35,preview.opacity);
+        assertEquals(3,preview.sizeTier);assertEquals(35,preview.opacity);
         activity.finish();
     }
 

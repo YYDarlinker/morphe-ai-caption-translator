@@ -29,8 +29,8 @@ public class ApiProfilesTest {
   ApiProfiles.select(a,"default");assertTrue(SecureApiKey.hasSavedValue(a));assertEquals("legacy",a.getSharedPreferences("deepseek_caption_secret",0).getString("api_key_ciphertext",""));
  }
  @Test public void namesDoNotChangeIdentityOrGlobalEngineAndStyle(){
-  DeepSeekConfig.saveEnabled(a,true);DeepSeekConfig.saveCaptionGlyphHeightRatioBps(a,200);String b=ApiProfiles.create(a,"B","https://b.example/v1");ApiProfiles.rename(a,b,"Renamed");
-  ApiProfiles.select(a,b);assertEquals("Renamed",ApiProfiles.list(a).get(b));assertTrue(DeepSeekConfig.enabled(a));assertEquals(200,DeepSeekConfig.load(a).captionGlyphHeightRatioBps);
+  DeepSeekConfig.saveEnabled(a,true);DeepSeekConfig.saveCaptionSizeTier(a,3);String b=ApiProfiles.create(a,"B","https://b.example/v1");ApiProfiles.rename(a,b,"Renamed");
+  ApiProfiles.select(a,b);assertEquals("Renamed",ApiProfiles.list(a).get(b));assertTrue(DeepSeekConfig.enabled(a));assertEquals(3,DeepSeekConfig.load(a).captionSizeTier);
   assertEquals(b,ApiProfiles.active(a.getApplicationContext()));assertEquals(2,ApiProfiles.list(a).size());
  }
  @Test public void pendingUrlEditsFlushToOldProfileAndDetachedEventsCannotWriteNewProfile(){

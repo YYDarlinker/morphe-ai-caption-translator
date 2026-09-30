@@ -10,8 +10,10 @@ static final String[][] SOURCES={
 {"API 地址必须以 https:// 或 http:// 开头","message_bafa7b1ca6cb"},
 {"相对字号 8–15；13sp 为舒适基准，随画面比例缩放","size_hint"},
 {"只删除本机加密保存的 API Key，不修改其他设置。","message_6ec744dcc83a"},
+{"%1$s：详情页 %2$spx · 全屏 %3$spx","size_tier_hint"},
 {"根据 API 地址和 Key 自动获取，也可手动输入","model_hint"},
 {"已启用；从自动翻译选择任意语言即可启动 AI 字幕","message_2c107e436145"},
+{"标准：详情页 44.5px · 全屏 55.5px","size_hint"},
 {"原字幕可直接显示；自动翻译需填写 API Key","message_1cc3c4b0aab0"},
 {"各方案独立保存；清空恢复随界面语言变化的默认要求","prompt_summary"},
 {"无法新增方案，请检查输入及 30 套方案上限。","profile_add_failed"},
@@ -81,6 +83,7 @@ static final String[][] SOURCES={
 {"诊断记录已清空","message_8bfb437edfc4"},
 {"API 可用：","message_3a1185c1dc9f"},
 {"显示文本调试：","message_c46b062d22ba"},
+{"字号（详情页）","size"},
 {"API 配置","api_config"},
 {"API 地址","api_address"},
 {"测试 API","test_api"},
@@ -116,6 +119,7 @@ static final String[][] SOURCES={
 {"原有配置","profile_default"},
 {"方案名称","profile_name"},
 {"新增方案","profile_add"},
+{"样式预览","preview_hint"},
 {"引擎：","message_dd0fb9f395bc"},
 {"（约 ","message_c34848823d86"},
 {"重命名","profile_rename"},
@@ -130,8 +134,13 @@ static final String[][] SOURCES={
 {"删除","delete"},
 {"开启","on"},
 {"关闭","off"},
+{"超小","size_tier_xs"},
+{"标准","size_tier_standard"},
+{"超大","size_tier_xl"},
 {"开","on"},
-{"关","off"}
+{"关","off"},
+{"小","size_tier_s"},
+{"大","size_tier_l"}
 };
 static final String[][] ENGLISH={
 {"ai_title","AI caption translation"},
@@ -144,7 +153,7 @@ static final String[][] ENGLISH={
 {"translation","Translation"},
 {"translation_requirements","Translation instructions"},
 {"style","Caption style"},
-{"size","Shorts / video details glyph height"},
+{"size","Font size (video details)"},
 {"opacity","Background opacity"},
 {"reset_position","Reset caption position"},
 {"cache_diagnostics","Cache and diagnostics"},
@@ -166,8 +175,8 @@ static final String[][] ENGLISH={
 {"enter_key","Enter API Key"},
 {"key_saved","Stored encrypted; enter to replace"},
 {"model_hint","Select a model or enter its ID"},
-{"preview_hint","Font size and background update live"},
-{"size_hint","Glyph height in Shorts / video details (px); 1.5%–3.0% of screen width, default 2.03%; scales proportionally in full screen and when the video narrows"},
+{"preview_hint","Style preview"},
+{"size_hint","Standard: video details 44.5px · full screen 55.5px"},
 {"opacity_hint","0% transparent, 100% opaque; saved on release"},
 {"diagnostic_hint","Expand to inspect and copy diagnostic records"},
 {"use_youtube","Use YouTube"},
@@ -256,6 +265,12 @@ static final String[][] ENGLISH={
 {"source_retry","Caption connection interrupted. Retrying…"},
 {"source_unavailable","Source captions unavailable. Try selecting the caption track again."},
 {"caption_overflow","Caption too long — original unavailable"},
-{"quality_outcome","Local validation: accepted / rejected (quality)"}
+{"quality_outcome","Local validation: accepted / rejected (quality)"},
+{"size_tier_hint","%1$s: video details %2$spx · full screen %3$spx"},
+{"size_tier_xs","Extra small"},
+{"size_tier_s","Small"},
+{"size_tier_standard","Standard"},
+{"size_tier_l","Large"},
+{"size_tier_xl","Extra large"}
 };
 }

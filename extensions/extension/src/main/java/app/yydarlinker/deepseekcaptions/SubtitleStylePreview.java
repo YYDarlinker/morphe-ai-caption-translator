@@ -9,7 +9,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.util.*;
 
-/** Theme-aware settings preview measured in the same content-frame coordinates as the live overlay. */
+/** Theme-aware 16:9 preview scaled from the calibrated full-screen reference. */
 @SuppressWarnings("deprecation")
 public final class SubtitleStylePreview extends android.preference.Preference {
     static final float LANDSCAPE_REFERENCE_WIDTH_PX=2736f;
@@ -26,7 +26,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
         root.addView(preview,new LinearLayout.LayoutParams(-1,-2));
         TextView hint=new TextView(c);hint.setText(CaptionStrings.localize(c,"字号与背景设置实时预览"));CaptionSettingsStyle.caption(hint);hint.setPadding(0,CaptionSettingsStyle.dp(c,8),0,0);root.addView(hint);return root;
     }
-    static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.ratioBps=value;else p.opacity=value;p.invalidate();}}
+    static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.sizeTier=CaptionFontSize.clampTier(value);else p.opacity=value;p.invalidate();}}
     // Use all available row width; video and captions share one 16:9 coordinate system.
     static float frameWidth(float width){
         return Math.max(1,width);
@@ -34,7 +34,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
     static float stageHeight(float width){
         return frameWidth(width)*9f/16f;
     }
-    static TextView sampleLabel(Context c,String sample,int ratioBps,int opacity,float screenWidthPx,float contentWidth){
+    static TextView sampleLabel(Context c,String sample,int sizeTier,int opacity,float screenWidthPx,float contentWidth){
         android.util.DisplayMetrics d=c.getResources().getDisplayMetrics();TextView label=new TextView(c);
         label.setIncludeFontPadding(false);label.setGravity(Gravity.CENTER);label.setTextColor(Color.WHITE);label.setText(sample);label.setMaxLines(2);label.setEllipsize(null);
         label.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);label.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
@@ -42,14 +42,14 @@ public final class SubtitleStylePreview extends android.preference.Preference {
         int maximum=Math.max(1,Math.round(contentWidth*.92f)-2*padX);
         label.setTypeface(Typeface.DEFAULT,Typeface.NORMAL);
         float sizePx=SubtitleStyleMetrics.textSizePxForGlyphHeight(label.getPaint(),
-                SubtitleStyleMetrics.targetGlyphHeightPx(ratioBps,screenWidthPx));
+                SubtitleStyleMetrics.targetGlyphHeightPx(sizeTier,screenWidthPx,true));
         label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sizePx);label.setShadowLayer(d.density,0,d.density,0xD0000000);
         GradientDrawable bg=new GradientDrawable();bg.setColor(SubtitleStyleMetrics.alpha(opacity)<<24);bg.setCornerRadius(4*d.density);label.setBackground(bg);
         int compact=CaptionOverlay.compactWidthPx(sample,sizePx,maximum)+2*padX;label.measure(View.MeasureSpec.makeMeasureSpec(compact,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));label.layout(0,0,compact,label.getMeasuredHeight());return label;
     }
     static final class Preview extends View {
-        int ratioBps;int opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);ratioBps=s.captionGlyphHeightRatioBps;opacity=s.backgroundOpacity;setContentDescription(CaptionStrings.settings(c,"preview"));}
+        int sizeTier;int opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);sizeTier=s.captionSizeTier;opacity=s.backgroundOpacity;setContentDescription(CaptionStrings.settings(c,"preview"));}
         @Override protected void onMeasure(int widthSpec,int heightSpec){int width=MeasureSpec.getSize(widthSpec);int height=Math.round(stageHeight(width));setMeasuredDimension(width,resolveSize(height,heightSpec));}
         @Override protected void onDraw(Canvas c){
             android.util.DisplayMetrics d=getResources().getDisplayMetrics();float radius=12*d.density;paint.setColor(CaptionSettingsStyle.tint(CaptionSettingsStyle.primary(getContext()),7));c.drawRoundRect(0,0,getWidth(),getHeight(),radius,radius,paint);
@@ -61,7 +61,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
             float scale=w/contentW,contentH=h/scale;
             String sample=CaptionStrings.localize(getContext(),"这是字幕样式预览");
             // Simulate the full-size content frame first; shrink the entire view exactly once.
-            TextView label=sampleLabel(getContext(),sample,ratioBps,opacity,
+            TextView label=sampleLabel(getContext(),sample,sizeTier,opacity,
                     LANDSCAPE_REFERENCE_WIDTH_PX,contentW);
             float pos=DeepSeekConfig.captionPositionY(getContext(),true);
             c.save();c.scale(scale,scale);

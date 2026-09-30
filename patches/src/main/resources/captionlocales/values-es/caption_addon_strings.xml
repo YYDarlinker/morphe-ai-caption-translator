@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Traducción"</string>
     <string name="cap_translation_requirements" formatted="false">"Instrucciones de traducción"</string>
     <string name="cap_style" formatted="false">"Estilo de subtítulos"</string>
-    <string name="cap_size" formatted="false">"Altura de texto en Shorts / detalles"</string>
+    <string name="cap_size" formatted="false">"Tamaño de letra (detalles)"</string>
     <string name="cap_opacity" formatted="false">"Opacidad del fondo"</string>
     <string name="cap_reset_position" formatted="false">"Restablecer posición"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Caché y diagnóstico"</string>
@@ -32,8 +32,8 @@
     <string name="cap_enter_key" formatted="false">"Introduce la clave de API"</string>
     <string name="cap_key_saved" formatted="false">"Guardada cifrada; escribe para sustituirla"</string>
     <string name="cap_model_hint" formatted="false">"Selecciona un modelo o introduce su ID"</string>
-    <string name="cap_preview_hint" formatted="false">"El tamaño de letra y el fondo se actualizan en directo"</string>
-    <string name="cap_size_hint" formatted="false">"Altura de texto en Shorts / detalles del vídeo (px); 1.5%–3.0% del ancho de pantalla, 2.03% por defecto; escala proporcionalmente a pantalla completa y al estrecharse el vídeo"</string>
+    <string name="cap_preview_hint" formatted="false">"Vista previa de estilo"</string>
+    <string name="cap_size_hint" formatted="false">"Estándar: detalles 44.5px · pantalla completa 55.5px"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparente, 100% opaco; se guarda al soltar"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Expande para consultar y copiar el diagnóstico"</string>
     <string name="cap_use_youtube" formatted="false">"Usar YouTube"</string>
@@ -123,4 +123,10 @@
     <string name="cap_source_unavailable" formatted="false">"Subtítulos de origen no disponibles. Vuelve a seleccionar la pista."</string>
     <string name="cap_caption_overflow" formatted="false">"Subtítulo demasiado largo; original no disponible"</string>
     <string name="cap_quality_outcome" formatted="false">"Validación local: aceptados / rechazados (calidad)"</string>
+    <string name="cap_size_tier_hint" formatted="false">"%1$s: detalles %2$spx · pantalla completa %3$spx"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Muy pequeño"</string>
+    <string name="cap_size_tier_s" formatted="false">"Pequeño"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Estándar"</string>
+    <string name="cap_size_tier_l" formatted="false">"Grande"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Muy grande"</string>
 </resources>

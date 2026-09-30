@@ -52,6 +52,74 @@ public class SettingsPolish113Test {
     }
     private void heading(LinearLayout root,String title){TextView label=new TextView(root.getContext());label.setText(title);CaptionSettingsStyle.caption(label);label.setTextSize(14);label.setPadding(20,20,20,6);root.addView(label);}
     private View row(android.preference.Preference preference,LinearLayout root){View row=preference.getView(null,new ListView(root.getContext()));root.addView(row,new LinearLayout.LayoutParams(-1,-2));return row;}
+    private float assertTierRail(View root,int selected){
+        DeepSeekSliderPreference.SizeTierSeekBar slider=(DeepSeekSliderPreference.SizeTierSeekBar)root.findViewWithTag("ai_size_tier_slider");
+        LinearLayout names=(LinearLayout)root.findViewWithTag("ai_size_tier_names");
+        assertNotNull(slider);assertNotNull(names);assertEquals(4,slider.getMax());assertEquals(selected,slider.getProgress());
+        assertEquals(5,names.getChildCount());assertEquals(slider.getThumbOffset(),names.getPaddingLeft());assertEquals(slider.getThumbOffset(),names.getPaddingRight());
+        String[] keys={"size_tier_xs","size_tier_s","size_tier_standard","size_tier_l","size_tier_xl"};
+        String current=CaptionStrings.settings(root.getContext(),keys[selected]);
+        assertTrue(slider.getContentDescription().toString().contains(current));
+        assertTrue(names.getContentDescription().toString().contains(current));
+        float tolerance=CaptionSettingsStyle.dp(root.getContext(),2);
+        Bitmap rail=Bitmap.createBitmap(slider.getWidth(),slider.getHeight(),Bitmap.Config.ARGB_8888);slider.draw(new Canvas(rail));
+        android.graphics.drawable.Drawable thumb=slider.getThumb(),track=slider.getProgressDrawable();int thumbOffset=slider.getThumbOffset();
+        float nativeThumbCenter=thumb.getBounds().exactCenterX()+slider.getPaddingLeft()-thumbOffset;
+        assertEquals("selected tick must align with the native thumb",nativeThumbCenter,slider.tickCenterX(selected),tolerance);
+        // Rasterize the tick layer alone so semitransparent theme colors can be checked exactly.
+        slider.setThumb(null);slider.setProgressDrawable(null);rail.eraseColor(Color.TRANSPARENT);slider.draw(new Canvas(rail));
+        int y=Math.round(slider.getPaddingTop()+(slider.getHeight()-slider.getPaddingTop()-slider.getPaddingBottom())/2f);
+        int previousWidth=-1;float maxAlignmentError=0;
+        for(int tier=0;tier<5;tier++){
+            TextView label=(TextView)names.getChildAt(tier);
+            assertEquals(CaptionStrings.settings(root.getContext(),keys[tier]),label.getText().toString());
+            assertFalse(label.getText().toString().contains("px"));
+            int expected=tier==selected?CaptionSettingsStyle.primary(root.getContext()):CaptionSettingsStyle.secondary(root.getContext());
+            assertEquals(expected,label.getCurrentTextColor());assertEquals(tier==selected,label.getTypeface().isBold());
+            if(previousWidth>=0)assertTrue("equal cells tolerate only integer pixel rounding",Math.abs(previousWidth-label.getWidth())<=1);
+            previousWidth=label.getWidth();
+            float labelCenter=names.getLeft()+label.getLeft()+label.getWidth()/2f;
+            assertEquals("tier label center must align with its tick",slider.getLeft()+slider.tickCenterX(tier),labelCenter,tolerance);
+            maxAlignmentError=Math.max(maxAlignmentError,Math.abs(slider.getLeft()+slider.tickCenterX(tier)-labelCenter));
+            assertEquals("native tick raster must use the tier color",expected,rail.getPixel(Math.round(slider.tickCenterX(tier)),y));
+        }
+        slider.setThumb(thumb);slider.setThumbOffset(thumbOffset);slider.setProgressDrawable(track);
+        rail.recycle();
+        return maxAlignmentError;
+    }
+    @Test @Config(qualifiers="ar-rSA-w420dp-h900dp") public void tierRailAlignsNativeThumbAndLocalizedNamesInRtl(){
+        Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
+        try{
+            DeepSeekConfig.saveCaptionSizeTier(activity,2);
+            DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);preference.setTitle(CaptionStrings.settings(activity,"size"));
+            View root=preference.onCreateView(new FrameLayout(activity));root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            SeekBar slider=(SeekBar)root.findViewWithTag("ai_size_tier_slider");
+            root.measure(View.MeasureSpec.makeMeasureSpec(420,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,420,root.getMeasuredHeight());
+            for(int tier=0;tier<5;tier++){
+                slider.setProgress(tier);Shadows.shadowOf(slider).getOnSeekBarChangeListener().onProgressChanged(slider,tier,true);assertTierRail(root,tier);
+            }
+        }finally{activity.finish();}
+    }
+    @Test @Config(qualifiers="zh-rCN-w420dp-h900dp") public void tierRailRendersFiveAlignedLocalizedNamesAndUpdatesAccessibility(){
+        for(boolean dark:new boolean[]{false,true}){
+            Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
+            activity.setTheme(dark?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);
+            try{
+                DeepSeekConfig.saveCaptionSizeTier(activity,2);
+                DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);preference.setTitle(CaptionStrings.settings(activity,"size"));
+                View root=preference.onCreateView(new FrameLayout(activity));
+                SeekBar slider=(SeekBar)root.findViewWithTag("ai_size_tier_slider");
+                for(int width:new int[]{320,420,960}){
+                    root.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,width,root.getMeasuredHeight());
+                    for(int tier=0;tier<5;tier++){
+                        slider.setProgress(tier);Shadows.shadowOf(slider).getOnSeekBarChangeListener().onProgressChanged(slider,tier,true);
+                        assertTierRail(root,tier);
+                        assertEquals("drag previews without persisting",2,DeepSeekConfig.displayStyle(activity).captionSizeTier);
+                    }
+                }
+            }finally{activity.finish();}
+        }
+    }
     @Test @Config(qualifiers="zh-rCN-w420dp-h900dp") public void renderNativeLightAndDarkSettingsFixtures()throws Exception{
         for(int tier:new int[]{CaptionFontSize.DEFAULT_TIER,4}) for(boolean dark:new boolean[]{false,true}){
             Activity activity=Robolectric.buildActivity(Activity.class).setup().get();activity.setTheme(dark?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);
@@ -68,8 +136,12 @@ public class SettingsPolish113Test {
             heading(root,"缓存与诊断");row(new DeepSeekDiagnosticsPreference(activity),root);
             root.measure(View.MeasureSpec.makeMeasureSpec(420,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,420,root.getMeasuredHeight());
             Bitmap bitmap=Bitmap.createBitmap(420,root.getHeight(),Bitmap.Config.ARGB_8888);root.draw(new Canvas(bitmap));
+            float alignmentError=assertTierRail(root,tier);
+            System.out.println("N20_TIER_RAIL theme="+(dark?"dark":"light")+" tier="+tier+" max_label_tick_error_px="+alignmentError);
             assertTrue(root.getHeight()>500);assertEquals(previewRow.getWidth()-previewRow.getPaddingLeft()-previewRow.getPaddingRight(),preview.getWidth());assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getHeight());
-            String output=System.getenv("CAPTION_UI_PREVIEW_OUTPUT");if(output!=null){File file=new File(output,"settings-"+(dark?"dark":"light")+"-"+(tier==2?"standard":"xl")+"-landscape.png");file.getParentFile().mkdirs();try(FileOutputStream out=new FileOutputStream(file)){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}}
+            String output=System.getenv("CAPTION_UI_PREVIEW_OUTPUT");if(output!=null){File file=new File(output,"settings-"+(dark?"dark":"light")+"-"+(tier==2?"standard":"xl")+"-landscape.png");file.getParentFile().mkdirs();try(FileOutputStream out=new FileOutputStream(file)){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}
+                if(!dark&&tier==CaptionFontSize.DEFAULT_TIER){try(FileOutputStream out=new FileOutputStream(new File(output,"settings-size-tiers.png"))){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}}
+            }
             activity.finish();
         }
     }

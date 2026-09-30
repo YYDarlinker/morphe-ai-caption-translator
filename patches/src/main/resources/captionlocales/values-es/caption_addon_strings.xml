@@ -121,7 +121,7 @@
     <string name="cap_profile_confirm_delete" formatted="false">"Confirmar eliminación"</string>
     <string name="cap_source_retry" formatted="false">"Conexión de subtítulos interrumpida. Reintentando…"</string>
     <string name="cap_source_unavailable" formatted="false">"Subtítulos de origen no disponibles. Vuelve a seleccionar la pista."</string>
-    <string name="cap_caption_overflow" formatted="false">"Subtítulo demasiado largo; original no disponible"</string>
+    <string name="cap_caption_translating" formatted="false">"Traduciendo…"</string>
     <string name="cap_quality_outcome" formatted="false">"Validación local: aceptados / rechazados (calidad)"</string>
     <string name="cap_size_tier_hint" formatted="false">"%1$s: detalles %2$spx · pantalla completa %3$spx"</string>
     <string name="cap_size_tier_xs" formatted="false">"Muy pequeño"</string>

@@ -53,7 +53,7 @@ public class RebuildN3PaginationTest {
         RebuildPageLayout.plan(sixty, 0, 5000, tenCharacters).isEmpty());
     assertTrue(RebuildPageLayout.plan(A10, 165680, 167180,
         text -> text.codePointCount(0, text.length()) <= 36).isEmpty());
-    assertTrue("an unreadable 886ms translation uses its source fallback",
+    assertTrue("an unreadable 886ms translation still fails closed before blank display",
         RebuildPageLayout.plan("有没有应该纳入的内容？", 0, 886,
             text -> true).isEmpty());
     assertEquals("only the entire short source window can force the time exception",

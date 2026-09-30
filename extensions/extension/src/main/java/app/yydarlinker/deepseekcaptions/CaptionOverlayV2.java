@@ -90,7 +90,7 @@ final class CaptionOverlay {
   private static List<RebuildPageLayout.Page> pendingPages = Collections.emptyList();
   private static int shownPage = -1;
   private static boolean previousShorts, previousFullScreen;
-  private static boolean pendingStatus, suppressed, guardedExpansion;
+  private static boolean pendingStatus, pendingWaiting, suppressed, guardedExpansion;
   private static RenderGuard currentGuard;
   private static Supplier<String> fallback;
   private static Rect previous = new Rect();
@@ -106,7 +106,8 @@ final class CaptionOverlay {
   private static final android.view.ViewTreeObserver.OnPreDrawListener WATCH =
       () -> {
         long now = SystemClock.uptimeMillis();
-        if (now - lastLayout >= 100 && !guardedExpansion && !suppressed && !pendingText.isEmpty()) {
+        if (now - lastLayout >= 100 && !guardedExpansion && !suppressed
+            && (!pendingText.isEmpty() || !pendingIdentity.isEmpty())) {
           lastLayout = now;
           render();
         }
@@ -157,6 +158,11 @@ final class CaptionOverlay {
     show(s, false, g, f, id, start, end, position);
   }
 
+  static void showWaitingEvent(String s, RenderGuard g, String id,
+      long start, long end, long position) {
+    show(s, false, g, null, id, start, end, position, true);
+  }
+
   static void position(long position) {
     main(() -> {
       pendingPosition = position;
@@ -178,6 +184,11 @@ final class CaptionOverlay {
 
   private static void show(String s, boolean status, RenderGuard g, Supplier<String> f, String id,
       long start, long end, long position) {
+    show(s, status, g, f, id, start, end, position, false);
+  }
+
+  private static void show(String s, boolean status, RenderGuard g, Supplier<String> f, String id,
+      long start, long end, long position, boolean waiting) {
     if (g != null && !g.isValid()) return;
     long command = COMMAND.incrementAndGet();
     main(
@@ -191,6 +202,7 @@ final class CaptionOverlay {
           pendingPages = Collections.emptyList();
           shownPage = -1;
           pendingStatus = status;
+          pendingWaiting = waiting;
           currentGuard = g;
           fallback = f;
           dirty = true;
@@ -209,6 +221,7 @@ final class CaptionOverlay {
         () -> {
           if (command != COMMAND.get() || g != null && !g.isValid()) return;
           pendingText = "";
+          pendingIdentity = "";
           pendingPages = Collections.emptyList();
           shownPage = -1;
           fallback = null;
@@ -223,6 +236,7 @@ final class CaptionOverlay {
         () -> {
           if (command != COMMAND.get()) return;
           pendingText = "";
+          pendingIdentity = "";
           pendingPages = Collections.emptyList();
           shownPage = -1;
           pendingStatus = false;
@@ -375,7 +389,7 @@ final class CaptionOverlay {
     if (a == null
         || a.isFinishing()
         || a.isDestroyed()
-        || pendingText.isEmpty()
+        || pendingText.isEmpty() && pendingIdentity.isEmpty()
         || suppressed
         || guardedExpansion
         || currentGuard != null && !currentGuard.isValid()) {
@@ -436,7 +450,8 @@ final class CaptionOverlay {
     float size = preferred;
     String shown = pendingText;
     String mode = pendingStatus ? "status" : "caption";
-    boolean ownedCaption = !pendingStatus && pendingStart >= 0 && pendingEnd > pendingStart;
+    boolean ownedCaption = !pendingStatus && !pendingWaiting && !pendingText.isEmpty()
+        && pendingStart >= 0 && pendingEnd > pendingStart;
     pendingPages = ownedCaption
         ? RebuildPageLayout.plan(pendingText, pendingStart, pendingEnd,
             value -> linesPx(value, preferred, inner) <= 2,
@@ -456,9 +471,8 @@ final class CaptionOverlay {
       shown = fallback == null ? "" : fallback.get();
       if (shown == null || shown.isEmpty() || linesPx(shown, size, inner) > 2) {
         mode = "overflow_status";
-        shown = CaptionStrings.get(a, "caption_overflow");
+        shown = "";
       }
-      if (linesPx(shown, size, inner) > 2) shown = "…";
     }
     text.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
     String notice = pendingIdentity + "|" + pendingText + "|" + mode + "|" + inner + "|" + size
@@ -514,6 +528,10 @@ final class CaptionOverlay {
                 + CaptionQualityTrace.redact(shown, DeepSeekConfig.load(a).apiKey, 400));
     }
     text.setText(shown);
+    if (shown.isEmpty()) {
+      hideView();
+      return;
+    }
     text.setSingleLine(false);
     text.setMaxLines(2);
     text.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);

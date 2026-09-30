@@ -245,11 +245,12 @@ public class RebuildIntegrationTest {
   public void originalModeMakesZeroModelCalls() throws Exception {
     start(true);
     RebuildController.Session s = session();
-    await(() -> s.raw != null);
+    await(() -> s.source != null);
     RebuildController.time(1000);
     advance(100);
     assertEquals(0, calls.get());
     assertTrue(s.sourceOnly);
+    assertTrue(s.lastShown,s.lastShown.endsWith("|This is one complete sentence.|"));
   }
 
   @Test
@@ -745,9 +746,9 @@ public class RebuildIntegrationTest {
     await(() -> s.raw != null);
     Method original =
         RebuildController.class.getDeclaredMethod(
-            "original", RebuildController.Session.class, long.class, boolean.class);
+            "original", RebuildController.Session.class, long.class);
     original.setAccessible(true);
-    assertEquals("newer words", original.invoke(null, s, 2000L, false));
+    assertEquals("newer words", original.invoke(null, s, 2000L));
     assertEquals(0, calls.get());
   }
 
@@ -834,13 +835,14 @@ public class RebuildIntegrationTest {
     }
   }
 
-  @Test public void a01ColdWaitShowsTimedSourceThenReplacesWithinOwnedWindow()throws Exception {
+  @Test public void a01ColdWaitShowsPlaceholderThenReplacesWithinOwnedWindow()throws Exception {
     engine.startMs=80;engine.duration=6960;
     blockResponse=true; start(false);await(()->calls.get()==1);
     RebuildController.time(92);
     RebuildController.Session s=session();
     assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:0:80_7040"));
-    assertTrue(s.lastShown.contains("[原文 / Original] This is one complete sentence."));
+    assertTrue(s.lastShown,s.lastShown.endsWith("|"+CaptionStrings.get(a,"caption_translating")+"|"));
+    assertFalse(s.lastShown.contains("This is one complete sentence."));
     assertEquals("",s.displayedEvent);
     release.countDown();await(()->s.plans[0]!=null);
     RebuildController.time(3195);
@@ -849,7 +851,7 @@ public class RebuildIntegrationTest {
     assertTrue(s.position<7040);
     assertEquals(7040,s.plans[0].events.get(0).end);
   }
-  @Test public void rawSourceShowsOwnedCueBeforeEnginePlanExists()throws Exception {
+  @Test public void rawSourceShowsWaitingPlaceholderWithinOwnedCueBeforeEnginePlanExists()throws Exception {
     engine.startMs=80;engine.duration=6960;
     blockResponse=true;start(false);RebuildController.Session s=session();await(()->s.blocks!=null);
     RebuildSource savedSource=s.source;
@@ -861,7 +863,8 @@ public class RebuildIntegrationTest {
     Method render=RebuildController.class.getDeclaredMethod("render",RebuildController.Session.class);
     render.setAccessible(true);render.invoke(null,s);
     assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:raw:80_7040"));
-    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] This is one complete sentence."));
+    assertTrue(s.lastShown,s.lastShown.endsWith("|"+CaptionStrings.get(a,"caption_translating")+"|"));
+    assertFalse(s.lastShown,s.lastShown.contains("This is one complete sentence."));
     assertFalse(s.lastShown,s.lastShown.contains("字幕准备中"));
     synchronized(s){s.position=7040;s.lastShown="";}
     render.invoke(null,s);
@@ -876,10 +879,11 @@ public class RebuildIntegrationTest {
     RebuildController.Session s=session();await(()->s.blocks!=null&&calls.get()==1);
     assertEquals(0,s.attempts[0]);
     assertEquals(1,s.attempts[1]);
-    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] This is the current sentence."));
+    assertTrue(s.lastShown,s.lastShown.endsWith("|"+CaptionStrings.get(a,"caption_translating")+"|"));
+    assertFalse(s.lastShown,s.lastShown.contains("This is the current sentence."));
     assertTrue(CaptionDiagnostics.fullText(a).contains("skipped_due_to_late_ready"));
   }
-  @Test public void failedBlockShowsEachOriginalCueOnlyInItsOwnTime()throws Exception {
+  @Test public void failedBlockStaysBlankWithEachCueOnlyInItsOwnTime()throws Exception {
     engine.fixtureBody=new JSONObject().put("events",new JSONArray()
       .put(RebuildR2SourceTest.cue(80,6960,"This is the first sentence.",false))
       .put(RebuildR2SourceTest.cue(7040,12960,"Earlier claims belong to this cue.",false))
@@ -889,23 +893,33 @@ public class RebuildIntegrationTest {
     assertEquals(28920,s.blocks.get(1).end);
     synchronized(s){s.states[1]=RebuildController.FAILED;s.reasons[1]="semantic_anchor_leak";}
     RebuildController.time(7000);
-    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] This is the first sentence."));
+    assertTrue(s.lastShown,s.lastShown.endsWith("|"+CaptionStrings.get(a,"caption_translating")+"|"));
+    assertFalse(s.lastShown,s.lastShown.contains("This is the first sentence."));
     assertFalse(s.lastShown,s.lastShown.contains("字幕暂不可用"));
     assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
     RebuildController.time(7040);
     assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:1:7040_20000"));
-    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] Earlier claims belong to this cue."));
+    assertTrue(s.lastShown,s.lastShown.endsWith("||"));
+    assertEquals("failed:semantic_anchor_leak",s.fallbackReason);
+    long blankRevision=s.renderRevision;
+    RebuildController.time(7041);
+    assertEquals("identical blank owned cue must remain deduplicated",blankRevision,s.renderRevision);
+    assertFalse(s.lastShown,s.lastShown.contains("Earlier claims"));
     assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
     assertFalse(s.lastShown,s.lastShown.contains("字幕暂不可用"));
     RebuildController.time(19999);
     assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
     RebuildController.time(20000);
     assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:1:20000_28920"));
-    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] Later equipment belongs to this cue."));
+    assertTrue(s.lastShown,s.lastShown.endsWith("||"));
+    assertTrue("the next blank cue still produces its own render",s.renderRevision>blankRevision);
     RebuildController.time(28920);
     assertFalse(s.lastShown,s.lastShown.contains("Later equipment"));
+    assertEquals("",s.fallbackReason);
+    assertTrue(CaptionDiagnostics.fullText(a).contains("reason=failed:semantic_anchor_leak"));
+    RebuildLayoutTest.exportDiagnostics("controller-failure-diagnostics.txt",CaptionDiagnostics.fullText(a));
   }
-  @Test public void eventReviewShowsOwnedOriginalWhileKeepingAcceptedTextWhenSafe()throws Exception {
+  @Test public void eventReviewStaysBlankWithinOwnedWindowAndKeepsAcceptedTextWhenSafe()throws Exception {
     engine.startMs=384639;engine.duration=7105;
     engine.fixtureBody=new JSONObject().put("events",new JSONArray().put(
         RebuildR2SourceTest.cue(384639,7105,"Foreign investment and explosive economic growth followed.",false))).toString();
@@ -924,10 +938,65 @@ public class RebuildIntegrationTest {
     }
     RebuildController.time(384648);
     assertTrue(s.lastShown,s.lastShown.startsWith("caption:source:0:"));
-    assertTrue(s.lastShown,s.lastShown.contains("[原文 / Original] Foreign investment and explosive economic growth followed."));
+    assertTrue(s.lastShown,s.lastShown.endsWith("||"));
+    assertFalse(s.lastShown,s.lastShown.contains("Foreign investment"));
+    assertFalse(s.lastShown,s.lastShown.contains("可展示的译文"));
+    assertEquals("event_review",s.fallbackReason);
+    assertTrue(CaptionDiagnostics.fullText(a).contains("reason=event_review"));
     assertFalse(s.lastShown,s.lastShown.contains("字幕暂不可用"));
     RebuildController.time(391744);
     assertFalse(s.lastShown,s.lastShown.contains("Foreign investment"));
+    assertEquals("",s.fallbackReason);
+  }
+
+  @Test public void lateUnreadableShowsOnlyWaitingAndKeepsItsOwnEnd()throws Exception {
+    engine.startMs=80;engine.duration=6960;
+    blockResponse=true;start(false);RebuildController.Session s=session();await(()->s.blocks!=null);
+    RebuildPlanner.Block b=s.blocks.get(0);
+    RebuildProtocol.Event event=new RebuildProtocol.Event(b.from,b.to,b.start,b.end,
+        "这段译文来得太晚，不能把后续时间借给当前字幕。");
+    synchronized(s){
+      s.plans[0]=new RebuildProtocol.Plan(Collections.singletonList(event),"{}",Collections.emptyList());
+      s.states[0]=RebuildController.READY;
+    }
+    RebuildController.time(6282);
+    assertTrue(s.lastShown,s.lastShown.endsWith("|"+CaptionStrings.get(a,"caption_translating")+"|"));
+    assertFalse(s.lastShown,s.lastShown.contains(event.text));
+    assertFalse(s.lastShown,s.lastShown.contains("This is one complete sentence."));
+    assertEquals("late_unreadable",s.fallbackReason);
+    String history=CaptionDiagnostics.fullText(a);
+    assertTrue(history.contains("REBUILD_LATE_UNREADABLE"));
+    assertTrue(history.contains(";remaining=758"));
+    assertTrue(history.contains("reason=late_unreadable"));
+    RebuildLayoutTest.exportDiagnostics("controller-late-diagnostics.txt",history);
+    RebuildController.time(7040);
+    assertTrue(s.lastShown,s.lastShown.endsWith("||"));
+    assertEquals("",s.fallbackReason);
+    assertEquals(7040,event.end);
+  }
+
+  @Test public void emptyStartupStatusUsesWaitingAndActionableStatusesRemainVisible()throws Exception {
+    blockResponse=true;start(false);RebuildController.Session s=session();await(()->s.blocks!=null);
+    RebuildSource saved=s.source;
+    RawCaptionSource.Source savedRaw=s.raw;
+    Method render=RebuildController.class.getDeclaredMethod("render",RebuildController.Session.class);
+    render.setAccessible(true);
+    synchronized(s){s.source=null;s.raw=null;s.status="";s.lastShown="";}
+    render.invoke(null,s);
+    assertTrue(s.lastShown,s.lastShown.endsWith("|"+CaptionStrings.get(a,"caption_translating")+"|"));
+    assertTrue(s.lastShown,s.lastShown.startsWith("status:"));
+    for(String message:new String[]{CaptionStrings.get(a,"configure_api"),
+        "字幕 API 配置错误：invalid_model",CaptionStrings.get(a,"source_unavailable"),
+        CaptionStrings.get(a,"source_retry")}) {
+      synchronized(s){s.status=message;s.lastShown="";}
+      render.invoke(null,s);
+      assertTrue(s.lastShown,s.lastShown.endsWith("|"+message+"|"));
+    }
+    synchronized(s){s.raw=savedRaw;s.status=CaptionStrings.get(a,"source_retry");s.lastShown="";}
+    render.invoke(null,s);
+    assertTrue("retry remains actionable even with a raw cue",s.lastShown.endsWith(
+        "|"+CaptionStrings.get(a,"source_retry")+"|"));
+    synchronized(s){s.source=saved;s.raw=savedRaw;s.status="";}
   }
   @Test public void r28LateReadabilityDoesNotInventOrExtendTimes() {
     RebuildProtocol.Event e=new RebuildProtocol.Event(0,20,80,7040,"在2月24日之前，你只需在网上稍作搜索，就能找到声称俄罗斯拥有世界第二强军事力量的人");

@@ -121,7 +121,7 @@
     <string name="cap_profile_confirm_delete" formatted="false">"Konfirmasi hapus"</string>
     <string name="cap_source_retry" formatted="false">"Koneksi subtitel terputus. Mencoba lagi…"</string>
     <string name="cap_source_unavailable" formatted="false">"Subtitel sumber tidak tersedia. Pilih kembali trek subtitel."</string>
-    <string name="cap_caption_overflow" formatted="false">"Subtitel terlalu panjang — teks asli tidak tersedia"</string>
+    <string name="cap_caption_translating" formatted="false">"Menerjemahkan…"</string>
     <string name="cap_quality_outcome" formatted="false">"Validasi lokal: diterima / ditolak (kualitas)"</string>
     <string name="cap_size_tier_hint" formatted="false">"%1$s: detail video %2$spx · layar penuh %3$spx"</string>
     <string name="cap_size_tier_xs" formatted="false">"Sangat kecil"</string>

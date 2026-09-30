@@ -76,6 +76,10 @@ public class RebuildLayoutTest {
     return (FrameLayout) ((WeakReference<?>) field("anchorRef")).get();
   }
 
+  String presentationHistory() {
+    return a.getSharedPreferences("deepseek_caption_diagnostics",0).getString("history","");
+  }
+
   @Test
   public void shortEventIsOneReadableLine() throws Exception {
     CaptionOverlay.showCaption("这是完整的一句。", () -> true);
@@ -88,8 +92,8 @@ public class RebuildLayoutTest {
   public void longEventFallsBackWithoutTailCropping() throws Exception {
     bounds = new Rect(0, 0, 240, 400);
     String longText = String.join("", java.util.Collections.nCopies(120, "字"));
-    CaptionOverlay.showCaption(longText, () -> true, () -> "[Original] source");
-    assertEquals("[Original] source", text().getText().toString());
+    CaptionOverlay.showCaption(longText, () -> true, () -> "source-only caption");
+    assertEquals("source-only caption", text().getText().toString());
     assertEquals(longText, field("pendingText"));
     float minimum = SubtitleStyleMetrics.textSizePxForGlyphHeight(text().getPaint(),
         SubtitleStyleMetrics.targetGlyphHeightPx(0,1264,false));
@@ -97,13 +101,105 @@ public class RebuildLayoutTest {
   }
 
   @Test
-  public void oversizedOriginalAlsoUsesExplicitStatus() throws Exception {
+  public void oversizedOriginalRemainsBlankAndRecordsOverflowWithAllFields() throws Exception {
+    CaptionDiagnostics.clear(a);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a, true);
     bounds = new Rect(0, 0, 200, 400);
     String text = String.join("", java.util.Collections.nCopies(200, "字"));
-    CaptionOverlay.showCaption(text, () -> true, () -> text);
-    assertNotEquals(text, text().getText().toString());
-    assertTrue(
-        text().getText().toString().contains("Caption") || text().getText().toString().equals("…"));
+    CaptionOverlay.showEvent(text, () -> true, () -> text,"n20-overflow",0,5000,100);
+    assertEquals("", text().getText().toString());
+    assertEquals(View.GONE, anchor().getVisibility());
+    String history=CaptionDiagnostics.fullText(a);
+    assertTrue(history.contains("REBUILD_LAYOUT_FALLBACK"));
+    assertTrue(history.contains("REBUILD_PRESENTED"));
+    assertTrue(history.contains("id=n20-overflow;mode=overflow_status;"));
+    assertTrue(history.contains(";pagination_unresolved=true;text="));
+    assertPresentationFields(history);
+    exportDiagnostics("overlay-overflow-diagnostics.txt",history);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a, false);
+  }
+
+  static void assertPresentationFields(String history) {
+    for(String field:new String[]{"id","mode","width","sp","text_size_px",
+        "target_glyph_height_px","rendered_glyph_target_px","glyph_height_px",
+        "font_metrics_height_px","screen_width_px","video_width_px","normal_video_width_px",
+        "size_tier","size_mode","detail_glyph_height_px","full_screen_glyph_height_px",
+        "glyph_height_ratio","effective_glyph_height_ratio","density","fontScale","lines",
+        "pagination_unresolved","text"})
+      assertTrue("diagnostic keeps field "+field,history.contains(field+"="));
+  }
+
+  static void exportDiagnostics(String name,String history)throws Exception {
+    String output=System.getenv("MORPHE_N20_DIAGNOSTICS_EXPORT");
+    if(output==null)return;
+    java.nio.file.Path file=java.nio.file.Path.of(output,name);
+    java.nio.file.Files.createDirectories(file.getParent());
+    java.nio.file.Files.write(file,history.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+
+  @Test public void blankOwnedEventsStillRecordEachIdentityAndDeduplicateRefresh()throws Exception {
+    CaptionDiagnostics.clear(a);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a, true);
+    CaptionOverlay.showEvent("",()->true,()->"","n20-failed:80_7040",80,7040,100);
+    assertEquals("",text().getText().toString());
+    assertEquals(View.GONE,anchor().getVisibility());
+    for(int n=0;n<8;n++)CaptionOverlay.refreshStyle(a);
+    String history=presentationHistory();
+    assertEquals(1,history.split("REBUILD_PRESENTED",-1).length-1);
+    assertEquals(0,history.split("REBUILD_LAYOUT_FALLBACK",-1).length-1);
+    assertTrue(history.contains("id=n20-failed:80_7040;mode=caption;"));
+    assertPresentationFields(history);
+    CaptionOverlay.showEvent("",()->true,()->"","n20-failed:7040_20000",7040,20000,7040);
+    history=presentationHistory();
+    assertEquals(2,history.split("REBUILD_PRESENTED",-1).length-1);
+    assertTrue(history.contains("id=n20-failed:7040_20000;mode=caption;"));
+    exportDiagnostics("overlay-blank-diagnostics.txt",history);
+    CaptionOverlay.hide();
+    CaptionOverlay.refreshStyle(a);
+    assertEquals(2,presentationHistory().split("REBUILD_PRESENTED",-1).length-1);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a, false);
+  }
+
+  @Test public void blankEventRetriesPresentationAfterGeometryAppearsWithoutFlooding()throws Exception {
+    CaptionDiagnostics.clear(a);
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a,true);
+    bounds=null;
+    CaptionOverlay.showEvent("",()->true,()->"","n20-late-geometry",80,7040,100);
+    assertFalse(CaptionDiagnostics.fullText(a).contains("REBUILD_PRESENTED"));
+    bounds=new Rect(0,0,600,340);
+    FrameLayout host=(FrameLayout)((WeakReference<?>)field("hostRef")).get();
+    for(int n=0;n<8;n++) {
+      Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(120));
+      host.getViewTreeObserver().dispatchOnPreDraw();
+    }
+    String history=presentationHistory();
+    assertEquals(1,history.split("REBUILD_PRESENTED",-1).length-1);
+    assertTrue(history.contains("id=n20-late-geometry;mode=caption;"));
+    assertEquals(View.GONE,anchor().getVisibility());
+    DeepSeekConfig.saveDisplayTextDebugEnabled(a,false);
+  }
+
+  @Test public void waitingPlaceholderIsVisibleEvenWhenCueTimeCannotFitTranslation()throws Exception {
+    CaptionDiagnostics.clear(a);
+    String waiting=CaptionStrings.get(a,"caption_translating");
+    CaptionOverlay.showWaitingEvent(waiting,()->true,"n20-wait:6282_7040",6282,7040,6282);
+    assertEquals(waiting,text().getText().toString());
+    assertEquals(View.VISIBLE,anchor().getVisibility());
+    assertTrue(((java.util.List<?>)field("pendingPages")).isEmpty());
+    assertFalse(CaptionDiagnostics.fullText(a).contains("REBUILD_LAYOUT_FALLBACK"));
+  }
+
+  @Test public void actionableStatusesRemainActuallyVisibleAtNormalVideoWidth()throws Exception {
+    bounds=new Rect(0,0,1121,631);
+    for(String message:new String[]{CaptionStrings.get(a,"configure_api"),
+        "字幕 API 配置错误：invalid_model",CaptionStrings.get(a,"source_unavailable"),
+        CaptionStrings.get(a,"source_retry")}) {
+      CaptionOverlay.showStatus(message,()->true);
+      assertEquals(message,text().getText().toString());
+      assertEquals(View.VISIBLE,anchor().getVisibility());
+      assertTrue(CaptionOverlay.linesPx(message,text().getTextSize(),
+          CaptionOverlay.budget().width)<=2);
+    }
   }
 
   @Test

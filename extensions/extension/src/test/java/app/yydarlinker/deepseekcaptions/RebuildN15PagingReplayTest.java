@@ -63,7 +63,7 @@ public class RebuildN15PagingReplayTest {
       assertNotNull(in); corpus=new String(in.readAllBytes(),StandardCharsets.UTF_8);
     }
     JSONObject root=new JSONObject(corpus);
-    JSONArray result=new JSONArray(),blocks=root.getJSONArray("blocks");
+    JSONArray result=new JSONArray(),blankFailureDisplays=new JSONArray(),blocks=root.getJSONArray("blocks");
     JSONArray words=root.getJSONArray("source_word_times");
     assertEquals(9684,words.length());
     assertEquals(124,blocks.length());
@@ -85,7 +85,7 @@ public class RebuildN15PagingReplayTest {
       }
       nextWord=block.getInt("to")+1;
       if(!"accepted".equals(block.getString("status"))) {
-        assertEquals("documented original fallback", "final-fail",block.getString("status"));
+        assertEquals("documented failed source ownership", "final-fail",block.getString("status"));
         JSONArray fallback=block.getJSONArray("fallback_events");
         int cursor=block.getInt("from");
         for(int cue=0;cue<fallback.length();cue++) {
@@ -96,6 +96,12 @@ public class RebuildN15PagingReplayTest {
           assertEquals(words.getJSONArray(part.getInt("to")).getInt(3),part.getLong("end"));
           for(int word=cursor;word<=part.getInt("to");word++)
             assertEquals(part.getInt("source_cue_id"),words.getJSONArray(word).getInt(4));
+          // N20 projects final failures as blank without changing the frozen source provenance.
+          blankFailureDisplays.put(new JSONObject().put("block",i)
+              .put("from",part.getInt("from")).put("to",part.getInt("to"))
+              .put("source_cue_id",part.getInt("source_cue_id"))
+              .put("start",part.getLong("start")).put("end",part.getLong("end"))
+              .put("mode","caption").put("reason","failed").put("text",""));
           cursor=part.getInt("to")+1;
         }
         assertEquals(block.getInt("to")+1,cursor);
@@ -173,6 +179,8 @@ public class RebuildN15PagingReplayTest {
         .put("prompt_sha256",root.getString("prompt_sha256"))
         .put("accepted_chinese_word_ids",chineseWords)
         .put("documented_original_fallback_word_ids",fallbackWords)
+        .put("current_failure_blank_word_ids",fallbackWords)
+        .put("current_failure_displays",blankFailureDisplays)
         .put("hard_constraints",constraints).put("api_calls",0).put("api_tokens",0)
         .put("measurement","Robolectric SDK28 StaticLayout proxy; not a phone measurement")
         .toString(2)+"\n").getBytes(StandardCharsets.UTF_8));
@@ -180,6 +188,16 @@ public class RebuildN15PagingReplayTest {
     assertEquals(9684,nextWord);
     assertEquals(9576,chineseWords);
     assertEquals(108,fallbackWords);
+    int blankWords=0;
+    for(int i=0;i<blankFailureDisplays.length();i++) {
+      JSONObject blank=blankFailureDisplays.getJSONObject(i);
+      assertEquals("",blank.getString("text"));
+      assertEquals("caption",blank.getString("mode"));
+      assertEquals(words.getJSONArray(blank.getInt("from")).getLong(2),blank.getLong("start"));
+      assertEquals(words.getJSONArray(blank.getInt("to")).getLong(3),blank.getLong("end"));
+      blankWords+=blank.getInt("to")-blank.getInt("from")+1;
+    }
+    assertEquals("all historical failure word ownership now projects to blank",108,blankWords);
     assertEquals("captured accepted Chinese events",540,count);
     assertTrue("StaticLayout native graphics must actually wrap",
         lines(String.join("",Collections.nCopies(100,"中")),paint)>=(GLYPH_HEIGHT_PX==null ? 5 : 3));

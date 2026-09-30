@@ -38,7 +38,7 @@ public class CaptionRatioSettingsTest {
                 LinearLayout root=(LinearLayout)preference.onCreateView(new FrameLayout(activity));
                 SeekBar slider=(SeekBar)root.getChildAt(1);
                 TextView value=(TextView)((LinearLayout)root.getChildAt(0)).getChildAt(1);
-                TextView summary=(TextView)root.getChildAt(2);
+                TextView summary=(TextView)root.getChildAt(3);
                 assertEquals(4,slider.getMax());assertEquals(2,slider.getProgress());
                 assertEquals("44.5 px",value.getText().toString());
                 SeekBar.OnSeekBarChangeListener listener=Shadows.shadowOf(slider).getOnSeekBarChangeListener();

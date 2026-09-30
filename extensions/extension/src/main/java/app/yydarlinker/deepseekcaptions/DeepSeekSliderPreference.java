@@ -1,8 +1,11 @@
 package app.yydarlinker.deepseekcaptions;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -94,7 +97,9 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
-        SeekBar slider = new SeekBar(context);
+        boolean sizeSlider = KEY_TEXT_SIZE.equals(getKey());
+        SeekBar slider = sizeSlider ? new SizeTierSeekBar(context) : new SeekBar(context);
+        slider.setTag(sizeSlider ? "ai_size_tier_slider" : "ai_opacity_slider");
         slider.setMinimumHeight(dp(48));
         slider.setContentDescription(getTitle());
         int minimum = minimum();
@@ -107,6 +112,15 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+
+        LinearLayout tierNames = sizeSlider ? tierNames(slider) : null;
+        if (tierNames != null) {
+            root.addView(tierNames, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            updateTierNames(slider, tierNames, current);
+        }
 
         CharSequence summaryText = KEY_TEXT_SIZE.equals(getKey()) ? tierDescription(current) : getSummary();
         TextView summary = new TextView(context);
@@ -122,7 +136,11 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 valueLabel.setText(format(minimum + progress));
-                if (KEY_TEXT_SIZE.equals(getKey())) summary.setText(tierDescription(minimum + progress));
+                if (sizeSlider) {
+                    summary.setText(tierDescription(minimum + progress));
+                    updateTierNames(slider, tierNames, minimum + progress);
+                    slider.invalidate();
+                }
                 if(fromUser) SubtitleStylePreview.update(getKey(),minimum+progress);
             }
 
@@ -133,6 +151,82 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
             }
         });
         return root;
+    }
+
+    private LinearLayout tierNames(SeekBar slider) {
+        LinearLayout names = new LinearLayout(getContext());
+        names.setTag("ai_size_tier_names");
+        names.setOrientation(LinearLayout.HORIZONTAL);
+        // With half a cell of additional rail inset, each cell center is a thumb position.
+        int inset = slider.getThumbOffset();
+        names.setPadding(inset, 0, inset, dp(4));
+        names.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        for (String key : SIZE_TIER_KEYS) {
+            TextView name = new TextView(getContext());
+            name.setText(CaptionStrings.settings(getContext(), key));
+            CaptionSettingsStyle.caption(name);
+            name.setGravity(Gravity.CENTER);
+            name.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            names.addView(name, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        return names;
+    }
+
+    private void updateTierNames(SeekBar slider, LinearLayout names, int tier) {
+        int selected = CaptionFontSize.clampTier(tier);
+        String current = CaptionStrings.settings(getContext(), SIZE_TIER_KEYS[selected]);
+        String description = getTitle() + ": " + current;
+        slider.setContentDescription(description);
+        names.setContentDescription(description);
+        for (int i = 0; i < names.getChildCount(); i++) {
+            TextView name = (TextView) names.getChildAt(i);
+            name.setTextColor(i == selected ? CaptionSettingsStyle.primary(getContext())
+                    : CaptionSettingsStyle.secondary(getContext()));
+            name.setTypeface(Typeface.DEFAULT, i == selected ? Typeface.BOLD : Typeface.NORMAL);
+        }
+    }
+
+    /** Five native thumb positions, with visible ticks even when the theme omits tick marks. */
+    static final class SizeTierSeekBar extends SeekBar {
+        private final Paint tickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        SizeTierSeekBar(Context context) {
+            super(context);
+            setTickMark(null);
+        }
+
+        @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+            float halfThumb = getThumb() == null ? getThumbOffset()
+                    : getThumb().getIntrinsicWidth() / 2f;
+            float cellWidth = (width - 2f * getThumbOffset()) / CaptionFontSize.COUNT;
+            int inset = Math.round(getThumbOffset() + cellWidth / 2f
+                    + getThumbOffset() - halfThumb);
+            setPadding(inset, getPaddingTop(), inset, getPaddingBottom());
+            super.onSizeChanged(width, height, oldWidth, oldHeight);
+        }
+
+        float tickCenterX(int tier) {
+            float halfThumb = getThumb() == null ? getThumbOffset()
+                    : getThumb().getIntrinsicWidth() / 2f;
+            float trackWidth = getWidth() - getPaddingLeft() - getPaddingRight()
+                    + 2f * getThumbOffset() - 2f * halfThumb;
+            float fraction = CaptionFontSize.clampTier(tier) / (float) (CaptionFontSize.COUNT - 1);
+            if (getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) fraction = 1f - fraction;
+            return getPaddingLeft() - getThumbOffset() + halfThumb + fraction * trackWidth;
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float centerY = getPaddingTop()
+                    + (getHeight() - getPaddingTop() - getPaddingBottom()) / 2f;
+            float radius = CaptionSettingsStyle.dp(getContext(), 3);
+            for (int tier = 0; tier < CaptionFontSize.COUNT; tier++) {
+                tickPaint.setColor(tier == getProgress() ? CaptionSettingsStyle.primary(getContext())
+                        : CaptionSettingsStyle.secondary(getContext()));
+                canvas.drawCircle(tickCenterX(tier), centerY, radius, tickPaint);
+            }
+        }
     }
 
     private int minimum() {

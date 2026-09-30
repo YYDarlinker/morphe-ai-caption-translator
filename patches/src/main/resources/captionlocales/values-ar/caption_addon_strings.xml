@@ -121,7 +121,7 @@
     <string name="cap_profile_confirm_delete" formatted="false">"تأكيد الحذف"</string>
     <string name="cap_source_retry" formatted="false">"انقطع اتصال الترجمة. جارٍ إعادة المحاولة…"</string>
     <string name="cap_source_unavailable" formatted="false">"الترجمة الأصلية غير متاحة. أعد اختيار مسار الترجمة."</string>
-    <string name="cap_caption_overflow" formatted="false">"الترجمة طويلة جدًا — النص الأصلي غير متاح"</string>
+    <string name="cap_caption_translating" formatted="false">"تجري الترجمة…"</string>
     <string name="cap_quality_outcome" formatted="false">"التحقق المحلي: مقبول / مرفوض (الجودة)"</string>
     <string name="cap_size_tier_hint" formatted="false">"%1$s: تفاصيل الفيديو %2$spx · ملء الشاشة %3$spx"</string>
     <string name="cap_size_tier_xs" formatted="false">"صغير جدًا"</string>

@@ -121,7 +121,7 @@
     <string name="cap_profile_confirm_delete" formatted="false">"确认删除"</string>
     <string name="cap_source_retry" formatted="false">"字幕连接中断，正在自动重试…"</string>
     <string name="cap_source_unavailable" formatted="false">"暂时无法获取原字幕，请重新选择字幕轨道。"</string>
-    <string name="cap_caption_overflow" formatted="false">"字幕过长，原文暂不可用"</string>
+    <string name="cap_caption_translating" formatted="false">"翻译中…"</string>
     <string name="cap_quality_outcome" formatted="false">"本地校验：接受 / 拒绝（其中质量问题）"</string>
     <string name="cap_size_tier_hint" formatted="false">"%1$s：详情页 %2$spx · 全屏 %3$spx"</string>
     <string name="cap_size_tier_xs" formatted="false">"超小"</string>

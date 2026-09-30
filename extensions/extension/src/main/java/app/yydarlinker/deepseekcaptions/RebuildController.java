@@ -795,9 +795,9 @@ final class RebuildController {
             + (detail.isEmpty() ? "" : ";" + detail));
   }
 
-  private static String original(Session s, long time, boolean label) {
+  private static String original(Session s, long time) {
     CaptionDocument.Cue cue = originalCue(s, time);
-    return cue == null ? "" : (label ? "[原文 / Original] " : "") + cue.text;
+    return cue == null ? "" : cue.text;
   }
 
   private static void endFallback(Session s,long position,String cause) {
@@ -860,20 +860,22 @@ final class RebuildController {
     synchronized (s) {
       generation = s.generation;
       selectedAt = s.position;
-      if (s.source == null && s.raw != null && !s.sourceOnly && !s.terminal) {
+      if (s.source == null && !s.status.isEmpty()) {
+        text = s.status;
+        status = true;
+      } else if (s.source == null && s.raw != null && !s.sourceOnly && !s.terminal) {
         CaptionDocument.Cue cue = originalCue(s, s.position);
         if (cue != null) {
-          text = "[原文 / Original] " + cue.text;
-          source = text;
+          text = CaptionStrings.get(s.context, "caption_translating");
           eventId = "source:raw:" + cue.startMs + "_" + cue.endMs;
           eventStart = cue.startMs;
           eventEnd = cue.endMs;
           fallbackReason = "pending_engine";
         }
       } else if (s.source == null) {
-        text = s.status.isEmpty() ? "字幕准备中…" : s.status;
+        text = s.status.isEmpty() ? CaptionStrings.get(s.context, "caption_translating") : s.status;
         status = true;
-      } else if (s.sourceOnly) text = original(s, s.position, false);
+      } else if (s.sourceOnly) text = original(s, s.position);
       else if (s.terminal) {
         text = s.status;
         status = true;
@@ -907,34 +909,29 @@ final class RebuildController {
                 eventStart = merged.start;
                 eventEnd = merged.end;
                 text = merged.text;
-                source = "[原文 / Original] " + s.source.text(merged.from, merged.to);
-              } else {
-                source = "[原文 / Original] " + s.source.text(e.from, e.to);
               }
               boolean late = merged == null && !eventId.equals(s.displayedEvent)
                   && (eventId.equals(s.withheldEvent) || lateUnreadable(e,s.position));
               if(blocked || late) {
                 if(late && !eventId.equals(s.withheldEvent))CaptionDiagnostics.mark(s.context,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
                 if(late)s.withheldEvent=eventId;
-                // A rejected display candidate still has source ownership and a bounded time.
-                // Keep the original readable instead of turning an entire event into a status.
-                text = source;
+                // Keep the existing owned window; only the diagnostic explains a rejection.
+                text = blocked ? "" : CaptionStrings.get(s.context, "caption_translating");
                 eventId = "source:" + eventId;
                 fallbackReason=blocked?"event_review":"late_unreadable";
               } else s.displayedEvent=eventId;
             }
           } else if (p == null) {
             fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
-            // Use the A01 timed source cue for every unresolved block, including final
-            // failure. A block-wide status would announce a later cue before its onset.
+            // Waiting and blank failure displays retain each source cue's own window.
+            // A block-wide display must not announce a later cue before its onset.
             CaptionDocument.Cue cue=originalCue(s,s.position);
             RebuildPlanner.Block block=s.blocks.get(i);
             if(cue!=null && cue.startMs<block.end && cue.endMs>block.start) {
               eventStart=Math.max(cue.startMs,block.start);
               eventEnd=Math.min(cue.endMs,block.end);
               if(eventStart<=s.position && s.position<eventEnd) {
-                text="[原文 / Original] "+cue.text;
-                source=text;
+                text=s.states[i]==FAILED ? "" : CaptionStrings.get(s.context, "caption_translating");
                 eventId="source:"+i+":"+eventStart+"_"+eventEnd;
               }
             }
@@ -956,7 +953,11 @@ final class RebuildController {
         () -> current(s) && s.generation == generation && s.renderRevision == revision && s.visible;
     String fallback = source;
     if (status) CaptionOverlay.showStatus(text, guard);
-    else if (text.isEmpty()) CaptionOverlay.hide(guard);
+    else if (text.isEmpty() && fallbackReason.isEmpty()) CaptionOverlay.hide(guard);
+    else if (fallbackReason.equals("pending_engine") || fallbackReason.equals("pending_translation")
+        || fallbackReason.equals("late_unreadable"))
+      CaptionOverlay.showWaitingEvent(text, guard, s.id + ":" + generation + ":" + eventId,
+          eventStart, eventEnd, selectedAt);
     else
       CaptionOverlay.showEvent(
           text, guard, () -> s.sourceOnly ? fallback : "", s.id + ":" + generation + ":" + eventId,

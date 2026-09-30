@@ -121,7 +121,7 @@
     <string name="cap_profile_confirm_delete" formatted="false">"Confirm deletion"</string>
     <string name="cap_source_retry" formatted="false">"Caption connection interrupted. Retrying…"</string>
     <string name="cap_source_unavailable" formatted="false">"Source captions unavailable. Try selecting the caption track again."</string>
-    <string name="cap_caption_overflow" formatted="false">"Caption too long — original unavailable"</string>
+    <string name="cap_caption_translating" formatted="false">"Translating…"</string>
     <string name="cap_quality_outcome" formatted="false">"Local validation: accepted / rejected (quality)"</string>
     <string name="cap_size_tier_hint" formatted="false">"%1$s: video details %2$spx · full screen %3$spx"</string>
     <string name="cap_size_tier_xs" formatted="false">"Extra small"</string>

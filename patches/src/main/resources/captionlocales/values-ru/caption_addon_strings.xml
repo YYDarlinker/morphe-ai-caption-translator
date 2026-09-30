@@ -121,7 +121,7 @@
     <string name="cap_profile_confirm_delete" formatted="false">"Подтвердить удаление"</string>
     <string name="cap_source_retry" formatted="false">"Соединение с субтитрами прервано. Повторная попытка…"</string>
     <string name="cap_source_unavailable" formatted="false">"Исходные субтитры недоступны. Выберите дорожку ещё раз."</string>
-    <string name="cap_caption_overflow" formatted="false">"Субтитр слишком длинный — оригинал недоступен"</string>
+    <string name="cap_caption_translating" formatted="false">"Перевод…"</string>
     <string name="cap_quality_outcome" formatted="false">"Локальная проверка: принято / отклонено (качество)"</string>
     <string name="cap_size_tier_hint" formatted="false">"%1$s: сведения %2$spx · полный экран %3$spx"</string>
     <string name="cap_size_tier_xs" formatted="false">"Очень маленький"</string>

@@ -4,16 +4,21 @@ import android.app.Activity;
 import android.graphics.*;
 import android.view.*;
 import android.widget.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.*;
 import org.robolectric.annotation.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import static org.junit.Assert.*;
 
 /** Actual native Android view rasterization in an isolated fixture, not a YouTube/device screenshot. */
 @RunWith(RobolectricTestRunner.class) @Config(manifest=Config.NONE,sdk=28) @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class SettingsPolish113Test {
+    /** The localized source line the landscape preview renders; also the catalog lookup key. */
+    static final String PREVIEW_SAMPLE="字幕要自然。";
     @Test public void landscapePreviewFillsAvailableWidthAndKeepsVideoAndGlyphScale(){
         float reference=SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX;
         assertEquals(2736f,reference,0);
@@ -56,18 +61,37 @@ public class SettingsPolish113Test {
         DeepSeekSliderPreference.SizeTierSeekBar slider=(DeepSeekSliderPreference.SizeTierSeekBar)root.findViewWithTag("ai_size_tier_slider");
         LinearLayout names=(LinearLayout)root.findViewWithTag("ai_size_tier_names");
         assertNotNull(slider);assertNotNull(names);assertEquals(4,slider.getMax());assertEquals(selected,slider.getProgress());
-        assertEquals(5,names.getChildCount());assertEquals(slider.getThumbOffset(),names.getPaddingLeft());assertEquals(slider.getThumbOffset(),names.getPaddingRight());
+        assertEquals(5,names.getChildCount());
+        // N24: each tier name is centred on its own tick, so the label row carries no rail inset.
+        assertEquals(0,names.getPaddingLeft());assertEquals(0,names.getPaddingRight());
+        assertFalse("tier names may overflow their equal cells to sit on their ticks",names.getClipChildren());
         String[] keys={"size_tier_xs","size_tier_s","size_tier_standard","size_tier_l","size_tier_xl"};
         String current=CaptionStrings.settings(root.getContext(),keys[selected]);
         assertTrue(slider.getContentDescription().toString().contains(current));
         assertTrue(names.getContentDescription().toString().contains(current));
         float tolerance=1f;
-        Bitmap rail=Bitmap.createBitmap(slider.getWidth(),slider.getHeight(),Bitmap.Config.ARGB_8888);slider.draw(new Canvas(rail));
-        android.graphics.drawable.Drawable thumb=slider.getThumb(),track=slider.getProgressDrawable();int thumbOffset=slider.getThumbOffset();
-        float nativeThumbCenter=thumb.getBounds().exactCenterX()+slider.getPaddingLeft()-thumbOffset;
-        assertEquals("selected tick must align with the native thumb",nativeThumbCenter,slider.tickCenterX(selected),tolerance);
-        // Rasterize the tick layer alone so semitransparent theme colors can be checked exactly.
-        slider.setThumb(null);slider.setProgressDrawable(null);rail.eraseColor(Color.TRANSPARENT);slider.draw(new Canvas(rail));
+        // N24: one geometry. railStart/railEnd are the drawn rail endpoints AND the two extreme thumb
+        // centres; every tier divides that same travel, so no endpoint check is left implied.
+        assertEquals("rail must start at the padded frame edge",slider.getPaddingLeft(),slider.railStart(),0f);
+        assertEquals("rail must end at the padded frame edge",slider.getWidth()-slider.getPaddingRight(),slider.railEnd(),0f);
+        assertEquals("first tier sits on the rail start",slider.railStart(),slider.tickCenterX(0),0f);
+        assertEquals("last tier sits on the rail end",slider.railEnd(),slider.tickCenterX(4),0f);
+        for(int tier=0;tier<5;tier++){
+            assertEquals("tier "+tier+" tick must equal its thumb centre",
+                    slider.thumbCenterX(tier/4f),slider.tickCenterX(tier),0f);
+        }
+        Bitmap rail=Bitmap.createBitmap(slider.getWidth(),slider.getHeight(),Bitmap.Config.ARGB_8888);
+        Canvas railCanvas=new Canvas(rail);
+        android.graphics.drawable.Drawable thumb=slider.getThumb(),track=slider.getProgressDrawable();
+        slider.setThumb(null);slider.setProgressDrawable(null);
+        DeepSeekSliderPreference.RailBar.RAIL_BANDS_HIDDEN=true;
+        rail.eraseColor(Color.TRANSPARENT);slider.draw(railCanvas);
+        float tickRadius=CaptionSettingsStyle.dp(root.getContext(),3);
+        // The tick ink spans the rail span grown by the tick radius on both sides, which proves the first
+        // and last ticks are centred exactly on the two rail endpoints rather than inset from them.
+        assertEquals("first tick centre must sit on the rail start",slider.railStart()-tickRadius,railStartInk(rail,slider.centerY()),1f);
+        assertEquals("last tick centre must sit on the rail end",slider.railEnd()+tickRadius-1,railEndInk(rail,slider.centerY()),1f);
+        DeepSeekSliderPreference.RailBar.RAIL_BANDS_HIDDEN=false;
         int y=Math.round(slider.getPaddingTop()+(slider.getHeight()-slider.getPaddingTop()-slider.getPaddingBottom())/2f);
         int previousWidth=-1;float maxAlignmentError=0;
         for(int tier=0;tier<5;tier++){
@@ -84,10 +108,12 @@ public class SettingsPolish113Test {
             int tickColor=tier==selected?CaptionSettingsStyle.primary(root.getContext()):CaptionSettingsStyle.sliderUnfilled(root.getContext());
             assertEquals("native tick raster must use the rail color",tickColor,rail.getPixel(Math.round(slider.tickCenterX(tier)),y));
         }
-        slider.setThumb(thumb);slider.setThumbOffset(thumbOffset);slider.setProgressDrawable(track);
+        slider.setThumb(thumb);slider.setThumbOffset(thumb==null?0:thumb.getIntrinsicWidth()/2);slider.setProgressDrawable(track);
         rail.recycle();
         return maxAlignmentError;
     }
+    private float railStartInk(Bitmap bitmap,int row){for(int x=0;x<bitmap.getWidth();x++)if(Color.alpha(bitmap.getPixel(x,row))!=0)return x;return -1;}
+    private float railEndInk(Bitmap bitmap,int row){for(int x=bitmap.getWidth()-1;x>=0;x--)if(Color.alpha(bitmap.getPixel(x,row))!=0)return x;return -1;}
     @Test @Config(qualifiers="ar-rSA-w420dp-h900dp") public void tierRailAlignsNativeThumbAndLocalizedNamesInRtl(){
         Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
         try{
@@ -122,7 +148,9 @@ public class SettingsPolish113Test {
         }
     }
     @Test @Config(qualifiers="zh-rCN-w420dp-h900dp") public void renderNativeLightAndDarkSettingsFixtures()throws Exception{
-        for(int tier:new int[]{CaptionFontSize.DEFAULT_TIER,4}) for(boolean dark:new boolean[]{false,true}){
+        JSONArray fixtureRecord=new JSONArray();
+        for(int tier:new int[]{0,CaptionFontSize.DEFAULT_TIER,4}) for(boolean dark:new boolean[]{false,true}){
+            String tierName=new String[]{"xs","s","standard","l","xl"}[tier];
             Activity activity=Robolectric.buildActivity(Activity.class).setup().get();activity.setTheme(dark?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);
             DeepSeekConfig.saveCaptionSizeTier(activity,tier);
             LinearLayout root=new LinearLayout(activity);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(dark?0xff0f0f0f:Color.WHITE);root.setLayoutParams(new FrameLayout.LayoutParams(420,-2));
@@ -133,12 +161,14 @@ public class SettingsPolish113Test {
             ApiKeyPreference key=new ApiKeyPreference(activity);key.setKey(DeepSeekTextPreference.KEY_API_KEY);key.setTitle("API Key");row(key,root);
             DeepSeekModelPreference model=new DeepSeekModelPreference(activity);model.setKey(DeepSeekModelPreference.KEY_MODEL);model.setTitle("模型");row(model,root);
             heading(root,"字幕样式");SubtitleStylePreview pref=new SubtitleStylePreview(activity);View previewRow=row(pref,root);SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)previewRow.findViewWithTag("ai_style_preview_canvas");
-            for(String field:new String[]{DeepSeekSliderPreference.KEY_TEXT_SIZE,DeepSeekSliderPreference.KEY_OPACITY}){DeepSeekSliderPreference slider=new DeepSeekSliderPreference(activity);slider.setKey(field);slider.setTitle(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?CaptionStrings.settings(activity,"size"):"背景不透明度");slider.setSummary(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?String.format(CaptionStrings.settings(activity,"size_tier_hint"),CaptionStrings.settings(activity,tier==2?"size_tier_standard":"size_tier_xl"),tier==2?"44.5":"56",tier==2?"55.5":"69.8"):"0% 为透明，100% 为不透明；松手保存");row(slider,root);}
+            for(String field:new String[]{DeepSeekSliderPreference.KEY_TEXT_SIZE,DeepSeekSliderPreference.KEY_OPACITY}){DeepSeekSliderPreference slider=new DeepSeekSliderPreference(activity);slider.setKey(field);slider.setTitle(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?CaptionStrings.settings(activity,"size"):"背景不透明度");slider.setSummary(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?String.format(CaptionStrings.settings(activity,"size_tier_hint"),CaptionStrings.settings(activity,"size_tier_"+tierName),pixels(activity,tier,false),pixels(activity,tier,true)):"0% 为透明，100% 为不透明；松手保存");row(slider,root);}
             heading(root,"缓存与诊断");row(new DeepSeekDiagnosticsPreference(activity),root);
             root.measure(View.MeasureSpec.makeMeasureSpec(420,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,420,root.getMeasuredHeight());
             Bitmap bitmap=Bitmap.createBitmap(420,root.getHeight(),Bitmap.Config.ARGB_8888);root.draw(new Canvas(bitmap));
             float alignmentError=assertTierRail(root,tier);
             SeekBar size=(SeekBar)root.findViewWithTag("ai_size_tier_slider"),opacity=(SeekBar)root.findViewWithTag("ai_opacity_slider");
+            DeepSeekSliderPreference.RailBar sizeRail=(DeepSeekSliderPreference.RailBar)size,opacityRail=(DeepSeekSliderPreference.RailBar)opacity;
+            DeepSeekSliderPreference.SizeTierSeekBar sizeTiers=(DeepSeekSliderPreference.SizeTierSeekBar)size;
             assertEquals(size.getWidth(),opacity.getWidth());assertEquals(size.getLeft(),opacity.getLeft());
             assertEquals(size.getPaddingLeft(),opacity.getPaddingLeft());assertEquals(size.getPaddingRight(),opacity.getPaddingRight());
             assertEquals(size.getThumbOffset(),opacity.getThumbOffset());
@@ -146,13 +176,74 @@ public class SettingsPolish113Test {
             assertEquals(size.getProgressTintList(),opacity.getProgressTintList());
             assertEquals(size.getProgressBackgroundTintList(),opacity.getProgressBackgroundTintList());
             assertEquals(size.getThumbTintList(),opacity.getThumbTintList());
-            System.out.println("N23_TIER_RAIL theme="+(dark?"dark":"light")+" tier="+tier+" max_label_tick_error_px="+alignmentError+" rail_width_delta_px=0 padding_delta_px=0 thumb_travel_delta_px=0");
+            int railLengthPx=Math.round(sizeRail.railEnd()-sizeRail.railStart());
+            assertEquals("both rails must be the same length",railLengthPx,Math.round(opacityRail.railEnd()-opacityRail.railStart()));
+            assertEquals("first tick must sit on the rail start",0f,sizeTiers.tickCenterX(0)-sizeRail.railStart(),0f);
+            assertEquals("last tick must sit on the rail end",0f,sizeTiers.tickCenterX(4)-sizeRail.railEnd(),0f);
+            System.out.println("N24_TIER_RAIL theme="+(dark?"dark":"light")+" tier="+tier+" rail_length_px="+railLengthPx
+                    +" rail_length_delta_px="+(railLengthPx-Math.round(opacityRail.railEnd()-opacityRail.railStart()))
+                    +" first_tick_vs_rail_start_px=0 last_tick_vs_rail_end_px=0 max_label_tick_error_px="+alignmentError);
             assertTrue(root.getHeight()>500);assertEquals(previewRow.getWidth()-previewRow.getPaddingLeft()-previewRow.getPaddingRight(),preview.getWidth());assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getHeight());
-            String output=System.getenv("CAPTION_UI_PREVIEW_OUTPUT");if(output!=null){File file=new File(output,"settings-"+(dark?"dark":"light")+"-"+(tier==2?"standard":"xl")+"-landscape.png");file.getParentFile().mkdirs();try(FileOutputStream out=new FileOutputStream(file)){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}
+            float previewWidth=preview.getWidth();
+            float fullScreenGlyph=CaptionFontSize.fullScreenGlyphHeightPx(tier);
+            float previewGlyph=SubtitleStyleMetrics.previewGlyphHeightPx(tier,previewWidth);
+            assertEquals(fullScreenGlyph/SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX,previewGlyph/previewWidth,.0001f);
+            fixtureRecord.put(new JSONObject().put("file","settings-"+(dark?"dark":"light")+"-"+tierName+"-landscape.png")
+                    .put("theme",dark?"dark":"light").put("size_tier",tier).put("tier_name",tierName)
+                    .put("preview_width_px",previewWidth).put("preview_height_px",preview.getHeight())
+                    .put("reference_full_screen_width_px",SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX)
+                    .put("detail_glyph_px",Double.parseDouble(pixels(activity,tier,false)))
+                    .put("full_screen_glyph_px",Double.parseDouble(pixels(activity,tier,true)))
+                    .put("preview_glyph_px",Double.parseDouble(String.format(java.util.Locale.ROOT,"%.2f",previewGlyph)))
+                    .put("preview_scale",Double.parseDouble(String.format(java.util.Locale.ROOT,"%.6f",previewWidth/SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX))));
+            String output=System.getenv("CAPTION_UI_PREVIEW_OUTPUT");if(output!=null){File file=new File(output,"settings-"+(dark?"dark":"light")+"-"+tierName+"-landscape.png");file.getParentFile().mkdirs();try(FileOutputStream out=new FileOutputStream(file)){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}
                 if(!dark&&tier==CaptionFontSize.DEFAULT_TIER){try(FileOutputStream out=new FileOutputStream(new File(output,"settings-size-tiers.png"))){assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,out));}}
             }
             activity.finish();
         }
+        String output=System.getenv("CAPTION_UI_PREVIEW_OUTPUT");
+        if(output!=null){File file=new File(output,"preview-measurements.json");file.getParentFile().mkdirs();
+            try(FileOutputStream out=new FileOutputStream(file)){out.write(new JSONObject().put("fixtures",fixtureRecord).toString(2).getBytes(StandardCharsets.UTF_8));}}
+    }
+    private static String pixels(Activity activity,int tier,boolean fullScreen){
+        float value=fullScreen?CaptionFontSize.fullScreenGlyphHeightPx(tier):CaptionFontSize.detailGlyphHeightPx(tier);
+        return value==Math.round(value)?Integer.toString(Math.round(value)):String.format(java.util.Locale.ROOT,"%.1f",value);
+    }
+    /**
+     * The preview must render a real sentence, not the short label that this very source string is mapped
+     * to in the catalog. The localized value may therefore legitimately be the label, so the layout
+     * properties are asserted on the raw source line with localization switched off for the fixture.
+     */
+    @Test public void previewSampleIsALongNaturalLineThatFitsTheLandscapeFrame(){
+        Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
+        try{
+            String source=SubtitleStylePreview.LANDSCAPE_SAMPLE;
+            assertEquals(PREVIEW_SAMPLE,source);
+            assertTrue("the sample must be a complete sentence",source.endsWith("。"));
+            assertTrue("the sample must be more than a bare label",source.codePointCount(0,source.length())>3);
+            SubtitleStylePreview.LOCALIZE_SAMPLE=false;
+            try{
+                SubtitleStylePreview previewRow=new SubtitleStylePreview(activity);
+                View root=previewRow.onCreateView(new FrameLayout(activity));
+                SubtitleStylePreview.Preview canvas=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");
+                canvas.sizeTier=CaptionFontSize.DEFAULT_TIER;canvas.opacity=70;
+                for(int width:new int[]{320,420,960}){
+                    canvas.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+                    canvas.layout(0,0,canvas.getMeasuredWidth(),canvas.getMeasuredHeight());
+                    assertEquals("the preview frame must stay 16:9",Math.round(width*9f/16f),canvas.getHeight());
+                    for(int tier=0;tier<CaptionFontSize.COUNT;tier++){
+                        TextView label=SubtitleStylePreview.sampleLabel(activity,source,tier,70,
+                                SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX,width);
+                        assertEquals("the sample must never be truncated",source,label.getText().toString());
+                        // getLineCount() is clamped to maxLines; the layout holds the real row count.
+                        assertNotNull("the sample must be laid out",label.getLayout());
+                        int rows=label.getLayout().getLineCount();
+                        assertTrue("the sample must fit the two line budget, needed "+rows,
+                                rows<=SubtitleStylePreview.MAX_SAMPLE_LINES);
+                    }
+                }
+            }finally{SubtitleStylePreview.LOCALIZE_SAMPLE=true;}
+        }finally{activity.finish();}
     }
     @Test public void previewHitsGlyphTargetsWithoutDensityOrFontScaleAssumptions(){
         Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
@@ -162,7 +253,7 @@ public class SettingsPolish113Test {
             float reference=SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX;
             for(int tier=0;tier<CaptionFontSize.COUNT;tier++){
                 metrics.density=1f;metrics.scaledDensity=1f;
-                TextView baseline=SubtitleStylePreview.sampleLabel(activity,"这是字幕样式预览",
+                TextView baseline=SubtitleStylePreview.sampleLabel(activity,PREVIEW_SAMPLE,
                         tier,70,reference,reference);
                 float actual=SubtitleStyleMetrics.measuredGlyphHeightPx(baseline.getPaint());
                 float target=CaptionFontSize.fullScreenGlyphHeightPx(tier);
@@ -172,7 +263,7 @@ public class SettingsPolish113Test {
                     assertEquals(SubtitleStyleMetrics.previewGlyphHeightPx(tier,previewWidth),actual*scale,1.5f*scale);
                 }
                 metrics.density=3.25f;metrics.scaledDensity=5.75f;
-                TextView changed=SubtitleStylePreview.sampleLabel(activity,"这是字幕样式预览",
+                TextView changed=SubtitleStylePreview.sampleLabel(activity,PREVIEW_SAMPLE,
                         tier,70,reference,reference);
                 assertEquals(baseline.getTextSize(),changed.getTextSize(),.001f);
                 assertEquals(actual,SubtitleStyleMetrics.measuredGlyphHeightPx(changed.getPaint()),.001f);

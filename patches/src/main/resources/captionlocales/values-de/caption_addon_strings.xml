@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Übersetzung"</string>
     <string name="cap_translation_requirements" formatted="false">"Übersetzungsanweisungen"</string>
     <string name="cap_style" formatted="false">"Untertitelstil"</string>
-    <string name="cap_size" formatted="false">"Schriftgröße (Videodetails)"</string>
+    <string name="cap_size" formatted="false">"Schriftgröße"</string>
     <string name="cap_opacity" formatted="false">"Hintergrunddeckkraft"</string>
     <string name="cap_reset_position" formatted="false">"Position zurücksetzen"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Cache und Diagnose"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"Untertiteltext-Debugging"</string>
     <string name="cap_diagnostics" formatted="false">"Untertiteldiagnose"</string>
     <string name="cap_clear_diagnostics" formatted="false">"Diagnose löschen"</string>
-    <string name="cap_preview" formatted="false">"Untertitelvorschau"</string>
+    <string name="cap_preview" formatted="false">"Vorschau im Vollbild-Querformat"</string>
     <string name="cap_landscape" formatted="false">"Querformat"</string>
     <string name="cap_refresh" formatted="false">"Aktualisieren"</string>
     <string name="cap_copy" formatted="false">"Kopieren"</string>

@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"翻訳"</string>
     <string name="cap_translation_requirements" formatted="false">"翻訳への指示"</string>
     <string name="cap_style" formatted="false">"字幕のスタイル"</string>
-    <string name="cap_size" formatted="false">"文字サイズ（動画詳細）"</string>
+    <string name="cap_size" formatted="false">"文字サイズ"</string>
     <string name="cap_opacity" formatted="false">"背景の不透明度"</string>
     <string name="cap_reset_position" formatted="false">"字幕の位置をリセット"</string>
     <string name="cap_cache_diagnostics" formatted="false">"キャッシュと診断"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"字幕テキストのデバッグ"</string>
     <string name="cap_diagnostics" formatted="false">"字幕の診断"</string>
     <string name="cap_clear_diagnostics" formatted="false">"診断記録を消去"</string>
-    <string name="cap_preview" formatted="false">"字幕プレビュー"</string>
+    <string name="cap_preview" formatted="false">"横画面の全画面プレビュー"</string>
     <string name="cap_landscape" formatted="false">"横向き"</string>
     <string name="cap_refresh" formatted="false">"更新"</string>
     <string name="cap_copy" formatted="false">"コピー"</string>

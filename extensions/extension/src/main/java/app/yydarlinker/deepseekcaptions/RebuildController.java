@@ -17,10 +17,15 @@ final class RebuildController {
       new java.util.concurrent.atomic.AtomicLong();
   static final int WAITING = 0, RUNNING = 1, READY = 2, FAILED = 3;
   private static final Handler MAIN = new Handler(Looper.getMainLooper());
+  /** Foreground translation slots. A new landing can use the free slot without waiting for the old one. */
+  static final int MAX_FOCUS_CONCURRENCY = 2;
+  /** Background prefetch slots. Background work never occupies a foreground slot. */
   static final int MAX_PREFETCH_CONCURRENCY = 2;
+  /** Client translation budget: at most four translation requests in flight in total. */
+  static final int MAX_TRANSLATION_CONCURRENCY = MAX_FOCUS_CONCURRENCY + MAX_PREFETCH_CONCURRENCY;
   static final long SEEK_STORM_WINDOW_MS = 3000, SEEK_STORM_PAUSE_MS = 5000;
   private static final ExecutorService SOURCE_IO = lane("CaptionSourceIO", 1);
-  private static final ExecutorService PRIORITY_IO = lane("CaptionPriorityIO", 1);
+  private static final ExecutorService PRIORITY_IO = lane("CaptionPriorityIO", MAX_FOCUS_CONCURRENCY);
   private static final ExecutorService PREFETCH_IO = lane("CaptionPrefetchIO", MAX_PREFETCH_CONCURRENCY);
 
   private static ExecutorService lane(String name, int concurrency) {
@@ -73,6 +78,13 @@ final class RebuildController {
     String[] reasons;
     Job[] jobs;
     boolean[] cacheChecked;
+    /**
+     * The single newest foreground request that has been selected but not handed to a lane yet. It exists
+     * only while both foreground slots are busy, and a later seek replaces it instead of queueing behind it.
+     */
+    Job pendingFocus;
+    /** Diagnostics: how many pending foreground requests have been replaced or retired this session. */
+    int replacedFocus;
     final Set<HttpURLConnection> connections = Collections.synchronizedSet(new HashSet<>());
 
     Session(
@@ -99,6 +111,7 @@ final class RebuildController {
         endFallback(this,position,"session_end");
         pausedDisplayPosition = -1;
         pausedHookState = null;
+        pendingFocus = null;
       }
       cancelled = true;
       generation++;
@@ -128,7 +141,12 @@ final class RebuildController {
     final int index;
     final boolean priority;
     volatile HttpURLConnection connection;
-    volatile boolean cancelled, sent;
+    /**
+     * {@code dispatched} means the job holds a lane slot (or is about to), {@code sent} means the provider
+     * request body has already been written. Only dispatched jobs count against the translation budget, and
+     * only the not-yet-sent newest foreground job may be replaced by a later seek.
+     */
+    volatile boolean cancelled, sent, dispatched;
     final long queuedAt = SystemClock.elapsedRealtime();
     long slotWaitMs, httpStartedAt, networkMs;
     int httpRounds;
@@ -651,34 +669,111 @@ final class RebuildController {
     return time >= b.start && time < b.end;
   }
 
+  /** The block the user is on right now, with the same rounding the planner already used. */
+  private static int currentIndex(Session s) {
+    int index = blockAt(s, s.position);
+    if (index < 0) return 0;
+    if (!covers(s.blocks.get(index), s.position) && index + 1 < s.blocks.size()) index++;
+    return index;
+  }
+
+  /** Jobs that hold a lane slot and have not finished yet. Unsent pending work is deliberately excluded. */
+  private static int dispatched(Session s, boolean focus) {
+    return dispatched(s, focus, null);
+  }
+
+  /** Same count, optionally ignoring one job that is releasing its slot right now. */
+  private static int dispatched(Session s, boolean focus, Job released) {
+    int count = 0;
+    if (s.jobs != null)
+      for (Job j : s.jobs)
+        if (j != null && j != released && j.dispatched && j.priority == focus) count++;
+    return count;
+  }
+
+  /**
+   * Hands a selected job to its lane. Attempt and repair accounting happens exactly here, so a job that is
+   * replaced before it is dispatched never consumes a translation attempt or a session repair.
+   */
+  private static void markDispatched(Session s, Job job) {
+    if (s.attempts[job.index] > 0) s.repairCount++;
+    s.attempts[job.index]++;
+    s.states[job.index] = RUNNING;
+    job.dispatched = true;
+  }
+
+  /**
+   * Drops the retained newest foreground request without dispatching it: the block goes back to WAITING so
+   * the next landing can reuse it, and no attempt or repair quota is charged.
+   */
+  private static void retirePendingFocus(Session s, String reason, int nextBlock) {
+    Job pending = s.pendingFocus;
+    if (pending == null) return;
+    s.pendingFocus = null;
+    s.replacedFocus++;
+    if (s.jobs[pending.index] == pending) s.jobs[pending.index] = null;
+    if (s.states[pending.index] == RUNNING) {
+      s.states[pending.index] = WAITING;
+      s.retryAt[pending.index] = SystemClock.elapsedRealtime() + 500;
+    }
+    CaptionDiagnostics.mark(s.context, "REBUILD_FOCUS_PENDING_REPLACED",
+        "session=" + s.id + ";request=" + pending.traceId + ";block=" + pending.index
+            + ";reason=" + reason + ";next_block=" + nextBlock
+            + ";attempts_consumed=0;session_repairs_consumed=0"
+            + ";replaced_total=" + s.replacedFocus);
+  }
+
   private static void schedule(Session s) {
     List<Job> start = new ArrayList<>();
     long now = SystemClock.elapsedRealtime();
     synchronized (s) {
       if (!current(s) || s.blocks == null || now < s.providerRetry) return;
-      int index = blockAt(s, s.position);
-      if (index < 0) index = 0;
-      else if (!covers(s.blocks.get(index), s.position) && index + 1 < s.blocks.size()) index++;
-      int backgroundRunning = 0;
-      for (Job j : s.jobs)
-        if (j != null && s.states[j.index] == RUNNING && !covers(s.blocks.get(j.index), s.position))
-          backgroundRunning++;
-      boolean allowAhead =
-          (s.plans[index] != null
+      int index = currentIndex(s);
+      int focusDispatched = dispatched(s, true);
+      int prefetchDispatched = dispatched(s, false);
+      // A retained pending request is only valid for the landing it was chosen for.
+      if (s.pendingFocus != null
+          && (s.pendingFocus.cancelled || s.pendingFocus.index != index)) {
+        retirePendingFocus(s,
+            s.pendingFocus.cancelled ? "cancelled_by_seek" : "superseded_by_seek", index);
+      }
+      // D2: the newest landing takes the free foreground slot immediately when one exists.
+      if (s.pendingFocus != null && focusDispatched < MAX_FOCUS_CONCURRENCY) {
+        Job promote = s.pendingFocus;
+        s.pendingFocus = null;
+        markDispatched(s, promote);
+        start.add(promote);
+        focusDispatched++;
+        CaptionDiagnostics.mark(s.context, "REBUILD_FOCUS_PENDING_PROMOTED",
+            "session=" + s.id + ";request=" + promote.traceId + ";block=" + promote.index
+                + ";focus_in_flight=" + focusDispatched);
+      }
+      boolean focusUnderWay =
+          s.plans[index] != null
               || s.states[index] == FAILED
-              || (s.jobs[index] != null && s.jobs[index].sent))
-              && backgroundRunning == 0
+              || (s.jobs[index] != null && s.jobs[index].sent);
+      // D4: the prefetch budget, not the mere existence of another in-flight job, bounds look-ahead.
+      boolean allowAhead =
+          focusUnderWay
               && now >= s.prefetchPausedUntil
               && !paused()
               && CLOCK.fresh(now);
-      int prefetchRunning = 0;
-      for (Job j : s.jobs) if (j != null && !j.priority && s.states[j.index] == RUNNING) prefetchRunning++;
       for (int i = index; i < s.blocks.size(); i++) {
         RebuildPlanner.Block b = s.blocks.get(i);
         if (b.start > s.position + 30000) break;
         if (i > index && !allowAhead) break;
-        if (i > index && prefetchRunning >= MAX_PREFETCH_CONCURRENCY) break;
-        if (s.states[i] != WAITING || s.retryAt[i] > now) continue;
+        if (i > index && prefetchDispatched >= MAX_PREFETCH_CONCURRENCY) break;
+        boolean focus = i == index;
+        if (!focus && !s.everReady) break;
+        if (s.states[i] != WAITING || s.retryAt[i] > now) {
+          // D3: an existing job for this block is reused, whichever lane it came from.
+          if (s.jobs[i] != null && s.plans[i] == null && s.states[i] == RUNNING)
+            CaptionDiagnostics.mark(s.context, "REBUILD_BLOCK_REUSED",
+                "session=" + s.id + ";block=" + b.index
+                    + ";reason=" + (s.jobs[i].priority ? "in_flight_focus" : "in_flight_prefetch")
+                    + ";request=" + s.jobs[i].traceId + ";dispatched=" + s.jobs[i].dispatched);
+          continue;
+        }
         // A ready memory plan wins first; lazy disk restoration never waits for a network lane.
         if (s.plans[i] == null && s.cacheChecked != null && !s.cacheChecked[i]) {
           s.cacheChecked[i] = true;
@@ -689,7 +784,8 @@ final class RebuildController {
             s.states[i] = READY;
             s.everReady = true;
             CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_RESTORED",
-                "session=" + s.id + ";block=" + b.index + ";network_calls=0");
+                "session=" + s.id + ";block=" + b.index + ";network_calls=0"
+                    + ";path=memory_then_disk_before_network");
             continue;
           }
         }
@@ -706,21 +802,26 @@ final class RebuildController {
           s.states[i] = s.plans[i] == null ? FAILED : READY;
           continue;
         }
-        if (s.attempts[i] > 0) {
-          if (s.repairCount >= RebuildReview.MAX_SESSION_REPAIRS) {
-            s.states[i] = s.plans[i] == null ? FAILED : READY;
-            continue;
-          }
-          s.repairCount++;
+        if (s.attempts[i] > 0 && s.repairCount >= RebuildReview.MAX_SESSION_REPAIRS) {
+          s.states[i] = s.plans[i] == null ? FAILED : READY;
+          continue;
         }
-        s.attempts[i]++;
-        s.states[i] = RUNNING;
-        boolean focus = i == index;
         Job job = new Job(s, i, focus);
         s.jobs[i] = job;
+        if (focus && focusDispatched >= MAX_FOCUS_CONCURRENCY) {
+          // Both foreground slots are busy: keep only this newest landing and drop any older pending one.
+          if (s.pendingFocus != null) retirePendingFocus(s, "superseded_by_newer_focus", i);
+          s.states[i] = RUNNING;
+          s.pendingFocus = job;
+          CaptionDiagnostics.mark(s.context, "REBUILD_FOCUS_PENDING_HELD",
+              "session=" + s.id + ";request=" + job.traceId + ";block=" + b.index
+                  + ";focus_in_flight=" + focusDispatched + ";prefetch_in_flight=" + prefetchDispatched);
+          break;
+        }
+        markDispatched(s, job);
         start.add(job);
-        if (!focus) prefetchRunning++;
-        if (i > index || !s.everReady) break;
+        if (focus) focusDispatched++;
+        else prefetchDispatched++;
       }
     }
     for (Job j : start) {
@@ -740,9 +841,29 @@ final class RebuildController {
               + ";range="
               + b.start
               + "-"
-              + b.end);
+              + b.end
+              + ";focus_in_flight="
+              + dispatched(s, true)
+              + ";prefetch_in_flight="
+              + dispatched(s, false)
+              + ";pending_focus_block="
+              + (s.pendingFocus == null ? -1 : s.pendingFocus.index));
       dispatch(j.priority, () -> translate(j));
     }
+  }
+
+  /**
+   * Releases a job that will not produce a plan. Unsent work returns its attempt and repair quota; sent work
+   * keeps the attempt it spent but still goes back to WAITING so the block can be requested again.
+   */
+  private static void finishCancelled(Session s, Job job) {
+    s.jobs[job.index] = null;
+    if (!job.sent) {
+      if (s.attempts[job.index] > 1) s.repairCount = Math.max(0, s.repairCount - 1);
+      s.attempts[job.index] = Math.max(0, s.attempts[job.index] - 1);
+    }
+    s.states[job.index] = WAITING;
+    s.retryAt[job.index] = SystemClock.elapsedRealtime() + 500;
   }
 
   private static void translate(Job job) {
@@ -757,7 +878,8 @@ final class RebuildController {
           RebuildApi.translate(
               s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index]);
       synchronized (s) {
-        if (!current(s) || job.cancelled) return;
+        if (!current(s)) return;
+        if (job.cancelled) { finishCancelled(s, job); return; }
         if(restoredFromCache)s.attempts[job.index]=Math.max(0,s.attempts[job.index]-1);
         RebuildProtocol.Plan candidate=accepted;
         RebuildProtocol.Plan old=s.plans[job.index];
@@ -809,15 +931,10 @@ final class RebuildController {
     } catch (Exception e) {
       if (!current(s)) return;
       synchronized (s) {
-        s.jobs[job.index] = null;
         if (job.cancelled) {
-          if (!job.sent) {
-            if (s.attempts[job.index] > 1) s.repairCount = Math.max(0, s.repairCount - 1);
-            s.attempts[job.index] = Math.max(0, s.attempts[job.index] - 1);
-          }
-          s.states[job.index] = WAITING;
-          s.retryAt[job.index] = SystemClock.elapsedRealtime() + 500;
+          finishCancelled(s, job);
         } else {
+          s.jobs[job.index] = null;
           String code =
               e instanceof RebuildProtocol.Invalid
                   ? ((RebuildProtocol.Invalid) e).code
@@ -871,7 +988,18 @@ final class RebuildController {
           + ";slot_wait_ms=" + job.slotWaitMs + ";network_ms=" + job.networkMs
           + ";validation_ms=" + Math.max(0, SystemClock.elapsedRealtime() - job.queuedAt - job.slotWaitMs - job.networkMs)
           + ";validation_repair_retries=" + Math.max(0, s.attempts[job.index] - 1)
-          + ";http_rounds=" + job.httpRounds + ";cancelled=" + job.cancelled);
+          + ";http_rounds=" + job.httpRounds + ";cancelled=" + job.cancelled
+          + ";dispatched=" + job.dispatched + ";sent=" + job.sent);
+      synchronized (s) {
+        int focusLeft = dispatched(s, true, job), prefetchLeft = dispatched(s, false, job);
+        if (job.dispatched)
+          CaptionDiagnostics.mark(s.context, "REBUILD_LANE_RELEASED",
+              "session=" + s.id + ";request=" + job.traceId + ";block=" + job.index
+                  + ";purpose=" + (job.priority ? "focus" : "prefetch")
+                  + ";focus_in_flight=" + focusLeft + ";prefetch_in_flight=" + prefetchLeft
+                  + ";translation_in_flight=" + (focusLeft + prefetchLeft)
+                  + ";pending_focus_block=" + (s.pendingFocus == null ? -1 : s.pendingFocus.index));
+      }
       if (current(s)) kick(s);
     }
   }

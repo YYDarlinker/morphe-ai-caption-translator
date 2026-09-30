@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Перевод"</string>
     <string name="cap_translation_requirements" formatted="false">"Инструкции для перевода"</string>
     <string name="cap_style" formatted="false">"Стиль субтитров"</string>
-    <string name="cap_size" formatted="false">"Размер шрифта (сведения)"</string>
+    <string name="cap_size" formatted="false">"Размер шрифта"</string>
     <string name="cap_opacity" formatted="false">"Непрозрачность фона"</string>
     <string name="cap_reset_position" formatted="false">"Сбросить положение"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Кэш и диагностика"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"Отладка текста субтитров"</string>
     <string name="cap_diagnostics" formatted="false">"Диагностика субтитров"</string>
     <string name="cap_clear_diagnostics" formatted="false">"Очистить диагностику"</string>
-    <string name="cap_preview" formatted="false">"Предпросмотр субтитров"</string>
+    <string name="cap_preview" formatted="false">"Предпросмотр в полноэкранном альбомном режиме"</string>
     <string name="cap_landscape" formatted="false">"Альбомная"</string>
     <string name="cap_refresh" formatted="false">"Обновить"</string>
     <string name="cap_copy" formatted="false">"Копировать"</string>

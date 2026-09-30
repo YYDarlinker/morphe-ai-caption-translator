@@ -47,6 +47,16 @@ public class RebuildIntegrationTest {
   volatile boolean blockResponse;
   CountDownLatch release;
   MediaSession mediaSession;
+  /** N24 gate: translation requests for these block ids wait until {@link #n24Gate} opens. */
+  final Set<String> n24GateBlocks = ConcurrentHashMap.newKeySet();
+  volatile CountDownLatch n24Gate;
+  /** N24 observation: requests the fixture server has actually received, and its live concurrency. */
+  final Set<String> n24SeenBlocks = ConcurrentHashMap.newKeySet();
+  final java.util.Map<String,AtomicInteger> n24BlockCalls = new ConcurrentHashMap<>();
+  final AtomicInteger n24InFlight = new AtomicInteger();
+  final AtomicInteger n24MaxInFlight = new AtomicInteger();
+  /** N24: when set the fixture answers per block so a presentation can be traced to its own block. */
+  volatile boolean n24TextByBlock;
 
   @Before
   public void setup() throws Exception {
@@ -63,12 +73,20 @@ public class RebuildIntegrationTest {
         new Dispatcher() {
           public MockResponse dispatch(RecordedRequest r) {
             calls.incrementAndGet();
+            int live = n24InFlight.incrementAndGet();
+            n24MaxInFlight.accumulateAndGet(live, Math::max);
             try {
               if (blockResponse) release.await(3, TimeUnit.SECONDS);
               JSONObject req = new JSONObject(r.getBody().clone().readUtf8());
               JSONObject input =
                   new JSONObject(
                       req.getJSONArray("messages").getJSONObject(1).getString("content"));
+              String blockId = input.optString("block", "");
+              n24SeenBlocks.add(blockId);
+              n24BlockCalls.computeIfAbsent(blockId, k -> new AtomicInteger()).incrementAndGet();
+              // The N24 tests hold chosen blocks open to prove that a second slot stays usable.
+              CountDownLatch gate = n24Gate;
+              if (gate != null && n24GateBlocks.contains(blockId)) gate.await(15, TimeUnit.SECONDS);
               if (mode == 1 && req.has("response_format"))
                 return new MockResponse()
                     .setResponseCode(400)
@@ -86,6 +104,7 @@ public class RebuildIntegrationTest {
               int from = words.getJSONArray(0).getInt(0),
                   to = words.getJSONArray(words.length() - 1).getInt(0);
               String translation="这是一条完整的测试字幕。";
+              if(n24TextByBlock)translation="这是"+blockId+"的译文。";
               if(mode>=5&&mode<=7)translation=mode==5&&input.has("repair")
                   ? "最后说明限制：虽然整集讨论中国现代化为何迅速，但这种速度恐怕不能永远持续。"
                   : "最后，我要对整体增长故事提出一些限制条件，";
@@ -116,6 +135,8 @@ public class RebuildIntegrationTest {
                           .toString());
             } catch (Exception e) {
               return new MockResponse().setResponseCode(500).setBody("{}");
+            } finally {
+              n24InFlight.decrementAndGet();
             }
           }
         });
@@ -137,6 +158,8 @@ public class RebuildIntegrationTest {
   @After
   public void cleanup() throws Exception {
     release.countDown();
+    CountDownLatch gate = n24Gate;
+    if (gate != null) gate.countDown();
     RebuildController.stop();
     if (mediaSession != null) mediaSession.release();
     Field f = DeepSeekCaptionHook.class.getDeclaredField("youtubeCronetEngine");
@@ -805,16 +828,21 @@ public class RebuildIntegrationTest {
     release.countDown();await(()->s.plans!=null&&s.plans[0]!=null);
     await(()->CaptionDiagnostics.fullText(a).contains("REBUILD_FALLBACK_END"));
   }
-  @Test public void startupAllowsOnlyOneNeighbourWhileFirstCallIsInFlight()throws Exception {
+  @Test public void startupPrefetchesUpToTheBackgroundBudgetAndKeepsTheFocusLaneFree()throws Exception {
     engine.fixtureBody=new JSONObject().put("events",new JSONArray()
         .put(RebuildR2SourceTest.cue(0,7000,"This is the first sentence.",false))
         .put(RebuildR2SourceTest.cue(7000,7000,"This is the second sentence.",false))
         .put(RebuildR2SourceTest.cue(14000,7000,"This is the third sentence.",false))).toString();
     blockResponse=true;start(false);RebuildController.Session s=session();await(()->calls.get()==1);
+    // N24 D4: the in-flight current block no longer holds the background lane shut.
     RebuildController.time(100);await(()->calls.get()==2);
-    RebuildController.time(200);assertEquals(2,calls.get());
-    assertEquals(1,s.attempts[0]);assertEquals(1,s.attempts[1]);
-    assertEquals(2,Arrays.stream(s.states).filter(x->x==RebuildController.RUNNING).count());
+    assertEquals(2,s.blocks.size());
+    assertEquals(1,s.attempts[0]);
+    assertEquals("the qualified successor is prefetched while the current block is open",1,s.attempts[1]);
+    String diag=CaptionDiagnostics.fullText(a);
+    assertTrue(diag.contains("purpose=focus"));
+    assertTrue("the successor request runs on the background lane",
+        diag.contains("block="+s.blocks.get(1).id()+";purpose=prefetch"));
     release.countDown();await(()->s.plans[0]!=null&&s.plans[1]!=null);
   }
 
@@ -1301,5 +1329,223 @@ public class RebuildIntegrationTest {
         -1, s.pausedDisplayPosition);
     assertEquals(s.position, overlayPosition());
     assertEquals(0, calls.get());
+  }
+
+  /* ------------------------------------------------------------------------------------------------
+   * N24 D7: the production scheduler's task selection and lifecycle under a bounded budget.
+   * These drive RebuildController.schedule()/time() and the real dispatch/translate path against the
+   * local fixture server; nothing here measures provider latency, only queueing and lane ownership.
+   * ---------------------------------------------------------------------------------------------- */
+
+  /** Four one-word blocks at 0-6s, 6-12s, 12-18s, 18-24s so a landing can be placed exactly. */
+  RebuildController.Session n24Session(int blockCount, long stepMs) throws Exception {
+    RebuildSource source=new RebuildSource(Arrays.asList(
+        new RebuildSource.Word("First complete sentence",0,stepMs,0,RebuildSource.Precision.NATIVE),
+        new RebuildSource.Word("Second complete sentence",stepMs,2*stepMs,1,RebuildSource.Precision.NATIVE),
+        new RebuildSource.Word("Third complete sentence",2*stepMs,3*stepMs,2,RebuildSource.Precision.NATIVE),
+        new RebuildSource.Word("Fourth complete sentence",3*stepMs,4*stepMs,3,RebuildSource.Precision.NATIVE),
+        new RebuildSource.Word("Fifth complete sentence",4*stepMs,5*stepMs,4,RebuildSource.Precision.NATIVE),
+        new RebuildSource.Word("Sixth complete sentence",5*stepMs,6*stepMs,5,RebuildSource.Precision.NATIVE)));
+    List<RebuildPlanner.Block> blocks=new ArrayList<>();
+    for(int i=0;i<blockCount;i++)blocks.add(new RebuildPlanner.Block(i,i,i,source));
+    RebuildController.Session s=new RebuildController.Session(
+        a,"","rebuild0001","n24-"+System.nanoTime(),"zh-Hans",config(),false,true);
+    s.source=source;
+    s.blocks=blocks;
+    s.plans=new RebuildProtocol.Plan[blockCount];
+    s.pendingPlans=new RebuildProtocol.Plan[blockCount];
+    s.states=new int[blockCount];
+    s.attempts=new int[blockCount];
+    s.retryAt=new long[blockCount];
+    s.reasons=new String[blockCount];
+    for(int i=0;i<blockCount;i++)s.reasons[i]="";
+    s.jobs=new RebuildController.Job[blockCount];
+    s.cacheChecked=new boolean[blockCount];
+    java.util.Arrays.fill(s.cacheChecked,true);
+    Field active=RebuildController.class.getDeclaredField("active");
+    active.setAccessible(true);
+    active.set(null,s);
+    return s;
+  }
+
+  int n24InFlight(RebuildController.Session s,boolean focus) {
+    try {
+      Method m=RebuildController.class.getDeclaredMethod("dispatched",RebuildController.Session.class,boolean.class);
+      m.setAccessible(true);
+      return (Integer)m.invoke(null,s,focus);
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /** All requests the fixture server has received for a block, matched on the block id in the body. */
+  boolean n24Saw(String blockId){return n24SeenBlocks.contains(blockId);}
+
+  int n24Calls(String blockId){
+    AtomicInteger count=n24BlockCalls.get(blockId);
+    return count==null?0:count.get();
+  }
+
+  void n24GateAll(RebuildController.Session s){
+    for(RebuildPlanner.Block b:s.blocks)n24GateBlocks.add(b.id());
+    n24Gate=new CountDownLatch(1);
+  }
+
+  @Test public void n24BlockedOldFocusStillLeavesTheSecondSlotForTheNewLanding() throws Exception {
+    RebuildController.Session s=n24Session(4,6000);
+    String first=s.blocks.get(0).id(), second=s.blocks.get(1).id();
+    // Gate before anything schedules, so the old landing is still open when the new one arrives.
+    n24GateBlocks.add(first);n24Gate=new CountDownLatch(1);
+    RebuildController.time(0);
+    await(()->n24Saw(first));
+    assertEquals("the old landing holds one foreground slot",1,n24InFlight(s,true));
+    // D2: the new landing must be served by the free slot, not queued behind the blocked request.
+    RebuildController.time(6500);
+    await(()->n24Saw(second));
+    assertTrue("both foreground slots are usable at once",n24MaxInFlight.get()>=2);
+    assertEquals(1,s.attempts[0]);assertEquals(1,s.attempts[1]);
+    n24Gate.countDown();
+    await(()->s.plans[0]!=null&&s.plans[1]!=null);
+    assertEquals("no request was duplicated",2,calls.get());
+  }
+
+  @Test public void n24TwoFocusInFlightRetainOnlyTheNewestPendingLanding() throws Exception {
+    RebuildController.Session s=n24Session(6,6000);
+    String b0=s.blocks.get(0).id(), b1=s.blocks.get(1).id();
+    n24GateBlocks.add(b0);n24GateBlocks.add(b1);n24Gate=new CountDownLatch(1);
+    Method schedule=RebuildController.class.getDeclaredMethod("schedule",RebuildController.Session.class);
+    schedule.setAccessible(true);
+    schedule.invoke(null,s);
+    await(()->n24Saw(b0));
+    RebuildController.time(6300);
+    await(()->n24Saw(b1));
+    assertEquals(2,n24InFlight(s,true));
+    // Both slots busy: three further landings must collapse into one retained newest pending.
+    RebuildController.time(12500);
+    RebuildController.time(18500);
+    RebuildController.time(24500);
+    await(()->s.pendingFocus!=null);
+    assertEquals("only the newest landing stays pending",4,s.pendingFocus.index);
+    assertEquals("nothing new may be sent while both slots are busy",2,calls.get());
+    assertEquals("both replaced landings are recorded",2,s.replacedFocus);
+    for(int i=2;i<4;i++) {
+      assertEquals("a replaced landing consumes no attempt",0,s.attempts[i]);
+      assertFalse("a replaced landing is never sent",n24Saw(s.blocks.get(i).id()));
+      assertEquals("a replaced landing goes back to WAITING",RebuildController.WAITING,s.states[i]);
+    }
+    assertEquals("the retained landing consumes no attempt before it is dispatched",0,s.attempts[4]);
+    assertEquals(RebuildController.RUNNING,s.states[4]);
+    assertTrue(CaptionDiagnostics.fullText(a).contains("REBUILD_FOCUS_PENDING_REPLACED"));
+    assertTrue(CaptionDiagnostics.fullText(a).contains("attempts_consumed=0"));
+    assertTrue("the retained pending block is reported",
+        CaptionDiagnostics.fullText(a).contains("REBUILD_FOCUS_PENDING_HELD"));
+    assertTrue(CaptionDiagnostics.fullText(a).contains("pending_focus_block="));
+    // Releasing one slot dispatches the retained landing, and only that one.
+    n24Gate.countDown();
+    await(()->n24Saw(s.blocks.get(4).id()));
+    await(()->s.pendingFocus==null);
+    assertEquals("only the newest landing was dispatched after a slot freed up",3,calls.get());
+    assertEquals(1,s.attempts[4]);
+    assertTrue("queueing stays separated from network time",
+        CaptionDiagnostics.fullText(a).contains("slot_wait_ms="));
+  }
+
+  @Test public void n24PrefetchBudgetUsesTwoSuccessorsAndStopsAtThirtySeconds() throws Exception {
+    RebuildController.Session s=n24Session(6,6000);
+    s.plans[0]=new RebuildProtocol.Plan(Collections.emptyList(),"{}",Collections.emptyList());
+    s.states[0]=RebuildController.READY;s.everReady=true;s.position=0;s.prefetchPausedUntil=0;
+    RebuildController.time(0);
+    // D4: one in-flight prefetch must not by itself block the second qualified successor.
+    assertEquals(1,s.attempts[1]);
+    assertEquals(1,s.attempts[2]);
+    assertEquals("a third successor is over the prefetch budget",0,s.attempts[3]);
+    await(()->n24Saw(s.blocks.get(1).id()));
+    await(()->n24Saw(s.blocks.get(2).id()));
+    assertFalse(n24Saw(s.blocks.get(3).id()));
+    // A block beyond the 30 second window is never dispatched, budget or not.
+    RebuildController.Session far=n24Session(6,20000);
+    far.plans[0]=new RebuildProtocol.Plan(Collections.emptyList(),"{}",Collections.emptyList());
+    far.states[0]=RebuildController.READY;far.everReady=true;far.position=0;far.prefetchPausedUntil=0;
+    n24SeenBlocks.clear();
+    RebuildController.time(0);
+    assertEquals("the only successor inside 30 seconds is dispatched",1,far.attempts[1]);
+    assertEquals("a block past 30 seconds is out of prefetch range",0,far.attempts[2]);
+    await(()->n24Saw(far.blocks.get(1).id()));
+    assertFalse("a block past 30 seconds is never sent",n24Saw(far.blocks.get(2).id()));
+  }
+
+  @Test public void n24TotalInFlightStaysBoundedAndBackgroundKeepsItsOwnLanes() throws Exception {
+    RebuildController.Session s=n24Session(6,6000);
+    n24GateAll(s);
+    RebuildController.time(0);
+    for(int i=1;i<6;i++)RebuildController.time(i*6000L+100);
+    await(()->n24MaxInFlight.get()>=1);
+    Thread.sleep(150);
+    int focus=n24InFlight(s,true),prefetch=n24InFlight(s,false);
+    assertTrue("foreground must never exceed two",focus<=2);
+    assertTrue("background must never exceed two",prefetch<=2);
+    assertTrue("client translation requests must never exceed four",focus+prefetch<=4);
+    assertTrue("the fixture server never saw more than four at once",n24MaxInFlight.get()<=4);
+    n24Gate.countDown();
+    await(()->s.plans[0]!=null||s.plans[1]!=null);
+  }
+
+  @Test public void n24SameBlockIsReusedCacheRestoresAndSessionEndReleasesEverything() throws Exception {
+    RebuildController.Session s=n24Session(4,6000);
+    s.plans[0]=new RebuildProtocol.Plan(Collections.emptyList(),"{}",Collections.emptyList());
+    s.states[0]=RebuildController.READY;s.everReady=true;s.position=0;s.prefetchPausedUntil=0;
+    String second=s.blocks.get(1).id(), fourth=s.blocks.get(3).id();
+    // Seed the cache before anything is scheduled, so a late lane completion can only restore it.
+    RebuildPlanner.Block cached=s.blocks.get(3);
+    String json=RebuildContractTest.reply(cached,new JSONArray().put(
+        RebuildR26Test.quoted(s.source,cached.from,cached.to,"这是已缓存的第四句。")));
+    RebuildCache.write(a,s.cacheKey,cached,RebuildProtocol.parseBound(json,s.source,cached));
+    s.cacheChecked[3]=false;s.states[3]=RebuildController.WAITING;
+    n24GateBlocks.add(second);n24Gate=new CountDownLatch(1);
+    RebuildController.time(0);
+    await(()->n24Saw(second));
+    assertEquals("the successor was requested exactly once",1,n24Calls(second));
+    // D3: landing on the block a background request already covers reuses it instead of re-requesting.
+    RebuildController.time(6500);
+    assertNotNull("the reused background request is still in flight",s.jobs[1]);
+    assertFalse("the reused request keeps its background lane",s.jobs[1].priority);
+    assertEquals("an in-flight background request is reused, never duplicated",1,n24Calls(second));
+    assertTrue("the reuse is recorded with its reason",
+        CaptionDiagnostics.fullText(a).contains("REBUILD_BLOCK_REUSED"));
+    assertTrue(CaptionDiagnostics.fullText(a).contains("reason=in_flight_prefetch"));
+    // The cached block is restored without any network call and never waits behind a lane.
+    RebuildController.time(18500);
+    await(()->s.plans[3]!=null);
+    assertEquals("a cache restore makes no translation request for that block",0,n24Calls(fourth));
+    assertEquals("a cache restore does not consume an attempt",0,s.attempts[3]);
+    assertTrue(CaptionDiagnostics.fullText(a).contains("REBUILD_CACHE_RESTORED"));
+    // Ending the session drops the retained pending request and marks the session cancelled.
+    RebuildController.stop();
+    assertTrue(s.cancelled);
+    assertNull("session end releases the retained pending request",s.pendingFocus);
+    n24Gate.countDown();
+  }
+
+  @Test public void n24LateResultNeverPresentsOnTheWrongLanding() throws Exception {
+    n24TextByBlock=true;
+    RebuildController.Session s=n24Session(4,6000);
+    String first=s.blocks.get(0).id(), landed=s.blocks.get(3).id();
+    n24GateBlocks.add(first);n24Gate=new CountDownLatch(1);
+    RebuildController.time(0);
+    await(()->n24Saw(first));
+    // Land far away while the old request is still open, and let the new landing answer first.
+    RebuildController.time(18500);
+    await(()->s.plans[3]!=null);
+    advance(200);
+    assertTrue("the new landing presents its own block",s.lastShown.contains("这是"+landed));
+    assertFalse("the open old request is not presented at the new landing",
+        s.lastShown.contains("这是"+first));
+    // The late old result may still be cached, but it must never be presented on this landing.
+    n24Gate.countDown();
+    await(()->s.plans[0]!=null);
+    advance(200);
+    assertFalse("a late result for the old block stays out of the new landing",
+        s.lastShown.contains("这是"+first));
+    assertTrue("the new landing keeps its own text",s.lastShown.contains("这是"+landed));
   }
 }

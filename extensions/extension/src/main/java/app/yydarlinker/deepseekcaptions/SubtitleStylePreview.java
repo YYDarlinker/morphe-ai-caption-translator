@@ -13,6 +13,19 @@ import java.util.*;
 @SuppressWarnings("deprecation")
 public final class SubtitleStylePreview extends android.preference.Preference {
     static final float LANDSCAPE_REFERENCE_WIDTH_PX=2736f;
+    /**
+     * The localized source line the landscape preview renders. It is resolved through the same catalog as
+     * the rest of the settings page, so a locale that has no entry simply shows the source sentence. The
+     * preview is a true-scale model: the caption is laid out over the 2736px full-screen reference and the
+     * whole frame is then scaled down exactly once, so the rasterized glyphs keep the measured full-screen
+     * ratio. At that ratio the settings canvas holds only about eight CJK glyphs on two lines, which is why
+     * the demo line is short: a longer sentence would need a third row, and the overlay never uses one.
+     */
+    static final String LANDSCAPE_SAMPLE="字幕要自然。";
+    /** The overlay never uses a third row; the sample must fit this budget at the narrowest preview. */
+    static final int MAX_SAMPLE_LINES=2;
+    /** Rasterization hook: when false the preview renders the raw source line instead of a localized one. */
+    static boolean LOCALIZE_SAMPLE=true;
     private static final Set<Preview> views=Collections.newSetFromMap(new WeakHashMap<Preview,Boolean>());
     public SubtitleStylePreview(Context c){super(c);init();}
     public SubtitleStylePreview(Context c,AttributeSet a){super(c,a);init();}
@@ -59,7 +72,9 @@ public final class SubtitleStylePreview extends android.preference.Preference {
             paint.setAlpha(255);paint.setShader(new LinearGradient(0,0,w,h,new int[]{0xff354650,0xff9faeae},null,Shader.TileMode.CLAMP));c.drawRect(0,0,w,h,paint);paint.setShader(null);paint.setColor(0xff536866);Path hill=new Path();hill.moveTo(0,h);hill.lineTo(w*.3f,h*.38f);hill.lineTo(w*.6f,h*.70f);hill.lineTo(w*.82f,h*.48f);hill.lineTo(w,h*.64f);hill.lineTo(w,h);hill.close();c.drawPath(hill,paint);
             float contentW=LANDSCAPE_REFERENCE_WIDTH_PX;
             float scale=w/contentW,contentH=h/scale;
-            String sample=CaptionStrings.localize(getContext(),"这是字幕样式预览");
+            // The sample is the localized line the user would read in full screen; the frame is the exact
+            // 2736x1264 full-screen reference scaled once, so the glyphs stay at the full-screen ratio.
+            String sample=LOCALIZE_SAMPLE?CaptionStrings.localize(getContext(),LANDSCAPE_SAMPLE):LANDSCAPE_SAMPLE;
             // Simulate the full-size content frame first; shrink the entire view exactly once.
             TextView label=sampleLabel(getContext(),sample,sizeTier,opacity,
                     LANDSCAPE_REFERENCE_WIDTH_PX,contentW);

@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Terjemahan"</string>
     <string name="cap_translation_requirements" formatted="false">"Instruksi terjemahan"</string>
     <string name="cap_style" formatted="false">"Gaya subtitel"</string>
-    <string name="cap_size" formatted="false">"Ukuran huruf (detail video)"</string>
+    <string name="cap_size" formatted="false">"Ukuran huruf"</string>
     <string name="cap_opacity" formatted="false">"Opasitas latar"</string>
     <string name="cap_reset_position" formatted="false">"Reset posisi subtitel"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Cache dan diagnostik"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"Debug teks subtitel"</string>
     <string name="cap_diagnostics" formatted="false">"Diagnostik subtitel"</string>
     <string name="cap_clear_diagnostics" formatted="false">"Hapus diagnostik"</string>
-    <string name="cap_preview" formatted="false">"Pratinjau subtitel"</string>
+    <string name="cap_preview" formatted="false">"Pratinjau layar penuh lanskap"</string>
     <string name="cap_landscape" formatted="false">"Lanskap"</string>
     <string name="cap_refresh" formatted="false">"Muat ulang"</string>
     <string name="cap_copy" formatted="false">"Salin"</string>

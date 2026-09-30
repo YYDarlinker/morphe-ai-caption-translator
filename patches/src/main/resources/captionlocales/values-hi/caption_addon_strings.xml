@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"अनुवाद"</string>
     <string name="cap_translation_requirements" formatted="false">"अनुवाद निर्देश"</string>
     <string name="cap_style" formatted="false">"उपशीर्षक शैली"</string>
-    <string name="cap_size" formatted="false">"अक्षर आकार (वीडियो विवरण)"</string>
+    <string name="cap_size" formatted="false">"अक्षर आकार"</string>
     <string name="cap_opacity" formatted="false">"पृष्ठभूमि की अपारदर्शिता"</string>
     <string name="cap_reset_position" formatted="false">"स्थिति रीसेट करें"</string>
     <string name="cap_cache_diagnostics" formatted="false">"कैश और निदान"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"उपशीर्षक पाठ डीबगिंग"</string>
     <string name="cap_diagnostics" formatted="false">"उपशीर्षक निदान"</string>
     <string name="cap_clear_diagnostics" formatted="false">"निदान साफ़ करें"</string>
-    <string name="cap_preview" formatted="false">"उपशीर्षक पूर्वावलोकन"</string>
+    <string name="cap_preview" formatted="false">"लैंडस्केप फ़ुल-स्क्रीन पूर्वावलोकन"</string>
     <string name="cap_landscape" formatted="false">"लैंडस्केप"</string>
     <string name="cap_refresh" formatted="false">"रीफ़्रेश"</string>
     <string name="cap_copy" formatted="false">"कॉपी"</string>

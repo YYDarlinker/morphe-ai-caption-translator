@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"翻译"</string>
     <string name="cap_translation_requirements" formatted="false">"翻译要求"</string>
     <string name="cap_style" formatted="false">"字幕样式"</string>
-    <string name="cap_size" formatted="false">"字号（详情页）"</string>
+    <string name="cap_size" formatted="false">"字号"</string>
     <string name="cap_opacity" formatted="false">"背景不透明度"</string>
     <string name="cap_reset_position" formatted="false">"恢复字幕默认位置"</string>
     <string name="cap_cache_diagnostics" formatted="false">"缓存与诊断"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"显示文本调试"</string>
     <string name="cap_diagnostics" formatted="false">"字幕诊断"</string>
     <string name="cap_clear_diagnostics" formatted="false">"清空诊断记录"</string>
-    <string name="cap_preview" formatted="false">"字幕预览"</string>
+    <string name="cap_preview" formatted="false">"横屏全屏预览"</string>
     <string name="cap_landscape" formatted="false">"横屏"</string>
     <string name="cap_refresh" formatted="false">"刷新"</string>
     <string name="cap_copy" formatted="false">"复制"</string>

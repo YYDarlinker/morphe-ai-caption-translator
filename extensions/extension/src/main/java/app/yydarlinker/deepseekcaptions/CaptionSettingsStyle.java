@@ -14,13 +14,25 @@ import android.widget.TextView;
 /** Small theme-derived refinements; native widgets, host typography and accessibility remain in charge. */
 final class CaptionSettingsStyle {
     static int sliderUnfilled(Context c){return tint(primary(c),64);}
+    /**
+     * Shared rail geometry and colours for both settings sliders. The platform already keeps
+     * {@code thumbOffset == padding == half the thumb}, so the two extreme thumb centres sit at
+     * {@code paddingLeft} and {@code width - paddingRight}. {@link DeepSeekSliderPreference.RailBar}
+     * draws the rail and every tick on exactly those two coordinates, which the stock progress drawable
+     * cannot do: its own bounds are the padded frame shifted one further thumb offset, and the visible
+     * rail is inset by an opaque vendor amount that does not scale with the layout width.
+     */
     static void slider(android.widget.SeekBar view){
         Context c=view.getContext();
+        android.graphics.drawable.Drawable thumb=view.getThumb();
+        int halfThumb=thumb==null?0:thumb.getIntrinsicWidth()/2;
+        // Platform thumb centre = paddingLeft + fraction * (available - thumbWidth): thumbOffset and the
+        // half thumb cancel in AbsSeekBar.onDraw. Insetting the padding by half a thumb on each side
+        // therefore puts the two end thumb centres exactly on the two visible rail endpoints.
+        view.setPadding(halfThumb,view.getPaddingTop(),halfThumb,view.getPaddingBottom());
         view.setProgressTintList(android.content.res.ColorStateList.valueOf(primary(c)));
         view.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(sliderUnfilled(c)));
         view.setThumbTintList(android.content.res.ColorStateList.valueOf(primary(c)));
-        // Keep both native rails identical, with each endpoint half a thumb inside the padding.
-        view.setThumbOffset(0);
     }
     static int dp(Context c,float value){return Math.round(value*c.getResources().getDisplayMetrics().density);}
     static int color(Context c,int attr,int fallback){

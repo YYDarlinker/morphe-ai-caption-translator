@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Dịch"</string>
     <string name="cap_translation_requirements" formatted="false">"Yêu cầu dịch"</string>
     <string name="cap_style" formatted="false">"Kiểu phụ đề"</string>
-    <string name="cap_size" formatted="false">"Cỡ chữ (chi tiết video)"</string>
+    <string name="cap_size" formatted="false">"Cỡ chữ"</string>
     <string name="cap_opacity" formatted="false">"Độ đục nền"</string>
     <string name="cap_reset_position" formatted="false">"Đặt lại vị trí phụ đề"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Bộ nhớ đệm và chẩn đoán"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"Gỡ lỗi văn bản phụ đề"</string>
     <string name="cap_diagnostics" formatted="false">"Chẩn đoán phụ đề"</string>
     <string name="cap_clear_diagnostics" formatted="false">"Xóa chẩn đoán"</string>
-    <string name="cap_preview" formatted="false">"Xem trước phụ đề"</string>
+    <string name="cap_preview" formatted="false">"Xem trước toàn màn hình ngang"</string>
     <string name="cap_landscape" formatted="false">"Ngang"</string>
     <string name="cap_refresh" formatted="false">"Làm mới"</string>
     <string name="cap_copy" formatted="false">"Sao chép"</string>

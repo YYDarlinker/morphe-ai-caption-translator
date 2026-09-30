@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Tradução"</string>
     <string name="cap_translation_requirements" formatted="false">"Instruções de tradução"</string>
     <string name="cap_style" formatted="false">"Estilo das legendas"</string>
-    <string name="cap_size" formatted="false">"Tamanho da fonte (detalhes)"</string>
+    <string name="cap_size" formatted="false">"Tamanho da fonte"</string>
     <string name="cap_opacity" formatted="false">"Opacidade do fundo"</string>
     <string name="cap_reset_position" formatted="false">"Restaurar posição"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Cache e diagnóstico"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"Depuração do texto"</string>
     <string name="cap_diagnostics" formatted="false">"Diagnóstico de legendas"</string>
     <string name="cap_clear_diagnostics" formatted="false">"Limpar diagnóstico"</string>
-    <string name="cap_preview" formatted="false">"Prévia das legendas"</string>
+    <string name="cap_preview" formatted="false">"Prévia em tela cheia horizontal"</string>
     <string name="cap_landscape" formatted="false">"Paisagem"</string>
     <string name="cap_refresh" formatted="false">"Atualizar"</string>
     <string name="cap_copy" formatted="false">"Copiar"</string>

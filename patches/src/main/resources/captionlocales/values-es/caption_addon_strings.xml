@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Traducción"</string>
     <string name="cap_translation_requirements" formatted="false">"Instrucciones de traducción"</string>
     <string name="cap_style" formatted="false">"Estilo de subtítulos"</string>
-    <string name="cap_size" formatted="false">"Tamaño de letra (detalles)"</string>
+    <string name="cap_size" formatted="false">"Tamaño de letra"</string>
     <string name="cap_opacity" formatted="false">"Opacidad del fondo"</string>
     <string name="cap_reset_position" formatted="false">"Restablecer posición"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Caché y diagnóstico"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"Depurar texto de subtítulos"</string>
     <string name="cap_diagnostics" formatted="false">"Diagnóstico de subtítulos"</string>
     <string name="cap_clear_diagnostics" formatted="false">"Borrar diagnóstico"</string>
-    <string name="cap_preview" formatted="false">"Vista previa"</string>
+    <string name="cap_preview" formatted="false">"Vista previa en pantalla completa horizontal"</string>
     <string name="cap_landscape" formatted="false">"Horizontal"</string>
     <string name="cap_refresh" formatted="false">"Actualizar"</string>
     <string name="cap_copy" formatted="false">"Copiar"</string>

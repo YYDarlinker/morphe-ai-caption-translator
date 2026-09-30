@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"الترجمة"</string>
     <string name="cap_translation_requirements" formatted="false">"تعليمات الترجمة"</string>
     <string name="cap_style" formatted="false">"نمط الترجمة النصية"</string>
-    <string name="cap_size" formatted="false">"حجم الخط (تفاصيل الفيديو)"</string>
+    <string name="cap_size" formatted="false">"حجم الخط"</string>
     <string name="cap_opacity" formatted="false">"عتامة الخلفية"</string>
     <string name="cap_reset_position" formatted="false">"إعادة ضبط الموضع"</string>
     <string name="cap_cache_diagnostics" formatted="false">"ذاكرة التخزين والتشخيص"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"تصحيح نص الترجمة"</string>
     <string name="cap_diagnostics" formatted="false">"تشخيص الترجمة النصية"</string>
     <string name="cap_clear_diagnostics" formatted="false">"مسح التشخيص"</string>
-    <string name="cap_preview" formatted="false">"معاينة الترجمة النصية"</string>
+    <string name="cap_preview" formatted="false">"معاينة بملء الشاشة بالوضع الأفقي"</string>
     <string name="cap_landscape" formatted="false">"أفقي"</string>
     <string name="cap_refresh" formatted="false">"تحديث"</string>
     <string name="cap_copy" formatted="false">"نسخ"</string>

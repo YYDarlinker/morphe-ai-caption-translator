@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"번역"</string>
     <string name="cap_translation_requirements" formatted="false">"번역 지침"</string>
     <string name="cap_style" formatted="false">"자막 스타일"</string>
-    <string name="cap_size" formatted="false">"글자 크기(동영상 상세)"</string>
+    <string name="cap_size" formatted="false">"글자 크기"</string>
     <string name="cap_opacity" formatted="false">"배경 불투명도"</string>
     <string name="cap_reset_position" formatted="false">"자막 위치 초기화"</string>
     <string name="cap_cache_diagnostics" formatted="false">"캐시 및 진단"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"자막 텍스트 디버깅"</string>
     <string name="cap_diagnostics" formatted="false">"자막 진단"</string>
     <string name="cap_clear_diagnostics" formatted="false">"진단 기록 지우기"</string>
-    <string name="cap_preview" formatted="false">"자막 미리보기"</string>
+    <string name="cap_preview" formatted="false">"가로 화면 전체 화면 미리보기"</string>
     <string name="cap_landscape" formatted="false">"가로"</string>
     <string name="cap_refresh" formatted="false">"새로고침"</string>
     <string name="cap_copy" formatted="false">"복사"</string>

@@ -17,7 +17,6 @@ API Key	cap_api_key
 显示文本调试	cap_text_debug
 字幕诊断	cap_diagnostics
 清空诊断记录	cap_clear_diagnostics
-字幕预览	cap_preview
 横屏	cap_landscape
 刷新	cap_refresh
 复制	cap_copy
@@ -49,7 +48,6 @@ API Key	cap_api_key
 已自动加密保存	cap_saved
 模型已自动保存	cap_saved
 填写兼容接口地址，停止输入后自动保存	cap_autosave
-这是字幕样式预览	cap_preview
 排查翻译或时间问题时，可展开查看并复制记录	cap_diagnostic_hint
 展开查看，可手动刷新或复制	cap_diagnostic_hint
 字幕链路诊断	cap_diagnostics
@@ -128,7 +126,6 @@ API 配置方案	cap_profiles_title
 相对字号 8–15；13sp 为舒适基准，随画面比例缩放	cap_size_hint
 Shorts / 视频详情页字高	cap_size
 Shorts / 视频详情页字高（px）；屏幕宽度的 1.5%–3.0%，默认 2.03%；全屏等比例放大，画面收窄时同比缩小	cap_size_hint
-字号（详情页）	cap_size
 样式预览	cap_preview_hint
 标准：详情页 44.5px · 全屏 55.5px	cap_size_hint
 超小	cap_size_tier_xs
@@ -138,3 +135,14 @@ Shorts / 视频详情页字高（px）；屏幕宽度的 1.5%–3.0%，默认 2.
 超大	cap_size_tier_xl
 %1$s：详情页 %2$spx · 全屏 %3$spx	cap_size_tier_hint
 翻译中…	cap_caption_translating
+Los subtitulos suenan natural.	cap_preview
+Les sous-titres restent naturels.	cap_preview
+Untertitel wirken naturlich.	cap_preview
+As legendas soam naturais.	cap_preview
+Субтитры звучат естественно.	cap_preview
+字幕は自然に。	cap_preview
+자막은 자연스럽게.	cap_preview
+الترجمة تبدو طبيعية.	cap_preview
+कैप्शन सहज लगें।	cap_preview
+Subtitel terbaca wajar.	cap_preview
+Phụ đề đọc tự nhiên.	cap_preview

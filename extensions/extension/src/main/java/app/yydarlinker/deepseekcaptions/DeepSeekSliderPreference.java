@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
@@ -86,19 +87,11 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
                 1f
         ));
 
-        TextView valueLabel = new TextView(context);
-        CaptionSettingsStyle.caption(valueLabel);
-        valueLabel.setTextSize(14);
-        valueLabel.setTextColor(CaptionSettingsStyle.primary(context));
-        valueLabel.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        valueLabel.setPadding(dp(12),0,0,0);
-        heading.addView(valueLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+        // The size slider states both pixel sizes in the tier line below, so it carries no header value.
+        TextView valueLabel = addHeaderValue(context, heading);
 
         boolean sizeSlider = KEY_TEXT_SIZE.equals(getKey());
-        SeekBar slider = sizeSlider ? new SizeTierSeekBar(context) : new SeekBar(context);
+        SeekBar slider = sizeSlider ? new SizeTierSeekBar(context) : new OpacitySeekBar(context);
         CaptionSettingsStyle.slider(slider);
         slider.setTag(sizeSlider ? "ai_size_tier_slider" : "ai_opacity_slider");
         slider.setMinimumHeight(dp(48));
@@ -108,7 +101,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         int current = currentValue();
         slider.setMax(maximum - minimum);
         slider.setProgress(current - minimum);
-        valueLabel.setText(format(current));
+        if (valueLabel != null) valueLabel.setText(format(current));
         root.addView(slider, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -136,7 +129,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
 
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                valueLabel.setText(format(minimum + progress));
+                setHeaderValue(valueLabel, minimum + progress);
                 if (sizeSlider) {
                     summary.setText(tierDescription(minimum + progress));
                     updateTierNames(slider, tierNames, minimum + progress);
@@ -154,10 +147,33 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         return root;
     }
 
+    /** Adds the live header value for the sliders that still show one; the size slider gets none. */
+    private TextView addHeaderValue(Context context, LinearLayout heading) {
+        if (KEY_TEXT_SIZE.equals(getKey())) return null;
+        TextView valueLabel = new TextView(context);
+        CaptionSettingsStyle.caption(valueLabel);
+        valueLabel.setTextSize(14);
+        valueLabel.setTextColor(CaptionSettingsStyle.primary(context));
+        valueLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        valueLabel.setPadding(dp(12), 0, 0, 0);
+        heading.addView(valueLabel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        return valueLabel;
+    }
+
+    /** The size slider carries no header value; only the opacity slider shows its live percentage. */
+    private void setHeaderValue(TextView valueLabel, int value) {
+        if (valueLabel != null) valueLabel.setText(format(value));
+    }
+
     private LinearLayout tierNames(SeekBar slider) {
         LinearLayout names = new LinearLayout(getContext()) {
             @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
                 super.onLayout(changed, left, top, right, bottom);
+                // Both rows are full-width siblings in the same padded container, so the slider's own
+                // tick coordinates are already this row's local coordinates.
                 for (int i = 0; i < getChildCount(); i++) {
                     View label = getChildAt(i);
                     float center = ((SizeTierSeekBar) slider).tickCenterX(i);
@@ -197,31 +213,134 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         }
     }
 
-    /** Five native thumb positions, with visible ticks even when the theme omits tick marks. */
-    static final class SizeTierSeekBar extends SeekBar {
+    /**
+     * One geometry for the whole slider. The rail runs over the inclusive padded frame — first endpoint at
+     * {@code paddingLeft}, last at {@code width - paddingRight} — the ticks and the extreme thumb centres
+     * sit on exactly those two coordinates, and every tier divides that same travel evenly.
+     * <p>
+     * {@code AbsSeekBar} cannot supply this: its stock rail is the only source of the intrinsic measured
+     * height but is additionally inset by a vendor amount (about 6px on API 28) that does not scale with
+     * the layout width, and its own thumb stamping follows a private offset. This class therefore keeps
+     * {@code AbsSeekBar}'s dragging and progress handling untouched and takes over only painting: the
+     * rail and ticks are drawn here and the real native thumb drawable is stamped from the same geometry.
+     */
+    abstract static class RailBar extends SeekBar {
+        /** Rasterization hook: suppresses only the two rail bands so the ticks can be sampled exactly. */
+        static boolean RAIL_BANDS_HIDDEN = false;
+        private final Paint railPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        RailBar(Context context) {
+            super(context);
+            // The rail is drawn by this view. The stock drawable is the only source of AbsSeekBar's
+            // intrinsic measured height, so onMeasure below replaces that contribution explicitly.
+            setProgressDrawable(null);
+        }
+
+        @Override protected void onMeasure(int widthSpec, int heightSpec) {
+            Drawable thumb = getThumb();
+            int intrinsic = Math.max(getSuggestedMinimumHeight(), thumb == null ? 0 : thumb.getIntrinsicHeight());
+            int height = Math.max(intrinsic, CaptionSettingsStyle.dp(getContext(), 24));
+            setMeasuredDimension(resolveSize(MeasureSpec.getSize(widthSpec), widthSpec),
+                    resolveSize(height, heightSpec));
+        }
+
+        final int centerY() {
+            return getPaddingTop() + (getHeight() - getPaddingTop() - getPaddingBottom()) / 2;
+        }
+
+        /** Inclusive visible rail: first endpoint at paddingLeft, last endpoint at width - paddingRight. */
+        final float railStart() {
+            return getPaddingLeft();
+        }
+
+        final float railEnd() {
+            return getWidth() - getPaddingRight();
+        }
+
+        /** Thumb centre travel: paddingLeft to width - paddingRight, divided evenly by progress. */
+        final float thumbCenterX(float fraction) {
+            return railStart() + fraction * (railEnd() - railStart());
+        }
+
+        final float progressFraction() {
+            int span = Math.max(1, getMax());
+            return getProgress() / (float) span;
+        }
+
+        private int railThickness() {
+            return Math.max(1, CaptionSettingsStyle.dp(getContext(), 2));
+        }
+
+        /** Extra decoration hook for the size tier ticks; drawn between the rail and the thumb. */
+        void drawOverRail(Canvas canvas) {
+        }
+
+        /**
+         * AbsSeekBar is not allowed to draw here: its own rail is inset by a vendor amount and its thumb
+         * is stamped at a platform position this class does not share. Rail, ticks and the native thumb
+         * drawable are all positioned from one geometry instead, so the visible rail endpoints, the first
+         * and last tick centres and the two end thumb centres are the same two coordinates.
+         */
+        @Override public void draw(Canvas canvas) {
+            float thickness = railThickness();
+            float radius = thickness / 2f;
+            float centerY = centerY();
+            float top = centerY - radius;
+            float bottom = centerY + radius;
+            float start = railStart();
+            float end = railEnd();
+            float fraction = progressFraction();
+            railPaint.setStyle(Paint.Style.FILL);
+            railPaint.setAlpha(255);
+            railPaint.setColor(CaptionSettingsStyle.sliderUnfilled(getContext()));
+            if (!RAIL_BANDS_HIDDEN && end > start) canvas.drawRoundRect(start, top, end, bottom, radius, radius, railPaint);
+            if (!RAIL_BANDS_HIDDEN && fraction > 0f && end > start) {
+                railPaint.setColor(CaptionSettingsStyle.primary(getContext()));
+                float filled = (end - start) * fraction;
+                boolean rtl = getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
+                canvas.save();
+                canvas.clipRect(rtl ? end - filled : start, top, rtl ? end : start + filled, bottom);
+                canvas.drawRoundRect(start, top, end, bottom, radius, radius, railPaint);
+                canvas.restore();
+            }
+            drawOverRail(canvas);
+            Drawable thumb = getThumb();
+            if (thumb == null) return;
+            int halfWidth = thumb.getIntrinsicWidth() / 2;
+            int halfHeight = thumb.getIntrinsicHeight() / 2;
+            int cx = Math.round(thumbCenterX(fraction));
+            int cy = centerY();
+            thumb.setBounds(cx - halfWidth, cy - halfHeight, cx + halfWidth, cy + halfHeight);
+            thumb.setState(getDrawableState());
+            thumb.draw(canvas);
+        }
+    }
+
+    /** Background opacity rail: identical geometry to the size rail, no tick marks. */
+    static final class OpacitySeekBar extends RailBar {
+        OpacitySeekBar(Context context) {
+            super(context);
+        }
+    }
+
+    /** Five thumb positions, with visible ticks even when the theme omits tick marks. */
+    static final class SizeTierSeekBar extends RailBar {
         private final Paint tickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final float nativeHalfThumb;
 
         SizeTierSeekBar(Context context) {
             super(context);
-            nativeHalfThumb = getThumb() == null ? getThumbOffset() : getThumb().getIntrinsicWidth() / 2f;
             setTickMark(null);
         }
 
+        /** Tick for a tier sits on the thumb centre that tier produces. */
         float tickCenterX(int tier) {
-            float halfThumb = getThumb() == null ? nativeHalfThumb
-                    : getThumb().getIntrinsicWidth() / 2f;
-            float trackWidth = getWidth() - getPaddingLeft() - getPaddingRight()
-                    + 2f * getThumbOffset() - 2f * halfThumb;
             float fraction = CaptionFontSize.clampTier(tier) / (float) (CaptionFontSize.COUNT - 1);
             if (getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) fraction = 1f - fraction;
-            return getPaddingLeft() - getThumbOffset() + halfThumb + fraction * trackWidth;
+            return thumbCenterX(fraction);
         }
 
-        @Override protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float centerY = getPaddingTop()
-                    + (getHeight() - getPaddingTop() - getPaddingBottom()) / 2f;
+        @Override void drawOverRail(Canvas canvas) {
+            float centerY = centerY();
             float radius = CaptionSettingsStyle.dp(getContext(), 3);
             for (int tier = 0; tier < CaptionFontSize.COUNT; tier++) {
                 tickPaint.setColor(tier == getProgress() ? CaptionSettingsStyle.primary(getContext())

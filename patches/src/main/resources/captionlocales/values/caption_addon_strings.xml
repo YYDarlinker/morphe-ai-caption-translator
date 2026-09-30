@@ -10,7 +10,7 @@
     <string name="cap_translation" formatted="false">"Translation"</string>
     <string name="cap_translation_requirements" formatted="false">"Translation instructions"</string>
     <string name="cap_style" formatted="false">"Caption style"</string>
-    <string name="cap_size" formatted="false">"Font size (video details)"</string>
+    <string name="cap_size" formatted="false">"Font size"</string>
     <string name="cap_opacity" formatted="false">"Background opacity"</string>
     <string name="cap_reset_position" formatted="false">"Reset caption position"</string>
     <string name="cap_cache_diagnostics" formatted="false">"Cache and diagnostics"</string>
@@ -19,7 +19,7 @@
     <string name="cap_text_debug" formatted="false">"Caption text debugging"</string>
     <string name="cap_diagnostics" formatted="false">"Caption diagnostics"</string>
     <string name="cap_clear_diagnostics" formatted="false">"Clear diagnostics"</string>
-    <string name="cap_preview" formatted="false">"Caption preview"</string>
+    <string name="cap_preview" formatted="false">"Landscape full-screen preview"</string>
     <string name="cap_landscape" formatted="false">"Landscape"</string>
     <string name="cap_refresh" formatted="false">"Refresh"</string>
     <string name="cap_copy" formatted="false">"Copy"</string>

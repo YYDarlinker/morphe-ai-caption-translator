@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-09-30 夜（N17d `00f53c8`、N18r `581112b`、N19 `10e9c85`、N20 `c124fb5`、N21 `c5f3f57` 五卡均已审阅通过；第三轮真机已完成首轮，诊断 0930-140013。N20 三项非阻塞发现 F1/F2/F3 与 N21 缓存裁决见 §6。流程：N21b 微修卡 → N22 重建包卡 → 第三轮真机补测。审阅与规划角色由 DeepSeek Harness 会话接手。）
+> 最后更新：2026-09-30 夜（N17d `00f53c8`、N18r `581112b`、N19 `10e9c85`、N20 `c124fb5`、N21 `c5f3f57`、N21b `66c1e00` 六卡均已审阅通过；第三轮真机已完成首轮。**代码线到此冻结，下一步 N22 重建包 → 第三轮真机补测**。N20 的 F1/F2/F3 已修，仅余文档措辞瑕疵 F4 见 §6。审阅与规划角色由 DeepSeek Harness 会话接手。）
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -98,8 +98,9 @@
 - **审阅补充（N20 后专项核查，用户提问：暂停是否翻页 / 无原字幕段是否残留）**：**暂停**——时钟 `RebuildClock.position()` 仅在 `STATE_PLAYING` 按速度外推，`STATE_PAUSED` 直接返回上报位置并清掉累积外推，80ms tick 重算分页索引，故暂停期间**不会因时间推进而翻页**；位置越过末页 `end` 后 `RebuildPageLayout.indexAt` 返回 -1 → 空白并隐藏视图。两个例外（均非时间翻页）：① 暂停期间当前区块的译文/修复响应到达会重建分页，屏上文字随之变化（正在等待占位时属期望行为）；② 恰好停在页边界且播放器上报位置有 ±1 帧抖动时（暂停分支无死区）理论上可能来回跳一次。**空档**——静音 ≥650ms 是硬边界：`RebuildPlanner.boundary()` 用它切块，`RebuildProtocol` 对事件做结构硬拒（`crosses_source_break`，且属 `RebuildReview` 不可放行类），故跨静音事件上不了屏；位置落在无 cue/无事件的空档时控制器每 tick 重算得到空串 → `CaptionOverlay.hide()`，N20 后空串统一 `hideView()`（视图 GONE）→ **不残留上一句、不留空字幕框**，最坏 ~80ms 残留（tick 周期）。边界说明：<650ms 短停顿视为连续语音（有意），词级时间全为 `ESTIMATED`（cue 内均匀分配），边界精度受 cue 时间精度限制。
 - ~~N21 缓存命中调查卡~~ ✅ `c5f3f57` 已审阅通过（审阅者独立重跑：50 套件 / 405 测试 / 0 失败 / 0 错误 / 0 跳过；`.verification/n21/cache-lookup-output.txt` 13 次 `N21_LOOKUP` 全部 `miss_reason=file_not_present`、namespace 无漂移、且自标 `key_scope=partial_source_and_fixture_config_not_device`）。**裁决 (b) 设计内行为**：块 key = 协议版本 | 配置 fingerprint(baseUrl+model+prompt) | 目标语言 | 生效 prompt SHA | **整片全部源词**（文本/起止/精度），文件名另含块序号与词区间；不含 API key、视频 ID、session/generation；零风险计划在 `ACCEPTED` 前同步落盘（临时文件 + fsync + ATOMIC_MOVE），风险非零不写盘；上限 256 块/64MiB 按写入时间淘汰、**无 TTL**；源缓存为独立子目录。12 次记账 = 启动 1 次查 2 块 + 后续 11 次各查 1 块，13 missed units 与逐块文件读取一一对应；三次修复不再查盘。**同 session 拖回复看走内存复用、不查盘，故 `hit blocks` 本可恒为 0；`current block hits` 两处调用点均传 `false`，结构上恒为 0，不得用作判据。** 无需修复、无需清缓存。
 - **第三轮真机清单第 4 项程序修正（依 N21 证据，判据 `hit blocks > 0` 不变）**：改为“**新会话**复看”——同包先看一段至 `REBUILD_EVENTS_ACCEPTED;review_risks=0` 且无 `REBUILD_CACHE_WRITE_FAILED`，**保留 app 数据与缓存**，重启 app 或退出重进同一视频（须见新的 engine session/启动链），保持模型/base URL/prompt/目标语言与源轨不变；首两块看 `REBUILD_SOURCE_READY.cache_hits>0`，懒读块看 `REBUILD_CACHE_RESTORED;block=…;network_calls=0`，汇总 `hit blocks` 必须 >0。同 session 拖回仅算“未执行盘命中验证”，不得据此翻绿；不得用 current block hits、提供商 cached tokens 或仅 `REBUILD_REQUEST` 判定命中。
-- **N21b 微修卡（下一张，N21 之后、建包之前）**：① F1 判据补回（用户 2026-09-30 已确认“补”）；② F2 空白/等待态早退；③ F3 清理 `render()` 死变量；④ 第 5 条“暂停期位置粘滞”**仅当用户明确同意时执行**。
-- **N22 重建包卡（N21b 之后）**：基于最新 HEAD 出 .mpp/.mpe + 未签名 APK，结构与 DEX 审计照旧，汇报三产物路径/字节数/与 N18r 体积差；不改源码。
+- ~~N21b 微修卡~~ ✅ `66c1e00` 已审阅通过（审阅者独立重跑：50 套件 / **413 测试** / 0 失败 / 0 错误 / 0 跳过）。五项逐条核对：① A01 判据补回请求时序、防预装“启动通过”与冻结值 3.845 秒引用，A13 补回源词归属/状态抢跑/0ms 独占镜像条款，并追加 N21b 签字记录；② 死计数器 `unit_cache_current_hits` 已删（形参、两处 add、摘要片段一并移除），摘要行现为 `Request-block disk cache: lookups 12 · hit blocks 0 · missed units 13`，取证测试改为断言字段不存在；③ 空白态早退用 `lastBlankIdentity` 实现，同一 identity 且视图 GONE 时跳过文本测量，新空白 cue 仍各自渲染与打点；④ `render()` 死变量 `source` 与恒空 `fallback` 清理，`showEvent` 形参语义保留；⑤ 暂停期位置粘滞落地——`pausedDisplayPosition`/`pausedHookState` 随 session、cancel 清空，`displayPosition()` 只影响显示与分页（`s.position` 调度时钟不变，诊断 `time=` 记原始观测值），非暂停态一律清冻，显式 hook 优先于抖动，1500ms 严格安全阀，并已按契约补齐四条取证测试（页面边界抖动 16ms 的真实回归夹具、恢复推进、暂停 seek 立即生效并递增 generation、换 session 清冻），另覆盖全部非暂停态与缺状态清冻。
+- **遗留文档小瑕疵（F4，不影响判据与产物，随时可顺手修）**：ACCEPTANCE.md 的 A14 行仍写“N9 原文兜底已有 Java 单测与离线镜像”，而 N20 起该窗已改为留空；建议措辞改为“该归属窗留空已有 Java 单测与离线镜像”。**不改判据语义，故不单独开卡**，与后续任一改文档的卡一起处理即可。
+- **N22 重建包卡（下一张，最后一步代码前动作）**：基于最新 HEAD `66c1e00` 出 .mpp/.mpe + 未签名 APK（沿用 `docs/N18r-LOCAL-TEST-BUILD.md` 的既有构建路径与工具组合：YouTube 21.16.256 + 官方 1.44.0 + Patcher 1.14.1），结构与 DEX 审计照旧（既有 82/82 + 官方新增 2/2），汇报三产物路径/字节数/SHA 与相对 N18r 的体积差；JDK 21、零 API、不改源码、不覆盖历史发布资产。**这是 N19–N21b 全部改动首次进包**，出来后即由用户执行第三轮真机补测。
 - **第三轮真机补测清单（用户本人，用 N22 新包执行；发现问题只记录不现场改）**：
   1. 字号五档逐档核对：详情页 34/39/44.5/50/56px、全屏 42.4/48.6/55.5/62.4/69.8px（全屏=详情页×1.247）；默认档应为标准 44.5/55.5。量法：原分辨率截图、单字窗口、只量实心字（不算黑框/阴影/描边）。
   2. 预览一致性：设置页预览中字幕占画面比例应与真机全屏一致，切档即时变化。
@@ -116,7 +117,31 @@
 
 ## 7. 提交序列（morphe-caption-v2）
 
-`c67d63b` 基线对齐 → `fb41189` 验收表+计分板 → `c198c21` N2 → `dc24b7e` N3 → `1ecb662` N4 → `a97bbae` N5 → `7ecc94c` N6 → `4d3e97f` N7 → `c3af18d` N7b记录 → `f360a12` N7b回滚 → `a31f778` N9 → `a1c0541` N10 → `932d24d` N11 → `f2c3aa9` N12 → `5b51c8b` N13 → `d67e8e1` N13b → `a063e47` N14 → `30deae4` N15 停止记录 → `cd97869` N15r → `33c288e` N16 建包 → `d40cfa3` N17a → `640905c` N17b（被推翻）→ `cc29229` N18 旧包（作废）→ `2ddfa14` N17c v2 → `00f53c8` N17d → `581112b` N18r 重建包 → `10e9c85` N19 五档字号 → `c124fb5` N20 字幕只显译文 + 字号档位可视化 → `c5f3f57` N21 块缓存 0 命中离线取证。
+`c67d63b` 基线对齐 → `fb41189` 验收表+计分板 → `c198c21` N2 → `dc24b7e` N3 → `1ecb662` N4 → `a97bbae` N5 → `7ecc94c` N6 → `4d3e97f` N7 → `c3af18d` N7b记录 → `f360a12` N7b回滚 → `a31f778` N9 → `a1c0541` N10 → `932d24d` N11 → `f2c3aa9` N12 → `5b51c8b` N13 → `d67e8e1` N13b → `a063e47` N14 → `30deae4` N15 停止记录 → `cd97869` N15r → `33c288e` N16 建包 → `d40cfa3` N17a → `640905c` N17b（被推翻）→ `cc29229` N18 旧包（作废）→ `2ddfa14` N17c v2 → `00f53c8` N17d → `581112b` N18r 重建包 → `10e9c85` N19 五档字号 → `c124fb5` N20 字幕只显译文 + 字号档位可视化 → `c5f3f57` N21 块缓存 0 命中离线取证 → `66c1e00` N21b 判据补回 + 暂停粘滞 + 诊断清理。
+
+## 7b. 后续功能线：自动翻译语言菜单多选（规划中，待用户拍板后开卡）
+
+- **目标**：把现有第二个补丁 `simplifiedCaptionLanguagePatch`（"Add Simplified Chinese to auto-translate"，单语言、default=false）升级为**用户自选多语言**加入 YouTube 自动翻译语言菜单，并**合并进 "AI caption translator" 补丁**。
+- **既有轮子检索（2026-09-30，审阅者）**：本机官方 `patches-1.44.0.mpp` 全量字符串扫描显示，官方与字幕相关的补丁只有 `captions`、`autoCaptionsPatch`（禁止自动开启字幕）、`captionCookiesPatch`（Timed Text API 请求带 cookies）、`transcriptPatch`，以及 `voiceOverTranslationPatch`（"Voice over translation"，语音配音翻译，另一功能）；**没有任何补丁改动自动翻译语言列表**。GitHub 在本机 web_fetch 被策略拦截（解析到非公网 IP），故为"官方包权威扫描 + 搜索引擎（含 anddea/revanced-patches、4pda Morphe 帖）指示性结果"；**开卡第一步仍需 Codex 联网复核**一次。
+- **本仓机制现状（可直接泛化）**：`NativeCaptionBridge.augmentTranslations()` 已实现"找 timedtext 原型条目 → 克隆 → 改写 code/标签/URL → 按 Collator 顺序插入 → 已存在则修正而非重复"；`LanguageMenuOrder` 用 UI 语言环境的 Collator 对 NFKC 归一化后的显示名排序（即"遵照 YouTube 在各语言下的排序"）；`CaptionLanguageMetadata` 写入条目字节字段（目前硬编码 `zh-Hans`）；`simplifiedUrl/simplifiedVss` 负责 `tlang`/`t<code>` 改写。**用户四项要求里，去重、排序、插入已有实现，缺的是"多选集合 + 每个 code 的元数据/URL 改写 + 设置项 UI"。**
+- **待用户拍板**：① 覆盖范围——YouTube 原生全集 vs 精选集（审阅者建议精选起步：14 个 UI 语种 + zh-Hant 等，运行时验证兜底）；② 多选 UI 落点（设置页新增一项）；③ 是否接受"每新增一种目标语言 ≈ 重新标定一次分页/可读性阈值并攒该语言对真机样本"的代价（见 §7c）。
+- **建议卡序列**：L1 调查/设计卡（联网复核现成轮子 + 定位承载语言列表的类与挂点 + 候选来源与 tlang 编码规则 + 多选 UI 落点 + 最小实现方案与风险，只查不改）→ L2 实现卡（多选/去重/排序/14 语种文案/测试/fixture）→ L3 建包 + 真机验证。
+- **回退锚点**：`66c1e00`（N21b，语言菜单开发前的最后代码点）。建议在下一张卡里创建 `anchor/n21b-66c1e00` 标签；功能线在独立分支（如 `feature/lang-menu`）上开发，主线保持可回退。
+
+## 7c. 翻译策略的语言对适配性（审阅者核查结论）
+
+- **架构上语言对无关**：`RebuildApi.prompt(cfg,lang)` = 主 prompt + 保真 prompt + `Target language: <lang>` + 用户偏好；源语言不显式声明（由 `source_text` 推断）；`RebuildSource.tokens()` 是脚本感知的（Han/假名/谚文逐字切，拉丁按词，数字/百分号/复合词单独成 token）；排版由 Android `StaticLayout` 按真实字体测量；目标语言就是所选菜单条目的 code，全链路可换目标。
+- **但阈值是为"英文源→中文目标"标定的**：`RebuildPageLayout` 的偏好 12–18 码点、`MAX_CPS=8`、`8L*|len−15|` 计分、12/18 惩罚项、`MIN_PAGE_MS=1200` 全部按**字符数**；拉丁/西里尔目标下同样字符数承载信息少得多，CPS=8 也偏紧，会明显多分页。`RebuildProtocol` 段落护栏已按 `cj ? 60 : 155` 自适应（部分自适应）。`RebuildReview`/`RebuildSemantics` 的语义护栏（主语错接、数字替换、锚点泄漏、比较极性）来自中英失败样本，换语言对最好情况是惰性、最坏情况是误报。
+- **结论**：换语言对"能跑通但不等于体验成立"；每加一个目标语言，工程代价 = 重标定分页/可读性阈值 + 一轮该语言对的真机样本。这直接影响 §7b 的覆盖范围决策。
+
+## 7d. 分语种参数依据：Netflix Timed Text Style Guide 实测数值（2026-09-30 检索，审阅者）
+
+- **检索方法**：`web_fetch` 对 github.com / *.github.io 被策略拦（解析到保留段 198.18.0.111），改用 shell 的 `curl` 抓 Netflix Partner Help Center 正文 + `gh` 做社区检索。
+- **通用要求**（[General Requirements](https://partnerhelp.netflixstudios.com/hc/en-us/articles/215758617-Timed-Text-Style-Guide-General-Requirements)）：最短 5/6 秒、最长 7 秒、**最多两行**、"不超过字符上限时保持一行"；断行规则=标点后断、连词/介词前断，不得拆开冠词与名词、形容词与名词、名与姓、动词与主语代词、动词与助动词/否定。每事件两行上限与我们的"每页 ≤2 行"是同一单位，可直接对齐。
+- **每行字符上限**（[官方 QC 表](https://partnerhelp.netflixstudios.com/hc/en-us/articles/215274938-What-is-the-maximum-number-of-characters-per-line-allowed-in-Timed-Text-assets)）：多数语言建议 **42**；强制上限——韩 23、简中 23、繁中 23、阿 50（Originals 档：韩/简中/繁中 **16**、阿 42）。
+- **阅读速度（正片 / 儿童 / SDH）**，取自各语言 TTSG：**简中·繁中 9 / 7 / 11**（每行 16 全角）；**日 4（重对话 7）/ — / 7**，每行 13 全角（SDH 16），半角与空格按 0.5 计；**韩 12 / 9 / 14**，每行 16（拉丁/空格/标点按 0.5 计）；**阿 20 / 17 / 23**；**印地 22 / 18 / 25**；**英·德·法·西·葡·俄·越·印尼 17 / 13 / 20**。
+- **对现行常量的判定**：`MAX_CPS=8` 全局单一值**只对中日文成立**（中文 8 与官方 9 同档、日文官方仅 4 需下调），对拉丁/西里尔/阿拉伯/印地/越南/印尼**过严约一倍**（官方 17–22），会造成大量无谓分页；"12–18 码点"只适用于 CJK，拉丁语种应以**实测行宽**为预算；计数单位应改为**显示宽度单位**（全角=1、半角/空格/标点=0.5，韩日官方即此口径）或**字素簇**（印地/阿拉伯），而非 `codePointCount`。
+- **质量承诺范围建议（待用户拍板）**：把"能把语言加进菜单"（14 种，平台能力）与"承诺译文质量"（仅中文简繁，可选加英文）分开；其余语种只承诺**版式合规与平台可用**，设置页文案如实标注，避免对无法验收的语言作质量承诺。
 
 ## 8. 项目由来（一句话）
 

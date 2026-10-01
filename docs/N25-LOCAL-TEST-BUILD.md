@@ -78,6 +78,6 @@
 | `E:\Projects\morphe-caption-v2\build\local-test\extension-1.3.5-本地测试包-n25.mpe` | 2,713,520 | +15,484 | `C75B1067F431E495FACE025E821CF8676570A426DFD2B0F048C6033BFE0FA401` |
 | `E:\Projects\morphe-caption-v2\build\n25-composition-final\YouTube-21.16.256-本地测试包-n25-unsigned.apk` | 196,935,268 | +134,320 | `9FE3A03F024ED54743589435685342C95D179ADB3112652A1E4CB88EA7D4964F` |
 
-MPE 由交付 MPP 抽取，与包内 `extensions/extension.mpe` 逐字节一致。体积增量几乎全部来自 76 个新键 × 14 语种的资源文本（XML 每语种 +10,226 字节）。提交 `8941244`（代码）＋文档提交，锚点标签指向 `8941244`（未推送）。
+MPE 由交付 MPP 抽取，与包内 `extensions/extension.mpe` 逐字节一致。体积增量几乎全部来自 76 个新键 × 14 语种的资源文本（XML 每语种 +10,226 字节）。本卡提交序列：`8941244`（源码与本地化）→ `c139144`（交付记录与档案同步）→ `99e7be5`（表头分隔符修正、`N25DiagnosticsLocalizationTest` 与最终记录）；锚点标签 `anchor/n25-99e7be5` 指向 `99e7be5`（未推送）。
 
 **真机仍待用户验证**：预览无重复标题后的观感、五档档名在系统大字体下的实际排版、RTL 系统语言下的滑轨方向与拖动一致性、十四语种界面下的示例与档名观感、以及诊断面板与 Token 审计摘要的本地化可读性。本卡不做真机、不签名、不发布；L 线语言菜单仍未启动。

@@ -945,7 +945,7 @@ final class RebuildController {
           boolean fatal = e instanceof RebuildApi.Failure && ((RebuildApi.Failure) e).configuration;
           if (fatal) {
             s.terminal = true;
-            s.status = "字幕 API 配置错误：" + code;
+            s.status = String.format(java.util.Locale.ROOT, CaptionStrings.settings(s.context, "api_config_error"), code);
           }
           boolean filtered =
               e instanceof RebuildApi.Failure

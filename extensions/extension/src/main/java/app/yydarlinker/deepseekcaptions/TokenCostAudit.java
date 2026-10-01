@@ -447,6 +447,15 @@ final class TokenCostAudit {
     }
 
     static String uiText(Context context) {
+        return uiText(context, true);
+    }
+
+    /**
+     * The audit panel body. {@code localized=false} reproduces the report exactly as earlier builds wrote
+     * it, so the saved export keeps its established shape and stays comparable with previous files; every
+     * number, model id, base URL and counter is the same in both forms.
+     */
+    static String uiText(Context context, boolean localized) {
         if (context != null) install(context);
         synchronized (LOCK) {
             JSONObject state = stateLocked();
@@ -458,92 +467,146 @@ final class TokenCostAudit {
             long attempts = value(totalAll, "attempts");
             long totalTokens = value(totalAll, "total_tokens");
             if (attempts == 0L && totalTokens == 0L) {
-                return "Token cost audit: no API usage yet. Play AI captions to see usage, cache hits, request purposes, and cost per viewing minute.";
+                return localized
+                        ? text(context, "audit_no_usage")
+                        : "Token cost audit: no API usage yet. Play AI captions to see usage, cache hits, request purposes, and cost per viewing minute.";
             }
 
             StringBuilder out = new StringBuilder(1500);
-            out.append("Token cost audit (since last reset)");
+            out.append(localized ? text(context, "audit_title") : "Token cost audit (since last reset)");
             String model = session.optString("model", "").trim();
-            if (!model.isEmpty()) out.append("\nCurrent model: ").append(model);
-            out.append("\nCurrent engine: ").append(
-                    "event_rebuild_r2".equals(session.optString("active_core", ""))
+            if (!model.isEmpty()) out.append("\n").append(localized
+                    ? format(context, "audit_current_model", model)
+                    : "Current model: " + model);
+            out.append("\n").append(localized
+                    ? format(context, "audit_current_engine",
+                            "event_rebuild_r2".equals(session.optString("active_core", ""))
+                                    ? text(context, "engine_event_rebuild") + " / " + RebuildProtocol.VERSION
+                                    : text(context, "audit_legacy_engine"))
+                    : "Current engine: " + ("event_rebuild_r2".equals(session.optString("active_core", ""))
                             ? "Event rebuild / " + RebuildProtocol.VERSION
-                            : "legacy engine"
-            );
-            out.append("\nAPI: ").append(format(value(totalAll, "attempts"))).append(" attempts")
-                    .append(" · ").append(format(value(totalAll, "http_ok"))).append(" successful (2xx)")
-                    .append(" · ").append(format(value(totalAll, "failures"))).append(" failures")
-                    .append(" · internal retries ").append(format(value(totalAll, "internal_retries")));
-            appendFailureBreakdown(out, totalAll);
+                            : "legacy engine"));
+            String apiLine = "API: " + format(value(totalAll, "attempts")) + " attempts"
+                    + " · " + format(value(totalAll, "http_ok")) + " successful (2xx)"
+                    + " · " + format(value(totalAll, "failures")) + " failures"
+                    + " · internal retries " + format(value(totalAll, "internal_retries"));
+            out.append("\n").append(localized
+                    ? format(context, "audit_api", format(value(totalAll, "attempts")),
+                            format(value(totalAll, "http_ok")), format(value(totalAll, "failures")),
+                            format(value(totalAll, "internal_retries")))
+                    : apiLine);
+            appendFailureBreakdown(out, totalAll, context, localized);
             long accepted=value(totalAll,"accepted_caption_units"),rejected=value(totalAll,"rejected_caption_units");
-            if(accepted+rejected>0)out.append("\n").append("Structural and deterministic checks: accepted / rejected (not semantic acceptance)")
-                    .append(": ").append(accepted).append(" / ").append(rejected)
-                    .append(" (").append(value(totalAll,"quality_rejected_units")).append(")");
-            out.append("\nTokens: ").append(format(totalTokens))
-                    .append(" = input ").append(format(value(totalAll, "prompt_tokens")))
-                    .append(" + output ").append(format(value(totalAll, "completion_tokens")));
+            if(accepted+rejected>0)out.append("\n").append(localized
+                    ? format(context, "audit_structural", format(accepted), format(rejected),
+                            format(value(totalAll, "quality_rejected_units")))
+                    : "Structural and deterministic checks: accepted / rejected (not semantic acceptance)"
+                            + ": " + accepted + " / " + rejected
+                            + " (" + value(totalAll, "quality_rejected_units") + ")");
+            out.append("\n").append(localized
+                    ? format(context, "audit_tokens", format(totalTokens),
+                            format(value(totalAll, "prompt_tokens")),
+                            format(value(totalAll, "completion_tokens")))
+                    : "Tokens: " + format(totalTokens)
+                            + " = input " + format(value(totalAll, "prompt_tokens"))
+                            + " + output " + format(value(totalAll, "completion_tokens")));
 
             long hit = value(totalAll, "cache_hit_tokens");
             long miss = value(totalAll, "cache_miss_tokens");
             long knownInput = hit + miss;
             if (knownInput > 0L) {
-                out.append("\nInput cache: hit ").append(format(hit))
-                        .append(" / miss ").append(format(miss))
-                        .append(" · hit rate ").append(percent(hit, knownInput));
+                out.append("\n").append(localized
+                        ? format(context, "audit_cache_known", format(hit), format(miss),
+                                percent(hit, knownInput))
+                        : "Input cache: hit " + format(hit)
+                                + " / miss " + format(miss)
+                                + " · hit rate " + percent(hit, knownInput));
             } else {
-                out.append("\nInput cache: provider did not report recognizable hit/miss details");
+                out.append("\n").append(localized
+                        ? text(context, "audit_cache_unknown")
+                        : "Input cache: provider did not report recognizable hit/miss details");
             }
 
-            appendCost(out, totalAll, "\nV4 Flash current provider estimate: ");
-            out.append("\nRequests by purpose:");
-            appendBucketLine(out, state, "priority", "Current priority");
-            appendBucketLine(out, state, "priority_current", "  Current anchor");
-            appendBucketLine(out, state, "priority_gap_rescue", "  Gap rescue");
-            appendBucketLine(out, state, "background", "Background prefetch");
-            appendBucketLine(out, state, "background_page", "  Page merge");
-            appendBucketLine(out, state, "background_block", "  Block (fallback)");
-            appendBucketLine(out, state, "background_alt", "  Boundary recheck");
-            appendBucketLine(out, state, "unit_realtime", "Time anchor / current batch");
-            appendBucketLine(out, state, "unit_background", "Time anchor / background batch");
-            appendBucketLine(out, state, "core_semantic_ledger_v2", "Core: Semantic Ledger v2");
-            appendBucketLine(out, state, "core_contextual_unit_v1", "Core: Contextual Unit v1");
-            appendBucketLine(out, state, "display", "Display slicing");
+            out.append("\n").append(localized
+                    ? format(context, "audit_estimate", costText(context, true, totalAll))
+                    : "V4 Flash current provider estimate: " + costText(context, false, totalAll));
+            out.append("\n").append(localized ? text(context, "audit_by_purpose") : "Requests by purpose:");
+            if (localized) {
+                compactBucketLine(out, state, "priority", "audit_bucket_priority", context);
+                compactBucketLine(out, state, "priority_current", "audit_bucket_priority_current", context);
+                compactBucketLine(out, state, "priority_gap_rescue", "audit_bucket_priority_gap_rescue", context);
+                compactBucketLine(out, state, "background", "audit_bucket_background", context);
+                compactBucketLine(out, state, "background_page", "audit_bucket_background_page", context);
+                compactBucketLine(out, state, "background_block", "audit_bucket_background_block", context);
+                compactBucketLine(out, state, "background_alt", "audit_bucket_background_alt", context);
+                compactBucketLine(out, state, "unit_realtime", "audit_bucket_unit_realtime", context);
+                compactBucketLine(out, state, "unit_background", "audit_bucket_unit_background", context);
+                compactBucketLine(out, state, "core_semantic_ledger_v2", "audit_core_semantic_ledger", context);
+                compactBucketLine(out, state, "core_contextual_unit_v1", "audit_core_contextual_unit", context);
+                compactBucketLine(out, state, "display", "audit_bucket_display", context);
+            } else {
+                appendBucketLine(out, state, "priority", "Current priority");
+                appendBucketLine(out, state, "priority_current", "  Current anchor");
+                appendBucketLine(out, state, "priority_gap_rescue", "  Gap rescue");
+                appendBucketLine(out, state, "background", "Background prefetch");
+                appendBucketLine(out, state, "background_page", "  Page merge");
+                appendBucketLine(out, state, "background_block", "  Block (fallback)");
+                appendBucketLine(out, state, "background_alt", "  Boundary recheck");
+                appendBucketLine(out, state, "unit_realtime", "Time anchor / current batch");
+                appendBucketLine(out, state, "unit_background", "Time anchor / background batch");
+                appendBucketLine(out, state, "core_semantic_ledger_v2", "Core: Semantic Ledger v2");
+                appendBucketLine(out, state, "core_contextual_unit_v1", "Core: Contextual Unit v1");
+                appendBucketLine(out, state, "display", "Display slicing");
+            }
 
             JSONObject totalsMetrics = metricsLocked(state);
-            appendPageEfficiencyLine(out, state, "background_page", "Page merge");
-            appendPageEfficiencyLine(out, state, "background_block", "Block (fallback)");
-            appendPageEfficiencyLine(out, state, "background_alt", "Boundary recheck");
+            appendPageEfficiencyLine(out, state, "background_page", "Page merge", context, localized);
+            appendPageEfficiencyLine(out, state, "background_block", "Block (fallback)", context, localized);
+            appendPageEfficiencyLine(out, state, "background_alt", "Boundary recheck", context, localized);
 
             JSONObject pageBucket = bucketLocked(state, "background_page");
             long pageRequests = value(pageBucket, "logical_requests");
             long pageBlocksCompleted = value(pageBucket, "blocks_completed");
             if (pageRequests > 0L) {
-                out.append("\nPage merge progress: ").append(format(pageBlocksCompleted))
-                        .append(" fixed blocks completed by ").append(format(pageRequests))
-                        .append(" page requests (")
-                        .append(oneDecimal(pageBlocksCompleted / (double) pageRequests))
-                        .append(" blocks/request; <1.0 means repeated requests without progress)");
+                out.append("\n").append(localized
+                        ? format(context, "audit_bucket_progress", format(pageBlocksCompleted),
+                                format(pageRequests),
+                                oneDecimal(pageBlocksCompleted / (double) pageRequests))
+                        : "Page merge progress: " + format(pageBlocksCompleted)
+                                + " fixed blocks completed by " + format(pageRequests)
+                                + " page requests ("
+                                + oneDecimal(pageBlocksCompleted / (double) pageRequests)
+                                + " blocks/request; <1.0 means repeated requests without progress)");
             }
             long altArmed = value(totalsMetrics, "background_alt_armed");
             if (altArmed > 0L) {
                 JSONObject altBucket = bucketLocked(state, "background_alt");
-                out.append("\nBoundary recheck: triggered ").append(format(altArmed))
-                        .append(" times (at most once/page) · sent ")
-                        .append(format(value(altBucket, "logical_requests")))
-                        .append(" requests · recovered ").append(format(value(altBucket, "committed_atoms")))
-                        .append(" atoms");
+                out.append("\n").append(localized
+                        ? format(context, "audit_boundary", format(altArmed),
+                                format(value(altBucket, "logical_requests")),
+                                format(value(altBucket, "committed_atoms")))
+                        : "Boundary recheck: triggered " + format(altArmed)
+                                + " times (at most once/page) · sent "
+                                + format(value(altBucket, "logical_requests"))
+                                + " requests · recovered " + format(value(altBucket, "committed_atoms"))
+                                + " atoms");
             }
             long pageFallback = value(totalsMetrics, "background_page_fallback_events");
             if (pageFallback > 0L) {
-                out.append("\nPage fallback: ").append(format(pageFallback))
-                        .append(" cached pages exceeded failure threshold; falling back to block requests");
+                out.append("\n").append(localized
+                        ? format(context, "audit_page_fallback", format(pageFallback))
+                        : "Page fallback: " + format(pageFallback)
+                                + " cached pages exceeded failure threshold; falling back to block requests");
             }
             long sunkPrompts = value(totalAll, "sunk_prompts");
             if (sunkPrompts > 0L) {
-                out.append("\nSent but unread requests: ").append(format(sunkPrompts))
-                        .append(" requests · ").append(format(value(totalAll, "sunk_prompt_bytes")))
-                        .append(" bytes. Provider processing/billing is unknown; token and cost totals below exclude this usage,")
-                        .append(" so actual spend cannot be determined.");
+                out.append("\n").append(localized
+                        ? format(context, "audit_sunk", format(sunkPrompts),
+                                format(value(totalAll, "sunk_prompt_bytes")))
+                        : "Sent but unread requests: " + format(sunkPrompts)
+                                + " requests · " + format(value(totalAll, "sunk_prompt_bytes"))
+                                + " bytes. Provider processing/billing is unknown; token and cost totals below exclude this usage,"
+                                + " so actual spend cannot be determined.");
             }
 
             long localSuccess = value(totalsMetrics, "display_local_success");
@@ -551,27 +614,50 @@ final class TokenCostAudit {
             long localWholeSentence = value(totalsMetrics, "display_local_whole_sentence");
             if (localSuccess + localInconclusive + localWholeSentence > 0L) {
                 JSONObject displayBucket = bucketLocked(state, "display");
-                out.append("\nDisplay slicing: local zero-token successes ").append(format(localSuccess)).append(" times");
-                if (localWholeSentence > 0L) {
-                    out.append(" · kept whole sentences ").append(format(localWholeSentence)).append(" times");
-                }
-                if (localInconclusive > 0L) {
-                    out.append(" · handed off to AI ").append(format(localInconclusive)).append(" times")
-                            .append(" (AI calls ").append(format(value(displayBucket, "attempts")))
-                            .append(" · with usage ").append(format(value(displayBucket, "usage_responses")))
-                            .append(" · failures ").append(format(value(displayBucket, "failures"))).append(")");
+                if (localized) {
+                    StringBuilder display = new StringBuilder(format(context, "audit_display_local", format(localSuccess)));
+                    if (localWholeSentence > 0L) {
+                        display.append(" · ").append(format(context, "audit_display_whole", format(localWholeSentence)));
+                    }
+                    if (localInconclusive > 0L) {
+                        display.append(" · ").append(format(context, "audit_display_handoff", format(localInconclusive),
+                                format(value(displayBucket, "attempts")),
+                                format(value(displayBucket, "usage_responses")),
+                                format(value(displayBucket, "failures"))));
+                    }
+                    out.append("\n").append(display);
+                } else {
+                    out.append("\nDisplay slicing: local zero-token successes ").append(format(localSuccess)).append(" times");
+                    if (localWholeSentence > 0L) {
+                        out.append(" · kept whole sentences ").append(format(localWholeSentence)).append(" times");
+                    }
+                    if (localInconclusive > 0L) {
+                        out.append(" · handed off to AI ").append(format(localInconclusive)).append(" times")
+                                .append(" (AI calls ").append(format(value(displayBucket, "attempts")))
+                                .append(" · with usage ").append(format(value(displayBucket, "usage_responses")))
+                                .append(" · failures ").append(format(value(displayBucket, "failures"))).append(")");
+                    }
                 }
             }
 
-            appendBucketLine(out, state, "core_event_rebuild_r2", "Core: Event rebuild / " + RebuildProtocol.VERSION);
+            if (localized) {
+                compactBucketLine(out, state, "core_event_rebuild_r2", "audit_core_event_rebuild", context,
+                        RebuildProtocol.VERSION);
+            } else {
+                appendBucketLine(out, state, "core_event_rebuild_r2", "Core: Event rebuild / " + RebuildProtocol.VERSION);
+            }
             long viewed = value(session, "viewed_ms");
             long sessionTokens = value(sessionAll, "total_tokens");
-            out.append("\nCurrent video: viewed ").append(seconds1(viewed / 1000d)).append(" s")
-                    .append(" · ").append(format(sessionTokens)).append(" tokens");
+            out.append("\n").append(localized
+                    ? format(context, "audit_video", seconds1(viewed / 1000d), format(sessionTokens))
+                    : "Current video: viewed " + seconds1(viewed / 1000d) + " s"
+                            + " · " + format(sessionTokens) + " tokens");
             if (viewed >= 5_000L) {
                 double minutes = viewed / 60_000d;
                 long perMinute = Math.round(sessionTokens / Math.max(0.001d, minutes));
-                out.append(" · ").append(format(perMinute)).append(" tokens/viewing minute");
+                out.append(" · ").append(localized
+                        ? format(context, "audit_per_minute", format(perMinute))
+                        : format(perMinute) + " tokens/viewing minute");
                 long sessionCost = value(sessionAll, "cost_nano_cny");
                 if (sessionCost > 0L) {
                     out.append(" · ¥").append(money(sessionCost / 1_000_000_000d / minutes)).append("/minute");
@@ -583,46 +669,120 @@ final class TokenCostAudit {
             long outsideAtoms = value(metrics, "semantic_outside_atoms");
             if (coreAtoms > 0L) {
                 double exposure = (windowAtoms + outsideAtoms) / (double) coreAtoms;
-                out.append("\nSemantic window: core ").append(format(coreAtoms))
-                        .append(" atoms · exposed ").append(format(windowAtoms + outsideAtoms))
-                        .append(" atoms · context exposure ratio ")
-                        .append(String.format(Locale.US, "%.2fx", exposure));
+                out.append("\n").append(localized
+                        ? format(context, "audit_semantic_window", format(coreAtoms),
+                                format(windowAtoms + outsideAtoms),
+                                String.format(Locale.US, "%.2fx", exposure))
+                        : "Semantic window: core " + format(coreAtoms)
+                                + " atoms · exposed " + format(windowAtoms + outsideAtoms)
+                                + " atoms · context exposure ratio "
+                                + String.format(Locale.US, "%.2fx", exposure));
             }
             long targetUnits = value(metrics, "unit_target_units");
             long contextUnits = value(metrics, "unit_context_units");
             long targetChars = value(metrics, "unit_target_chars");
             long contextChars = value(metrics, "unit_context_chars");
             if (targetUnits > 0L) {
-                out.append("\nRequest blocks: target ").append(format(targetUnits))
-                        .append(" blocks · read-only context ").append(format(contextUnits))
-                        .append(" sections · context sections/block ")
-                        .append(String.format(Locale.US, "%.2fx", contextUnits / (double) targetUnits));
+                StringBuilder blocks = new StringBuilder(localized
+                        ? format(context, "audit_request_blocks", format(targetUnits),
+                                format(contextUnits),
+                                String.format(Locale.US, "%.2fx", contextUnits / (double) targetUnits))
+                        : "Request blocks: target " + format(targetUnits)
+                                + " blocks · read-only context " + format(contextUnits)
+                                + " sections · context sections/block "
+                                + String.format(Locale.US, "%.2fx", contextUnits / (double) targetUnits));
                 if (targetChars > 0L) {
-                    out.append(" · character exposure ratio ")
-                            .append(String.format(Locale.US, "%.2fx", contextChars / (double) targetChars));
+                    blocks.append(" · ").append(localized
+                            ? format(context, "audit_char_ratio",
+                                    String.format(Locale.US, "%.2fx", contextChars / (double) targetChars))
+                            : "character exposure ratio "
+                                    + String.format(Locale.US, "%.2fx", contextChars / (double) targetChars));
                 }
+                out.append("\n").append(blocks);
             }
             long cacheLookups = value(metrics, "unit_cache_lookups");
             if (cacheLookups > 0L) {
-                out.append("\nRequest-block disk cache: lookups ").append(format(cacheLookups))
-                        .append(" · hit blocks ").append(format(value(metrics, "unit_cache_hit_units")))
-                        .append(" · missed units ").append(format(value(metrics, "unit_cache_miss_units")));
+                out.append("\n").append(localized
+                        ? format(context, "audit_disk_cache", format(cacheLookups),
+                                format(value(metrics, "unit_cache_hit_units")),
+                                format(value(metrics, "unit_cache_miss_units")))
+                        : "Request-block disk cache: lookups " + format(cacheLookups)
+                                + " · hit blocks " + format(value(metrics, "unit_cache_hit_units"))
+                                + " · missed units " + format(value(metrics, "unit_cache_miss_units")));
             }
-            appendCoreRate(out, session, metrics, "semantic_ledger_v2", "legacy engine");
-            appendCoreRate(out, session, metrics, "contextual_unit_v1", "Legacy compatibility engine");
-            appendCoreRate(out, session, metrics, "event_rebuild_r2", "Event rebuild / " + RebuildProtocol.VERSION);
+            appendCoreRate(out, session, metrics, "semantic_ledger_v2", "legacy engine", context, localized);
+            appendCoreRate(out, session, metrics, "contextual_unit_v1", "Legacy compatibility engine", context, localized);
+            appendCoreRate(out, session, metrics, "event_rebuild_r2", "Event rebuild / " + RebuildProtocol.VERSION, context, localized);
             long requestBytes = value(sessionAll, "request_bytes");
             long sessionAttempts = value(sessionAll, "attempts");
             if (sessionAttempts > 0L) {
-                out.append("\nRequest body: total ").append(format(requestBytes)).append(" bytes")
-                        .append(" · average ").append(format(requestBytes / sessionAttempts)).append(" bytes/API attempt");
+                out.append("\n").append(localized
+                        ? format(context, "audit_request_body", format(requestBytes),
+                                format(requestBytes / sessionAttempts))
+                        : "Request body: total " + format(requestBytes) + " bytes"
+                                + " · average " + format(requestBytes / sessionAttempts) + " bytes/API attempt");
             }
             long noUsage = value(totalAll, "responses_without_usage");
             if (noUsage > 0L) {
-                out.append("\nNote: ").append(format(noUsage))
-                        .append(" 2xx responses lacked usage; only request counts, not exact tokens, are known for these.");
+                out.append("\n").append(localized
+                        ? format(context, "audit_no_usage_note", format(noUsage))
+                        : "Note: " + format(noUsage)
+                                + " 2xx responses lacked usage; only request counts, not exact tokens, are known for these.");
             }
             return out.toString();
+        }
+    }
+
+    /** One settings-catalog lookup for a UI label of the audit panel. */
+    private static String text(Context context, String key) {
+        return CaptionStrings.settings(context, key);
+    }
+
+    /** Renders one authored template; the numbers are formatted exactly as the raw report formats them. */
+    private static String format(Context context, String key, String... values) {
+        return String.format(Locale.ROOT, text(context, key), (Object[]) values);
+    }
+
+    /** The provider estimate without its label, so one template can carry the whole line. */
+    private static String costText(Context context, boolean localized, JSONObject bucket) {
+        long nano = value(bucket, "cost_nano_cny");
+        long priced = value(bucket, "priced_responses");
+        if (priced <= 0L) return "-";
+        StringBuilder out = new StringBuilder("¥").append(money(nano / 1_000_000_000d));
+        long usage = value(bucket, "usage_responses");
+        if (priced < usage) {
+            out.append(" ").append(localized
+                    ? text(context, "audit_priced_subset")
+                    : "(only responses priced by built-in V4 Flash rates)");
+        }
+        return out.toString();
+    }
+
+    /** Localized bucket line: one authored template per locale, so nothing is concatenated at runtime. */
+    private static void compactBucketLine(
+            StringBuilder out, JSONObject parent, String key, String labelKey, Context context, String... labelArgs
+    ) {
+        JSONObject bucket = bucketLocked(parent, key);
+        long requests = value(bucket, "logical_requests"), attempts = value(bucket, "attempts");
+        String label = labelArgs.length == 0
+                ? text(context, labelKey)
+                : format(context, labelKey, labelArgs);
+        out.append("\n  ").append(label).append(": ")
+                .append(format(context, requests == 1 ? "audit_logical_request_one" : "audit_logical_request_many",
+                        format(requests)))
+                .append(format(context, attempts == 1 ? "audit_api_call_one" : "audit_api_call_many",
+                        format(attempts)))
+                .append(format(context, "audit_tok", format(value(bucket, "total_tokens"))));
+        long focusMiss = value(bucket, "focus_miss_results");
+        long deferred = value(bucket, "local_deferrals");
+        if (focusMiss > 0L) out.append(" · ").append(format(context, "audit_focus_misses", format(focusMiss)));
+        if (deferred > 0L) out.append(" · ").append(format(context, "audit_circuit_breakers", format(deferred)));
+        long nano = value(bucket, "cost_nano_cny");
+        long priced = value(bucket, "priced_responses");
+        if (priced > 0L) {
+            out.append(" · ¥").append(money(nano / 1_000_000_000d));
+            long usage = value(bucket, "usage_responses");
+            if (priced < usage) out.append(" ").append(text(context, "audit_priced_subset"));
         }
     }
 
@@ -631,27 +791,49 @@ final class TokenCostAudit {
             JSONObject session,
             JSONObject metrics,
             String core,
-            String label
+            String label,
+            Context context,
+            boolean localized
     ) {
         long viewed = value(metrics, "viewed_ms_" + core);
         JSONObject bucket = bucketLocked(session, "core_" + core);
         long tokens = value(bucket, "total_tokens");
         if (viewed <= 0L && tokens <= 0L) return;
-        out.append("\n  ").append(label).append(": viewed ")
-                .append(seconds1(viewed / 1000d)).append(" s · ")
-                .append(format(tokens)).append(" tok");
+        out.append("\n  ").append(localized
+                ? ("event_rebuild_r2".equals(core)
+                        ? format(context, "audit_core_event_rebuild", RebuildProtocol.VERSION)
+                        : format(context, "audit_current_engine", label))
+                : label);
+        out.append(": ").append(localized
+                ? format(context, "audit_viewed", seconds1(viewed / 1000d), format(tokens))
+                : "viewed " + seconds1(viewed / 1000d) + " s · " + format(tokens) + " tok");
         if (viewed >= 5_000L) {
             double minutes = viewed / 60_000d;
-            out.append(" · ").append(format(Math.round(tokens / Math.max(0.001d, minutes))))
-                    .append(" tok/viewing minute");
+            out.append(" · ").append(localized
+                    ? format(context, "audit_tok_per_minute",
+                            format(Math.round(tokens / Math.max(0.001d, minutes))))
+                    : format(Math.round(tokens / Math.max(0.001d, minutes))) + " tok/viewing minute");
             long cost = value(bucket, "cost_nano_cny");
             if (cost > 0L) {
                 out.append(" · ¥").append(money(cost / 1_000_000_000d / minutes)).append("/minute");
             }
         }
     }
-    private static void appendFailureBreakdown(StringBuilder out, JSONObject bucket) {
+    private static void appendFailureBreakdown(
+            StringBuilder out, JSONObject bucket, Context context, boolean localized
+    ) {
         if (value(bucket, "failures") <= 0L) return;
+        if (localized) {
+            out.append("\n").append(format(context, "audit_failure_breakdown",
+                    format(value(bucket, "http_429_failures")),
+                    format(value(bucket, "http_5xx_failures")),
+                    format(value(bucket, "http_4xx_failures")),
+                    format(value(bucket, "timeout_failures")),
+                    format(value(bucket, "network_failures")),
+                    format(value(bucket, "cancelled_failures")),
+                    format(value(bucket, "other_failures") + value(bucket, "http_other_failures"))));
+            return;
+        }
         out.append("\nFailure breakdown: 429 ").append(format(value(bucket, "http_429_failures")))
                 .append(" · 5xx ").append(format(value(bucket, "http_5xx_failures")))
                 .append(" · other 4xx ").append(format(value(bucket, "http_4xx_failures")))
@@ -678,13 +860,23 @@ final class TokenCostAudit {
     }
 
     private static void appendPageEfficiencyLine(
-            StringBuilder out, JSONObject parent, String key, String label
+            StringBuilder out, JSONObject parent, String key, String label,
+            Context context, boolean localized
     ) {
         JSONObject bucket = bucketLocked(parent, key);
         long committed = value(bucket, "committed_atoms");
         if (committed <= 0L) return;
         long input = value(bucket, "prompt_tokens");
         long miss = value(bucket, "cache_miss_tokens");
+        if (localized) {
+            String localizedLabel = "background_page".equals(key) ? text(context, "audit_bucket_background_page")
+                    : "background_block".equals(key) ? text(context, "audit_bucket_background_block")
+                    : text(context, "audit_bucket_background_alt");
+            out.append("\n  ").append(format(context, "audit_efficiency", localizedLabel,
+                    format(committed), oneDecimal(input / (double) committed),
+                    oneDecimal(miss / (double) committed)));
+            return;
+        }
         out.append("\n  ").append(label).append(" efficiency: added ").append(format(committed))
                 .append(" core atoms · input per atom ").append(oneDecimal(input / (double) committed))
                 .append(" tok · cache-miss input per atom ").append(oneDecimal(miss / (double) committed))

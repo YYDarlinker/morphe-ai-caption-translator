@@ -56,47 +56,103 @@ final class CaptionDiagnostics {
         try { TokenCostAudit.clear(context); } catch (Throwable ignored) {}
     }
 
+    /**
+     * The three localized header lines. Each one is a single authored template: the engine label, the
+     * mode sentence and the debug state are never assembled from translated fragments here, and the
+     * "On"/"Off" wording comes from the catalog so it stays grammatical in every language.
+     */
+    private static String localizedHeader(Context context) {
+        String separator = CaptionStrings.settings(context, "label_separator");
+        String engine = format(separator, CaptionStrings.settings(context, "engine"))
+                + CaptionStrings.settings(context, "engine_event_rebuild") + " / " + RebuildProtocol.VERSION;
+        String mode = format(separator, CaptionStrings.settings(context, "mode"))
+                + CaptionStrings.settings(context, CaptionChoice.translates()
+                        ? "mode_auto_translate" : "mode_original");
+        String debug = format(CaptionStrings.settings(context, "display_debug"),
+                CaptionStrings.settings(context, DeepSeekConfig.displayTextDebugEnabled(context) ? "on" : "off"));
+        return engine + "\n" + mode + "\n" + debug;
+    }
+
+    /** One positional substitution into an authored template. */
+    private static String format(String template, Object... values) {
+        return String.format(java.util.Locale.ROOT, template, values);
+    }
+
+    /**
+     * The diagnostics panel body. UI text is resolved through the settings catalog so it follows the
+     * interface language; every recorded source line, translation, provider reply, identifier, counter
+     * and timestamp is appended verbatim and is never translated.
+     */
     static String uiText(Context context) {
+        return uiText(context, true);
+    }
+
+    /**
+     * The raw diagnostic report. {@code localized=false} is the export form used by
+     * {@link #fullText(Context)}: its headings stay exactly as they were, because the saved report has to
+     * remain byte-comparable with earlier exports and must not absorb the reader's interface language.
+     */
+    static String uiText(Context context, boolean localized) {
         try {
             SharedPreferences p = prefs(context);
             String stage = p.getString(STAGE, "");
             String detail = p.getString(DETAIL, "");
             long time = p.getLong(TIME, 0L);
-            String audit = TokenCostAudit.uiText(context);
-            String header = "Engine: Event rebuild / " + RebuildProtocol.VERSION + "\nMode: "
-                    + (CaptionChoice.translates() ? "automatic translation" : "original captions (no translation API)")
-                    + "\nDisplay text debug: " + (DeepSeekConfig.displayTextDebugEnabled(context) ? "on" : "off");
+            String audit = TokenCostAudit.uiText(context, localized);
+            String header = localized
+                    ? localizedHeader(context)
+                    : "Engine: Event rebuild / " + RebuildProtocol.VERSION + "\nMode: "
+                            + (CaptionChoice.translates() ? "automatic translation" : "original captions (no translation API)")
+                            + "\nDisplay text debug: " + (DeepSeekConfig.displayTextDebugEnabled(context) ? "on" : "off");
             if (stage == null || stage.isEmpty()) {
-                String base = "No automatic translation request captured yet. Enable translation, set an API key, play a video, select a target language, then refresh diagnostics.";
+                String base = localized
+                        ? CaptionStrings.settings(context, "no_request_yet")
+                        : "No automatic translation request captured yet. Enable translation, set an API key, play a video, select a target language, then refresh diagnostics.";
                 return audit == null || audit.isEmpty()
                         ? header + "\n" + base
                         : header + "\n" + base + "\n\n" + audit;
             }
             long seconds = time <= 0 ? -1 : Math.max(0L, (System.currentTimeMillis() - time) / 1000L);
-            String age = seconds < 0 ? "" : " (about " + seconds + " seconds ago)";
+            String age = seconds < 0 ? "" : localized
+                    ? " " + format(CaptionStrings.settings(context, "age_open"), seconds)
+                            + CaptionStrings.settings(context, "age_close")
+                    : " (about " + seconds + " seconds ago)";
             StringBuilder text = new StringBuilder();
             text.append(header).append("\n");
-            text.append("Latest stage: ").append(stage).append(age);
+            text.append(localized
+                            ? format(CaptionStrings.settings(context, "label_separator"),
+                                    CaptionStrings.settings(context, "message_44feb4d98d48"))
+                            : "Latest stage: ")
+                    .append(stage).append(age);
             if (detail != null && !detail.isEmpty()) text.append("\n").append(detail);
             if (audit != null && !audit.isEmpty()) {
                 text.append("\n\n").append(audit);
             }
             String decisions=p.getString(DECISIONS, "");
-            if(!decisions.isEmpty())text.append("\n\nTiming decisions and errors (preserved with timestamps):\n").append(decisions);
+            if(!decisions.isEmpty())text.append("\n\n")
+                    .append(localized ? CaptionStrings.settings(context, "timing_decisions") : "Timing decisions and errors (preserved with timestamps):\n")
+                    .append(decisions);
             String history = p.getString(HISTORY, "");
             if (history != null && !history.isEmpty()) {
-                text.append("\n\nRecent trace:\n").append(history);
+                text.append("\n\n")
+                        .append(localized ? CaptionStrings.settings(context, "recent_trace") : "Recent trace:\n")
+                        .append(history);
             }
             text.append(CaptionQualityTrace.text(context));
             return text.toString(); // Recorded source/translation/provider evidence must remain verbatim.
         } catch (Throwable error) {
-            return "Failed to read diagnostics: " + error.getClass().getSimpleName();
+            return (localized ? CaptionStrings.settings(context, "message_75a885d3b526") : "Failed to read diagnostics: ")
+                    + error.getClass().getSimpleName();
         }
     }
 
+    /**
+     * The saved export. Its header is the raw, unlocalized report so an exported file keeps the format
+     * earlier exports used, and the manifest and archive channels are appended unchanged.
+     */
     static String fullText(Context c) {
         String history=CaptionDiagnosticArchive.read(c,"history"),quality=CaptionDiagnosticArchive.read(c,"quality");
-        return uiText(c) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; exported_at="+System.currentTimeMillis()
+        return uiText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; exported_at="+System.currentTimeMillis()
             +"; completeness=bounded_not_guaranteed; history_records="+records(history,false)+"; quality_records="+records(quality,true)
             +"; truncation_markers="+(occurrences(history,"record truncated")+occurrences(quality,"record truncated"))
             +"; debug="+DeepSeekConfig.displayTextDebugEnabled(c)+"]\n"

@@ -30,11 +30,16 @@ public class SettingsSurfaceFrameworkTest {
     Activity a=Robolectric.buildActivity(Activity.class).setup().get();
     SubtitleStylePreview p=new SubtitleStylePreview(a);
     LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));
-    assertEquals(3,root.getChildCount());
-    assertTrue(root.getChildAt(0) instanceof TextView);assertFalse(root.getChildAt(0) instanceof Button);
-    assertTrue(root.getChildAt(2) instanceof TextView);assertFalse(root.getChildAt(2) instanceof Button);
+    // N25: the section heading already names this block, so the row no longer repeats it as a caption
+    // title; the canvas comes first and the hint line follows it.
+    assertEquals(2,root.getChildCount());
     SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");
-    assertSame(preview,root.getChildAt(1));
+    assertSame(preview,root.getChildAt(0));
+    assertTrue(root.getChildAt(1) instanceof TextView);assertFalse(root.getChildAt(1) instanceof Button);
+    for(int i=0;i<root.getChildCount();i++){
+      String text=root.getChildAt(i) instanceof TextView?((TextView)root.getChildAt(i)).getText().toString():"";
+      assertFalse("no extra caption title may be rendered",text.equals(CaptionStrings.settings(a,"preview")));
+    }
     assertFalse(preview.isClickable());assertFalse(preview.hasOnClickListeners());
     assertEquals(CaptionStrings.settings(a,"preview"),preview.getContentDescription().toString());
     SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,1);
@@ -46,7 +51,8 @@ public class SettingsSurfaceFrameworkTest {
     Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionDiagnostics.clear(a);
     CaptionDiagnostics.mark(a,"ANCHOR_RESPONSE_REJECTED","unit=12;reason=protocol_json");
     for(int n=0;n<100;n++)CaptionDiagnostics.mark(a,"CONTEXTUAL_DISPLAY_SELECTED",String.join("",Collections.nCopies(180,"x")));
-    String report=CaptionDiagnostics.uiText(a);assertTrue(report.contains("Timing decisions and errors"));assertTrue(report.contains("unit=12;reason=protocol_json"));
-    CaptionDiagnostics.clear(a);assertFalse(CaptionDiagnostics.uiText(a).contains("protocol_json"));a.finish();
+    // The saved export keeps its raw, unlocalized report; the panel body is the localized summary.
+    String report=CaptionDiagnostics.uiText(a,false);assertTrue(report.contains("Timing decisions and errors"));assertTrue(report.contains("unit=12;reason=protocol_json"));
+    CaptionDiagnostics.clear(a);assertFalse(CaptionDiagnostics.uiText(a,false).contains("protocol_json"));a.finish();
  }
 }

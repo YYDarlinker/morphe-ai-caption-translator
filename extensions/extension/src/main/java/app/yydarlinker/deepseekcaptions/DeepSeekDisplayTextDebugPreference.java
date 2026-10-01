@@ -50,8 +50,7 @@ public final class DeepSeekDisplayTextDebugPreference extends AddonSwitchPrefere
     }
 
     private void updateSummary(boolean enabled) {
-        setSummary(CaptionStrings.localize(getContext(), enabled
-                ? "诊断中记录字幕原文与译文，仅建议排查时开启"
-                : "关闭时不记录字幕原文与译文"));
+        setSummary(CaptionStrings.settings(getContext(),
+                enabled ? "message_261f1c6f0fde" : "message_f496dd228d0b"));
     }
 }

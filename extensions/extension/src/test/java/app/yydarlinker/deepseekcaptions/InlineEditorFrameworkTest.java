@@ -50,7 +50,7 @@ public class InlineEditorFrameworkTest {
         android.widget.LinearLayout root=(android.widget.LinearLayout)preference.onCreateView(new android.widget.FrameLayout(activity));
         root.measure(View.MeasureSpec.makeMeasureSpec(600,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(1000,View.MeasureSpec.AT_MOST));
         root.layout(0,0,root.getMeasuredWidth(),root.getMeasuredHeight());
-        assertEquals(3,root.getChildCount());
+        assertEquals(2,root.getChildCount());
         SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");
         assertTrue(preview.getLeft()>0);assertTrue(preview.getRight()<root.getWidth());
         assertEquals(root.getPaddingLeft(),preview.getLeft());

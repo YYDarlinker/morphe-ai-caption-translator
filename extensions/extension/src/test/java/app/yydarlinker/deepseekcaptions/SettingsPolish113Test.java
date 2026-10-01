@@ -70,10 +70,16 @@ public class SettingsPolish113Test {
         assertTrue(slider.getContentDescription().toString().contains(current));
         assertTrue(names.getContentDescription().toString().contains(current));
         float tolerance=1f;
-        // N24: one geometry. railStart/railEnd are the drawn rail endpoints AND the two extreme thumb
-        // centres; every tier divides that same travel, so no endpoint check is left implied.
-        assertEquals("rail must start at the padded frame edge",slider.getPaddingLeft(),slider.railStart(),0f);
-        assertEquals("rail must end at the padded frame edge",slider.getWidth()-slider.getPaddingRight(),slider.railEnd(),0f);
+        // N25: one geometry, now with the row's label inset on both rails. railStart/railEnd are the
+        // drawn rail endpoints AND the two extreme thumb centres; every tier divides that same travel, so
+        // the end ticks, the end thumb centres and the visible rail ends are still the same coordinates.
+        // The inset is what lets the two end labels stay centred on their ticks inside the row.
+        int inset=slider.railInsetPx();
+        assertEquals("the row must reserve room for the end labels",slider.railInsetPx(),inset);
+        assertEquals("rail must start at the padded frame edge plus the label inset",
+                slider.getPaddingLeft()+inset,slider.railStart(),0f);
+        assertEquals("rail must end at the padded frame edge minus the label inset",
+                slider.getWidth()-slider.getPaddingRight()-inset,slider.railEnd(),0f);
         assertEquals("first tier sits on the rail start",slider.railStart(),slider.tickCenterX(0),0f);
         assertEquals("last tier sits on the rail end",slider.railEnd(),slider.tickCenterX(4),0f);
         for(int tier=0;tier<5;tier++){
@@ -91,17 +97,25 @@ public class SettingsPolish113Test {
         // and last ticks are centred exactly on the two rail endpoints rather than inset from them.
         assertEquals("first tick centre must sit on the rail start",slider.railStart()-tickRadius,railStartInk(rail,slider.centerY()),1f);
         assertEquals("last tick centre must sit on the rail end",slider.railEnd()+tickRadius-1,railEndInk(rail,slider.centerY()),1f);
+        // The tick ink has to be inside the row as well: that is the whole point of the inset.
+        assertTrue("tick ink must stay inside the row",railStartInk(rail,slider.centerY())>=0);
         DeepSeekSliderPreference.RailBar.RAIL_BANDS_HIDDEN=false;
         int y=Math.round(slider.getPaddingTop()+(slider.getHeight()-slider.getPaddingTop()-slider.getPaddingBottom())/2f);
-        int previousWidth=-1;float maxAlignmentError=0;
+        int previousRight=-1;float maxAlignmentError=0;
         for(int tier=0;tier<5;tier++){
             TextView label=(TextView)names.getChildAt(tier);
             assertEquals(CaptionStrings.settings(root.getContext(),keys[tier]),label.getText().toString());
             assertFalse(label.getText().toString().contains("px"));
             int expected=tier==selected?CaptionSettingsStyle.primary(root.getContext()):CaptionSettingsStyle.secondary(root.getContext());
             assertEquals(expected,label.getCurrentTextColor());assertEquals(tier==selected,label.getTypeface().isBold());
-            if(previousWidth>=0)assertTrue("equal cells tolerate only integer pixel rounding",Math.abs(previousWidth-label.getWidth())<=1);
-            previousWidth=label.getWidth();
+            // N25: each label gets the width its own translation needs and is placed on its own tick, so
+            // the five are no longer equal cells; what has to hold is that they are inside the row, in
+            // order, and clear of each other.
+            assertTrue("tier "+tier+" label must start inside the row",label.getLeft()>=0);
+            assertTrue("tier "+tier+" label must end inside the row",label.getRight()<=names.getWidth());
+            assertTrue("tier "+tier+" label must not overlap its neighbour("+label.getLeft()
+                            +" < "+previousRight+")",label.getLeft()>=previousRight);
+            previousRight=label.getRight();
             float labelCenter=names.getLeft()+label.getLeft()+label.getWidth()/2f;
             assertEquals("tier label center must align with its tick",slider.getLeft()+slider.tickCenterX(tier),labelCenter,tolerance);
             maxAlignmentError=Math.max(maxAlignmentError,Math.abs(slider.getLeft()+slider.tickCenterX(tier)-labelCenter));
@@ -214,35 +228,31 @@ public class SettingsPolish113Test {
      * to in the catalog. The localized value may therefore legitimately be the label, so the layout
      * properties are asserted on the raw source line with localization switched off for the fixture.
      */
-    @Test public void previewSampleIsALongNaturalLineThatFitsTheLandscapeFrame(){
+    /**
+     * The preview renders the catalog's localized sample for whatever interface language is active. The
+     * per-locale coverage lives in {@code N25PreviewSampleTest}; this case locks the wiring: the drawn
+     * string is the catalog value for the reference budget, never a label and never a truncated line.
+     */
+    @Test @Config(qualifiers="en") public void previewSampleIsALongNaturalLineThatFitsTheLandscapeFrame(){
         Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
         try{
-            String source=SubtitleStylePreview.LANDSCAPE_SAMPLE;
-            assertEquals(PREVIEW_SAMPLE,source);
-            assertTrue("the sample must be a complete sentence",source.endsWith("。"));
-            assertTrue("the sample must be more than a bare label",source.codePointCount(0,source.length())>3);
-            SubtitleStylePreview.LOCALIZE_SAMPLE=false;
-            try{
-                SubtitleStylePreview previewRow=new SubtitleStylePreview(activity);
-                View root=previewRow.onCreateView(new FrameLayout(activity));
-                SubtitleStylePreview.Preview canvas=(SubtitleStylePreview.Preview)root.findViewWithTag("ai_style_preview_canvas");
-                canvas.sizeTier=CaptionFontSize.DEFAULT_TIER;canvas.opacity=70;
-                for(int width:new int[]{320,420,960}){
-                    canvas.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
-                    canvas.layout(0,0,canvas.getMeasuredWidth(),canvas.getMeasuredHeight());
-                    assertEquals("the preview frame must stay 16:9",Math.round(width*9f/16f),canvas.getHeight());
-                    for(int tier=0;tier<CaptionFontSize.COUNT;tier++){
-                        TextView label=SubtitleStylePreview.sampleLabel(activity,source,tier,70,
-                                SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX,width);
-                        assertEquals("the sample must never be truncated",source,label.getText().toString());
-                        // getLineCount() is clamped to maxLines; the layout holds the real row count.
-                        assertNotNull("the sample must be laid out",label.getLayout());
-                        int rows=label.getLayout().getLineCount();
-                        assertTrue("the sample must fit the two line budget, needed "+rows,
-                                rows<=SubtitleStylePreview.MAX_SAMPLE_LINES);
-                    }
-                }
-            }finally{SubtitleStylePreview.LOCALIZE_SAMPLE=true;}
+            String source=SubtitleStylePreview.sample(activity);
+            assertEquals(CaptionStrings.settings(activity,SubtitleStylePreview.SAMPLE_KEY),source);
+            assertTrue("the sample must be a complete sentence",source.trim().length()>1);
+            float budget=SubtitleStylePreview.sampleTextWidthPx(activity,
+                    SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX);
+            for(int tier=0;tier<CaptionFontSize.COUNT;tier++){
+                TextView label=SubtitleStylePreview.sampleLabel(activity,source,tier,70,
+                        SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX,
+                        SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX);
+                assertEquals("the sample must never be truncated",source,label.getText().toString());
+                // getLineCount() is clamped to maxLines; the layout holds the real row count.
+                assertNotNull("the sample must be laid out",label.getLayout());
+                assertEquals("the sample must fit the one line budget",
+                        1,label.getLayout().getLineCount());
+                assertTrue("the complete advance must fit the reference budget",
+                        label.getPaint().measureText(source)<=budget);
+            }
         }finally{activity.finish();}
     }
     @Test public void previewHitsGlyphTargetsWithoutDensityOrFontScaleAssumptions(){

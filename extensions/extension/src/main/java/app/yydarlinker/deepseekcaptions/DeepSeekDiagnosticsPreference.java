@@ -14,27 +14,28 @@ public final class DeepSeekDiagnosticsPreference extends android.preference.Pref
     @Override protected View onCreateView(ViewGroup parent){
         Context c=getContext();LinearLayout box=new LinearLayout(c);box.setOrientation(LinearLayout.VERTICAL);CaptionSettingsStyle.row(box);
         LinearLayout header=new LinearLayout(c);header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=new TextView(c);title.setText(CaptionStrings.localize(getContext(), "字幕诊断"));CaptionSettingsStyle.title(title);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-        Button toggle=new Button(c,null,android.R.attr.borderlessButtonStyle);CaptionSettingsStyle.button(toggle);toggle.setText(CaptionStrings.localize(getContext(), "展开"));toggle.setTag("ai_diagnostics_toggle");header.addView(toggle);box.addView(header);
-        TextView hint=new TextView(c);hint.setText(CaptionStrings.localize(getContext(), "长时间测试请开启显示文本调试；保存完整诊断可导出最近 24 小时记录（容量上限 16 MiB）。下方仅显示最近摘要。"));CaptionSettingsStyle.caption(hint);box.addView(hint);
+        TextView title=new TextView(c);title.setText(CaptionStrings.settings(c,"diagnostics"));CaptionSettingsStyle.title(title);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        Button toggle=new Button(c,null,android.R.attr.borderlessButtonStyle);CaptionSettingsStyle.button(toggle);toggle.setText(CaptionStrings.settings(c,"expand"));toggle.setTag("ai_diagnostics_toggle");header.addView(toggle);box.addView(header);
+        TextView hint=new TextView(c);hint.setText(CaptionStrings.settings(c,"diagnostics_hint"));CaptionSettingsStyle.caption(hint);box.addView(hint);
         LinearLayout expanded=new LinearLayout(c);expanded.setOrientation(LinearLayout.VERTICAL);expanded.setVisibility(View.GONE);
         ProfileActionStrip actions=new ProfileActionStrip(c);
         TextView body=new TextView(c);body.setTag("ai_diagnostics_body");CaptionSettingsStyle.caption(body);body.setTextIsSelectable(true);body.setPadding(CaptionSettingsStyle.dp(c,12),CaptionSettingsStyle.dp(c,10),CaptionSettingsStyle.dp(c,12),CaptionSettingsStyle.dp(c,10));
         ScrollView scroll=new ScrollView(c){@Override public boolean onInterceptTouchEvent(MotionEvent e){if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);return super.onInterceptTouchEvent(e);}};
         scroll.setTag("ai_diagnostics_scroll");scroll.setBackground(CaptionSettingsStyle.surface(c,false));scroll.setFillViewport(false);scroll.setVerticalScrollBarEnabled(true);scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
-        Button refresh=CaptionSettingsStyle.action(c,CaptionStrings.localize(c,"刷新"),false,false,()->{});refresh.setTag("ai_diagnostics_refresh");refresh.setOnClickListener(v->{body.setText(CaptionDiagnostics.uiText(c));scroll.scrollTo(0,0);});actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));
-        Button copy=CaptionSettingsStyle.action(c,CaptionStrings.localize(c,"复制"),false,false,()->{});copy.setTag("ai_diagnostics_copy");copy.setOnClickListener(v->{ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);if(manager!=null){manager.setPrimaryClip(ClipData.newPlainText("AI 字幕诊断",body.getText()));Toast.makeText(c,"诊断已复制",Toast.LENGTH_SHORT).show();}});actions.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+        Button refresh=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"refresh"),false,false,()->{});refresh.setTag("ai_diagnostics_refresh");refresh.setOnClickListener(v->{body.setText(CaptionDiagnostics.uiText(c));scroll.scrollTo(0,0);});actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));
+        Button copy=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"copy"),false,false,()->{});copy.setTag("ai_diagnostics_copy");copy.setOnClickListener(v->{ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);if(manager!=null){manager.setPrimaryClip(ClipData.newPlainText(CaptionStrings.settings(c,"diagnostics"),body.getText()));Toast.makeText(c,CaptionStrings.settings(c,"message_896c4b51d7e9"),Toast.LENGTH_SHORT).show();}});actions.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         ProfileActionStrip archiveActions=new ProfileActionStrip(c);
-        Button save=CaptionSettingsStyle.action(c,"保存完整诊断",false,false,()->{});save.setTag("ai_diagnostics_save");archiveActions.addView(save,new LinearLayout.LayoutParams(0,-2,1));
+        Button save=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"save_diagnostics"),false,false,()->{});save.setTag("ai_diagnostics_save");archiveActions.addView(save,new LinearLayout.LayoutParams(0,-2,1));
         save.setOnClickListener(v->{save.setEnabled(false);new Thread(()->{
+            // The export keeps the stable raw report; only the toast text follows the interface language.
             String report=CaptionDiagnostics.fullText(c);String result;
-            try { result=saveReport(c,report); } catch(Exception e){result="保存失败："+e.getClass().getSimpleName();}
+            try { result=saveReport(c,report); } catch(Exception e){result=String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"save_failed"),e.getClass().getSimpleName());}
             String message=result;new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{save.setEnabled(true);if(message==null)copyPages(c,report);else Toast.makeText(c,message,Toast.LENGTH_LONG).show();});
         },"caption-export").start();});
         Button clear=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"clear_diagnostics"),false,true,()->{});clear.setTag("ai_diagnostics_clear");
         clear.setOnClickListener(v->CaptionSettingsDialogs.confirm(c,
                 CaptionStrings.settings(c,"clear_diagnostics"),
-                CaptionStrings.localize(c,"清空本地诊断记录？不会清除 API 设置或翻译缓存。"),
+                CaptionStrings.settings(c,"clear_diagnostics_confirm"),
                 CaptionStrings.settings(c,"clear_diagnostics"),
                 ()->{CaptionDiagnostics.clear(c);body.setText(CaptionDiagnostics.uiText(c));}));
         body.setTypeface(android.graphics.Typeface.MONOSPACE);
@@ -45,7 +46,7 @@ public final class DeepSeekDiagnosticsPreference extends android.preference.Pref
         expanded.addView(archiveActions,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout.LayoutParams clearParams=new LinearLayout.LayoutParams(-1,-2);clearParams.topMargin=gap;
         expanded.addView(clear,clearParams);box.addView(expanded);
-        toggle.setOnClickListener(v->{boolean open=expanded.getVisibility()!=View.VISIBLE;if(open)body.setText(CaptionDiagnostics.uiText(c));expanded.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(CaptionStrings.localize(getContext(), open?"收起":"展开"));toggle.setContentDescription(CaptionStrings.localize(getContext(), open?"收起字幕诊断":"展开字幕诊断"));});return box;
+        toggle.setOnClickListener(v->{boolean open=expanded.getVisibility()!=View.VISIBLE;if(open)body.setText(CaptionDiagnostics.uiText(c));expanded.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(CaptionStrings.settings(c,open?"collapse":"expand"));toggle.setContentDescription(open?CaptionStrings.settings(c,"collapse"):CaptionStrings.settings(c,"expand"));});return box;
     }
     static String saveReport(Context c,String report) throws java.io.IOException {
         if(android.os.Build.VERSION.SDK_INT<29)return null;
@@ -62,15 +63,26 @@ public final class DeepSeekDiagnosticsPreference extends android.preference.Pref
             try(java.io.OutputStream out=resolver.openOutputStream(uri)){if(out==null)throw new java.io.IOException("No output stream");out.write(report.getBytes(java.nio.charset.StandardCharsets.UTF_8));}
             values.clear();values.put(android.provider.MediaStore.MediaColumns.IS_PENDING,0);if(resolver.update(uri,values,null,null)!=1)throw new java.io.IOException("Download was not published");
         }catch(Exception e){resolver.delete(uri,null,null);throw new java.io.IOException(e);}
-        return "已保存到 Download/"+name;
+        // Only the file name is substituted; the whole sentence is one authored template per locale.
+        return String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"save_ok"),name);
     }
+    /**
+     * Android 9 cannot publish a file through MediaStore, so the export is handed over in clipboard
+     * chunks. Each label and toast is one complete authored template, never a concatenated fragment.
+     */
     private static void copyPages(Context c,String report){
         int length=60000,count=(report.length()+length-1)/length;String[] labels=new String[count];
-        for(int i=0;i<count;i++)labels[i]="复制第 "+(i+1)+" / "+count+" 部分";
-        new android.app.AlertDialog.Builder(c).setTitle("Android 9 及以下：分段复制完整诊断").setItems(labels,(d,index)->{
+        for(int i=0;i<count;i++)labels[i]=String.format(java.util.Locale.ROOT,
+                CaptionStrings.settings(c,"copy_part_label"),i+1,count);
+        new android.app.AlertDialog.Builder(c)
+                .setTitle(CaptionStrings.settings(c,"copy_parts_title"))
+                .setItems(labels,(d,index)->{
             ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);
-            if(manager!=null)manager.setPrimaryClip(ClipData.newPlainText("Caption diagnostic "+(index+1)+"/"+count,report.substring(index*length,Math.min(report.length(),(index+1)*length))));
-            Toast.makeText(c,"已复制第 "+(index+1)+" 部分；再次保存可选择其余部分",Toast.LENGTH_LONG).show();
+            String chunk=report.substring(index*length,Math.min(report.length(),(index+1)*length));
+            if(manager!=null)manager.setPrimaryClip(ClipData.newPlainText(
+                    String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"copy_part_label"),index+1,count),chunk));
+            Toast.makeText(c,String.format(java.util.Locale.ROOT,
+                    CaptionStrings.settings(c,"copy_part_done"),index+1,count),Toast.LENGTH_LONG).show();
         }).show();
     }
 }

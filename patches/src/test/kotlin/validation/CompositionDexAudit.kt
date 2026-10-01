@@ -10,7 +10,14 @@ import java.io.File
 
 /** Read-only verification of generated DEX, including the new native reselect invocation's access. */
 fun main(args:Array<String>){
-    val file=File(args[0]);val container=DexFileFactory.loadDexContainer(file,Opcodes.getDefault())
+    val file=File(args[0])
+    // N27r: the same entry point that audits the composition now also has to prove that every branch
+    // in the delivered DEX lands on a real opcode start. The old hook check only replayed an
+    // assembled instruction list, which is exactly how the N27 VerifyError reached the device.
+    check(FinalDexBranchAudit.audit(file,requireAi=true,report=null,label="composition")){
+        "Final DEX branch/controls-hook audit failed for ${file.absolutePath}"
+    }
+    val container=DexFileFactory.loadDexContainer(file,Opcodes.getDefault())
     val classes=mutableMapOf<String,ClassDef>()
     container.dexEntryNames.forEach { name->container.getEntry(name)!!.dexFile.classes.forEach { cls->check(classes.put(cls.type,cls)==null){"Duplicate class ${cls.type}"} } }
     val support=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")

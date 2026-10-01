@@ -1,9 +1,10 @@
 package app.yydarlinker.patches.deepseekcaptions
 
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
@@ -84,7 +85,13 @@ internal fun BytecodePatchContext.bindPlayerControlsVisibilityHook() {
     }
     val storeIndex = stores.single()
     val store = instructions[storeIndex] as TwoRegisterInstruction
-    if (instructions.last().opcode != Opcode.RETURN_VOID) {
+    // N27r: the branch target is the real final RETURN_VOID, captured as the live
+    // BuilderInstruction object before anything is inserted. The patcher relocates an
+    // ExternalLabel by that object identity when the method is serialised, so the encoded
+    // offset always lands on an opcode start no matter how wide the surrounding block becomes.
+    val returnIndex = instructions.size - 1
+    val originalReturn = instructions[returnIndex]
+    if (originalReturn.opcode != Opcode.RETURN_VOID) {
         throw PatchException(
             "Player-controls visibility model constructor does not end in return-void"
         )
@@ -106,16 +113,22 @@ internal fun BytecodePatchContext.bindPlayerControlsVisibilityHook() {
     // even when the official hook has already reused this register for its own enum result, so the
     // two injections can coexist in either order without the verifier seeing a mixed register type.
     // The null guard covers models built without a state holder, which YouTube's own getter tolerates.
-    constructor.addInstructions(
-        instructions.size - 1,
+    //
+    // The fragment deliberately has no trailing label of its own: a bare label at the end of an
+    // addInstructions fragment was serialised at the wrong code unit in N27
+    // (`source_pc=0x10 target_pc=0x0d`, inside the official hook's operand words), and ART rejects
+    // the whole class with VerifyError before any method body runs. `originalReturn` above is the
+    // only target, and it is passed as an ExternalLabel so the offset is computed at serialisation.
+    constructor.addInstructionsWithLabels(
+        returnIndex,
         """
             iget-object v$valueRegister, v$ownerRegister, $holderField
-            if-eqz v$valueRegister, :yydarlinker_caption_controls_ready
+            if-eqz v$valueRegister, :yydarlinker_caption_controls_return
             iget v$valueRegister, v$valueRegister, $stateField
             invoke-static { v$valueRegister }, $factory
             move-result-object v$valueRegister
             invoke-static { v$valueRegister }, $CAPTION_HOOK_CLASS->onPlayerControlsVisibility(Ljava/lang/Enum;)V
-            :yydarlinker_caption_controls_ready
-        """.trimIndent()
+        """.trimIndent(),
+        ExternalLabel("yydarlinker_caption_controls_return", originalReturn),
     )
 }

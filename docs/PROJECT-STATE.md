@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-01（N26 已交付：源码509d50a、锚点anchor/n26-509d50a、HEAD7f9c639仅文档收尾；用户已装机发现入口说明不合适及多语种运行时适配不全，程序性诊断仍出现中文）。这些问题未关闭，用户明确要求留到全部功能完成后统一审计修复，见最新反馈节；本期不提前修改。N27普通详情页/横屏全屏的播放器控件避让已由执行者按卡交付，源码、测试、三件套与哈希见§4m；三项语言/文案问题仍未关闭。九项已定选择、中文字幕基线、冻结事实和既有质量遗留保持。
+> 最后更新：2026-10-01（N27r源码见§4o；当前E盘HEAD与锚点以`git log`核对）。用户装机后点图标立即闪退，规划者读取手机日志及最终APK确认非法DEX跳转：bfec构造器PC0x10的if-eqz跳到0x0d（官方invoke内部），ART抛VerifyError。**N27r已执行完毕**：生产注入改为`ExternalLabel`绑定真实`return-void`，`signed_offset`由−3变+11、target 0x1b；新增仓库内最终DEX分支审计并接入既有组合入口，旧N27坏包被直接拒绝。N27仍为「已交付、真机启动失败、未验收」，**启动修复待用户装机复验**。语言阶段暂不推进。用户取消换对话，本聊天继续研究/规划/审阅，DeepSeek只执行；压缩后恢复以本档案最新节及`docs/N27R-LOCAL-TEST-BUILD.md`为准。三项延期语言/文案问题、九项已定选择、中文字幕基线与冻结事实保持。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -15,13 +15,13 @@
 > 用途：任何 AI 会话（Kimi 或 Codex）接续本项目时，先读本文件，无需翻阅长对话历史。
 > 本文件是唯一的“记忆”，对话记录不是。仓库 `docs/PROJECT-STATE.md` 为权威副本，每卡开工时同步。
 
-## 0. 接手须知（2026-10-01 交接修订，覆盖历史角色与卡序）
+## 0. 上下文压缩后恢复须知（2026-10-01，覆盖历史角色与卡序）
 
-1. **先读本文件及交接说明**：交接入口为 `C:\Users\14776\Documents\morphe-caption-handoff\2026-10-01\HANDOFF.md`。本节、§4i–§4k和用户最新反馈是当前安排；其他阶段的“待执行/下一步”是历史记录，不自动恢复执行。
+1. **先读本实时状态档案**：优先读本节、§4i、§4k、最新§4n及 `docs/N27-CRASH-REVIEW.md`、`docs/N27R-CRASH-REPAIR-TASK.md`；其后按需读历史/研究。用户已取消换对话，旧交接包是历史快照，不代表实时状态、不作为行动入口。上下文压缩后按最新文件恢复职责与在途状态，其他阶段的“待执行/下一步”不自动恢复执行。
 2. **角色边界**：接任本聊天的 AI 负责官方资料研究、根因判断、方案定案、详细任务卡、只读审阅及管理档案维护；**DeepSeek Harness 只负责执行已定任务卡**（源码、测试、构建、提交、交付）；用户负责真机反馈与最终验收。规划者不修改产品代码、不跑产品测试/构建、不自行签名/推送/发布；可读仓库/证据及维护规划文档。旧文中“由 Codex 执行”不再是当前分工。
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：N26 已交付并装机；新发现的三项语言/文案问题仍开放，用户要求最后统一修。N27任务卡已生成交给用户，本次交接未观察到N27提交/报告；仓库HEAD仍为7f9c639，但末次核对已出现N27相关源码改动/新增文件，按疑似在途处理。后续接任时重新只读核对，不能因这份快照重复派发正在执行的N27。
-5. **执行顺序**：N27普通详情页/横屏全屏避让 → 语言档案/计数/方向/源目标路由及接入 → 原生自动翻译菜单十四语种多选与简中补丁合并 → 必须执行的最终全面本地化/功能说明/诊断英文审计修复。旧L1调查、N25后开feature/lang-menu的安排由此覆盖。
+4. **当前阶段**：N27已交付（源码62c4916，HEAD28229e0），用户真机启动失败，尚未验收；手机日志+最终APK已定位到空值保护分支非法目标。N27r修复卡已由规划者准备，本轮尚未执行修复。优先修启动和补真实最终DEX审计，再由用户装机复验；不重复派发N27、不先进入语言功能。三项语言/文案问题仍开放并留最后统一修。
+5. **执行顺序**：N27r启动修复及N27避让真机复验 → 语言档案/计数/方向/源目标路由及接入 → 原生自动翻译菜单十四语种多选与简中补丁合并 → 必须执行的最终全面本地化/功能说明/诊断英文审计修复。旧L1调查、N25后开feature/lang-menu的安排由此覆盖。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
@@ -216,7 +216,7 @@ N27只做普通视频详情页和横屏全屏的显示避让，默认生效，�
 
 N27开工HEAD7f9c639。本节是规划者管理更新，docs/PROJECT-STATE.md未提交改动须保留并随N27提交，两份档案同步。研究和任务设计由本聊天负责；DeepSeek只按已明确的N27任务卡执行，不自派后续阶段。
 
-## 4l. 新规划对话交接（2026-10-01）
+## 4l. 历史交接准备（用户随后取消，当前以§4n为准）
 
 已准备交接目录 `C:\Users\14776\Documents\morphe-caption-handoff\2026-10-01`，入口 `HANDOFF.md`，新对话首条提示词 `START-HERE.txt`，附N27当前执行卡、研究草案、语言参数草案、N24审阅记录、N26交付记录和本档案快照。新对话仍是规划/审阅者，DeepSeek只执行。此交接只修订管理说明，未改产品源码、未跑测试/构建、未生成N27产物、未提交/签名/推送/发布。
 
@@ -244,6 +244,40 @@ N27开工HEAD7f9c639。本节是规划者管理更新，docs/PROJECT-STATE.md未
 
 **真机仍待用户验证**：普通详情页与横屏全屏下 UI 出现且遮挡时字幕自然上移、不遮挡时不动；UI 隐藏后回原位置；暂停不因本功能翻页；拖动/旋转/seek/换视频无跳跃或残留；Shorts 原样。**离线不做真机结论**；下一阶段仍为语言档案/计数/方向及接入（本卡未执行、未自派），最终全面本地化/功能说明/诊断英文审计修复仍为必须步骤。
 
+## 4n. N27 真机启动失败、根因与 N27r 修复定案（2026-10-01）
+
+**用户最新要求**：取消换对话，继续由本聊天负责研究/判断/任务卡/审阅，DeepSeek Harness只执行。所有必要状态与资料索引需落本地，确保上下文压缩后仍可恢复，不依赖旧对话全文或旧交接快照。
+
+**提交边界核对**：E:\Projects\morphe-caption-v2 HEAD28229e0；源码62c4916，anchor/n27-62c4916指向它；其后只有docs。N27执行者报告Java464/464（59套件）、Python27/27、组合84/84、DEX类58034及三件套见§4m/交付记录，这些是其有限离线检查结果，不能等同ART/真机启动通过。用户已安装，确认“点开应用立即闪退”。此前N27在途快照已过时。
+
+**已证实根因**：用户连接手机授权读取日志。只读adb crash buffer中7个此包进程（18:47:59–18:52:03）均为`java.lang.VerifyError: Verifier rejected class bfec: void bfec.<init>(bfed): [0x10] target dex pc 0xd is not at instruction start.`。已装包21.16.256/minSdk28/targetSdk36，手机Android17/API37。对本地最终N27交付APK独立读取codeUnits/PC/signed offset亦完全相同：PC0x10 `if-eqz` relative=-3→0x0d；官方invoke在0x0b、宽3，故落入其操作数字。正确目标应是实际RETURN_VOID（当前坏包0x1b，修复不能硬编码）。不是API/语言/几何问题，类验证发生在方法运行之前，即使holder非空也会拒绝。
+
+**机制与漏检**：N27的CaptionControlsAvoidancePatch.kt以普通addInstructions插入含分支及末尾裸标签片段，最终序列化标签重定位失效。旧N27ControlsHookCheck用原始APK+独立assemble+ArrayList拼接，主要做寄存器类型模拟，未校验真实patcher注入后的最终分支地址；旧dump无PC/offset，Java/Robolectric渲染回归不执行宿主构造器DEX。不得因历史PASS忽略真机失败，不改写历史冻结结果。
+
+**N27r方案已定**：只把本卡注入改为addInstructionsWithLabels，ExternalLabel绑定插入前捕获的真实return指令，保留owner重载、空值保护、enum callback与官方hook；不得数值修补/裸标签/nop碰运气/删除避让/try-catch掩盖。补常规管线中的最终APK全根DEX分支边界与本卡目标审计；生产标签API注入→序列化→重新读回的回归覆盖官方先后与无官方hook。新增审计必须拒绝保留的旧N27坏包，报告0x10→0x0d；新包target必须是正确return。
+
+**本期卡与证据**：`docs/N27R-CRASH-REPAIR-TASK.md`（完整执行卡），`docs/N27-CRASH-REVIEW.md`（根因/漏检/边界）。证据目录 `C:\Users\14776\.codex\visualizations\2026\10\01\01a0f56a-7d8c-75e0-8def-3fa2f0b542ef\n27-crash-review`：`n27-crash-androidruntime.txt`仅此包PID日志、`n27-final-constructor-pc.txt`直接从最终APK读出的PC/宽度/relative/target、`patcher-instruction-extensions-javap.txt`确认现有标签API。原始buffer含其他应用记录，仅本地留存，不作为分享材料。只读DEX分析工具在同目录，不是产品改动。
+
+**当前状态与交付约束**：N27标记“已交付，真机启动失败，未验收”，优先N27r；不推进语言功能。**（本节为N27r开工前的定案记录；N27r已于同日执行完毕，结果见§4o。）** N27r尚未执行，没有修复产物；须保留本轮管理文件改动随修复卡提交。新产物用-n27r独立路径/新源码锚点，旧N27/N26及其他历史产物不覆盖；不要amend、推送、签名或发布。静态新审计通过不宣称真机修复完成，用户装机复验正常启动及避让后才闭环。未授权安装/清数据/卸载，规划者本轮也未做这些。
+
+**后续顺序**：N27r恢复启动＋N27普通播放器避让复验 → 十四语种档案/计数/方向/源目标路由与接入 → 菜单十四语种多选/简中root合并 → 必须执行的最终入口功能说明/全部运行时本地化/程序性诊断英文审计修复。三项延期不趁此卡修改；九项定案不再询问。
+
+**研究恢复索引**：`C:\Users\14776\.codex\visualizations\2026\10\01\01a0f56a-7d8c-75e0-8def-3fa2f0b542ef\future-plan-research\N25-next-feature-study.md`与`language-profile-draft.json`，逐语种官方指南和开源实现均在该目录。旧pending/unapproved及2A自然放置已被§4i决定覆盖；英文普通成人参考20CPS（旧§7d英文17不可套），中文保持现行，新语种速率软、几何/两行硬。N24质量审阅与诊断拆解在同根`caption-n24-review`目录，真实诊断/SRT路径见根因记录与该审阅。所有细节草案尚未上线，不把接口资源覆盖当运行时或语义质量通过。
+
+## 4o. N27r 执行结果（2026-10-01，用户卡：修复启动VerifyError ＋ 补齐最终DEX分支审计）
+
+**A 最小生产修复**：`patches/src/main/kotlin/app/yydarlinker/patches/deepseekcaptions/CaptionControlsAvoidancePatch.kt` 由普通 `addInstructions`＋片段末尾裸标签，改为 `addInstructionsWithLabels` ＋ `ExternalLabel("yydarlinker_caption_controls_return", originalReturn)`；`originalReturn` 是插入前捕获的构造器末尾真实 `RETURN_VOID` 的 `BuilderInstruction` 对象，不计算、不写死 relative/PC。交付 APK 实测同一条 `Lbfec;-><init>(Lbfed;)V`：PC0x10 的 `if-eqz` 由 `signed_offset=-3 → target_pc=0x0d`（落在 0x0b、宽 3 的官方 `invoke-static` 操作数字内部，即 ART 报的 `[0x10] target dex pc 0xd is not at instruction start`）变为 **`signed_offset=+11 → target_pc=0x1b return-void`**（`target_is_method_last=true same_method=true`）。官方 hook 与本卡观察者仍并存且顺序未变，从 owner 重载 holder／空值保护／enum 回调／指纹与类型约束全部保留。**未采用**数值偏移、盲加 nop、删除空值判断、关闭避让、host/hook catch-all、回退 N26；未改 API/分页/语言策略。MPE 与 N27 逐字节相同（本卡未触碰扩展源码）。
+
+**B 最终 DEX 审计（进入常规管线）**：新增 `patches/src/test/kotlin/validation/`：`DexBranchAudit.kt`（容器遍历 APK／MPE／MPP／裸 DEX＋嵌套、逐方法 16 位 code unit 地址映射、goto/if 目标、`packed-switch`/`sparse-switch` 的 payload 引用/种类/对齐与 case 目标「相对 switch 指令」、`fill-array-data` payload、try/catch 范围、并用自写解析器读裸 `code_item.insns_size` 与 `Σ codeUnits` 双向核对；方法漏读／解析失败／code size 不一致一律 FAIL；内置变异自检每次运行都必须拒绝「落入操作数字」与「越界」两种改写）、`ControlsHookBindingAudit.kt`（按真实方法引用＋读数指纹形状识别实体模型，检查 null guard 目标恰为非空路径落入的同一 `RETURN_VOID`、路径顺序、invoke 与 move-result 相邻、寄存器界限/word 数/类型、本卡 callback 恰 1 次、官方 hook ≤1 次，并打印真实混淆名与整张 PC 表）、`FinalDexBranchAudit.kt`（CLI 入口，非 0 退出）、`InjectionOrderRegression.kt`（真 patcher 注入→序列化→从磁盘重读）。Gradle 新增 `:patches:auditFinalDex`、`:patches:verifyInjectionOrder`；**同时接入既有组合/交付入口** `CompositionDexAudit`（`:patches:auditComposition`），在旧判据之前调用同一 validator，失败即构建非 0。旧 `TYPE_SAFE_SUMMARY` 类型模拟与其产物保留，不再充当分支/最终产物证明。审计如实输出实际读到的 DEX 数，不写死 11。
+
+**C 证据**：① 旧 N27 真实坏包被新 validator 直接拒绝——`FAIL_BRANCH … class=Lbfec; method=<init>(Lbfed;)V source_pc=0x10 signed_offset=-3 target_pc=0xd target_valid=false reason=target_inside_instruction containing_pc=0xb containing_width=3 containing_opcode=invoke-static` ＋ `FAIL_BINDING guard_target_not_instruction_start target_pc=0xd`，非 0 退出；同一坏包送进既有组合入口同样 `IllegalStateException: Final DEX branch/controls-hook audit failed` → `BUILD FAILED`（坏包是预期失败样本，未被包装成 PASS）。② 新交付 APK `DEX_BRANCH_AUDIT_PASS label=n27r-final dex_units=11 methods=322002 branch_edges=624712 switch_cases=112402 try_blocks=46579 invalid_branches=0`，随后既有 `DEX_AUDIT_PASS classes=58034`。③ 真 patcher 注入回归 `official-first`／`ai-first`／`no-ai` 三组，序列化后重读全部 `signed_offset=11 target_pc=0x1b return-void`；两种顺序在本 bundle 下被 patcher 归一成同一布局，**如实报告未产生不同宽度前缀**。④ 同一 validator 亦通过交付 MPE（1 unit／12,600 方法）、交付 MPP（内嵌扩展＋patcher `classes.dex`，2 units）与未补丁原版 APK（7 units）。**边界（三次真实尝试）**：官方 1.44.0 下无法构造「官方 hook 未被选中」的组合——只选 AI root 会因缺 `FlyoutUtils` 失败；去掉 `Hide player overlay buttons`（83 补丁）后 hook 仍在，因为 `GmsCore support` 声明依赖它；再去掉 `GmsCore support`（82 补丁）hook 仍可经共享内部依赖到达；只留 `Hide player flyout menu components` 则缺 `morphe_settings_screen_12_video_sort_by_key`。依赖表由 patcher 自身 `Patch.getDependencies()` 读出留档（`build/n27r-records/official-patch-list.txt`），注入方由官方 bundle 内携带该 smali 串的类定位（`PlayerControlsOverlayVisibilityPatchKt`），未猜测；validator 仍报告 `official_hook_count` 并在 >1 时失败，未因无法构造该组合而放宽判据。
+
+**验证**：Java **464/464**（0 失败／0 错误／0 跳过，59 套件，与 N27 基线一致；本卡未新增 JUnit，新增回归以仓库既有 `validation` 入口方式落地）；Python **27/27**；localization **220 keys × 14 语种**；冻结计分板 **4 通过 / 4 既有失败 / 4 未验证** 且三类不可见时长全 0，`ACCEPTANCE.md` 与 `frozen-baseline.json` Git 无差异；组合 **84/84 PASS**（`onPlayerControlsVisibility=1`）；`verify_bundle.py 1.3.5` 与 `N8Verify`（74 条目／14 语种／CRC／根 DEX／内嵌扩展逐字节一致／交付 patch dex 含新 `ExternalLabel` 名且不再含旧裸标签）通过；`aapt` 确认 `app.morphe.android.youtube` 21.16.256／minSdk 28／targetSdk 36；`apksigner` 报 `DOES NOT VERIFY`（未签名）；**43 个历史产物 SHA-256 前后全一致**（含 N27 坏包本身，未被覆盖）。
+
+**交付**：`build/local-test/patches-1.3.5-本地测试包-n27r.mpp`（1,117,960 B，+179，`5428E17A…`）、`extension-1.3.5-本地测试包-n27r.mpe`（2,727,272 B，+0，`45F2C9B6…`，与 N27 逐字节相同）、`build/n27r-composition-final/YouTube-21.16.256-本地测试包-n27r-unsigned.apk`（196,943,036 B，−4，`31071874…`；未签名确认）；交付 APK 由**交付 MPP 本身**组合、组合后从磁盘重读做新增审计。详见 `docs/N27R-LOCAL-TEST-BUILD.md`。
+
+**真机未覆盖**：**最终 DEX 检查通过，启动修复待用户装机验证**；本卡未签名、未安装、未启动、未采新日志，不写「实测不再闪退」。用户复验顺序：先启动／主页／设置，再普通详情页与横屏全屏显示隐藏控件，然后暂停／旋转／seek／换视频／拖字幕。三项延期语言/文案问题与最终全面本地化/功能说明/诊断英文审计仍为必须步骤，本卡未提前修改。
+
 ## 5. 已确认的关键决策
 
 - **字号五档制（N19）**：见文首决策块。旧的单一 r（203bps）与连续滑块范围作废。
@@ -253,6 +287,8 @@ N27开工HEAD7f9c639。本节是规划者管理更新，docs/PROJECT-STATE.md未
 - **成本**：第三轮真机 9,709 tok/观看分钟；全片捕获一次性 32 万 tok（N15r 授权）。
 
 ## 6. 待办队列
+
+**当前最高优先级：用户装机复验 N27r 启动与避让（`-n27r` 三件套已交付，见§4o）；以下旧阶段安排不得绕过此阻断。**修复卡`docs/N27R-CRASH-REPAIR-TASK.md`已执行完毕，交付记录`docs/N27R-LOCAL-TEST-BUILD.md`；本卡未做真机。
 
 - ~~N17a 修复卡~~ ✅ `d40cfa3`（孤字页 ≥8 汉字格硬门槛）。
 - ~~N17b 字号架构卡~~ ✅ `640905c`（后被用户推翻）。
@@ -270,7 +306,8 @@ N27开工HEAD7f9c639。本节是规划者管理更新，docs/PROJECT-STATE.md未
 - **N23 合并卡**：✅ `45a830a` 已完成（滑条一致性 + C 原生黑块修复 + D 频跳调度），**B 段两条护栏修正已被 N24 按用户决定撤销**；锚点 `anchor/n23-45a830a` 保留（不推送）。
 - **N24 执行卡**：✅ `9049591` 已提交并打标签 `anchor/n24-9049591`（不推送）。四段全部完成，详见 §4g 与 `docs/N24-LOCAL-TEST-BUILD.md`。**质量行为已回到 N22**（`RebuildReview` 与 `a482262` 逐字节一致），N23 的 C/D 工程改进保留且 D 段升级为有界调度（前台 2 路 / 后台 2 路 / 总 4 路 / 最新待办替换 / 两路预取生效）。测试数 421→429。产物 `-n24` 三件套与 84/84、`DEX_AUDIT_PASS classes=58028` 见 §4g。
 - **N25 执行卡**：✅ `99e7be5` 已提交并打标签 `anchor/n25-99e7be5`（不推送）。四段全部完成，详见 §4h 与 `docs/N25-LOCAL-TEST-BUILD.md`。测试数 429→**437**，本地化 129→**220 keys × 14 语种**，产物 `-n25` 三件套与 84/84、`DEX_AUDIT_PASS classes=58028` 见 §4h。**未改**：翻译提示词、`RebuildReview`、语义分块、协议校验、重试与分页算法、前台2／后台2／总4 调度、源词时间归属、字号五档与 55.5/44.5 缩放、缓存键、用户自填配置；ACCEPTANCE.md、冻结计分板与历史诊断证据逐字节未改。
-- **N27 执行卡**：✅ 已提交并打标签 `anchor/n27-62c4916`（不推送，指向含全部源码与最终文案的提交；本条状态补记与文档收尾为其后的独立提交，源锚点与 HEAD 的关系见下）。五段（可见性输入与运行时接入 ＋ 已确认控件与坐标 ＋ 避让算法与动画 ＋ 渲染/拖动/生命周期整合 ＋ 英文诊断与离线验证）全部完成，详见 §4m 与 `docs/N27-LOCAL-TEST-BUILD.md`。测试数 440→**464**（套件 58→59，新增 `N27ControlsAvoidanceTest` 24 条），产物 `-n27` 三件套与 84/84、`DEX_AUDIT_PASS classes=58034` 见 §4m。**未改**：正文、页索引与时间归属、字体大小/样式、API 协议/调度/重试、原生与 AI 轨道 ownership、缓存、菜单、语言策略、设置入口及全部用户持久化值；翻译提示词、`RebuildReview`、语义分块、协议校验、分页算法、`LayoutBudget`；ACCEPTANCE.md、冻结计分板与历史诊断证据逐字节未改。**四阶段顺序不变**，下一阶段是语言档案/计数/方向及接入，本卡不执行、不自派。**源锚点 `anchor/n27-62c4916` 指向源码与最终文案提交；其后仅有把本行占位短哈希写实的状态补记提交，不含任何源码或文案改动。**
+- **N27r 修复卡**：✅ 已执行完毕并交付 `-n27r` 三件套（**未验收，待用户装机复验**），详见 §4o 与 `docs/N27R-LOCAL-TEST-BUILD.md`。生产注入改为 `ExternalLabel` 绑定真实 `return-void`（`signed_offset` −3→+11、target 0x0d→0x1b），新增仓库内最终 DEX 分支审计并接入既有 `:patches:auditComposition`；旧 N27 坏包被直接拒绝。测试数 **464/59 未变**（新增回归以 `patches/src/test/kotlin/validation` 入口落地，非 JUnit）；MPE 与 N27 逐字节相同。**未改**：N27 协调器 Java、Overlay、HookV2 显示算法、8dp/100ms/200ms、五档字号、分页/正文/时间归属、原生与 AI ownership、缓存、调度、API、语言策略及全部用户持久化值；ACCEPTANCE.md 与冻结证据逐字节未改。**四阶段顺序不变**，下一阶段仍是语言档案/计数/方向及接入，本卡不执行、不自派。
+- **N27 执行卡**：⚠ 已交付但用户真机启动闪退、未验收（见§4n/§4o）；已提交并打标签 `anchor/n27-62c4916`（不推送，指向含全部源码与最终文案的提交；本条状态补记与文档收尾为其后的独立提交，源锚点与 HEAD 的关系见下）。五段（可见性输入与运行时接入 ＋ 已确认控件与坐标 ＋ 避让算法与动画 ＋ 渲染/拖动/生命周期整合 ＋ 英文诊断与离线验证）全部完成，详见 §4m 与 `docs/N27-LOCAL-TEST-BUILD.md`。测试数 440→**464**（套件 58→59，新增 `N27ControlsAvoidanceTest` 24 条），产物 `-n27` 三件套与 84/84、`DEX_AUDIT_PASS classes=58034` 见 §4m。**未改**：正文、页索引与时间归属、字体大小/样式、API 协议/调度/重试、原生与 AI 轨道 ownership、缓存、菜单、语言策略、设置入口及全部用户持久化值；翻译提示词、`RebuildReview`、语义分块、协议校验、分页算法、`LayoutBudget`；ACCEPTANCE.md、冻结计分板与历史诊断证据逐字节未改。**四阶段顺序不变**，下一阶段是语言档案/计数/方向及接入，本卡不执行、不自派。**源锚点 `anchor/n27-62c4916` 指向源码与最终文案提交；其后仅有把本行占位短哈希写实的状态补记提交，不含任何源码或文案改动。**
 - **N26 执行卡**：✅ `509d50a` 已提交并打标签 `anchor/n26-509d50a`（不推送，指向含全部源码与最终文案的提交；本条状态补记与文档收尾为其后的独立提交，源锚点与 HEAD 的关系见下）。三段（入口迁入视频页 ＋ 入口样式与同页普通项一致 ＋ 预览说明改全屏）全部完成，详见 §4j 与 `docs/N26-LOCAL-TEST-BUILD.md`。测试数 437→**440**（套件 56→58），产物 `-n26` 三件套与 84/84、`DEX_AUDIT_PASS classes=58028` 见 §4j。**未改**：播放器与避让、翻译提示词、`RebuildReview`、语义分块、协议校验、重试与分页算法、调度、源词时间归属、字号与几何、缓存键、用户配置存储、诊断 raw 格式、`preview_sample` 与预览交互；ACCEPTANCE.md、冻结计分板与历史诊断证据逐字节未改。**四阶段顺序不变**，下一阶段是常规详情页／横屏全屏的播放器控件避让，本卡未启动。**源锚点 `anchor/n26-509d50a` 指向源码与最终文案提交；其后仅有把本行占位短哈希写实的状态补记提交，不含任何源码或文案改动。**
 - **N24 真机验收清单（用户本人执行；发现问题只记录不现场改）**：
   1. **滑条两端**：拉到超小/超大档，确认两端刻度点落在可见轨道两端，thumb 中心压在刻度上，档名与刻度对齐；两条滑条等长、同左右边距、同取色。亮/暗主题、RTL 布局各看一次。
@@ -302,7 +339,7 @@ N27开工HEAD7f9c639。本节是规划者管理更新，docs/PROJECT-STATE.md未
 
 ## 7. 提交序列（morphe-caption-v2）
 
-`c67d63b` 基线对齐 → `fb41189` 验收表+计分板 → `c198c21` N2 → `dc24b7e` N3 → `1ecb662` N4 → `a97bbae` N5 → `7ecc94c` N6 → `4d3e97f` N7 → `c3af18d` N7b记录 → `f360a12` N7b回滚 → `a31f778` N9 → `a1c0541` N10 → `932d24d` N11 → `f2c3aa9` N12 → `5b51c8b` N13 → `d67e8e1` N13b → `a063e47` N14 → `30deae4` N15 停止记录 → `cd97869` N15r → `33c288e` N16 建包 → `d40cfa3` N17a → `640905c` N17b（被推翻）→ `cc29229` N18 旧包（作废）→ `2ddfa14` N17c v2 → `00f53c8` N17d → `581112b` N18r 重建包 → `10e9c85` N19 五档字号 → `c124fb5` N20 字幕只显译文 + 字号档位可视化 → `c5f3f57` N21 块缓存 0 命中离线取证 → `66c1e00` N21b 判据补回 + 暂停粘滞 + 诊断清理 → `a482262` N22 重建包 n22 + 回滚锚点 → `45a830a` N23 滑条一致性 + 原生遮蔽 + 有界重建调度 → `9049591` N24 质量回退 N22 + 滑条端点统一 + 字号文案与全屏预览 + 有界调度（前台 2 路 + 最新待办替换 + 两路预取），锚点 `anchor/n24-9049591` → `8941244` + `c139144` + `99e7be5` N25 设置排版修正（预览去重复标题）+ 五档标签完整显示与统一 LTR/RTL 几何 + 预览示例资源键 + 十四语种完整 UI 本地化 + 表头分隔符修正与交付记录，锚点 `anchor/n25-99e7be5` → **`509d50a` N26 设置入口迁入 Morphe 视频页（新导航 key `morphe_vot_screen__ai_captions`，紧跟旁白翻译）+ 入口与同页普通项同样式 + 预览说明改「样式预览（全屏）」十四语种**，锚点 `anchor/n26-509d50a`（指向源码与最终文案提交）→ **N27 普通播放器控件避让**（本 patch 自建可见性指纹并沿官方同一实体模型构造器路径注入自有观察者，字幕与真实可见操作控件相交时最小上移、隐藏回原基准，Shorts/小窗/PiP 排除，新增诊断事件全英文），锚点 `anchor/n27-62c4916`（指向含全部源码与最终文案的提交；短哈希由本卡提交后不含源码改动的状态补记提交写实）。
+`c67d63b` 基线对齐 → `fb41189` 验收表+计分板 → `c198c21` N2 → `dc24b7e` N3 → `1ecb662` N4 → `a97bbae` N5 → `7ecc94c` N6 → `4d3e97f` N7 → `c3af18d` N7b记录 → `f360a12` N7b回滚 → `a31f778` N9 → `a1c0541` N10 → `932d24d` N11 → `f2c3aa9` N12 → `5b51c8b` N13 → `d67e8e1` N13b → `a063e47` N14 → `30deae4` N15 停止记录 → `cd97869` N15r → `33c288e` N16 建包 → `d40cfa3` N17a → `640905c` N17b（被推翻）→ `cc29229` N18 旧包（作废）→ `2ddfa14` N17c v2 → `00f53c8` N17d → `581112b` N18r 重建包 → `10e9c85` N19 五档字号 → `c124fb5` N20 字幕只显译文 + 字号档位可视化 → `c5f3f57` N21 块缓存 0 命中离线取证 → `66c1e00` N21b 判据补回 + 暂停粘滞 + 诊断清理 → `a482262` N22 重建包 n22 + 回滚锚点 → `45a830a` N23 滑条一致性 + 原生遮蔽 + 有界重建调度 → `9049591` N24 质量回退 N22 + 滑条端点统一 + 字号文案与全屏预览 + 有界调度（前台 2 路 + 最新待办替换 + 两路预取），锚点 `anchor/n24-9049591` → `8941244` + `c139144` + `99e7be5` N25 设置排版修正（预览去重复标题）+ 五档标签完整显示与统一 LTR/RTL 几何 + 预览示例资源键 + 十四语种完整 UI 本地化 + 表头分隔符修正与交付记录，锚点 `anchor/n25-99e7be5` → **`509d50a` N26 设置入口迁入 Morphe 视频页（新导航 key `morphe_vot_screen__ai_captions`，紧跟旁白翻译）+ 入口与同页普通项同样式 + 预览说明改「样式预览（全屏）」十四语种**，锚点 `anchor/n26-509d50a`（指向源码与最终文案提交）→ **N27 普通播放器控件避让**（本 patch 自建可见性指纹并沿官方同一实体模型构造器路径注入自有观察者，字幕与真实可见操作控件相交时最小上移、隐藏回原基准，Shorts/小窗/PiP 排除，新增诊断事件全英文），锚点 `anchor/n27-62c4916`（指向含全部源码与最终文案的提交；短哈希由本卡提交后不含源码改动的状态补记提交写实）→ **N27r 启动 VerifyError 修复 ＋ 最终 DEX 分支审计**（本卡注入改用 `ExternalLabel` 绑定构造器真实 `return-void`，空值分支 offset −3→+11、target 0x0d→0x1b；新增仓库内 `FinalDexBranchAudit`／`DexBranchAudit`／`ControlsHookBindingAudit`／`InjectionOrderRegression` 并接入既有 `:patches:auditComposition`，旧 N27 坏包被直接拒绝），锚点 `anchor/n27r-<实现短哈希>`。
 
 ## 7b. 后续功能线：自动翻译语言菜单多选（L 线，交接给新 DSH 对话）
 

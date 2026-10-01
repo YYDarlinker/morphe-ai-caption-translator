@@ -83,3 +83,27 @@ tasks.register<JavaExec>("auditComposition") {
     maxHeapSize="4G"
     providers.gradleProperty("composition.apk").orNull?.let { args(it) }
 }
+// Final-artifact control-flow audit, runnable on any delivered container (APK / MPE / MPP / DEX).
+// The composition audit also calls this, so a delivery is never accepted without it.
+tasks.register<JavaExec>("auditFinalDex") {
+    dependsOn(tasks.named("testClasses"))
+    classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
+    mainClass.set("validation.FinalDexBranchAuditKt")
+    maxHeapSize="6G"
+    listOf("input","report","requireAi","label").forEach { key ->
+        providers.gradleProperty("dexAudit.$key").orNull?.let { value ->
+            if (key == "requireAi") args("--require-ai", value) else args("--$key", value)
+        }
+    }
+}
+// Production injection regression: applies the real patcher in a chosen order, serialises, then reads
+// the written APK back with the same auditor the delivery uses.
+tasks.register<JavaExec>("verifyInjectionOrder") {
+    dependsOn(tasks.named("testClasses"))
+    classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
+    mainClass.set("validation.InjectionOrderRegressionKt")
+    maxHeapSize="6G"
+    listOf("input","official","addon","output","order","report","label").forEach { key ->
+        providers.gradleProperty("injectionOrder.$key").orNull?.let { args("--$key", it) }
+    }
+}

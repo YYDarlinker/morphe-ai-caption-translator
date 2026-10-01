@@ -129,7 +129,7 @@ invoke-static { v1 }, Lapp/yydarlinker/deepseekcaptions/DeepSeekCaptionHookV2;->
 
 MPE 与交付 MPP 内嵌扩展逐字节一致。MPP 增量来自新指纹/绑定/注入与新增 `CaptionControlsAvoidancePatchKt` 类；MPE 增量来自协调器与 4 个英文事件名；APK 增量来自扩展 DEX 与 patcher 元数据。工具链沿用 N26：YouTube **21.16.256** ＋ 官方 **1.44.0** ＋ Patcher **1.14.1**，嵌套 JDK 21（`E:\morphe-ai-caption-translator-next\build\isolated-toolchains\jdk-21.0.12.1+1`）、`C:\Users\14776\AppData\Local\Android\Sdk`、离线 Gradle 9.6.1，全程 `--offline`；未安装新 SDK、未加依赖。
 
-本卡为**一个实现提交**（源码、测试、交付记录与状态档案），锚点标签 `anchor/n27-<短哈希>` 指向该提交，即含全部源码与最终文案的点。N26 及其前的提交未被 amend。
+本卡为**一个实现提交** `62c4916`（源码、测试、交付记录与状态档案），锚点标签 `anchor/n27-62c4916` 指向该提交，即含全部源码与最终文案的点。其后若另有把本记录里的占位短哈希写实的状态补记提交，它不含任何源码或文案改动，源锚点与 HEAD 的关系以 `git log --oneline anchor/n27-62c4916..HEAD` 为准。N26 及其前的提交未被 amend。开工 HEAD `7f9c639`；提交后工作区除被忽略的 `build/`（本地产物与记录）与 `.verification/n27/`（离线证据）外无未跟踪源码改动。
 
 **§2 三项延期问题继续未关闭**：AI 入口 summary 仍是“修改后自动保存”；十四语种运行时适配仍不完整；程序性诊断正文仍出现中文。按用户要求，全部功能完成后仍须执行最终全面检查修复阶段，本卡不提前修改、不宣称十四语种已全部适配。
 

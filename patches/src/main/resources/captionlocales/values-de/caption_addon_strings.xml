@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Für lange Tests die Textdiagnose einschalten; Vollständige Diagnose speichern exportiert die letzten 24 Stunden (Obergrenze 16 MiB). Die Zusammenfassung unten zeigt nur die letzten Aktivitäten."</string>
     <string name="cap_display_debug" formatted="false">"Textdiagnose: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"KI-Übersetzung aktivieren"</string>
-    <string name="cap_engine" formatted="false">"Engine: "</string>
+    <string name="cap_engine" formatted="false">"Engine"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Ereignis-Neuerstellung"</string>
     <string name="cap_enter_key" formatted="false">"API-Schlüssel eingeben"</string>
     <string name="cap_expand" formatted="false">"Aufklappen"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Modellliste wird aktualisiert…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"Originaltext und Übersetzung nicht protokollieren"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Vertikale Position zurücksetzen; Größe und Hintergrund beibehalten"</string>
-    <string name="cap_mode" formatted="false">"Modus: "</string>
+    <string name="cap_mode" formatted="false">"Modus"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Automatisch übersetzen"</string>
     <string name="cap_mode_off_pending" formatted="false">"KI ist aus. YouTube-Untertitel werden fortgesetzt, sobald die native Spur bereit ist."</string>
     <string name="cap_mode_original" formatted="false">"Originaluntertitel (ohne Übersetzungs-API)"</string>

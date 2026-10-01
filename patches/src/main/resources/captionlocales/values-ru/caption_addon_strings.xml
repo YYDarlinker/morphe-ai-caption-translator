@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Для долгих тестов включите отладку текста; «Сохранить полную диагностику» выгружает записи за последние 24 часа (лимит 16 MiB). Ниже показана только последняя сводка."</string>
     <string name="cap_display_debug" formatted="false">"Отладка текста: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Включить перевод с ИИ"</string>
-    <string name="cap_engine" formatted="false">"Движок: "</string>
+    <string name="cap_engine" formatted="false">"Движок"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Пересборка событий"</string>
     <string name="cap_enter_key" formatted="false">"Введите ключ API"</string>
     <string name="cap_expand" formatted="false">"Развернуть"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Обновление списка моделей…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"Не записывать оригинальный и переведённый текст"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Сбросить положение по вертикали, сохранив размер и фон"</string>
-    <string name="cap_mode" formatted="false">"Режим: "</string>
+    <string name="cap_mode" formatted="false">"Режим"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Автоперевод"</string>
     <string name="cap_mode_off_pending" formatted="false">"ИИ выключен. Субтитры YouTube возобновятся, когда исходная дорожка будет готова."</string>
     <string name="cap_mode_original" formatted="false">"Оригинальные субтитры (без API перевода)"</string>

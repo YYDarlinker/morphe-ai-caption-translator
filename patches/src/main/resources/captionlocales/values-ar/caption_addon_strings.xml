@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"فعِّل تصحيح نص الترجمة عند الاختبار الطويل؛ «حفظ التشخيص الكامل» يصدِّر سجل آخر 24 ساعة (بحد أقصى 16 MiB). الملخص أدناه يعرض النشاط الأخير فقط."</string>
     <string name="cap_display_debug" formatted="false">"تصحيح النص: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"تفعيل الترجمة بالذكاء الاصطناعي"</string>
-    <string name="cap_engine" formatted="false">"المحرّك: "</string>
+    <string name="cap_engine" formatted="false">"المحرّك"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"إعادة بناء الأحداث"</string>
     <string name="cap_enter_key" formatted="false">"أدخل مفتاح API"</string>
     <string name="cap_expand" formatted="false">"توسيع"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"جارٍ تحديث قائمة النماذج…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"عدم تسجيل النص الأصلي أو المترجم"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"إعادة ضبط الموضع العمودي مع الاحتفاظ بالحجم والخلفية"</string>
-    <string name="cap_mode" formatted="false">"الوضع: "</string>
+    <string name="cap_mode" formatted="false">"الوضع"</string>
     <string name="cap_mode_auto_translate" formatted="false">"الترجمة التلقائية"</string>
     <string name="cap_mode_off_pending" formatted="false">"تم إيقاف الذكاء الاصطناعي. ستُستأنف ترجمة YouTube عندما يصبح المسار الأصلي جاهزًا."</string>
     <string name="cap_mode_original" formatted="false">"الترجمة النصية الأصلية (بدون API للترجمة)"</string>

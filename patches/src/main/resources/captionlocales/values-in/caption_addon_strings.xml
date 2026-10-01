@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Aktifkan debug teks untuk pengujian lama; Simpan diagnostik lengkap mengekspor 24 jam terakhir (batas 16 MiB). Ringkasan di bawah hanya menampilkan aktivitas terbaru."</string>
     <string name="cap_display_debug" formatted="false">"Debug teks: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Aktifkan terjemahan AI"</string>
-    <string name="cap_engine" formatted="false">"Mesin: "</string>
+    <string name="cap_engine" formatted="false">"Mesin"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Pembangunan ulang peristiwa"</string>
     <string name="cap_enter_key" formatted="false">"Masukkan kunci API"</string>
     <string name="cap_expand" formatted="false">"Perluas"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Memperbarui daftar model…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"Jangan rekam teks asli atau terjemahan"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Reset posisi vertikal; pertahankan ukuran dan latar"</string>
-    <string name="cap_mode" formatted="false">"Mode: "</string>
+    <string name="cap_mode" formatted="false">"Mode"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Terjemahan otomatis"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI dinonaktifkan. Subtitel YouTube akan dilanjutkan saat trek aslinya siap."</string>
     <string name="cap_mode_original" formatted="false">"Subtitel asli (tanpa API terjemahan)"</string>

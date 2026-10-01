@@ -43,12 +43,13 @@ EN = {
  'shorts_flyout_summary': "Show the shortcut in the Shorts flyout menu. Hiding it does not disable AI captions; applies when the menu is reopened.",
 
  # D: diagnostics summary headings
- # Some headings already end in a fixed separator, matching the raw report's wording. They keep those
- # bytes, including "Engine: " / "Mode: "; a later card never rewrites an existing value.
- 'engine': "Engine: ",
+ # The labels are bare: the line is "label + value", and the separator that joins them is its own
+ # template, because CJK sets a full-width colon with no trailing space and Latin sets a half-width one
+ # with a space.
+ 'engine': "Engine",
  'engine_event_rebuild': "Event rebuild",
  'label_separator': "%1$s: ",
- 'mode': "Mode: ",
+ 'mode': "Mode",
  'mode_auto_translate': "Auto-translate",
  'mode_original': "Original captions (no translation API)",
  'no_request_yet': "No translation request yet. Configure the API, select an Auto-translate language in the player, then refresh diagnostics.",

@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Bật gỡ lỗi văn bản cho các bài kiểm tra dài; Lưu chẩn đoán đầy đủ sẽ xuất 24 giờ gần nhất (giới hạn 16 MiB). Phần tóm tắt bên dưới chỉ hiển thị hoạt động gần đây."</string>
     <string name="cap_display_debug" formatted="false">"Gỡ lỗi văn bản: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Bật dịch phụ đề bằng AI"</string>
-    <string name="cap_engine" formatted="false">"Bộ máy: "</string>
+    <string name="cap_engine" formatted="false">"Bộ máy"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Dựng lại sự kiện"</string>
     <string name="cap_enter_key" formatted="false">"Nhập khóa API"</string>
     <string name="cap_expand" formatted="false">"Mở rộng"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Đang làm mới danh sách mô hình…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"Không ghi nguyên văn hoặc bản dịch phụ đề"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Đặt lại vị trí dọc, giữ cỡ chữ và nền"</string>
-    <string name="cap_mode" formatted="false">"Chế độ: "</string>
+    <string name="cap_mode" formatted="false">"Chế độ"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Dịch tự động"</string>
     <string name="cap_mode_off_pending" formatted="false">"Đã tắt AI. Phụ đề YouTube sẽ tiếp tục khi bản phụ đề gốc sẵn sàng."</string>
     <string name="cap_mode_original" formatted="false">"Phụ đề gốc (không dùng API dịch)"</string>

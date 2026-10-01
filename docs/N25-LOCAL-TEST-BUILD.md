@@ -51,6 +51,8 @@
 | `CaptionDiagnostics.uiText` | 标题／说明固定英文 | 引擎／模式／调试状态／阶段／时间参照／最近事件／年龄；`label_separator` 与 `display_debug` 为整句模板 |
 | `TokenCostAudit.uiText` | 整段固定英文 | 全部 52 个 `audit_*` 键，含失败明细、分页进度、边界复核、磁盘缓存、每用途行、成本与速率行 |
 
+**顺带修一处真实缺陷（自查发现）**：初版 `localizedHeader` 把 `label_separator` 套在已经带冒号的头名上，中文渲染成「引擎：：事件重建」、英文渲染成「Engine: : Event rebuild」。现 `engine`／`mode`／`engine_event_rebuild` 一律为**裸标签**，冒号只由 `label_separator` 提供一次；`apply_n25_catalog.py` 在合并后对全部语种做该归一并在占位符检查中加断言，重复运行幂等。十四语种实测表头：`Engine: Event rebuild / 1.3.5`／`引擎：事件重建 / 1.3.5`／`エンジン：イベント再構築 / 1.3.5`／`المحرّك: إعادة بناء الأحداث / 1.3.5` 等均只出现一次分隔符。
+
 **UI 与 raw 分离**：`CaptionDiagnostics.uiText(c)` 默认本地化并加 `uiText(c,false)` 重载，`fullText` 只调用后者，因此导出的原始报告表头逐字不变（`CaptionLongDiagnosticsTest.exportManifestReportsActualEngineAndBothChannels` 继续通过），本地化 UI 文案不会混入 raw 头部；复制 UI 摘要与保存完整诊断各自用途未变。REBUILD_* 事件名、JSON 键、协议错误码、源文／译文／时间戳／请求ID／计数值全部原样保留。
 
 **顺带修一处真实缺陷**：`DeepSeekActionPreference` 原先用 `message.startsWith("API 可用：")` 判断测试成功——文案一旦本地化该判断即失效，成功时不再刷新配置。现改为布尔标志，并把「API 可用／测试失败／重试提示」各做成整句模板。
@@ -59,12 +61,12 @@
 
 ## 验证
 
-- Java 全套离线单测 **435/435**（0 失败 / 0 错误 / 0 跳过，55 套件；N24 为 429，净增 6：`N25PreviewSampleTest` 2 条 + `N25TierRailTest` 4 条）。既有断言改动仅 3 个文件、全部随 A/B 行为变更同步（预览子视图 3→2、raw 报告改走 `uiText(c,false)`、档名行不再等宽单元格）。
+- Java 全套离线单测 **437/437**（0 失败 / 0 错误 / 0 跳过，56 套件；N24 为 429，净增 8：`N25PreviewSampleTest` 2 条 + `N25TierRailTest` 4 条 + `N25DiagnosticsLocalizationTest` 2 条）。既有断言改动仅 3 个文件、全部随 A/B 行为变更同步（预览子视图 3→2、raw 报告改走 `uiText(c,false)`、档名行不再等宽单元格）。
 - Python `unittest discover -s scoreboard` **27/27**；`tools/check_localization.py` 通过（220 keys × 14 语种）。
 - `scoreboard/run.py`、`n9.py`、`n10.py`：**4 通过 / 4 既有失败 / 4 未验证**，`pending_translation`／`event_review`／`overflow` 不可见时长**全 0**；`scoreboard/results/frozen-baseline.json` 与 `ACCEPTANCE.md` Git 无差异。
 - 本地化检查不仅查键存在：`tools/apply_n25_catalog.py` 校验十四语种占位符编号／类型与英文一致（含允许的语序重排）、English 源头表与占位符表一致、逐次运行幂等；`verify_artifacts.py` 从**交付包内**的 14 份 XML 用真实 XML 解析器读回 `cap_preview_sample` 并与卡片表格逐字比对。
 - 组合 **84/84 PASS**（`STRUCTURE_PASS` 矩阵：84 条 `PASS`，与 N24 的 82 既有 + 官方新增 2 完全一致）；`DEX_AUDIT_PASS classes=58028`；`SHARED_APPLIED_DISPATCH_PASS`／`NATIVE_APPLIED_PATH_PASS`／`INDEPENDENT_FLYOUT_SETTINGS_PASS`／`PROFILE_DIALOG_HOST_API_PASS` 全通过。
-- `.github/scripts/verify_bundle.py 1.3.5` PASS（72 条目 / 14 locales / root DEX / extension）；`build/N8Verify.java` PASS（CRC、仓库身份、版本 1.3.5、DEX 头、MPE 与交付包内嵌扩展逐字节一致）。APK ZIP CRC、唯一条目、11 个根级 DEX 头／长度／校验和通过，`META-INF` 无签名文件；`aapt dump badging` 确认 `app.morphe.android.youtube` 21.16.256 / 1561068412 / minSdk 28；`apksigner verify` 返回 `DOES NOT VERIFY / Missing META-INF/MANIFEST.MF`，**确认未签名**。
+- `.github/scripts/verify_bundle.py 1.3.5` PASS（72 条目 / 14 locales / root DEX / extension）；`build/N8Verify.java` PASS（CRC、仓库身份、版本 1.3.5、DEX 头、MPE 与交付包内嵌扩展逐字节一致）。APK ZIP CRC、唯一条目、11 个根级 DEX 头／长度／校验和通过，`META-INF` 无签名文件；`aapt dump badging` 确认 `app.morphe.android.youtube` 21.16.256 / 1561068412 / minSdk 28；`apksigner verify` 返回 `DOES NOT VERIFY / Missing META-INF/MANIFEST.MF`，**确认未签名**。Windows 中文路径沿用 N18r 的 ASCII 硬链接解决 `aapt`／`apksigner` 限制。
 - 12 个历史产物（N18／N18r／N22／N23／N24 三件套与既有本地包、`recovered/1.3.5` 两个 MPP）前后 SHA-256 与字节数**全部一致**，N24／N23 三件套未被覆盖。
 - **覆盖边界如实报告**：RTL 控件树无法在 Robolectric 内搭建（见 B 段），已用映射两半的等价断言替代并保留透明度条几何全等断言；预览示例的「单行」结论基于参考宽 2736px 的预算，窄于该参考的窗口不在本卡承诺范围；fixture 只覆盖亮／暗 × 标准档 × 320/420/960 与 14 语种最大档预览帧，未做真机截图。
 
@@ -72,10 +74,10 @@
 
 | 产物完整路径 | 字节数 | 比 N24 | SHA-256 |
 | --- | ---: | ---: | --- |
-| `E:\Projects\morphe-caption-v2\build\local-test\patches-1.3.5-本地测试包-n25.mpp` | 1,101,117 | +40,784 | `EFA6613CD9CD96934A15E601462CE872A2A3A1C39DAFAAD638FD50B5BD30DABC` |
-| `E:\Projects\morphe-caption-v2\build\local-test\extension-1.3.5-本地测试包-n25.mpe` | 2,713,500 | +15,464 | `E7F30D9199D35DFEFEE92690857A3C1B022D71730676A3D52132F3253E5EF3CA` |
-| `E:\Projects\morphe-caption-v2\build\n25-composition-final\YouTube-21.16.256-本地测试包-n25-unsigned.apk` | 196,935,220 | +134,272 | `D062F1BB9EECBF74E5276B362E0F1BCDCD53087F13B21A8D6A797626FE0F736E` |
+| `E:\Projects\morphe-caption-v2\build\local-test\patches-1.3.5-本地测试包-n25.mpp` | 1,101,113 | +40,780 | `36F885BEC7A2D0CE2FB1E10677F13B10B8DCFB7C3EB9496F965AF0830577B568` |
+| `E:\Projects\morphe-caption-v2\build\local-test\extension-1.3.5-本地测试包-n25.mpe` | 2,713,520 | +15,484 | `C75B1067F431E495FACE025E821CF8676570A426DFD2B0F048C6033BFE0FA401` |
+| `E:\Projects\morphe-caption-v2\build\n25-composition-final\YouTube-21.16.256-本地测试包-n25-unsigned.apk` | 196,935,268 | +134,320 | `9FE3A03F024ED54743589435685342C95D179ADB3112652A1E4CB88EA7D4964F` |
 
-MPE 由交付 MPP 抽取，与包内 `extensions/extension.mpe` 逐字节一致。体积增量几乎全部来自 76 个新键 × 14 语种的资源文本（XML 每语种 +10,223 字节）。提交 `8941244`，锚点标签 `anchor/n25-8941244`（未推送）。
+MPE 由交付 MPP 抽取，与包内 `extensions/extension.mpe` 逐字节一致。体积增量几乎全部来自 76 个新键 × 14 语种的资源文本（XML 每语种 +10,226 字节）。提交 `8941244`（代码）＋文档提交，锚点标签指向 `8941244`（未推送）。
 
 **真机仍待用户验证**：预览无重复标题后的观感、五档档名在系统大字体下的实际排版、RTL 系统语言下的滑轨方向与拖动一致性、十四语种界面下的示例与档名观感、以及诊断面板与 Token 审计摘要的本地化可读性。本卡不做真机、不签名、不发布；L 线语言菜单仍未启动。

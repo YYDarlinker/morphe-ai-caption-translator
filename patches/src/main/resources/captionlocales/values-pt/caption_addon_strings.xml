@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Ative a depuração de texto para testes longos; Salvar diagnóstico completo exporta as últimas 24 horas (limite de 16 MiB). O resumo abaixo mostra apenas a atividade recente."</string>
     <string name="cap_display_debug" formatted="false">"Depuração de texto: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Ativar tradução com IA"</string>
-    <string name="cap_engine" formatted="false">"Mecanismo: "</string>
+    <string name="cap_engine" formatted="false">"Mecanismo"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Reconstrução de eventos"</string>
     <string name="cap_enter_key" formatted="false">"Insira a chave da API"</string>
     <string name="cap_expand" formatted="false">"Expandir"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Atualizando modelos…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"Não registrar texto original ou traduzido"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Restaurar posição vertical; manter tamanho e fundo"</string>
-    <string name="cap_mode" formatted="false">"Modo: "</string>
+    <string name="cap_mode" formatted="false">"Modo"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Tradução automática"</string>
     <string name="cap_mode_off_pending" formatted="false">"IA desativada. As legendas do YouTube voltarão quando a faixa estiver pronta."</string>
     <string name="cap_mode_original" formatted="false">"Legendas originais (sem API de tradução)"</string>

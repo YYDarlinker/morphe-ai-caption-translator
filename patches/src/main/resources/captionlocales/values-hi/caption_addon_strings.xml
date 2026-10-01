@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"लंबे परीक्षणों के लिए टेक्स्ट डिबगिंग चालू करें; पूरा डायग्नॉस्टिक्स सहेजें अंतिम 24 घंटे के रिकॉर्ड निर्यात करता है (16 MiB की सीमा)। नीचे केवल हाल की गतिविधि का सारांश है।"</string>
     <string name="cap_display_debug" formatted="false">"टेक्स्ट डिबगिंग: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"AI उपशीर्षक अनुवाद चालू करें"</string>
-    <string name="cap_engine" formatted="false">"इंजन: "</string>
+    <string name="cap_engine" formatted="false">"इंजन"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"इवेंट पुनर्निर्माण"</string>
     <string name="cap_enter_key" formatted="false">"API कुंजी दर्ज करें"</string>
     <string name="cap_expand" formatted="false">"विस्तार करें"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"मॉडल सूची रीफ़्रेश हो रही है…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"मूल या अनूदित उपशीर्षक पाठ रिकॉर्ड न करें"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"ऊर्ध्वाधर स्थिति रीसेट करें, आकार और पृष्ठभूमि बनाए रखें"</string>
-    <string name="cap_mode" formatted="false">"मोड: "</string>
+    <string name="cap_mode" formatted="false">"मोड"</string>
     <string name="cap_mode_auto_translate" formatted="false">"अपने आप अनुवाद"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI बंद है। मूल ट्रैक तैयार होने पर YouTube के उपशीर्षक फिर से दिखेंगे।"</string>
     <string name="cap_mode_original" formatted="false">"मूल उपशीर्षक (अनुवाद API के बिना)"</string>

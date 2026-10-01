@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Activa la depuración de texto para pruebas largas; Guardar diagnóstico completo exporta las últimas 24 horas (límite de 16 MiB). El resumen de abajo solo muestra la actividad reciente."</string>
     <string name="cap_display_debug" formatted="false">"Depuración de texto: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Activar traducción con IA"</string>
-    <string name="cap_engine" formatted="false">"Motor: "</string>
+    <string name="cap_engine" formatted="false">"Motor"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Reconstrucción de eventos"</string>
     <string name="cap_enter_key" formatted="false">"Introduce la clave de API"</string>
     <string name="cap_expand" formatted="false">"Expandir"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Actualizando modelos…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"No registrar texto original ni traducido"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Restablecer posición vertical; conservar tamaño y fondo"</string>
-    <string name="cap_mode" formatted="false">"Modo: "</string>
+    <string name="cap_mode" formatted="false">"Modo"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Traducción automática"</string>
     <string name="cap_mode_off_pending" formatted="false">"IA desactivada. Los subtítulos de YouTube se reanudarán cuando la pista esté lista."</string>
     <string name="cap_mode_original" formatted="false">"Subtítulos originales (sin API de traducción)"</string>

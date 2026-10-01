@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"長時間のテストではテキストのデバッグをオンにしてください。「完全な診断を保存」は直近 24 時間の記録を書き出します（上限 16 MiB）。下の概要は直近の記録のみです。"</string>
     <string name="cap_display_debug" formatted="false">"テキストのデバッグ: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"AI 字幕翻訳を有効にする"</string>
-    <string name="cap_engine" formatted="false">"エンジン："</string>
+    <string name="cap_engine" formatted="false">"エンジン"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"イベント再構築"</string>
     <string name="cap_enter_key" formatted="false">"API キーを入力"</string>
     <string name="cap_expand" formatted="false">"展開"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"モデル一覧を更新中…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"字幕の原文と訳文を記録しません"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"縦位置のみリセットし、サイズと背景は保持します"</string>
-    <string name="cap_mode" formatted="false">"モード："</string>
+    <string name="cap_mode" formatted="false">"モード"</string>
     <string name="cap_mode_auto_translate" formatted="false">"自動翻訳"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI をオフにしました。元の字幕トラックの準備ができ次第、YouTube の字幕が再開されます。"</string>
     <string name="cap_mode_original" formatted="false">"原字幕（翻訳 API なし）"</string>

@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Enable caption text debugging for long tests; Save full diagnostics exports the last 24 hours (16 MiB cap). The summary below is recent activity only."</string>
     <string name="cap_display_debug" formatted="false">"Display text debugging: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Enable AI caption translation"</string>
-    <string name="cap_engine" formatted="false">"Engine: "</string>
+    <string name="cap_engine" formatted="false">"Engine"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Event rebuild"</string>
     <string name="cap_enter_key" formatted="false">"Enter API Key"</string>
     <string name="cap_expand" formatted="false">"Expand"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Refreshing model list…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"Do not record source or translated caption text"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Reset vertical position; keep size and background settings"</string>
-    <string name="cap_mode" formatted="false">"Mode: "</string>
+    <string name="cap_mode" formatted="false">"Mode"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Auto-translate"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI is off. YouTube captions will resume when the native track is ready."</string>
     <string name="cap_mode_original" formatted="false">"Original captions (no translation API)"</string>

@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"긴 테스트에서는 텍스트 디버깅을 켜세요. 전체 진단 저장은 최근 24시간 기록을 내보냅니다(최대 16 MiB). 아래 요약은 최근 기록만 보여 줍니다."</string>
     <string name="cap_display_debug" formatted="false">"텍스트 디버깅: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"AI 자막 번역 사용"</string>
-    <string name="cap_engine" formatted="false">"엔진: "</string>
+    <string name="cap_engine" formatted="false">"엔진"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"이벤트 재구성"</string>
     <string name="cap_enter_key" formatted="false">"API 키 입력"</string>
     <string name="cap_expand" formatted="false">"펼치기"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"모델 목록 새로고침 중…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"자막 원문과 번역문을 기록하지 않습니다"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"세로 위치를 초기화하고 크기와 배경 설정은 유지합니다"</string>
-    <string name="cap_mode" formatted="false">"모드: "</string>
+    <string name="cap_mode" formatted="false">"모드"</string>
     <string name="cap_mode_auto_translate" formatted="false">"자동 번역"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI가 꺼졌습니다. 기본 자막 트랙이 준비되면 YouTube 자막이 다시 표시됩니다."</string>
     <string name="cap_mode_original" formatted="false">"원본 자막 (번역 API 미사용)"</string>

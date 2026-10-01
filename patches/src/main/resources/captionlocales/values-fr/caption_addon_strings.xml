@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"Activez le débogage du texte pour les tests longs ; Enregistrer le diagnostic complet exporte les 24 dernières heures (limite de 16 MiB). Le résumé ci-dessous ne montre que l\'activité récente."</string>
     <string name="cap_display_debug" formatted="false">"Débogage du texte : %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Activer la traduction par IA"</string>
-    <string name="cap_engine" formatted="false">"Moteur : "</string>
+    <string name="cap_engine" formatted="false">"Moteur"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"Reconstruction d\'événements"</string>
     <string name="cap_enter_key" formatted="false">"Saisissez la clé API"</string>
     <string name="cap_expand" formatted="false">"Développer"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"Actualisation des modèles…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"Ne pas enregistrer le texte original ou traduit"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"Réinitialiser la position verticale, conserver taille et fond"</string>
-    <string name="cap_mode" formatted="false">"Mode : "</string>
+    <string name="cap_mode" formatted="false">"Mode"</string>
     <string name="cap_mode_auto_translate" formatted="false">"Traduction automatique"</string>
     <string name="cap_mode_off_pending" formatted="false">"IA désactivée. Les sous-titres YouTube reprendront lorsque la piste sera prête."</string>
     <string name="cap_mode_original" formatted="false">"Sous-titres originaux (sans API de traduction)"</string>

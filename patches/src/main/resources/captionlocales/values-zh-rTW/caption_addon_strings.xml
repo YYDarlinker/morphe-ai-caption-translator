@@ -85,7 +85,7 @@
     <string name="cap_diagnostics_hint" formatted="false">"長時間測試請開啟顯示文字偵錯；儲存完整診斷可匯出最近 24 小時記錄（容量上限 16 MiB）。下方僅顯示最近摘要。"</string>
     <string name="cap_display_debug" formatted="false">"顯示文字偵錯：%1$s"</string>
     <string name="cap_enable_ai" formatted="false">"啟用 AI 字幕翻譯"</string>
-    <string name="cap_engine" formatted="false">"引擎："</string>
+    <string name="cap_engine" formatted="false">"引擎"</string>
     <string name="cap_engine_event_rebuild" formatted="false">"事件重建"</string>
     <string name="cap_enter_key" formatted="false">"請輸入 API Key"</string>
     <string name="cap_expand" formatted="false">"展開"</string>
@@ -137,7 +137,7 @@
     <string name="cap_message_ec966cf35a63" formatted="false">"正在更新模型清單…"</string>
     <string name="cap_message_f496dd228d0b" formatted="false">"不記錄字幕原文或譯文"</string>
     <string name="cap_message_fd1ada5395a0" formatted="false">"重設垂直位置，保留大小與背景設定"</string>
-    <string name="cap_mode" formatted="false">"模式："</string>
+    <string name="cap_mode" formatted="false">"模式"</string>
     <string name="cap_mode_auto_translate" formatted="false">"自動翻譯"</string>
     <string name="cap_mode_off_pending" formatted="false">"AI 已關閉，原生字幕將在軌道就緒後恢復。"</string>
     <string name="cap_mode_original" formatted="false">"原字幕（不使用翻譯 API）"</string>

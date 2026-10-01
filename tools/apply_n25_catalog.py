@@ -44,13 +44,28 @@ for locale in locales:
     before = dict(data['languages'][locale])
     for key in new_keys:
         if key in before:
-            # Already merged by an earlier run: the authored value is what the catalog must hold.
-            assert before[key] == value_for(locale, key, before), (locale, key)
+            # Already merged by an earlier run: the authored value is what the catalog must hold. Values
+            # merged by an earlier revision of this card are corrected in place, which is safe here
+            # because every key this script owns is introduced by this same card.
+            authored = value_for(locale, key, before)
+            if before[key] != authored:
+                before[key] = authored
             continue
         value = value_for(locale, key, before)
         assert isinstance(value, str) and value.strip(), (locale, key)
         before[key] = value
     data['languages'][locale] = {k: before[k] for k in sorted(before)}
+
+# `engine` and `mode` are labels: the rendered line is "label + separator + value", and the separator is
+# its own template because CJK sets a full-width colon with no trailing space. A label that also carries
+# a separator would render two of them, so every locale's value is reduced to the bare label. This is
+# applied here rather than in the translation table because these two reuse an existing catalog value.
+for locale in locales:
+    values = data['languages'][locale]
+    for key in ('engine', 'mode'):
+        bare = values[key].rstrip(' :：').strip()
+        if bare:
+            values[key] = bare
 
 # `keys` is the curated subset the localization checker reports on; it must keep listing every key it
 # listed before, plus the new ones, and may never name a key no locale defines.
@@ -65,6 +80,11 @@ for key, kinds in PLACEHOLDERS.items():
     expected = sorted('%{}${}'.format(i + 1, kind) for i, kind in enumerate(kinds))
     english = sorted(m.group(0) for m in TOKEN.finditer(data['languages']['en'][key]))
     assert english == expected, (key, expected, english)
+    # A label-only heading must not carry a separator of its own.
+    if key in ('engine', 'mode', 'engine_event_rebuild'):
+        for locale in locales:
+            value = data['languages'][locale][key]
+            assert value == value.rstrip(' :：'), (locale, key, value)
     for locale in locales:
         value = data['languages'][locale][key]
         found = sorted(m.group(0) for m in TOKEN.finditer(value))

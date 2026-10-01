@@ -31,7 +31,7 @@ jobs:
         run: ./gradlew :extensions:extension:testDebugUnitTest :patches:buildAndroid --no-daemon
       - name: Validate bundle
         run: python3 .github/scripts/verify_bundle.py "$(jq -r .version patches-bundle.json)"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: caption-validation-${{ github.sha }}

@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"배경 불투명도"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 투명, 100% 불투명. 놓으면 저장"</string>
     <string name="cap_preview" formatted="false">"가로 화면 전체 화면 미리보기"</string>
-    <string name="cap_preview_hint" formatted="false">"스타일 미리보기"</string>
+    <string name="cap_preview_hint" formatted="false">"스타일 미리보기(전체 화면)"</string>
     <string name="cap_preview_sample" formatted="false">"세상은 넓어요. 함께 둘러봐요."</string>
     <string name="cap_profile_add" formatted="false">"프로필 추가"</string>
     <string name="cap_profile_add_failed" formatted="false">"프로필을 추가할 수 없습니다. 입력 내용과 30개 한도를 확인하세요."</string>

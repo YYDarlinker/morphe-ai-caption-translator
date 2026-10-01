@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"Opacidade do fundo"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparente, 100% opaco; salvo ao soltar"</string>
     <string name="cap_preview" formatted="false">"Prévia em tela cheia horizontal"</string>
-    <string name="cap_preview_hint" formatted="false">"Prévia do estilo"</string>
+    <string name="cap_preview_hint" formatted="false">"Prévia do estilo (tela cheia)"</string>
     <string name="cap_preview_sample" formatted="false">"O mundo é grande. Vamos explorar!"</string>
     <string name="cap_profile_add" formatted="false">"Adicionar perfil"</string>
     <string name="cap_profile_add_failed" formatted="false">"Não foi possível adicionar o perfil. Verifique os campos e o limite de 30 perfis."</string>

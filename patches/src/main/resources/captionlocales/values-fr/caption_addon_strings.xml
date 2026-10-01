@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"Opacité du fond"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparent, 100% opaque ; enregistré au relâchement"</string>
     <string name="cap_preview" formatted="false">"Aperçu plein écran paysage"</string>
-    <string name="cap_preview_hint" formatted="false">"Aperçu du style"</string>
+    <string name="cap_preview_hint" formatted="false">"Aperçu du style (plein écran)"</string>
     <string name="cap_preview_sample" formatted="false">"Le monde est grand. Explorons-le !"</string>
     <string name="cap_profile_add" formatted="false">"Ajouter un profil"</string>
     <string name="cap_profile_add_failed" formatted="false">"Impossible d’ajouter un profil. Vérifiez les champs et la limite de 30 profils."</string>

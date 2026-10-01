@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"背景不透明度"</string>
     <string name="cap_opacity_hint" formatted="false">"0% 为透明，100% 为不透明；松手保存"</string>
     <string name="cap_preview" formatted="false">"横屏全屏预览"</string>
-    <string name="cap_preview_hint" formatted="false">"样式预览"</string>
+    <string name="cap_preview_hint" formatted="false">"样式预览（全屏）"</string>
     <string name="cap_preview_sample" formatted="false">"世界很大，一起看看。"</string>
     <string name="cap_profile_add" formatted="false">"新增方案"</string>
     <string name="cap_profile_add_failed" formatted="false">"无法新增方案，请检查输入及 30 套方案上限。"</string>

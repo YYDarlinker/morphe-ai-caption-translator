@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"Độ đục nền"</string>
     <string name="cap_opacity_hint" formatted="false">"0% trong suốt, 100% đục; thả để lưu"</string>
     <string name="cap_preview" formatted="false">"Xem trước toàn màn hình ngang"</string>
-    <string name="cap_preview_hint" formatted="false">"Xem trước kiểu"</string>
+    <string name="cap_preview_hint" formatted="false">"Xem trước kiểu (toàn màn hình)"</string>
     <string name="cap_preview_sample" formatted="false">"Thế giới rộng lớn. Cùng khám phá nhé!"</string>
     <string name="cap_profile_add" formatted="false">"Thêm hồ sơ"</string>
     <string name="cap_profile_add_failed" formatted="false">"Không thể thêm hồ sơ. Kiểm tra các trường và giới hạn 30 hồ sơ."</string>

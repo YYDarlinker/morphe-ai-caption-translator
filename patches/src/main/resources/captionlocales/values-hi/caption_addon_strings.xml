@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"पृष्ठभूमि की अपारदर्शिता"</string>
     <string name="cap_opacity_hint" formatted="false">"0% पारदर्शी, 100% अपारदर्शी; छोड़ने पर सहेजें"</string>
     <string name="cap_preview" formatted="false">"लैंडस्केप फ़ुल-स्क्रीन पूर्वावलोकन"</string>
-    <string name="cap_preview_hint" formatted="false">"शैली पूर्वावलोकन"</string>
+    <string name="cap_preview_hint" formatted="false">"शैली पूर्वावलोकन (पूर्ण स्क्रीन)"</string>
     <string name="cap_preview_sample" formatted="false">"दुनिया बड़ी है। चलिए साथ देखें।"</string>
     <string name="cap_profile_add" formatted="false">"प्रोफ़ाइल जोड़ें"</string>
     <string name="cap_profile_add_failed" formatted="false">"प्रोफ़ाइल नहीं जुड़ सकी। फ़ील्ड और 30 प्रोफ़ाइल की सीमा जाँचें।"</string>

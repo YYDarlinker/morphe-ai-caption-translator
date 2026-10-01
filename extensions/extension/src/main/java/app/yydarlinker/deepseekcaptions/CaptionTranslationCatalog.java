@@ -312,7 +312,7 @@ static final String[][] ENGLISH={
 {"opacity","Background opacity"},
 {"opacity_hint","0% transparent, 100% opaque; saved on release"},
 {"preview","Landscape full-screen preview"},
-{"preview_hint","Style preview"},
+{"preview_hint","Style preview (full screen)"},
 {"preview_sample","A big world. Let's explore!"},
 {"profile_add","Add profile"},
 {"profile_add_failed","Unable to add profile. Check the fields and the 30-profile limit."},

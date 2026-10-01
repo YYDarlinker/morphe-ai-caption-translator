@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"背景の不透明度"</string>
     <string name="cap_opacity_hint" formatted="false">"0% は透明、100% は不透明。指を離すと保存"</string>
     <string name="cap_preview" formatted="false">"横画面の全画面プレビュー"</string>
-    <string name="cap_preview_hint" formatted="false">"スタイルプレビュー"</string>
+    <string name="cap_preview_hint" formatted="false">"スタイルプレビュー（全画面）"</string>
     <string name="cap_preview_sample" formatted="false">"世界は広い。一緒に見てみよう。"</string>
     <string name="cap_profile_add" formatted="false">"プロファイルを追加"</string>
     <string name="cap_profile_add_failed" formatted="false">"追加できません。入力内容と 30 件の上限を確認してください。"</string>

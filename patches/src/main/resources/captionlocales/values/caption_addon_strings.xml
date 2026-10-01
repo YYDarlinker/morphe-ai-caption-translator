@@ -160,7 +160,7 @@
     <string name="cap_opacity" formatted="false">"Background opacity"</string>
     <string name="cap_opacity_hint" formatted="false">"0% transparent, 100% opaque; saved on release"</string>
     <string name="cap_preview" formatted="false">"Landscape full-screen preview"</string>
-    <string name="cap_preview_hint" formatted="false">"Style preview"</string>
+    <string name="cap_preview_hint" formatted="false">"Style preview (full screen)"</string>
     <string name="cap_preview_sample" formatted="false">"A big world. Let\'s explore!"</string>
     <string name="cap_profile_add" formatted="false">"Add profile"</string>
     <string name="cap_profile_add_failed" formatted="false">"Unable to add profile. Check the fields and the 30-profile limit."</string>

@@ -107,10 +107,17 @@ final class CaptionOverlay {
   private static final android.view.ViewTreeObserver.OnPreDrawListener WATCH =
       () -> {
         long now = SystemClock.uptimeMillis();
-        if (now - lastLayout >= 100 && !guardedExpansion && !suppressed
-            && (!pendingText.isEmpty() || !pendingIdentity.isEmpty())) {
-          lastLayout = now;
-          render();
+        if (now - lastLayout >= 100) {
+          if (!guardedExpansion
+              && !suppressed
+              && (!pendingText.isEmpty() || !pendingIdentity.isEmpty())) {
+            lastLayout = now;
+            render();
+          }
+          // The same bounded, low-frequency path is where the avoidance coordinator re-checks the
+          // player's own controls. It only reads references cached in the current player, so this
+          // never turns into a per-frame Activity scan.
+          CaptionControlsAvoidance.tick();
         }
         return true;
       };
@@ -125,6 +132,7 @@ final class CaptionOverlay {
           }
           activityRef = new WeakReference<>(a);
           CaptionSurface.activity(a);
+          CaptionControlsAvoidance.onActivity(a);
           dirty = true;
           render();
         });
@@ -287,6 +295,7 @@ final class CaptionOverlay {
                       || s.contains("HIDDEN")
                       || s.contains("DISMISSED")
                       || s.contains("PICTURE_IN_PICTURE"));
+          CaptionControlsAvoidance.onPlayerType(s);
           dirty = true;
           render();
           // This callback may arrive before YouTube updates the video bounds.
@@ -325,6 +334,8 @@ final class CaptionOverlay {
     lastBlankIdentity = null;
     FrameLayout a = anchorRef.get();
     if (a != null) a.setVisibility(View.GONE);
+    // Nothing visible means nothing to keep clear of; the temporary offset must not survive.
+    CaptionControlsAvoidance.onCaptionCleared("caption_hidden");
   }
 
   private static void detach() {
@@ -335,6 +346,7 @@ final class CaptionOverlay {
     hostRef = new WeakReference<>(null);
     anchorRef = new WeakReference<>(null);
     textRef = new WeakReference<>(null);
+    CaptionControlsAvoidance.onCaptionCleared("detached");
     previous.setEmpty();
     previousScreenWidth = 0;
     lastScan = -500;
@@ -570,6 +582,16 @@ final class CaptionOverlay {
     anchor.setLayoutParams(params);
     anchor.setVisibility(View.VISIBLE);
     anchor.bringToFront();
+    // The avoidance coordinator gets the caption's own box -- the real TextView with its background
+    // and padding, not the anchor's full-width transparent strip -- plus the frame's original
+    // position, which is what it re-derives the temporary offset from.
+    int textLeft = params.leftMargin + (params.width - compact) / 2;
+    CaptionControlsAvoidance.onCaptionPlaced(
+        host,
+        anchor,
+        text,
+        b,
+        new Rect(textLeft, params.topMargin, textLeft + compact, params.topMargin + height));
   }
 
   static int compactWidth(Context a, String value, float sp, int maximum) {
@@ -616,6 +638,9 @@ final class CaptionOverlay {
       case MotionEvent.ACTION_MOVE:
         if (!dragging && SystemClock.uptimeMillis() - downAt >= 350) {
           dragging = true;
+          // The long-press threshold is unchanged. The avoidance animation stops here but the text
+          // keeps the offset it already had, so the caption never jumps under the finger.
+          CaptionControlsAvoidance.onDragStart();
           v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
         }
         if (dragging) {
@@ -629,6 +654,7 @@ final class CaptionOverlay {
         return true;
       case MotionEvent.ACTION_UP:
       case MotionEvent.ACTION_CANCEL:
+        if (dragging) CaptionControlsAvoidance.onDragEnd();
         dragging = false;
         return true;
       default:

@@ -113,6 +113,12 @@ val deepSeekChineseCaptionsPatch = bytecodePatch(
                 """
             )
         }
+
+        // N27: the caption overlay must know when the regular player's controls appear, so it can
+        // step above them. The observer is part of this root's own bytecode dependency set: the user
+        // selects nothing extra, no official class is repackaged and the official player-controls
+        // hook is neither replaced nor removed.
+        bindPlayerControlsVisibilityHook()
     }
 
 

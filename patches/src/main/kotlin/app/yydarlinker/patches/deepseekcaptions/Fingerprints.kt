@@ -98,6 +98,23 @@ internal object CurrentVideoIdFingerprint : Fingerprint(
 )
 
 /**
+ * N27: the regular player's control-visibility reader, located exactly the way the official
+ * player-controls patch locates it. The matched method takes no arguments, returns the visibility
+ * enum as an object and reads an int state field out of a holder before converting it with a
+ * static factory; the two filters are what make that shape unambiguous.
+ */
+internal object PlayerControlsVisibilityFingerprint : Fingerprint(
+    name = "getPlayerControlsVisibility",
+    accessFlags = listOf(AccessFlags.PUBLIC),
+    returnType = "L",
+    parameters = listOf(),
+    filters = OpcodesFilter.opcodesToFilters(
+        Opcode.IGET,
+        Opcode.INVOKE_STATIC,
+    ),
+)
+
+/**
  * Exact Morphe player-CC controller identity, kept standalone by a tiny local resource mapper.
  * This preserves the official fingerprint's two caption-resource literals rather than weakening
  * matching to generic ImageView methods that could hit an unrelated overlay control.

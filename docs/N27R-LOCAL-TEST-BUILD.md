@@ -146,4 +146,4 @@ MPP 增量来自标签绑定改动后的 `CaptionControlsAvoidancePatchKt` 字�
 
 ## 提交与锚点
 
-一个实现提交含源码（`CaptionControlsAvoidancePatch.kt`）、验证（4 个新 validator ＋ `CompositionDexAudit.kt` 接入 ＋ `patches/build.gradle.kts` 两个任务）、管理档案（`docs/PROJECT-STATE.md`、`docs/N27-CRASH-REVIEW.md`、`docs/N27R-CRASH-REPAIR-TASK.md`）与本交付记录；标签 `anchor/n27r-<实现短哈希>` 指向该提交（含全部修复源码）。未 amend 任何既有 N27/N26 提交，未推送。若其后另有把占位短哈希写实的 docs 收尾提交，它不含任何源码改动，源锚点与 HEAD 的关系以 `git log --oneline anchor/n27r-<短哈希>..HEAD` 为准。
+一个实现提交 `4c1d33f` 含源码（`CaptionControlsAvoidancePatch.kt`）、验证（4 个新 validator ＋ `CompositionDexAudit.kt` 接入 ＋ `patches/build.gradle.kts` 两个任务）、管理档案（`docs/PROJECT-STATE.md`、`docs/N27-CRASH-REVIEW.md`、`docs/N27R-CRASH-REPAIR-TASK.md`）与本交付记录；标签 `anchor/n27r-4c1d33f` 指向该提交，即含全部修复源码的点。未 amend 任何既有 N27/N26 提交，未推送。其后若另有把本记录里的占位短哈希写实的状态补记提交（`docs: N27r write the real anchor hash`），它不含任何源码改动，源锚点与 HEAD 的关系以 `git log --oneline anchor/n27r-4c1d33f..HEAD` 为准（本次为 1 个仅 docs 的提交）。

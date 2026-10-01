@@ -22,7 +22,6 @@ public final class DeepSeekCaptionHookV2 {
 
         CaptionMusicSuppressor.setActivity(activity);
         DeepSeekCaptionHook.setMainActivity(activity);
-        CaptionControlsAvoidance.onActivity(activity);
         CaptionMusicSuppressor.kick();
     }
 
@@ -32,29 +31,16 @@ public final class DeepSeekCaptionHookV2 {
         // Observe the old video's ON/OFF intent before the stable controller tears down its session.
         CaptionVideoHandoffV2.onVideoId(videoId);
         DeepSeekCaptionHook.onVideoId(videoId);
-        CaptionControlsAvoidance.onVideoId(videoId);
         CaptionMusicSuppressor.forceNativeRendererScan();
     }
 
     public static void onPlayerType(Enum<?> playerType) {
         DeepSeekCaptionHook.onPlayerType(playerType);
-        CaptionControlsAvoidance.onPlayerType(playerType == null ? "" : playerType.name());
         // YouTube can rebuild subtitle windows during fullscreen/miniplayer transitions while the
         // previous renderer View remains attached. Force one player-local recheck; the existing
         // transition guard still owns the visual animation and this adds no independent timer.
         CaptionMusicSuppressor.forceNativeRendererScan();
         CaptionMusicSuppressor.kick();
-    }
-
-    /**
-     * N27: YouTube's own player-controls visibility state, delivered by this patch's own observer on
-     * the entity model that carries it. The argument is an already-initialised instance of YouTube's
-     * visibility enum (or {@code null} when the model holds no state, which YouTube's own reader also
-     * reports as unknown). It is only a trigger: whether a control is really in the caption's way is
-     * decided later, on the main thread, from the current player's own visible rectangles.
-     */
-    public static void onPlayerControlsVisibility(Enum<?> state) {
-        CaptionControlsAvoidance.onVisibilitySignal(state);
     }
 
     /**

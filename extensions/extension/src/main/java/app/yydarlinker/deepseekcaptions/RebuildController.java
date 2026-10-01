@@ -53,6 +53,8 @@ final class RebuildController {
     final String owner, identity, target;
     final DeepSeekConfig.Snapshot config;
     final boolean sourceOnly;
+    final CaptionLanguageContext languageContext;
+    String lastObservedSourceCode;
     final long activatedAtMs = SystemClock.elapsedRealtime();
     volatile String url;
     volatile boolean visible, cancelled, loading, terminal;
@@ -101,6 +103,8 @@ final class RebuildController {
       owner = o;
       identity = key;
       this.target = target;
+      languageContext = CaptionLanguageContext.observe(u, target);
+      lastObservedSourceCode = languageContext.sourceCode;
       config = cfg;
       sourceOnly = original;
       visible = show;
@@ -363,6 +367,14 @@ final class RebuildController {
       } catch (Exception ignored) {
       }
       if (current(prev) && prev.identity.equals(key)) {
+        CaptionLanguageContext observed = CaptionLanguageContext.observe(url, prev.target);
+        if (!observed.sourceCode.equals(prev.lastObservedSourceCode)) {
+          if (!observed.sourceCode.equals(prev.languageContext.sourceCode))
+            CaptionDiagnostics.mark(prev.context, "LANGUAGE_CONTEXT_MISMATCH",
+                "session=" + prev.id + ";bound_source_code=" + prev.languageContext.sourceCode
+                    + ";observed_source_code=" + observed.sourceCode + ";strategy=legacy_unchanged");
+          prev.lastObservedSourceCode = observed.sourceCode;
+        }
         prev.url = url;
         prev.visible |= show;
         if (prev.source == null && prev.sourceFailures > 0) {
@@ -374,6 +386,8 @@ final class RebuildController {
         if (prev != null) prev.cancel();
         s = new Session(c.getApplicationContext(), url, owner, key, target, cfg, original, show);
         active = s;
+        CaptionDiagnostics.mark(s.context, "LANGUAGE_PROFILE_BOUND",
+            "session=" + s.id + ";" + s.languageContext.diagnosticFields());
         CaptionOverlay.clear();
       }
     }

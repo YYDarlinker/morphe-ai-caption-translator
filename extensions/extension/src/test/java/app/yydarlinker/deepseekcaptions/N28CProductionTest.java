@@ -65,19 +65,26 @@ public class N28CProductionTest {
     h.a.getResources().getDisplayMetrics().setTo(saved);
   }
   void presented(RebuildController.Session s)throws Exception {
-    assertSame(s.languageContext.renderSpec,field("pendingRenderSpec"));assertFalse(s.lastShown,pages().isEmpty());
-    RebuildProtocol.Event e=s.plans[0].events.get(0);StringBuilder text=new StringBuilder();long at=e.start;
-    for(RebuildPageLayout.Page p:pages()) {assertEquals(at,p.start);assertTrue(p.end<=e.end);assertTrue(p.end>p.start);at=p.end;text.append(p.text);}
-    assertEquals(e.end,at);assertEquals(e.text,text.toString());assertFalse(view().getText().toString().isEmpty());assertTrue(view().getLineCount()<=2);
+    assertSame(s.languageContext.renderSpec,field("pendingRenderSpec"));
+    RebuildProtocol.Event e=s.plans[0].events.get(0);
+    if(pages().isEmpty()) {
+      assertFalse(s.languageContext.renderSpec.legacy);
+      assertFalse(s.languageContext.renderSpec.fits(e.text,CaptionOverlay.budget().preferredPx,CaptionOverlay.budget().width,2));
+      assertEquals("",view().getText().toString());
+      assertTrue(CaptionDiagnostics.fullText(h.a).contains("page_time_capacity_unresolved"));
+      assertEquals(0,s.repairCount);return;
+    }StringBuilder text=new StringBuilder();long at=e.start;
+    for(RebuildPageLayout.Page p:pages()) {assertEquals(at,p.start);assertTrue(p.end<=e.end);assertTrue(p.end>p.start);if(!s.languageContext.renderSpec.legacy && pages().size()>1)assertTrue(p.end-p.start>=1200);at=p.end;text.append(p.text);}
+    if(!s.languageContext.renderSpec.legacy && e.end-e.start<1200)assertEquals(1,pages().size());assertEquals(e.end,at);assertEquals(e.text,text.toString());assertFalse(view().getText().toString().isEmpty());assertTrue(view().getLineCount()<=2);
   }
   void row(RebuildController.Session s,String ui,int calls,boolean cache)throws Exception {
     CaptionRenderSpec spec=s.languageContext.renderSpec;RebuildProtocol.Event e=s.plans[0].events.get(0);
     trace.put(new JSONObject().put("source_code",s.languageContext.sourceCode).put("target_code",s.languageContext.targetCode)
         .put("ui_locale",ui).put("profile_id",spec.profile.id).put("direction",spec.direction).put("presentation_policy",spec.presentationPolicy)
-        .put("reading_units",spec.readingUnits(e.text)).put("line_units",spec.lineUnits(view().getText().toString(),view().getLayout()))
-        .put("max_lines",2).put("actual_width_px",spec.actualWidth(view().getLayout())).put("line_count",view().getLineCount())
+        .put("reading_units",spec.readingUnits(e.text)).put("line_units",(pages().isEmpty()?0:spec.lineUnits(view().getText().toString(),view().getLayout())))
+        .put("max_lines",2).put("actual_width_px",(pages().isEmpty()?0:spec.actualWidth(view().getLayout()))).put("line_count",pages().isEmpty()?0:view().getLineCount())
         .put("soft_reading_target",spec.profile.referenceCps).put("soft_cpl_target",spec.profile.referenceCpl)
-        .put("event_start",e.start).put("event_end",e.end).put("pages",N28CGeometryTest.pageRows(pages()))
+        .put("event_text",e.text).put("safe_blank",pages().isEmpty()).put("event_start",e.start).put("event_end",e.end).put("pages",N28CGeometryTest.pageRows(pages()))
         .put("cache",cache).put("provider_calls",calls).put("cache_key",s.cacheKey).put("scope",s.languageContext.scope())
         .put("prompt_hash",RebuildCache.hash(RebuildApi.prompt(s.config,s.target,s.languageContext))).put("remote_translation_calls",0));
   }
@@ -143,7 +150,7 @@ public class N28CProductionTest {
     source("One complete source sentence.",2400);translated="Model J-20 (12) stays visible with all complete words.";
     RebuildController.Session s=start("fr","en");ready(s);presented(s);int count=pages().size();String key=s.cacheKey;RebuildController.stop();
     RebuildLayoutTest.bounds=new Rect(0,0,280,400);CaptionOverlay.refreshStyle(h.a);RebuildController.Session warm=start("fr","en");ready(warm);presented(warm);
-    assertEquals(key,warm.cacheKey);assertEquals(0,warm.attempts[0]);assertEquals(1,h.calls.get());assertTrue(pages().size()>count);row(warm,"default",0,true);export("remeasured-cache");
+    assertEquals(key,warm.cacheKey);assertEquals(0,warm.attempts[0]);assertEquals(1,h.calls.get());assertTrue("original 2400ms narrow geometry cannot fit legal >=1200ms pages",pages().isEmpty());assertTrue(count>0);row(warm,"default",0,true);export("remeasured-cache");
   }
   @Test public void softOverrunAndLateArrivalDoNotBlankTheAcceptedNonChineseEvent()throws Exception {
     source("One complete source sentence.",2400);translated="This complete sentence remains visible even when its reading interval is unusually short.";

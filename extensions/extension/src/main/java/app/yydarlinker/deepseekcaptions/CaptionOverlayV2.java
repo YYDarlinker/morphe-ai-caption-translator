@@ -550,7 +550,9 @@ final class CaptionOverlay {
     text.setText(shown);
     if (shown.isEmpty()) {
       if(ownedCaption && !pendingRenderSpec.legacy)
-        presentationDiagnostics(a,pendingText,preferred,inner,pendingEnd-pendingStart,"hard_geometry_unresolved");
+        presentationDiagnostics(a,pendingText,preferred,inner,pendingEnd-pendingStart,
+            CaptionLanguagePager.failureReason(pendingText,
+                new CaptionOverlay.LayoutBudget(inner,preferred,preferred,pendingRenderSpec),pendingRenderSpec));
       hideView();
       lastBlankIdentity = pendingIdentity;
       return;

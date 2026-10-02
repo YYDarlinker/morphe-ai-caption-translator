@@ -241,7 +241,7 @@ public class SchedulerLifecycleRegressionTest {
     h.await(()->s.jobs!=null && s.jobs[0]!=null && s.jobs[0].sent);
     RebuildController.Job job=s.jobs[0];
     synchronized(s){s.pendingFocus=new RebuildController.Job(s,0,true);}
-    RebuildController.stop();assertTrue(job.isCancelled());assertFalse(s.retired);
+    join(start("Scheduler-ExplicitPhysicalStop",RebuildController::stop));assertTrue(job.isCancelled());assertFalse(s.retired);
     assertNull(s.pendingFocus);assertFalse(s.loading);assertNull(s.sourceJob);assertTrue(s.connections.isEmpty());
     h.release.countDown();released(job);assertNull(s.plans[0]);assertEquals(1,s.attempts[0]);
     assertNull(RebuildCache.read(h.a,s.cacheKey,s.source,s.blocks.get(0),s.languageContext));

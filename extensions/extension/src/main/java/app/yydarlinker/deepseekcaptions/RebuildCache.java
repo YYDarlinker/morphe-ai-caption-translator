@@ -117,7 +117,10 @@ final class RebuildCache {
     }
 
     void drain() {
-      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+      drain(System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5));
+    }
+
+    void drain(long deadline) {
       for (Permit permit : state.get().permits) {
         try {
           if (!permit.done.await(Math.max(0, deadline - System.nanoTime()),
@@ -150,21 +153,44 @@ final class RebuildCache {
     public void close() { if (closed.compareAndSet(false, true)) publication.release(this); }
   }
 
+  // Entries live only while a prepared write is outstanding, not for the lifetime of cache keys.
+  // A held old candidate retains the newer successful ordinal even after the newer candidate closes.
+  private static final Map<String, WriteOrder> WRITES = new HashMap<>();
+  private static long writeOrdinal;
+  private static final class WriteOrder { int users; long committed; }
+
   /** Fully serialized/fsynced candidate. Preparation never holds a lifecycle lock or permit. */
   static final class Prepared implements AutoCloseable {
     final File temporary, destination;
-    Prepared(File temporary, File destination) { this.temporary = temporary; this.destination = destination; }
+    private final WriteOrder order;
+    private final long ordinal;
+    private final java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+    Prepared(File temporary, File destination) {
+      this.temporary = temporary; this.destination = destination;
+      synchronized (RebuildCache.class) {
+        order = WRITES.computeIfAbsent(destination.getAbsolutePath(), key -> new WriteOrder());
+        order.users++; ordinal = ++writeOrdinal;
+      }
+    }
     boolean commit() {
       try {
         synchronized (RebuildCache.class) {
+          if (closed.get() || ordinal < order.committed) return false;
           java.nio.file.Files.move(temporary.toPath(), destination.toPath(),
               java.nio.file.StandardCopyOption.REPLACE_EXISTING,
               java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+          order.committed = ordinal;
         }
         return true;
       } catch (IOException failure) { return false; }
     }
-    public void close() { temporary.delete(); }
+    public void close() {
+      if (!closed.compareAndSet(false, true)) return;
+      temporary.delete();
+      synchronized (RebuildCache.class) {
+        if (--order.users == 0) WRITES.remove(destination.getAbsolutePath());
+      }
+    }
   }
 
   static Prepared prepare(Context c, String key, RebuildSource source, RebuildPlanner.Block block,

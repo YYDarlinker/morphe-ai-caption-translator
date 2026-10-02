@@ -30,6 +30,11 @@ public class N28CCounterTest {
       assertEquals(1,spec("en-US").readingUnits(text));assertArrayEquals(new int[]{0,text.length()},CaptionUnicode.characterBoundaries(text,spec("en-US").locale));
     }
   }
+  @Test public void nonChineseMinimumTimeAndPolicyDoNotChangeChineseNamespace() {
+    assertEquals(1200,CaptionLanguagePager.MIN_PAGE_MS);
+    assertEquals("n28c-presentation-v2",spec("en").presentationPolicy);
+    assertEquals("legacy_n26",spec("zh-Hans").presentationPolicy);
+  }
   @Test public void lineCandidatesNeverSplitNbspCrLfOrCompleteClusters() {
     assertArrayEquals(new int[]{0,3},CaptionUnicode.lineBoundaries("a\u00a0b",spec("en-GB").locale));
     assertArrayEquals(new int[]{0,3,4},CaptionUnicode.lineBoundaries("a\r\nb",spec("en-GB").locale));

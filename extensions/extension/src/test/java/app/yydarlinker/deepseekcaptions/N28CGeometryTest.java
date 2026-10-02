@@ -32,11 +32,21 @@ public class N28CGeometryTest {
     CaptionOverlay.showEvent(text,()->true,()->"","n28c-"+target,100,100+duration,100,spec(target));
   }
   void validate(String original,String target,long start,long end,List<RebuildPageLayout.Page> pages)throws Exception {
-    assertFalse(target,pages.isEmpty());CaptionRenderSpec spec=spec(target);
+    CaptionRenderSpec spec=spec(target);
+    if(pages.isEmpty()) {
+      assertFalse("only hard geometry/time capacity may blank",spec.fits(original,
+          CaptionOverlay.budget().preferredPx,CaptionOverlay.budget().width,2));
+      assertEquals("",view().getText().toString());
+      assertTrue(CaptionDiagnostics.fullText(h.a).contains("page_time_capacity_unresolved")
+          || CaptionDiagnostics.fullText(h.a).contains("hard_geometry_unresolved"));
+      return;
+    }
+    if(!spec.legacy && end-start<1200) assertEquals(1,pages.size());
     int[] cuts=CaptionUnicode.characterBoundaries(original,spec.locale);StringBuilder complete=new StringBuilder();
     long at=start;int offset=0;
     for(RebuildPageLayout.Page page:pages) {
       assertEquals(at,page.start);assertTrue(page.end>page.start);assertTrue(page.end<=end);
+      if(!spec.legacy && pages.size()>1) assertTrue("multi-page minimum",page.end-page.start>=1200);
       assertTrue(Arrays.binarySearch(cuts,offset)>=0);offset+=page.text.length();assertTrue(Arrays.binarySearch(cuts,offset)>=0);
       complete.append(page.text);at=page.end;
       CaptionOverlay.position(page.start);
@@ -56,8 +66,11 @@ public class N28CGeometryTest {
   @Test public void overSoftReadingSpeedDisplaysEveryLetterAndRecordsWatch()throws Exception {
     String text="This complete caption remains visible despite a fast reading interval.";
     show(text,"en",600);validate(text,"en",100,700,pages());
-    String log=CaptionDiagnostics.fullText(h.a);assertTrue(log,log.contains("REBUILD_PRESENTATION_WATCH"));
-    assertTrue(log.contains("watch=reading_speed"));assertTrue(log.contains("repair_candidate=false"));assertFalse(log.contains("REBUILD_PRESENTATION_HARD_REJECT"));assertFalse(log.contains("REBUILD_LAYOUT_TIME_EXCEPTION"));
+    String log=CaptionDiagnostics.fullText(h.a);
+    // Same original 600ms/70-unit input occupies three hard lines at the frozen size.
+    // It must now blank for capacity, not pass through several faster one-line fragments.
+    assertTrue(pages().isEmpty());assertTrue(log,log.contains("page_time_capacity_unresolved"));
+    assertFalse(log.contains("REBUILD_LAYOUT_TIME_EXCEPTION"));
   }
   @Test public void oneLineIsPreferredWithoutChineseMinimumCells()throws Exception {
     show("OK.","en",80);assertEquals(1,pages().size());assertEquals("OK.",view().getText().toString());assertEquals(1,view().getLineCount());
@@ -71,7 +84,7 @@ public class N28CGeometryTest {
   @Test public void longGermanWordUsesOnlyCompleteEmergencyGraphemes()throws Exception {
     RebuildLayoutTest.bounds=new Rect(0,0,300,400);
     String text="Donaudampfschifffahrtsgesellschaftskapitän";
-    show(text,"de",700);assertTrue(pages().size()>1);validate(text,"de",100,800,pages());
+    show(text,"de",700);assertTrue(pages().isEmpty());validate(text,"de",100,800,pages());
   }
   @Test public void nbspAndCrLfAreNeverCutInHalf()throws Exception {
     String text="one\u00a0two\r\nthree\r\nfour\r\nfive";
@@ -138,7 +151,7 @@ public class N28CGeometryTest {
       assertEquals(full,h.a.getResources().getDisplayMetrics().widthPixels>h.a.getResources().getDisplayMetrics().heightPixels);
       RebuildLayoutTest.bounds=new Rect(0,0,full?1500:600,full?700:400);DeepSeekConfig.saveCaptionSizeTier(h.a,tier);
       show(text,"en",1000);validate(text,"en",100,1100,pages());
-      rows.put(new JSONObject().put("full_screen",full).put("tier",tier).put("density",density).put("font_scale",scale).put("text_size_px",view().getTextSize()).put("pages",pageRows(pages())));
+      rows.put(new JSONObject().put("full_screen",full).put("tier",tier).put("density",density).put("font_scale",scale).put("text_size_px",view().getTextSize()).put("event_text",text).put("event_start",100).put("event_end",1100).put("pages",pageRows(pages())));
     }
     assertEquals(40,rows.length());export("geometry-matrix.json",new JSONObject().put("rows",rows));
   }

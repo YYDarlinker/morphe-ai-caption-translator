@@ -14,7 +14,7 @@ import java.util.Locale;
 
 /** Immutable target presentation contract; never inferred from UI locale or text script. */
 final class CaptionRenderSpec {
-  static final String POLICY_VERSION = "n28c-presentation-v1";
+  static final String POLICY_VERSION = "n28c-presentation-v2";
   static final CaptionRenderSpec LEGACY = new CaptionRenderSpec("zh-Hans",
       CaptionLanguageProfile.fromCode("zh-Hans"), true);
   final String targetCode, presentationPolicy;

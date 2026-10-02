@@ -28,6 +28,12 @@ final class RebuildController {
   private static final ExecutorService PRIORITY_IO = lane("CaptionPriorityIO", MAX_FOCUS_CONCURRENCY);
   private static final ExecutorService PREFETCH_IO = lane("CaptionPrefetchIO", MAX_PREFETCH_CONCURRENCY);
 
+  // Bounded, separate from source/translation lanes: no task here waits on a commit permit.
+  private static final ThreadPoolExecutor CLEANUP = new ThreadPoolExecutor(1, 1, 0L,
+      TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16), r -> {
+        Thread t = new Thread(r, "CaptionRetirementIO"); t.setDaemon(true); return t;
+      }, new ThreadPoolExecutor.AbortPolicy());
+
   private static ExecutorService lane(String name, int concurrency) {
     return Executors.newFixedThreadPool(concurrency, r -> {
       Thread t = new Thread(r, name);
@@ -124,41 +130,123 @@ final class RebuildController {
       visible = show;
     }
 
-    void cancel() {
-      publication.revoke(true);
-      finishRetirement();
-      List<HttpURLConnection> disconnect;
-      synchronized (connections) {
-        disconnect = new ArrayList<>(connections);
-        connections.clear();
-      }
-      for (HttpURLConnection c : disconnect)
-        try { c.disconnect(); } catch (Exception ignored) { }
-    }
+    final java.util.concurrent.atomic.AtomicBoolean cleanupScheduled =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    volatile CountDownLatch cleanupDone = new CountDownLatch(1);
+    volatile String retirementFailure = "";
+    private volatile boolean disconnectCaptureComplete;
+    // Retain physical cleanup eligibility after detaching the logically closed connection set.
+    private final Set<HttpURLConnection> pendingDisconnects = ConcurrentHashMap.newKeySet();
+    private List<Notice> retirementNotices = Collections.emptyList();
 
-    /** Revoke publication on a scope change; an already sent HTTP may finish in its own scope. */
-    void retire() {
-      publication.revoke(false);
-      finishRetirement();
-    }
+    void cancel() { requestRetirement(true); }
 
-    private void finishRetirement() {
-      publication.drain();
-      List<Notice> notices = new ArrayList<>();
+    /** Scope replacement allows an already sent HTTP to finish, but never to publish. */
+    void retire() { requestRetirement(false); }
+
+    private void requestRetirement(boolean stop) {
+      publication.revoke(stop);
+      // Only minimal state changes; no disk, disconnect, diagnostic or executor calls under S.
       synchronized (this) {
-        if (!cancelled) generation++;
+        if (!cancelled) {
+          generation++;
+          List<Notice> notices = new ArrayList<>();
+          endFallback(this, position, "session_end", notices);
+          retirementNotices = notices;
+          renderRevision++;
+        }
+        if (retired && !publication.finishSent()) {
+          cleanupDone = new CountDownLatch(1);
+          disconnectCaptureComplete = false;
+        }
         cancelled = true;
         retired = publication.finishSent();
-        endFallback(this, position, "session_end", notices);
         pausedDisplayPosition = -1;
         pausedHookState = null;
         pendingFocus = null;
         if (pendingPlans != null) Arrays.fill(pendingPlans, null);
         sourceJob = null;
         loading = false;
-        renderRevision++;
       }
-      flush(this, notices);
+      if (!publication.finishSent()) {
+        synchronized (connections) {
+          pendingDisconnects.addAll(connections);
+          connections.clear();
+        }
+        disconnectCaptureComplete = true;
+      }
+      requestCleanup();
+      // Main returns after logical revocation. Off-main retains the historical physical barrier.
+      if (Looper.myLooper() != Looper.getMainLooper()) awaitRetirement();
+    }
+
+    void requestCleanup() {
+      if (cleanupDone.getCount() == 0 || !cleanupScheduled.compareAndSet(false, true)) return;
+      try { CLEANUP.execute(this::cleanup); }
+      catch (RejectedExecutionException capacity) {
+        cleanupScheduled.set(false);
+        // Do not throw on a UI entry or pretend physical cleanup succeeded. Explicit await can retry.
+        retirementFailure = "retirement_cleanup_capacity";
+      }
+    }
+
+    private void cleanup() {
+      boolean success = true;
+      boolean finishSent = publication.finishSent();
+      try {
+        List<HttpURLConnection> disconnect = new ArrayList<>();
+        if (!finishSent) disconnect.addAll(pendingDisconnects);
+        for (HttpURLConnection c : disconnect) {
+          try { c.disconnect(); pendingDisconnects.remove(c); }
+          catch (RuntimeException failure) {
+            success = false;
+            retirementFailure = "retirement_disconnect_failed";
+          }
+        }
+        List<Notice> notices;
+        synchronized (this) { notices = retirementNotices; retirementNotices = Collections.emptyList(); }
+        flush(this, notices);
+        if (!success) CaptionDiagnostics.mark(context, "REBUILD_RETIREMENT_FAILED",
+            "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
+      } catch (RuntimeException failure) {
+        success = false;
+        retirementFailure = "retirement_cleanup_failed";
+      } finally {
+        boolean escalated;
+        synchronized (this) {
+          escalated = finishSent && !publication.finishSent();
+          if (success && !escalated && (finishSent || disconnectCaptureComplete)) cleanupDone.countDown();
+        }
+        cleanupScheduled.set(false);
+        if (escalated) requestCleanup();
+      }
+    }
+
+    /** Explicit off-main barrier: all admitted file work and queued disconnect/diagnostics finished. */
+    void awaitRetirement() {
+      if (Looper.myLooper() == Looper.getMainLooper())
+        throw new IllegalStateException("retirement_barrier_on_main");
+      if (publication.isOpen()) throw new IllegalStateException("retirement_not_requested");
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      requestCleanup();
+      try {
+        publication.drain(deadline);
+        if (!cleanupDone.await(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS))
+          throw new IllegalStateException("retirement_cleanup_timeout");
+        retirementFailure = "";
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        retirementFailure = "publication_commit_interrupted";
+        throw new IllegalStateException(retirementFailure, interrupted);
+      } catch (IllegalStateException failure) {
+        retirementFailure = failure.getMessage();
+        boolean interrupted = Thread.currentThread().isInterrupted();
+        try {
+          CaptionDiagnostics.mark(context, "REBUILD_RETIREMENT_FAILED",
+              "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
+        } finally { if (interrupted) Thread.currentThread().interrupt(); }
+        throw failure;
+      }
     }
 
     void noteSeek(long now) {
@@ -214,7 +302,7 @@ final class RebuildController {
       connection = c;
       if (c != null) {
         session.connections.add(c);
-        if (isCancelled()) c.disconnect();
+        if (isCancelled()) { session.connections.remove(c); c.disconnect(); }
       }
     }
 
@@ -311,8 +399,8 @@ final class RebuildController {
       epoch = publicationEpoch;
     }
     if (previous != null) {
-      previous.cancel();
       clear(epoch);
+      previous.cancel();
       CaptionMusicSuppressor.kick();
     }
     if (changed) {
@@ -325,6 +413,7 @@ final class RebuildController {
     SemanticCaptionTimeline.onVideoId(id);
   }
 
+  /** Main: revocation/old UI invalidation only. Off-main: also the fixed five-second physical barrier. */
   static void stop() {
     Session s;
     long epoch;
@@ -334,8 +423,8 @@ final class RebuildController {
       active = null;
       epoch = ++publicationEpoch;
     }
-    if (s != null) s.cancel();
     clear(epoch);
+    if (s != null) s.cancel();
     CaptionMusicSuppressor.kick();
   }
 

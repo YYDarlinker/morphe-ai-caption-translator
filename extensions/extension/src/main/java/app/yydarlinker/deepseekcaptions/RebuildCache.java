@@ -21,15 +21,20 @@ final class RebuildCache {
     }
   }
 
+  /** Historical English/Chinese cache identity for legacy fixtures only. */
   static String identity(RebuildSource s, DeepSeekConfig.Snapshot c, String target) {
+    return identity(s,c,target,CaptionLanguageContext.LEGACY);
+  }
+  static String identity(RebuildSource s,DeepSeekConfig.Snapshot c,String target,CaptionLanguageContext context) {
     StringBuilder b =
         new StringBuilder(RebuildProtocol.VERSION)
             .append('|')
-            .append(c.fingerprint())
+            .append(context.fingerprint(c))
             .append('|')
             .append(target)
             .append('|')
-            .append(hash(RebuildApi.prompt(c, target)));
+            .append(hash(RebuildApi.prompt(c, target,context)));
+    if(!context.canApplyEnglishToChinese)b.append('|').append(context.scope());
     for (RebuildSource.Word w : s.words)
       b.append('\n')
           .append(w.start)
@@ -53,13 +58,20 @@ final class RebuildCache {
     return f;
   }
 
+  /** Explicit legacy fixture entry; production reads must pass their immutable context. */
   static RebuildProtocol.Plan read(Context c, String key, RebuildSource s, RebuildPlanner.Block b) {
+    return read(c,key,s,b,CaptionLanguageContext.LEGACY);
+  }
+  static RebuildProtocol.Plan read(Context c,String key,RebuildSource s,RebuildPlanner.Block b,
+                                   CaptionLanguageContext context) {
     File f = new File(directory(c), key + "-" + b.id() + ".json");
     if (!f.isFile()) return null;
     try {
       if (f.length() > 256000) throw new IOException("oversized");
       String raw = new String(java.nio.file.Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-      RebuildProtocol.Plan plan=RebuildProtocol.parseBound(raw,s,b);
+      RebuildProtocol.Plan plan=RebuildProtocol.parseBound(raw,s,b,context);
+      if(!context.canApplyEnglishToChinese)
+        plan=RebuildReview.withLayoutReview(plan,CaptionOverlay.budget(),context);
       return RebuildReview.score(plan.issues)==0 ? plan : null;
     } catch (Exception bad) {
       f.delete();
@@ -97,5 +109,15 @@ final class RebuildCache {
     } finally {
       if (tmp != null) tmp.delete();
     }
+  }
+  static boolean write(Context c,String key,RebuildSource source,RebuildPlanner.Block block,
+      RebuildProtocol.Plan plan,CaptionLanguageContext context) {
+    if(context.canApplyEnglishToChinese)return write(c,key,block,plan);
+    try {
+      // Same source ownership and language policy on write and on a future cold read.
+      RebuildProtocol.Plan verified=RebuildProtocol.parseBound(plan.json,source,block,context);
+      if(RebuildReview.score(verified.issues)>0)return false;
+      return write(c,key,block,plan);
+    } catch(Exception invalid) { return false; }
   }
 }

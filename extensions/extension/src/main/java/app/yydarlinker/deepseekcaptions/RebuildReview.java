@@ -17,15 +17,19 @@ final class RebuildReview {
   }
 
   static List<Issue> inspect(RebuildSource s,RebuildPlanner.Block b,List<RebuildProtocol.Event> events) {
+    return inspect(s,b,events,CaptionLanguageContext.LEGACY);
+  }
+  static List<Issue> inspect(RebuildSource s,RebuildPlanner.Block b,List<RebuildProtocol.Event> events,
+                            CaptionLanguageContext context) {
     List<Issue> out=new ArrayList<>();
     int shortEvents=0, fragmentaryRepairEvents=0;
     for(RebuildProtocol.Event e:events) {
       String source=s.text(e.from,e.to), text=e.text;
-      boolean zh=RebuildSemantics.chinese(text);
+      boolean zh=context.canApplyEnglishToChinese && RebuildSemantics.chinese(text);
       int words=source.split("\\s+").length;
       long han=text.codePoints().filter(c->Character.UnicodeScript.of(c)==Character.UnicodeScript.HAN).count();
       int visible=(int)text.codePoints().filter(c->!Character.isWhitespace(c)).count();
-      boolean english=source.matches("(?s).*[a-zA-Z]{3}.*") && !source.codePoints().anyMatch(RebuildSource::cjk);
+      boolean english=context.englishSource;
       if(words<=6 || han<=7) shortEvents++;
       boolean compressed=english&&zh&&words>=24&&han<words*.8;
       boolean negative=RebuildSemantics.has("\\b(?:cannot|can't|couldn't|won't|never)\\b",source);
@@ -70,7 +74,7 @@ final class RebuildReview {
       if(english&&zh&&RebuildSemantics.has("\\btank fleet\\b",source)
           &&RebuildSemantics.has("坦克舰队|坦克艦隊",text))
         out.add(new Issue(e.from,e.to,"possible_equipment_term","Tank fleet means the tanks as a force, not a naval fleet; preserve the intended military unit and repair the wording.",true));
-      if(e.to<b.to && RebuildPlanner.protectedCut(s,e.to))
+      if(context.canApplyEnglishToChinese && e.to<b.to && RebuildPlanner.protectedCut(s,e.to,context))
         out.add(new Issue(e.from,e.to,"dependent_boundary","Boundary may split a noun phrase, comparison or subject+verb. Reassign coherent SOURCE ranges, then translate each whole range; never divide target text to create times.",true));
 
       Matcher adjacent=Pattern.compile("\\b(\\d{1,3}) (\\d{1,2})\\b").matcher(source);
@@ -79,10 +83,10 @@ final class RebuildReview {
         out.add(new Issue(e.from,e.to,"source_number_ambiguity","Adjacent source numbers; do not silently invent a range or model identifier.",false));
         boolean leftPresent=RebuildSemantics.has("(?<![0-9])"+Pattern.quote(left)+"(?![0-9])",text);
         boolean rightPresent=RebuildSemantics.has("(?<![0-9])"+Pattern.quote(right)+"(?![0-9])",text);
-        if(!leftPresent||!rightPresent)
+        if(context.canApplyEnglishToChinese && (!leftPresent||!rightPresent))
           out.add(new Issue(e.from,e.to,"possible_number_loss","Original ASR has two adjacent numbers; translation omits at least one. Keep the uncertainty explicit rather than silently selecting one.",true));
         String joined="(?s)(?<![0-9])"+Pattern.quote(left)+"\\s*(?:至|到|[-—~]|型|型号|号|架|艘|辆|枚)\\s*"+Pattern.quote(right)+"(?![0-9])";
-        if(RebuildSemantics.has(joined,text))
+        if(context.canApplyEnglishToChinese && RebuildSemantics.has(joined,text))
           out.add(new Issue(e.from,e.to,"possible_number_range_invention","Adjacent source numbers were joined as a range, model, or unit relation that the source does not state. Preserve the unresolved ASR locally.",true));
       }
       if(zh)for(int i=0;i<RebuildSemantics.ANCHORS.length;i++)
@@ -94,7 +98,7 @@ final class RebuildReview {
     }
     int totalWords=Math.max(1,b.to-b.from+1);
     double average=(double)totalWords/Math.max(1,events.size());
-    if(out.size()<16 && events.size()>=9 && average<9.0 && shortEvents*100>=events.size()*60) {
+    if(context.canApplyEnglishToChinese && out.size()<16 && events.size()>=9 && average<9.0 && shortEvents*100>=events.size()*60) {
       boolean repair=fragmentaryRepairEvents>0 || events.size()>=14;
       out.add(new Issue(b.from,b.to,"fragmented_plan","The block is over-segmented into many short events. Prefer fewer clause-complete events; never split discourse markers, auxiliaries, or complements merely to follow estimated word times.",repair));
     }
@@ -124,6 +128,24 @@ final class RebuildReview {
             "The complete event exceeds the bounded page/time budget at the preferred font; retain its source and text.", true));
     return all.size() == plan.issues.size() ? plan
         : new RebuildProtocol.Plan(plan.events, plan.json, all, plan.reboundEvents);
+  }
+  static RebuildProtocol.Plan withLayoutReview(RebuildProtocol.Plan plan, CaptionOverlay.LayoutBudget budget,
+                                               CaptionLanguageContext context) {
+    if(context.canApplyEnglishToChinese)return withLayoutReview(plan,budget);
+    if(budget==null)return plan;
+    List<Issue> all=new ArrayList<>(plan.issues);
+    for(RebuildProtocol.Event e:plan.events)if(!budget.canPresent(e))
+      all.add(new Issue(e.from,e.to,"readability_observation",
+          "Measured legacy_n26 presentation capacity exceeded; advisory only; pagination policy is unchanged.",false));
+    return new RebuildProtocol.Plan(plan.events,plan.json,Collections.unmodifiableList(all),plan.reboundEvents);
+  }
+  static boolean splitsFlaggedSubject(RebuildSource source,RebuildProtocol.Plan previous,
+      RebuildProtocol.Plan candidate,CaptionLanguageContext context) {
+    return context.canApplyEnglishToChinese && splitsFlaggedSubject(source,previous,candidate);
+  }
+  static RebuildProtocol.Plan prefer(RebuildProtocol.Plan previous,RebuildProtocol.Plan candidate,
+      RebuildSource source,CaptionLanguageContext context) {
+    return context.canApplyEnglishToChinese ? prefer(previous,candidate,source) : prefer(previous,candidate);
   }
   static boolean uncertainNumbers(RebuildProtocol.Plan p,RebuildProtocol.Event e) {
     for(Issue i:p.issues)if(i.code.equals("source_number_ambiguity")&&i.from<=e.to&&i.to>=e.from)return true;

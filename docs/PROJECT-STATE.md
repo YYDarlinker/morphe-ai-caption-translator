@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-02。N28A基础已完整实现/验证/建包交付，源码d683e59、锚点anchor/n28a-d683e59，其后仅docs收尾，实际HEAD见Git及交付记录。旧440测试不变，新增50、总490/490；Python27/27、220×14、正式组合84项、11DEX/58034类全审计通过、56历史产物SHA不变。只有3基础类和Controller14行只读记录，不启用新prompt/cache/分页/RTL策略；两份状态同步。Codex全责、无DeepSeek收尾；未签名/安装/推送，真机与自然度未覆盖。完成后停止，待用户/规划者审阅，不自动N28B；N27搁置、VISIONOS关闭、三项遗留保留。
+> 最后更新：2026-10-02。N28B语言范围/请求/解析审查/数字/cache接入已由Codex完整工程交付，源码/锚点 N28B_SOURCE_COMMIT_PENDING（实现提交后docs-only写实）。Java538/538（原490＋48）、Python27/27、220×14、84/84、11DEX/58036类，68行真实policy trace，18组英文地区码/中文别名黄金与A相同。presentation_policy=legacy_n26，分页/字号/RTL/源证据/native冻结；未做手机/母语验收。见最新§4w及N28B-LOCAL-TEST-BUILD.md；本卡结束停止，待审阅/单独N28C卡，不自动继续。N27搁置、VISIONOS关闭、三个遗留保持。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -15,14 +15,14 @@
 > 用途：任何 AI 会话（Kimi 或 Codex）接续本项目时，先读本文件，无需翻阅长对话历史。
 > 本文件是唯一的“记忆”，对话记录不是。仓库 `docs/PROJECT-STATE.md` 为权威副本，每卡开工时同步。
 
-## 0. 上下文压缩后恢复须知（2026-10-01，覆盖历史角色与卡序）
+## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节、最新§4u、`docs/CODEX-EXECUTION-WORKFLOW.md`、`docs/N28A-LOCAL-TEST-BUILD.md`；开工恢复历史见§4t和回退记录。N28A已完整交付并停止；旧§4s接力/旧N28核心卡失效，不能恢复未验收归档实现或复活N27。
-2. **当前角色分工（用户最新）**：后续项目由Codex完整负责每张卡的实现、验证、资源/矩阵、构建、提交与交付，不再交DeepSeek，不生成其收尾卡。本规划对话继续研究/具体方案/任务卡/审阅；用户把卡交Codex执行，真机与最终验收仍在用户。撤回与N28A均已完成；当前停止待审阅，不自动实施N28B。单卡完整负责不等于一次开发所有后续功能；避免多执行者同时改仓库。
+1. **先读本实时状态档案**：优先本节、最新§4w、`docs/N28B-LOCAL-TEST-BUILD.md`、`docs/N28B-RULE-SCOPE.md`与CODEX-EXECUTION-WORKFLOW；N28B已完成工程交付，旧接力/回退/N27及§4v开B前状态只作历史，不重复实施。真实手机兼容与母语自然度仍未验证。
+2. **当前角色分工（用户最新）**：后续项目由Codex完整负责每张卡的实现、验证、资源/矩阵、构建、提交与交付，不再交DeepSeek，不生成其收尾卡。本规划对话继续研究/具体方案/任务卡/审阅；用户把卡交Codex执行，真机与最终验收仍在用户。撤回、N28A与N28B均已完成；当前停止待B审阅，不自动实施N28C。单卡完整负责不等于一次开发所有后续功能；避免多执行者同时改仓库。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：未完成旧N28恢复历史检查点45a7cc4及N26r锚点保留；本轮基于N26完成N28A三基础类/只读Session接入、全量验证和独立-n28a三件套。其余旧产品/资源/build/测试blob与7f9c639相同；实现源码锚点及其后docs-only关系见§4u/交付记录。Git实时核对仍优先。
-5. **执行顺序**：先N28A基础/无行为变更→单独审阅后N28B源目标策略与prompt/cache→N28C非中文分页/真实字体/RTL；全部Codex完整实现并交付。之后第四期菜单多选/简中合并，再最终三项UI/语言/诊断闭环。旧Codex/DeepSeek接力取消；每卡结束停，不让执行者自动做整个阶段或复活N27。
+4. **当前阶段**：N28B完整工程交付，开工c518823/源码d683e59，当前B源码与锚点 N28B_SOURCE_COMMIT_PENDING；其后docs-only写实。规划者四份管理/审阅/任务文档已保留随B提交。B以固定生产回归与实际交付DEX验收，不强制用户逐语种视觉验收才能发下一卡；手机未验不伪装已通过。
+5. **执行顺序**：N28A工程通过→N28B实际请求/规则/缓存接入（固定自动化生产回归为主）→审阅后N28C非中文分页/真实字体/RTL（首次完整可见多语种真机验收集中于此）；全部Codex全权实现并交付。B策略可能改变译文但不声称已完成呈现；后续第四期菜单/最终三项闭环保持，每卡停，不自动扩展或恢复N27。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
@@ -363,6 +363,40 @@ N27开工HEAD7f9c639。本节是规划者管理更新，docs/PROJECT-STATE.md未
 
 **提交与停止**：实现源码d683e5927191928c335957b3e9fe4fb4816ac518（短d683e59），锚点anchor/n28a-d683e59实际指向该点；一个实现提交，其后只docs写实、不再产品改动。最终HEAD/干净工作区见Git和build/n28a-records/final-state.json。Codex全责完成，没有DeepSeek收尾卡/handoff。两份实时状态同步；未签名/安装/清数据/推送/发布、无远程翻译API或工具/依赖下载。真机、真实多语种自然度、RTL实际几何和全UI遗漏未覆盖；不宣称解决全语种翻译/UI。等待用户/规划者审阅，不自动开始N28B。N27继续搁置、VISIONOS关闭、三项旧问题仍留最后统一闭环。
 
+## 4v. N28A 工程审阅通过、验收方式与 N28B 定案（2026-10-02）
+
+用户反馈N28A不便做真机验收，要求规划者判断下一步。已核对真实仓库、源码diff/新增测试/固定证据、三件套实际SHA及两份状态，未重新运行产品测试/构建。HEADc518823、源码d683e59/anchor/n28a-d683e59其后仅docs、开工工作区干净。
+
+**限定结论**：N28A基础/只读观察范围工程审阅通过，没有本期返工阻断。三个基础类/profile enum＋既有Controller14行只读接入，不影响有效prompt、请求/缓存、分页/字体或RTL；解析对比build/n28a-records/baseline/legacy-activate.json与当期JSON相同，冻结原生产/测试blob与类清单一致；SDK28/35报告明确ICU/Unicode实际版本和限定Indic保护，未称最新规范合规。报告490/490/27/84/DEX等属于执行者提供的测试证据，本规划者没有冒称复跑。三件套实际hash与用户汇报全一致。
+
+**验收方式**：N28A没有预期视觉改善，不能强迫用户“找字幕变化”或人工逐语种核算字素；允许凭其范围内自动化+真实调用/实际产物证据继续B。手机启动/系统兼容和母语自然度仍未验证，可在已安装时顺手做日常中文/启动回归，但不是开B的强制前置。首次完整可见多语种呈现对照集中N28C之后，不把离线接受说成已通过手机验收。
+
+**下一卡**：docs/N28B-CODEX-TASK.md，基线c518823/anchor/n28a-d683e59；Codex全程实现、关键/全量验证、最终MPP/MPE/APK/DEX与提交/状态，尚未执行。复用A语言上下文→strict Session/Job范围→请求/payload/prompt→parse/review/numbers→cache读写重验；只有明确English→Hans/Hant中英特化，unknown/script不猜；known源变化/duplicate变UNKNOWN不能再仅观察而复用冲突scope；cold/warm、旧Job、地区码、默认来源/自填保护都必须实际验证。
+
+**B兼容/风险边界**：英文→中文固定样本有效prompt/request/hash、source tokens/blocks、旧cache空间保持；neutral pair不套中英字典/日期/片段误杀，明确Unicode整数等值与简单不等、歧义UNKNOWN。程序默认/自填provenance只在内部请求语义需要处新增只读元数据，不改存储/显示文案/全面迁移。新scope版隔离非中文旧cache，所有网络/cache/repair生产入口都显式context。B会改变其他pair请求与审查、可能影响译文，但分页/字体/真实几何/RTL仍冻结，旧8CPS导致空页是N28C已知待办，不让B假称多语种呈现完成。
+
+**对应文件**：docs/N28A-REVIEW.md（只读结论/验收安排），docs/N28B-CODEX-TASK.md（具体执行方案/范围/矩阵/产物），CODEX-EXECUTION-WORKFLOW已补工程与真机验收区别。本次只写上述管理文档，未改产品源、未安装手机/签名/推送。两份状态同步，规划改动后续随B提交，避免执行者回滚成“待A真机确认”。
+
+N27继续搁置、VISIONOS已由用户解决；第四期菜单及最终summary/全UI多语种/程序性诊断英文三项问题顺序保持。Codex-only分工不变，不再交DeepSeek，不自动执行N28C。用户不承担14语种母语语义认证，客观呈现与语义自然度分开。
+
+## 4w. N28B 完整工程交付、真实生产策略与停止（2026-10-02）
+
+**施工/来源**：Codex独立负责本卡全部实现、关键/全量验证、建包、交付、提交和两份状态。开工HEADc518823，N28A源码d683e59/anchor/n28a-d683e59；规划者CODEX-EXECUTION-WORKFLOW、PROJECT-STATE、N28A-REVIEW、N28B-CODEX-TASK四份变化保留。没有恢复撤回旧N28源码/改动测试、没有DeepSeek收尾。源码与锚点 N28B_SOURCE_COMMIT_PENDING（首次实现提交后docs-only写实）。
+
+**实际实现**：n28b-policy-v1不可变context在Session复用决策前确定，Job持有同对象；request/prompt/payload、parse/Review/Semantics/Numbers、cache读写重验与repair比较显式scope。源为当前已绑定请求的唯一有效lang，UNKNOWN/duplicate/非法不猜English；完整地区/脚本保留，确认中文别名的实际metadata与旧Session.target分别保留。源/目标/policy/有效自填偏好变更独立身份；签名同scope复用，已发旧HTTP可完成，但无旧Job发布或新scope cache串用。无有效target不创建翻译Session，sourceOnly/人工/native/AI关闭实际provider0。
+
+**兼容/范围**：明确English→Hans/Hant为legacy_en_zh，旧PROMPT/FIDELITY/有效表达/hash、payload/request/schema/hint、tokens/blocks、页面/时间/字号和旧cache保持；generic zh、其他Latin、UNKNOWN和Japanese纯Han不套中英词表。中立模板保真、完整命题、source-owned quote/ID全覆盖，无领域例句或泛化长度指导；程序默认provenance仅只读内部请求元数据，自填/存储/显示/保存/Keystore/profile不改。新中立cache包含实际source/target/policy/有效偏好/provider，旧非中文自然隔离且原文件保留；UI默认变化不破坏中立cache，legacy UI默认参与fingerprint行为保留。Unicode Nd完整十进制整数数值等值及简单不等可确定；日期/小数/范围/多数字/数量级/单位/书写数字UNKNOWN有观察，不假称语义100%。规则逐条见N28B-RULE-SCOPE.md。
+
+**冻结/差异**：分页/CaptionOverlayV2/LayoutBudget/字号/FontMetrics/RTL/触摸、native菜单/桥/字节码指纹、源word/token/time/静音/speaker、调度/槽位/storm/超时/重试额度、provider鉴权/参数与所有持久化值保持；27份patch/资源及ACCEPTANCE/frozen blob与A一致。非English soft request seam可用中立标点/既有边界：固定240token样例3blocks→2blocks，原tokens/text/250ms时间完全一致，非呈现算法改动。presentation_policy=legacy_n26；新CPS/CPL/7000ms未影响页面，旧CPS>8空页仍为N28C项。
+
+**验证**：Java538/538（65套件，原490＋48，0失败/错误/跳过），Python27/27、本地化220键×14、冻结4通过/4既有失败/4未验证，pending_translation/event_review/overflow不可见0。用户明确批准更新两个冲突N28A观察期断言（strategy与duplicate复用）；两个旧固定英中fixture类只补三处显式scope参数，原断言/fixture保留。真实activate→source→Job→local MockWebServer→parse/review→write→read→Controller接受，68行policy-trace-matrix.json；source/target/UI/实际prompt/key hash、network/cache/calls/拒绝观察齐全且无密钥，远程翻译API0。en/en-US/en-GB×6中文写法18组独立N28A源码黄金逐字段一致；冷暖/UI/签名/known→UNKNOWN/目标地区码/迟到/默认与自填/Unicode数字/歧义/ID/quote/silence/speaker硬约束/provider0均覆盖。不是手机或母语质量认证。
+
+**组合/DEX**：本次交付MPP＋YouTube21.16.256＋官方1.44.0＋实际Patcher1.14.1，84/84；structure/selection与A相同。MPP72条目、根patch DEX/全部资源与A一致、独立/内嵌MPE相同。34个归档审计工具文件SHA一致，--require-ai false只排除N27 observer，正常AI仍启用。实际11DEX/58036类（A58034→B58036），新增4/移除2仅enum/合成lambda与重排；MPE1417→1419，完整清单保留。接口及branch审计PASS，invalid_branches/dex_problems/binding_failures均0，N27类/事件/回调0，损坏branch自测拒绝。
+
+**三件套**：build/local-test/patches-1.3.5-本地测试包-n28b.mpp（1112063字节，SHA93B8A2BA6B2C1127B7DC928F0187D4A476C7CF7FCB233CAD5117651EF79FFB91）；extension-1.3.5-本地测试包-n28b.mpe（2732120字节，SHA15C0703670BE698B9EE931FDF174BF9751895D7F6831E4597D67FB307E8C1845）；build/n28b-composition-final/YouTube-21.16.256-本地测试包-n28b-unsigned.apk（196945780字节，SHAD36DCB776FD61240F5F3103481B60E45B2B60E59137DA20AC7D21CB4851DD0A4）。所有路径相对E:\Projects\morphe-caption-v2，完整报告N28B-LOCAL-TEST-BUILD.md；build/n28b-records保留实际测试/golden/trace/输入/DEX/资源/候选/签名/hash证据，历史三件套保护不覆盖。初次候选B包保留records/candidates，正式组合绑定最终local-test MPP。
+
+**停止/验收**：本卡完整结束待审阅，不自动开发N28C，不交DeepSeek；两份状态比对后同步。未做真机启动/安装/视觉/母语审校，不声称翻译自然度改善、完整多语种呈现/UI/RTL可用。工程节点不强制用户逐语种视觉验收才能继续；完整可见多语种真机检查集中N28C后。未签名/安装/清数据/推送/发布、无下载/远程翻译API。N27搁置、VISIONOS已解决关闭、第四期菜单与三个summary/全UI本地化/技术英文遗留顺序保持。
+
 ## 5. 已确认的关键决策
 
 - **字号五档制（N19）**：见文首决策块。旧的单一 r（203bps）与连续滑块范围作废。
@@ -373,7 +407,7 @@ N27开工HEAD7f9c639。本节是规划者管理更新，docs/PROJECT-STATE.md未
 
 ## 6. 待办队列
 
-**当前推进：N28A已由Codex完整交付并停止（§4u）；待用户/规划者审阅。不自动N28B，无DeepSeek收尾；原prompt/cache/分页/RTL策略仍未改变。**
+**当前推进：N28B完整工程交付，源码/锚点 N28B_SOURCE_COMMIT_PENDING，538/27/84/11DEX58036/68trace/18golden；待审阅和单独N28C卡，不自动开发。呈现legacy_n26冻结，多语种可见功能真机验收集中N28C后，手机未验不虚报通过。**
 
 - ~~N17a 修复卡~~ ✅ `d40cfa3`（孤字页 ≥8 汉字格硬门槛）。
 - ~~N17b 字号架构卡~~ ✅ `640905c`（后被用户推翻）。

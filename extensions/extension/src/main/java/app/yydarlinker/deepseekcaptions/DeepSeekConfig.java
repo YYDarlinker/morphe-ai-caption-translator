@@ -53,6 +53,8 @@ final class DeepSeekConfig {
         SharedPreferences p = ApiProfiles.values(context);
         SharedPreferences global = prefs(context);
         String prompt = p.getString(PROMPT, "");
+        boolean programDefault = prompt == null || prompt.trim().isEmpty()
+                || LEGACY_CHINESE_PROMPT.equals(prompt) || DEFAULT_PROMPT.equals(prompt);
         // Absence is a dynamic default, not a Chinese string frozen into each profile.
         if (prompt == null || prompt.trim().isEmpty() || LEGACY_CHINESE_PROMPT.equals(prompt)
                 || DEFAULT_PROMPT.equals(prompt)) prompt = defaultPrompt(context);
@@ -63,7 +65,8 @@ final class DeepSeekConfig {
                 prompt,
                 captionSizeTier(global),
                 clampOpacity(global.getInt(BACKGROUND_OPACITY, DEFAULT_BACKGROUND_OPACITY)),
-                SecureApiKey.load(context)
+                SecureApiKey.load(context),
+                programDefault ? "program_default" : "stored_custom"
         );
         }
     }
@@ -207,6 +210,7 @@ final class DeepSeekConfig {
         final int captionSizeTier;
         final int backgroundOpacity;
         final String apiKey;
+        final String preferenceProvenance, effectivePreference;
 
         Snapshot(
                 boolean enabled,
@@ -217,6 +221,12 @@ final class DeepSeekConfig {
                 int backgroundOpacity,
                 String apiKey
         ) {
+            this(enabled, baseUrl, model, prompt, captionSizeTier, backgroundOpacity, apiKey,
+                    "unverified_custom");
+        }
+
+        Snapshot(boolean enabled, String baseUrl, String model, String prompt,
+                int captionSizeTier, int backgroundOpacity, String apiKey, String provenance) {
             this.enabled = enabled;
             this.baseUrl = baseUrl;
             this.model = model;
@@ -224,6 +234,10 @@ final class DeepSeekConfig {
             this.captionSizeTier = CaptionFontSize.clampTier(captionSizeTier);
             this.backgroundOpacity = backgroundOpacity;
             this.apiKey = apiKey == null ? "" : apiKey;
+            preferenceProvenance = provenance;
+            effectivePreference = "program_default".equals(provenance)
+                    ? "Translate faithfully, naturally and concisely in the selected target language; preserve names, numbers, tone and necessary punctuation; do not add explanations."
+                    : prompt;
         }
 
         boolean ready() {

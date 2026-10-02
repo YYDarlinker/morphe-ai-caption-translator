@@ -23,6 +23,16 @@ final class RebuildSemantics {
     while(m.find())out.add(m.group(1).toLowerCase(Locale.ROOT)+"-"+m.group(2));
     return out;
   }
+  /** Literal hyphenated ASCII identifiers only; no translated aliases or space-to-hyphen inference. */
+  static Set<String> literalModels(String text) {
+    Set<String> out=new HashSet<>();
+    Matcher m=Pattern.compile("(?<![\\p{L}\\p{N}])([A-Za-z]{1,4}-[0-9]{1,3})(?![\\p{L}\\p{N}])").matcher(text);
+    while(m.find())out.add(m.group(1));
+    return out;
+  }
+  static Evidence evidence(int concept,String owned,String all,CaptionLanguageContext context) {
+    return context.canApplyEnglishToChinese ? evidence(concept,owned,all) : Evidence.UNKNOWN;
+  }
   static boolean has(String pattern,String value){return Pattern.compile(pattern,Pattern.CASE_INSENSITIVE).matcher(value).find();}
 
   static boolean supports(int concept, String owned) {
@@ -49,17 +59,21 @@ final class RebuildSemantics {
   /** Reject only positively observed cross-event transfers; omissions/synonyms are not proved locally. */
   static void validatePlan(RebuildSource source, RebuildPlanner.Block block, List<RebuildProtocol.Event> events)
       throws RebuildProtocol.Invalid {
+    validatePlan(source,block,events,CaptionLanguageContext.LEGACY);
+  }
+  static void validatePlan(RebuildSource source,RebuildPlanner.Block block,List<RebuildProtocol.Event> events,
+                           CaptionLanguageContext context) throws RebuildProtocol.Invalid {
     String all=source.text(block.from,block.to);
-    Set<String> allModels=models(all);
+    Set<String> allModels=context.canApplyEnglishToChinese ? models(all) : literalModels(all);
     for(RebuildProtocol.Event e:events){
       String owned=source.text(e.from,e.to);
-      Set<String> ownModels=models(owned);
-      for(String id:models(e.text))
+      Set<String> ownModels=context.canApplyEnglishToChinese ? models(owned) : literalModels(owned);
+      for(String id:context.canApplyEnglishToChinese ? models(e.text) : literalModels(e.text))
         if(allModels.contains(id)&&!ownModels.contains(id))
           throw new RebuildProtocol.Invalid("semantic_anchor_leak", "range="+e.from+"-"+e.to+"; model="+id+" belongs elsewhere in this block; translate only the quoted source");
       // Absence from a dictionary is UNKNOWN, not proof of transfer. Require an explicit
       // different equipment concept in the owned source as well as the elsewhere-only alias.
-      if(chinese(e.text))for(int i=0;i<ANCHORS.length;i++) {
+      if(context.canApplyEnglishToChinese && chinese(e.text))for(int i=0;i<ANCHORS.length;i++) {
         if(has(ANCHORS[i][1],e.text)&&evidence(i,owned,all)==Evidence.CONTRADICTED)
           throw new RebuildProtocol.Invalid("semantic_anchor_leak", "range="+e.from+"-"+e.to+"; incompatible explicit equipment anchor; source="+owned);
       }
@@ -67,6 +81,11 @@ final class RebuildSemantics {
   }
 
   static void validate(RebuildSource source, int from, int to, String target) throws RebuildProtocol.Invalid {
+    validate(source,from,to,target,CaptionLanguageContext.LEGACY);
+  }
+  static void validate(RebuildSource source,int from,int to,String target,CaptionLanguageContext context)
+      throws RebuildProtocol.Invalid {
+    if(!context.canApplyEnglishToChinese)return;
     String raw=source.text(from,to);
     Matcher adjacent=Pattern.compile("(?<![\\p{L}\\p{N}])(\\d{1,4}) (\\d{1,4})(?![\\p{L}\\p{N}])").matcher(raw);
     while(adjacent.find()){

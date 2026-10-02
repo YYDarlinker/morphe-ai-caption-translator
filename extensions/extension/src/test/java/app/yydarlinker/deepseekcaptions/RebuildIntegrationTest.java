@@ -1069,7 +1069,7 @@ public class RebuildIntegrationTest {
 
   @Test public void n23SeekStormPausesPrefetchButDispatchesFocusWithoutDuplicate() throws Exception {
     blockResponse=true;
-    RebuildController.Session s=new RebuildController.Session(a, "", "rebuild0001", "n23-storm", "zh-Hans", config(), false, true);
+    RebuildController.Session s=new RebuildController.Session(a, "", "rebuild0001", "n23-storm", "zh-Hans", config(), false, true, CaptionLanguageContext.LEGACY);
     s.source=new RebuildSource(Arrays.asList(
         new RebuildSource.Word("First complete sentence",0,6000,0,RebuildSource.Precision.NATIVE),
         new RebuildSource.Word("Second complete sentence",6000,12000,1,RebuildSource.Precision.NATIVE),
@@ -1349,7 +1349,7 @@ public class RebuildIntegrationTest {
     List<RebuildPlanner.Block> blocks=new ArrayList<>();
     for(int i=0;i<blockCount;i++)blocks.add(new RebuildPlanner.Block(i,i,i,source));
     RebuildController.Session s=new RebuildController.Session(
-        a,"","rebuild0001","n24-"+System.nanoTime(),"zh-Hans",config(),false,true);
+        a,"","rebuild0001","n24-"+System.nanoTime(),"zh-Hans",config(),false,true,CaptionLanguageContext.LEGACY);
     s.source=source;
     s.blocks=blocks;
     s.plans=new RebuildProtocol.Plan[blockCount];

@@ -54,10 +54,9 @@ final class RebuildController {
     final DeepSeekConfig.Snapshot config;
     final boolean sourceOnly;
     final CaptionLanguageContext languageContext;
-    String lastObservedSourceCode;
     final long activatedAtMs = SystemClock.elapsedRealtime();
     volatile String url;
-    volatile boolean visible, cancelled, loading, terminal;
+    volatile boolean visible, cancelled, retired, loading, terminal;
     volatile long sourceRetry, position, providerRetry;
     long lastSeekAt = -1, prefetchPausedUntil;
     volatile long pausedDisplayPosition = -1;
@@ -98,19 +97,33 @@ final class RebuildController {
         DeepSeekConfig.Snapshot cfg,
         boolean original,
         boolean show) {
-      context = c;
+      this(c,u,o,key,target,cfg,original,show,CaptionLanguageContext.observe(u,target));
+    }
+    Session(Context c,String u,String o,String key,String target,DeepSeekConfig.Snapshot cfg,
+            boolean original,boolean show,CaptionLanguageContext context) {
+      this.context = c;
       url = u;
       owner = o;
       identity = key;
       this.target = target;
-      languageContext = CaptionLanguageContext.observe(u, target);
-      lastObservedSourceCode = languageContext.sourceCode;
+      languageContext = context;
       config = cfg;
       sourceOnly = original;
       visible = show;
     }
 
     void cancel() {
+      retire();
+      retired = false;
+      synchronized (connections) {
+        for (HttpURLConnection c : connections)
+          try { c.disconnect(); } catch (Exception ignored) { }
+        connections.clear();
+      }
+    }
+
+    /** Revoke publication on a scope change; an already sent HTTP may finish in its own scope. */
+    void retire() {
       synchronized(this){
         endFallback(this,position,"session_end");
         pausedDisplayPosition = -1;
@@ -118,15 +131,8 @@ final class RebuildController {
         pendingFocus = null;
       }
       cancelled = true;
+      retired = true;
       generation++;
-      synchronized (connections) {
-        for (HttpURLConnection c : connections)
-          try {
-            c.disconnect();
-          } catch (Exception ignored) {
-          }
-        connections.clear();
-      }
     }
 
     void noteSeek(long now) {
@@ -142,6 +148,7 @@ final class RebuildController {
   static final class Job implements DeepSeekApiClient.RequestControl {
     final long traceId = IDS.incrementAndGet();
     final Session session;
+    final CaptionLanguageContext languageContext;
     final int index;
     final boolean priority;
     volatile HttpURLConnection connection;
@@ -161,12 +168,13 @@ final class RebuildController {
 
     Job(Session s, int i, boolean focus) {
       session = s;
+      languageContext = s.languageContext;
       index = i;
       priority = focus;
     }
 
     public boolean isCancelled() {
-      return cancelled || !current(session);
+      return cancelled || (!current(session) && !(sent && session.retired));
     }
 
     public void onConnection(HttpURLConnection c) {
@@ -336,12 +344,14 @@ final class RebuildController {
         original ? TargetLanguage.fromCode(CaptionChoice.language()) : TargetLanguage.fromUrl(url);
     String target = language == null ? (original ? "source" : "") : language.code;
     if (target.isEmpty()) return;
+    CaptionLanguageContext languageContext=CaptionLanguageContext.observe(url,target);
+    if(!original && languageContext.targetCode.equals("UNKNOWN"))return;
     String key =
         RebuildCache.hash(
             CaptionEngine.sourceCaptionUrl(url)
                     .replaceAll("([?&])(?:expire|signature|sig)=[^&]*", "$1")
                 + "|"
-                + cfg.fingerprint()
+                + languageContext.fingerprint(cfg)
                 + "|"
                 + RebuildCache.hash(cfg.apiKey)
                 + "|"
@@ -357,7 +367,7 @@ final class RebuildController {
         key =
             SourceCaptionCache.key(CaptionEngine.sourceCaptionUrl(url))
                 + "|"
-                + cfg.fingerprint()
+                + languageContext.fingerprint(cfg)
                 + "|"
                 + RebuildCache.hash(cfg.apiKey)
                 + "|"
@@ -366,15 +376,9 @@ final class RebuildController {
                 + original;
       } catch (Exception ignored) {
       }
-      if (current(prev) && prev.identity.equals(key)) {
-        CaptionLanguageContext observed = CaptionLanguageContext.observe(url, prev.target);
-        if (!observed.sourceCode.equals(prev.lastObservedSourceCode)) {
-          if (!observed.sourceCode.equals(prev.languageContext.sourceCode))
-            CaptionDiagnostics.mark(prev.context, "LANGUAGE_CONTEXT_MISMATCH",
-                "session=" + prev.id + ";bound_source_code=" + prev.languageContext.sourceCode
-                    + ";observed_source_code=" + observed.sourceCode + ";strategy=legacy_unchanged");
-          prev.lastObservedSourceCode = observed.sourceCode;
-        }
+      if(!languageContext.canApplyEnglishToChinese)key += "|"+languageContext.scope();
+      if (current(prev) && prev.identity.equals(key)
+          && prev.languageContext.scope().equals(languageContext.scope())) {
         prev.url = url;
         prev.visible |= show;
         if (prev.source == null && prev.sourceFailures > 0) {
@@ -383,8 +387,8 @@ final class RebuildController {
         }
         s = prev;
       } else {
-        if (prev != null) prev.cancel();
-        s = new Session(c.getApplicationContext(), url, owner, key, target, cfg, original, show);
+        if (prev != null) prev.retire();
+        s = new Session(c.getApplicationContext(), url, owner, key, target, cfg, original, show,languageContext);
         active = s;
         CaptionDiagnostics.mark(s.context, "LANGUAGE_PROFILE_BOUND",
             "session=" + s.id + ";" + s.languageContext.diagnosticFields());
@@ -580,10 +584,10 @@ final class RebuildController {
       }
       CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=reference;ms="+(SystemClock.elapsedRealtime()-phase));
       phase=SystemClock.elapsedRealtime();
-      List<RebuildPlanner.Block> blocks = RebuildPlanner.plan(source);
+      List<RebuildPlanner.Block> blocks = RebuildPlanner.plan(source,s.languageContext);
       CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=planner;ms="+(SystemClock.elapsedRealtime()-phase));
       phase=SystemClock.elapsedRealtime();
-      String key = RebuildCache.identity(source, s.config, s.target);
+      String key = RebuildCache.identity(source, s.config, s.target,s.languageContext);
       RebuildProtocol.Plan[] plans = new RebuildProtocol.Plan[blocks.size()];
       int[] states = new int[blocks.size()];
       int restored = 0;
@@ -594,7 +598,7 @@ final class RebuildController {
         if(b.index!=focusIndex && b.index!=focusIndex+1)continue;
         checked[b.index]=true;
         if (!current(s)) return;
-        plans[b.index] = s.sourceOnly ? null : RebuildCache.read(s.context, key, source, b);
+        plans[b.index] = s.sourceOnly ? null : RebuildCache.read(s.context, key, source, b,s.languageContext);
         if (plans[b.index] != null) {
           states[b.index] = READY;
           restored++;
@@ -791,7 +795,7 @@ final class RebuildController {
         // A ready memory plan wins first; lazy disk restoration never waits for a network lane.
         if (s.plans[i] == null && s.cacheChecked != null && !s.cacheChecked[i]) {
           s.cacheChecked[i] = true;
-          RebuildProtocol.Plan cached = RebuildCache.read(s.context, s.cacheKey, s.source, b);
+          RebuildProtocol.Plan cached = RebuildCache.read(s.context, s.cacheKey, s.source, b,s.languageContext);
           TokenCostAudit.recordUnitCacheOutcome(1, cached == null ? 0 : 1);
           if (cached != null) {
             s.plans[i] = cached;
@@ -890,15 +894,15 @@ final class RebuildController {
       boolean restoredFromCache=false;
       if(accepted==null) accepted =
           RebuildApi.translate(
-              s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index]);
+              s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index],job.languageContext);
       synchronized (s) {
         if (!current(s)) return;
         if (job.cancelled) { finishCancelled(s, job); return; }
         if(restoredFromCache)s.attempts[job.index]=Math.max(0,s.attempts[job.index]-1);
         RebuildProtocol.Plan candidate=accepted;
         RebuildProtocol.Plan old=s.plans[job.index];
-        boolean subjectSplit=RebuildReview.splitsFlaggedSubject(s.source,old,candidate);
-        accepted = RebuildReview.prefer(old,candidate,s.source);
+        boolean subjectSplit=RebuildReview.splitsFlaggedSubject(s.source,old,candidate,job.languageContext);
+        accepted = RebuildReview.prefer(old,candidate,s.source,job.languageContext);
         if(subjectSplit)
           CaptionDiagnostics.mark(s.context,"REBUILD_REPAIR_SUBJECT_SPLIT_REJECTED",
               "session="+s.id+";request="+job.traceId+";block="+b.index+";attempts="+s.attempts[job.index]);
@@ -928,10 +932,13 @@ final class RebuildController {
       }
       // Finish durable storage before reporting acceptance, so a new session cannot
       // observe the accepted block while its cache write is still queued.
-      if (!restoredFromCache && RebuildReview.score(accepted.issues) == 0
-          && !RebuildCache.write(s.context, s.cacheKey, b, accepted))
-        CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_WRITE_FAILED",
-            "session=" + s.id + ";block=" + b.index);
+      synchronized(RebuildController.class) {
+        if(!current(s))return;
+        if (!restoredFromCache && RebuildReview.score(accepted.issues) == 0
+            && !RebuildCache.write(s.context, s.cacheKey, s.source,b,accepted,job.languageContext))
+          CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_WRITE_FAILED",
+              "session=" + s.id + ";block=" + b.index);
+      }
       CaptionDiagnostics.mark(
           s.context,
           "REBUILD_EVENTS_ACCEPTED",

@@ -26,7 +26,7 @@ public class NativeRendererN23Test {
     activity=Robolectric.buildActivity(Activity.class).setup().visible().get();
     player=new FrameLayout(activity);activity.setContentView(player);
     field("video","");
-    RebuildController.Session s=new RebuildController.Session(activity,"","","n23","zh-Hans",DeepSeekConfig.load(activity),false,true);
+    RebuildController.Session s=new RebuildController.Session(activity,"","","n23","zh-Hans",DeepSeekConfig.load(activity),false,true,CaptionLanguageContext.LEGACY);
     field("active",s);
     CaptionMusicSuppressor.setActivity(activity);
   }

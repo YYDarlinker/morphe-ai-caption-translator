@@ -38,7 +38,7 @@ public class N28ALanguageContextTest {
         assertEquals(c[0]==null ? "UNKNOWN" : c[0],ctx(s).sourceCode);
         assertEquals(c[0]==null ? "UNKNOWN" : "url_lang",ctx(s).sourceProvenance);
         assertEquals(c[1].startsWith("zh-"),ctx(s).canApplyEnglishToChinese);
-        assertTrue(log().contains("LANGUAGE_PROFILE_BOUND"));assertTrue(log().contains("strategy=legacy_unchanged"));
+        assertTrue(log().contains("LANGUAGE_PROFILE_BOUND"));assertTrue(log().contains("strategy="+(ctx(s).canApplyEnglishToChinese ? "legacy_en_zh" : "neutral")));
         assertEquals(1,records("LANGUAGE_PROFILE_BOUND"));
         evidence.put(new org.json.JSONObject().put("ui_locale",ui).put("confirmed_session_target",s.target)
             .put("diagnostic_fields",ctx(s).diagnosticFields()).put("english_to_chinese_metadata",ctx(s).canApplyEnglishToChinese));
@@ -87,17 +87,19 @@ public class N28ALanguageContextTest {
     RebuildController.activate(h.a,url("ja","en").replace("rebuild0001","rebuild0002"),false,false);
     assertNotSame(second,h.session());assertEquals("ja",ctx(h.session()).sourceCode);
   }
-  @Test public void duplicateSourceObservationReportsMismatchWithoutFixingLegacyIdentity() throws Exception {
+  @Test public void duplicateSourceChangeRevokesPreviousPublicationAndBindsUnknownScope() throws Exception {
     String u=url("en","fr");CaptionDiagnostics.clear(h.a);
     RebuildController.activate(h.a,u,false,false);RebuildController.Session s=h.session();String key=s.identity;
-    // Legacy cache uses the first lang; duplicate lang makes the observer unable to establish one source.
+    // N28B intentionally replaces N28A's observation-only Session reuse contract.
     RebuildController.activate(h.a,u+"&lang=ar",false,false);
+    RebuildController.Session unknown=h.session();
     RebuildController.activate(h.a,u+"&lang=ar&signature=other",false,false);
-    assertSame(s,h.session());assertEquals(key,s.identity);assertEquals("en",ctx(s).sourceCode);
-    assertEquals(1,records("LANGUAGE_CONTEXT_MISMATCH"));assertEquals(1,records("LANGUAGE_PROFILE_BOUND"));
-    assertTrue(log().contains("observed_source_code=UNKNOWN"));
+    assertSame(unknown,h.session());assertNotEquals(key,unknown.identity);assertEquals("en",ctx(s).sourceCode);
+    assertNotSame(s,unknown);assertTrue(s.cancelled);assertFalse(RebuildController.current(s));
+    assertEquals(0,records("LANGUAGE_CONTEXT_MISMATCH"));assertEquals(2,records("LANGUAGE_PROFILE_BOUND"));
+    assertEquals("UNKNOWN",ctx(unknown).sourceCode);assertTrue(log().contains("source_code=UNKNOWN"));
     RebuildController.activate(h.a,u,false,false);RebuildController.activate(h.a,u+"&lang=ar",false,false);
-    assertEquals(2,records("LANGUAGE_CONTEXT_MISMATCH"));
+    assertEquals(4,records("LANGUAGE_PROFILE_BOUND"));
   }
   @Test public void nativeManualSourceAndAiDisabledRemainApiZero() throws Exception {
     CaptionChoice.select("en",false,false);

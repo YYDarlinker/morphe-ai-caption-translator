@@ -29,7 +29,9 @@ final class RebuildPlanner {
     }
   }
 
-  static List<Block> plan(RebuildSource s) {
+  /** Explicit legacy entry for fixed English fixtures. */
+  static List<Block> plan(RebuildSource s) { return plan(s, CaptionLanguageContext.LEGACY); }
+  static List<Block> plan(RebuildSource s, CaptionLanguageContext context) {
     List<Block> out = new ArrayList<>();
     int from = 0;
     while (from < s.words.size()) {
@@ -43,7 +45,7 @@ final class RebuildPlanner {
           break;
         end = i;
         chars += w.text.length();
-        if(out.isEmpty() && span>=6000 && i+1<s.words.size() && safeCut(s,i) && resourceScore(s,i)>=50) break;
+        if(out.isEmpty() && span>=6000 && i+1<s.words.size() && safeCut(s,i,context) && resourceScore(s,i,context)>=50) break;
         if (boundary(s, i)) {
           lastBoundary = i;
           if (span >= aim || i + 1 == s.words.size() || s.words.get(i + 1).start - w.end >= 900)
@@ -55,8 +57,8 @@ final class RebuildPlanner {
       else if (end + 1 < s.words.size()) {
         int best = end, score = Integer.MIN_VALUE;
         for (int i = end; i > from + (end - from) / 2; i--) {
-          if (!safeCut(s, i)) continue;
-          int candidate = resourceScore(s, i);
+          if (!safeCut(s, i, context)) continue;
+          int candidate = resourceScore(s, i, context);
           if (candidate > score) {
             best = i;
             score = candidate;
@@ -65,7 +67,7 @@ final class RebuildPlanner {
         if (score != Integer.MIN_VALUE) end = best;
         // If all late candidates are dependent, prefer any earlier safe cut; otherwise
         // retain the hard cut and declare continuation rather than making an impossible protocol.
-        else if(dependentEnding(s,end))for(int i=end-1;i>=from;i--)if(safeCut(s,i)){end=i;break;}
+        else if(dependentEnding(s,end,context))for(int i=end-1;i>=from;i--)if(safeCut(s,i,context)){end=i;break;}
       }
       out.add(new Block(out.size(), from, end, s));
       from = end + 1;
@@ -133,6 +135,26 @@ final class RebuildPlanner {
         || next.startsWith("let's ")) return 50;
     if (left.endsWith(",") || s.words.get(i).text.endsWith(",")) return 30;
     return s.words.get(i).cue != s.words.get(i + 1).cue ? 10 : 0;
+  }
+
+  static boolean dependentEnding(RebuildSource s,int i,CaptionLanguageContext context) {
+    return context.englishSource && dependentEnding(s,i);
+  }
+  static boolean strongDependentEnding(RebuildSource s,int i,CaptionLanguageContext context) {
+    return context.canApplyEnglishToChinese && strongDependentEnding(s,i);
+  }
+  static boolean protectedCut(RebuildSource s,int i,CaptionLanguageContext context) {
+    return context.englishSource && protectedCut(s,i);
+  }
+  static boolean safeCut(RebuildSource s,int i,CaptionLanguageContext context) {
+    return i>=0 && i<s.words.size() && !dependentEnding(s,i,context) && !protectedCut(s,i,context);
+  }
+  static int resourceScore(RebuildSource s,int i,CaptionLanguageContext context) {
+    if(context.englishSource)return resourceScore(s,i);
+    if(boundary(s,i))return 60;
+    String text=s.words.get(i).text;
+    if(text.endsWith(",") || text.endsWith("，") || text.endsWith(";") || text.endsWith("；"))return 30;
+    return i+1<s.words.size() && s.words.get(i).cue!=s.words.get(i+1).cue ? 10 : 0;
   }
 
   static boolean boundary(RebuildSource s, int i) {

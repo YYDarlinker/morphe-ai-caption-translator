@@ -586,3 +586,5 @@ R1身份闭合：核心实现 `9a7bdf35351b9a052233bac8b9004241548eb1eb` / `anch
 交付：E:\Projects\morphe-caption-v2\build\n29-composition-final\YouTube-21.16.256-本地测试包-n29-unsigned.apk；198090986 B；SHA256 7D741BE68E4C215B800FD378042BDAED793C86658D28FC19A00CA13461EF5EF9。
 
 未签名/安装/清数据/卸载/推送/发布；远程API/下载/依赖0。工程结果不等于手机或14语言语义全通过。用户仅中文连续启动、日语底框/42–52秒切口、开关/旋转一次并给诊断，不再次十四语言全表。Codex本卡完成即停，不开N30、不交DeepSeek；第四期与三项本地化收尾仍等规划者同一N30授权。核心提交/anchor由后续docs-only写实；两份状态同步。
+
+N29真实身份补记：核心提交 `3eefe00ee1491ea4c6bb4e076dbc511fc120fe65`，源码锚点 `anchor/n29-3eefe00`，父HEAD f7c0c462。本次只补docs身份，不amend核心/旧提交；产品与测试/工具/规划docs均提交，已知未跟踪官方1.45输入MPP保留不纳入Git。

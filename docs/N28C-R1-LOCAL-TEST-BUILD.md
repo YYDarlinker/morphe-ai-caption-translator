@@ -7,7 +7,7 @@
 ## 1. 身份与冻结范围
 
 - 真实开工HEAD：`ce372cf4100a3a9af27ae0c1bcb5779341845221`；产品源码：`4d98eec20f9f9d1d9a8b2bf0e52934cade8d93b0` / `anchor/n28c-4d98eec`。两点之间只有docs；工作区原规划docs和两份状态档案获准保留。
-- 最终完整产品/测试输入SHA：`3c6b788861fe19f093ec18dcb19e4095ae9bc3849e482194ed591056d462b01e`（`full-final/inputs.json`逐文件清单）。实现提交和新源码锚点由紧接的docs-only身份附记精确记录；该附记不改产品树或重新建包。
+- 最终完整产品/测试输入SHA：`3c6b788861fe19f093ec18dcb19e4095ae9bc3849e482194ed591056d462b01e`（`full-final/inputs.json`逐文件清单）。核心实现提交：`9a7bdf35351b9a052233bac8b9004241548eb1eb`；真实新锚点：`anchor/n28c-r1-9a7bdf3`，精确指向该提交。本段身份附记为独立docs-only后继，不改产品树或重新建包。
 - 产品只改5个文件：`RebuildController.java`、`RebuildCache.java`、`CaptionLanguagePager.java`、`CaptionRenderSpec.java`、`CaptionOverlayV2.java`，均在 `E:\Projects\morphe-caption-v2\extensions\extension\src\main\java\app\yydarlinker\deepseekcaptions`。
 - 65份原Java测试逐文件SHA不变，中文fixture、18组golden和legacy activate全字段相等。请求/prompt、n28b-policy-v1、scope、源文/token/owned时间/数字语义、供应商调度、配置、字号/颜色/透明度/拖动位置、菜单/patch/resources/build/dependencies均冻结。
 - focus2/prefetch2/总4、seek storm、attempt/repair预算、旧HTTP已在途允许完成规则不变。
@@ -125,3 +125,9 @@ retire允许旧已发送HTTP完成原请求；stop取消/后台disconnect。两�
 3. 保留完整诊断、异常时间段、设备/Android版本、target/UI locale与设置，回规划者分析；不要只给一段摘录。
 
 手机YouTube/OEM ICU和字体、真实远程供应商、母语语义仍未覆盖。**未签名、未安装、未清用户数据、未推送/发布；零远程翻译API；本卡完成即停，第四期暂不发。**
+
+## 8. 实现提交与docs-only身份闭合
+
+核心实现：`9a7bdf35351b9a052233bac8b9004241548eb1eb`。源锚点：`anchor/n28c-r1-9a7bdf3`。该提交的父提交仍是原`ce372cf4100a3a9af27ae0c1bcb5779341845221`，原`4d98eec`/`anchor/n28c-4d98eec`和历史包/证据不动；实现提交同时保留本轮规划的N28C-REVIEW、R1任务卡与PROJECT-STATE管理更新。
+
+本节及两份状态档案中的真实身份由后续docs-only提交写实。最终HEAD/工作区/产品输入/所有产物hash闭合记录位于`E:\Projects\morphe-caption-v2\.verification\n28c-r1\final-state.json`；后继源码/资源/build/测试必须与本实现锚点相同，不回写历史C记录或amend实现提交。

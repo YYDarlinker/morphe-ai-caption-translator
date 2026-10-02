@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"Yêu cầu dịch"</string>
     <string name="cap_use_ai" formatted="false">"Dùng AI"</string>
     <string name="cap_use_youtube" formatted="false">"Dùng YouTube"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"Dịch phụ đề bằng AI · Bật"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"Dịch phụ đề bằng AI · Tắt"</string>
+    <string name="cap_ai_summary" formatted="false">"Dịch phụ đề trực tiếp bằng dịch vụ AI bạn đã cấu hình"</string>
+    <string name="cap_languages_title" formatted="false">"Ngôn ngữ dịch tự động"</string>
+    <string name="cap_languages_summary" formatted="false">"Chọn ngôn ngữ để thêm vào trình đơn dịch YouTube"</string>
+    <string name="cap_languages_count" formatted="false">"Đã chọn %1$d ngôn ngữ"</string>
+    <string name="cap_languages_save" formatted="false">"Lưu"</string>
+    <string name="cap_languages_existing" formatted="false">"Đã có"</string>
+    <string name="cap_languages_new" formatted="false">"Đã thêm"</string>
+    <string name="cap_languages_unavailable" formatted="false">"Không khả dụng"</string>
+    <string name="cap_languages_empty" formatted="false">"Chưa chọn ngôn ngữ; giữ nguyên trình đơn gốc"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

@@ -42,7 +42,26 @@ public final class DeepSeekCaptionHook {
         }
     }
 
+    private static final android.os.Handler PLAYER_MAIN=new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final Object PLAYER_NOTIFICATION_LOCK=new Object();
+    private static Enum<?> queuedPlayerType;
+    private static boolean queuedPlayerOuter, playerNotificationPosted;
+    private static long queuedPlayerEpoch;
+    static boolean deferPlayerNotification(Enum<?> type,boolean outer) {
+        if(android.os.Looper.myLooper()==android.os.Looper.getMainLooper())return false;
+        synchronized(PLAYER_NOTIFICATION_LOCK) {
+            queuedPlayerType=type;queuedPlayerOuter=outer;queuedPlayerEpoch=CaptionOverlay.playerDispatchIdentity();
+            if(!playerNotificationPosted){playerNotificationPosted=true;PLAYER_MAIN.post(()->{
+                Enum<?> next;boolean full;long epoch;
+                synchronized(PLAYER_NOTIFICATION_LOCK){next=queuedPlayerType;full=queuedPlayerOuter;epoch=queuedPlayerEpoch;queuedPlayerType=null;playerNotificationPosted=false;}
+                if(epoch!=CaptionOverlay.playerDispatchIdentity())return;
+                if(full)DeepSeekCaptionHookV2.onPlayerType(next);else onPlayerType(next);
+            });}
+        }
+        return true;
+    }
     public static void onPlayerType(Enum<?> playerType) {
+        if(deferPlayerNotification(playerType,false))return;
         try {
             if (playerType != null) {
                 String type = playerType.name();

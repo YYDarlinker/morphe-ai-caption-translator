@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"Instruções de tradução"</string>
     <string name="cap_use_ai" formatted="false">"Usar IA"</string>
     <string name="cap_use_youtube" formatted="false">"Usar YouTube"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"Tradução de legendas com IA · Ativada"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"Tradução de legendas com IA · Desativada"</string>
+    <string name="cap_ai_summary" formatted="false">"Traduza legendas ao vivo com seu serviço de IA"</string>
+    <string name="cap_languages_title" formatted="false">"Idiomas de tradução automática"</string>
+    <string name="cap_languages_summary" formatted="false">"Escolha idiomas para adicionar ao menu de tradução do YouTube"</string>
+    <string name="cap_languages_count" formatted="false">"%1$d idiomas selecionados"</string>
+    <string name="cap_languages_save" formatted="false">"Salvar"</string>
+    <string name="cap_languages_existing" formatted="false">"Já disponível"</string>
+    <string name="cap_languages_new" formatted="false">"Adicionado"</string>
+    <string name="cap_languages_unavailable" formatted="false">"Indisponível"</string>
+    <string name="cap_languages_empty" formatted="false">"Nenhum idioma selecionado; o menu nativo não muda"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

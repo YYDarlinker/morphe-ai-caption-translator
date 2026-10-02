@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"Инструкции для перевода"</string>
     <string name="cap_use_ai" formatted="false">"Использовать ИИ"</string>
     <string name="cap_use_youtube" formatted="false">"Использовать YouTube"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"ИИ-перевод субтитров · Включён"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"ИИ-перевод субтитров · Выключен"</string>
+    <string name="cap_ai_summary" formatted="false">"Переводите субтитры в реальном времени с вашим ИИ-сервисом"</string>
+    <string name="cap_languages_title" formatted="false">"Языки автоперевода"</string>
+    <string name="cap_languages_summary" formatted="false">"Выберите языки для добавления в меню перевода YouTube"</string>
+    <string name="cap_languages_count" formatted="false">"Выбрано языков: %1$d"</string>
+    <string name="cap_languages_save" formatted="false">"Сохранить"</string>
+    <string name="cap_languages_existing" formatted="false">"Уже доступен"</string>
+    <string name="cap_languages_new" formatted="false">"Добавлен"</string>
+    <string name="cap_languages_unavailable" formatted="false">"Недоступен"</string>
+    <string name="cap_languages_empty" formatted="false">"Языки не выбраны; исходное меню не изменится"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

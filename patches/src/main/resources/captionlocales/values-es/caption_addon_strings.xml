@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"Instrucciones de traducción"</string>
     <string name="cap_use_ai" formatted="false">"Usar IA"</string>
     <string name="cap_use_youtube" formatted="false">"Usar YouTube"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"Traducción de subtítulos con IA · Activada"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"Traducción de subtítulos con IA · Desactivada"</string>
+    <string name="cap_ai_summary" formatted="false">"Traduce subtítulos en directo con tu servicio de IA"</string>
+    <string name="cap_languages_title" formatted="false">"Idiomas de traducción automática"</string>
+    <string name="cap_languages_summary" formatted="false">"Elige idiomas para añadir al menú de traducción de YouTube"</string>
+    <string name="cap_languages_count" formatted="false">"%1$d idiomas seleccionados"</string>
+    <string name="cap_languages_save" formatted="false">"Guardar"</string>
+    <string name="cap_languages_existing" formatted="false">"Ya disponible"</string>
+    <string name="cap_languages_new" formatted="false">"Añadido"</string>
+    <string name="cap_languages_unavailable" formatted="false">"No disponible"</string>
+    <string name="cap_languages_empty" formatted="false">"Sin idiomas seleccionados; el menú nativo no cambia"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

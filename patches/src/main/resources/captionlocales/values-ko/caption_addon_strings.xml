@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"번역 지침"</string>
     <string name="cap_use_ai" formatted="false">"AI 사용"</string>
     <string name="cap_use_youtube" formatted="false">"YouTube 사용"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"AI 자막 번역 · 켜짐"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"AI 자막 번역 · 꺼짐"</string>
+    <string name="cap_ai_summary" formatted="false">"설정한 AI 서비스로 동영상 자막을 실시간 번역"</string>
+    <string name="cap_languages_title" formatted="false">"자동 번역 언어"</string>
+    <string name="cap_languages_summary" formatted="false">"YouTube 자동 번역 메뉴에 추가할 언어 선택"</string>
+    <string name="cap_languages_count" formatted="false">"%1$d개 언어 선택됨"</string>
+    <string name="cap_languages_save" formatted="false">"저장"</string>
+    <string name="cap_languages_existing" formatted="false">"이미 있음"</string>
+    <string name="cap_languages_new" formatted="false">"추가됨"</string>
+    <string name="cap_languages_unavailable" formatted="false">"사용 불가"</string>
+    <string name="cap_languages_empty" formatted="false">"선택된 언어 없음: 기본 메뉴 유지"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

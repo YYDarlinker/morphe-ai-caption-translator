@@ -7,7 +7,7 @@ public final class CaptionStrings {
     static{for(String[] entry:CaptionTranslationCatalog.ENGLISH)english.put(entry[0],entry[1]);}
     public static String get(Context c,String key){
         if(c!=null)try{int id=c.getResources().getIdentifier("cap_"+key,"string",c.getPackageName());if(id!=0)return c.getString(id);}catch(Exception ignored){}
-        return english.getOrDefault(key,key);
+        return english.getOrDefault(key,"");
     }
     static String settings(Context c,String key){
         // Public, non-obfuscated official resource API honors Morphe's language override.

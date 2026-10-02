@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"تعليمات الترجمة"</string>
     <string name="cap_use_ai" formatted="false">"استخدام الذكاء الاصطناعي"</string>
     <string name="cap_use_youtube" formatted="false">"استخدام YouTube"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"ترجمة الترجمة المصاحبة بالذكاء الاصطناعي · مفعّلة"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"ترجمة الترجمة المصاحبة بالذكاء الاصطناعي · معطّلة"</string>
+    <string name="cap_ai_summary" formatted="false">"ترجمة نصوص الفيديو مباشرة باستخدام خدمة الذكاء الاصطناعي لديك"</string>
+    <string name="cap_languages_title" formatted="false">"لغات الترجمة التلقائية"</string>
+    <string name="cap_languages_summary" formatted="false">"اختر لغات لإضافتها إلى قائمة الترجمة التلقائية في YouTube"</string>
+    <string name="cap_languages_count" formatted="false">"تم اختيار %1$d لغة"</string>
+    <string name="cap_languages_save" formatted="false">"حفظ"</string>
+    <string name="cap_languages_existing" formatted="false">"متاحة بالفعل"</string>
+    <string name="cap_languages_new" formatted="false">"مضافة"</string>
+    <string name="cap_languages_unavailable" formatted="false">"غير متاحة"</string>
+    <string name="cap_languages_empty" formatted="false">"لم يتم اختيار لغات؛ لن تتغير القائمة الأصلية"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

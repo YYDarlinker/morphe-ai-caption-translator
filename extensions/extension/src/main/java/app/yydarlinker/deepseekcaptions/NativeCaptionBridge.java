@@ -72,33 +72,50 @@ public final class NativeCaptionBridge {
     private static final java.util.concurrent.atomic.AtomicBoolean drawObserved=new java.util.concurrent.atomic.AtomicBoolean();
     public static boolean suppressNativeDraw() {
         if(CaptionAddonSupport.aiInstalled() && context!=null && drawObserved.compareAndSet(false,true))
-            CaptionDiagnostics.mark(context,"NATIVE_DRAW_HOOK_CONNECTED","build=n29;official=1.45.0;presentation=n29-presentation-v3;hook=SubtitleWindowView.draw");
+            CaptionDiagnostics.mark(context,"NATIVE_DRAW_HOOK_CONNECTED","build=n30;official=1.45.0;presentation=n29-presentation-v3;hook=SubtitleWindowView.draw");
         // Holding an accepted AI track survives waiting, safe blanks and rotation; source-only
         // keeps its previously recognized visible-overlay behavior rather than being redefined.
         return enabled() && (RebuildController.ownsNativeTrack() || DynamicCaptionController.isVisibleActive());
     }
+    private static volatile Set<String> availableLanguages=java.util.Collections.emptySet();
+    private static volatile java.util.Map<String,String> nativeLabels=java.util.Collections.emptyMap();
+    private static volatile String labelLocale="";
+    private static volatile boolean languagePrototypeAvailable;
+    static void observeLanguageMetadata(java.util.Map<String,String> labels) {
+        nativeLabels=java.util.Collections.unmodifiableMap(new java.util.HashMap<>(labels));
+        availableLanguages=java.util.Collections.unmodifiableSet(new HashSet<>(labels.keySet()));
+        labelLocale=LanguageMenuOrder.locale().toLanguageTag();languagePrototypeAvailable=!labels.isEmpty();
+    }
+    static String languageStatus(String code) {
+        if(!labelLocale.equals(LanguageMenuOrder.locale().toLanguageTag()) || !languagePrototypeAvailable)return "languages_unavailable";
+        return availableLanguages.contains(code)?"languages_existing":"languages_new";
+    }
+    public static String translationLabel(String code) {
+        String name=labelLocale.equals(LanguageMenuOrder.locale().toLanguageTag())?nativeLabels.get(code):null;
+        return name==null?LanguageMenuOrder.label(code):name;
+    }
     public static List<?> augmentTranslations(List<?> original) {
-        if(!CaptionAddonSupport.simplifiedInstalled() || original==null || original.isEmpty()) return original;
+        if((!CaptionAddonSupport.aiInstalled() && !CaptionAddonSupport.simplifiedInstalled()) || original==null || original.isEmpty())return original;
+        long started=System.nanoTime();
         try {
-            Object prototype=null;
-            for(Object track:original) {
-                String code=language(track);
-                if(LanguageMenuOrder.rank(code)==1){
-                    Object corrected=cloneSimplified(track);if(corrected==null)return original;
-                    List<Object> copy=new ArrayList<>(original);copy.set(copy.indexOf(track),corrected);
-                    return LanguageMenuOrder.insertSimplified(copy,NativeCaptionBridge::language,t->displayName(t).toString());
-                }
-                if(prototype==null && DeepSeekCaptionHook.isYouTubeTimedTextUrl(url(track))) prototype=track;
+            Set<String> chosen=CaptionLanguageSelection.menuCodes();
+            if(chosen.isEmpty())return original;
+            Object prototype=null;Set<String> present=new HashSet<>();List<Object> copy=new ArrayList<>(original);
+            for(Object track:original){String code=CaptionLanguageSelection.canonical(language(track));if(!code.isEmpty())present.add(code);
+                if(prototype==null && DeepSeekCaptionHook.isYouTubeTimedTextUrl(url(track)))prototype=track;}
+            if(prototype==null)return original;
+            java.text.Collator collator=java.text.Collator.getInstance(LanguageMenuOrder.locale());
+            for(String code:chosen) {
+                if(!present.add(code))continue;
+                Object added=cloneTranslation(prototype,code);if(added==null)continue;
+                String label=displayName(added).toString();int at=copy.size();
+                for(int i=0;i<copy.size();i++)if(collator.compare(LanguageMenuOrder.sortLabel(label),LanguageMenuOrder.sortLabel(displayName(copy.get(i)).toString()))<0){at=i;break;}
+                copy.add(at,added);
+                CaptionDiagnostics.mark(context,"LANGUAGE_MENU_INSERTED","code="+code+";display_name="+label+";position="+at+";native_preserved=true");
             }
-            if(prototype==null) return original;
-            Object simplified=cloneSimplified(prototype);
-            if(simplified==null) return original;
-            List<Object> copy=new ArrayList<>(original.size()+1);
-            copy.add(simplified); copy.addAll(original); return LanguageMenuOrder.insertSimplified(copy,NativeCaptionBridge::language,t->displayName(t).toString());
-        } catch(Exception failed) {
-            CaptionDiagnostics.mark(context,"AI_MENU_INSERT_FAILED",failed.getClass().getSimpleName());
-            return original;
-        }
+            CaptionDiagnostics.mark(context,"LANGUAGE_MENU_READY","selected="+chosen.size()+";items="+copy.size()+";deduplicated=true;elapsed_us="+((System.nanoTime()-started)/1000));
+            return copy.size()==original.size()?original:copy;
+        }catch(Exception failed){CaptionDiagnostics.mark(context,"AI_MENU_INSERT_FAILED",failed.getClass().getSimpleName());return original;}
     }
     public static void onSelection(Object track) { applySelection(track,true); }
     static void applySelection(Object track,boolean remember) {
@@ -346,4 +363,7 @@ public final class NativeCaptionBridge {
     public static String vss(Object track) { return ""; }
     public static String url(Object track) { return ""; }
     public static Object cloneSimplified(Object track) { return null; }
+    public static Object cloneTranslation(Object track,String code) { return null; }
+    public static String translationUrl(String url,String code){return TargetLanguage.withCode(url,code);}
+    public static String translationVss(String value,String code){int at=value==null?-1:value.indexOf('.');return "t"+code+(at<0?"":value.substring(at));}
 }

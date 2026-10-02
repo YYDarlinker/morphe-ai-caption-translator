@@ -87,6 +87,8 @@ final class RebuildController {
     String fallbackReason = "";
     long fallbackStart = -1;
     boolean everReady;
+    volatile long focusAcceptedAt = -1, firstPrefetchSentAt = -1;
+    int bootstrapCacheHit, bootstrapCacheMiss;
     String bootstrapMark=""; // Diagnostic deduplication only; never an installation/runtime permission.
     String displayedEvent = "", withheldEvent = "";
     RawCaptionSource.Source raw;
@@ -309,8 +311,11 @@ final class RebuildController {
 
     public void onRequestBodySent() {
       sent = true;
+      if (!priority && current(session) && session.firstPrefetchSentAt < 0)
+        session.firstPrefetchSentAt = SystemClock.elapsedRealtime();
       trace("REBUILD_BODY_SENT","lane="+(priority?"focus":"prefetch")+";scheduled_elapsed_ms="+queuedAt
-          +";sent_elapsed_ms="+SystemClock.elapsedRealtime()+";video_ms="+session.position);
+          +";sent_elapsed_ms="+SystemClock.elapsedRealtime()+";video_ms="+session.position
+          +";focus_accepted_at="+session.focusAcceptedAt+";first_prefetch_sent_at="+session.firstPrefetchSentAt);
     }
 
     void trace(String stage,String detail) {
@@ -832,6 +837,7 @@ final class RebuildController {
         s.sourceJob = null;
         s.status = "";
         s.everReady = focusIndex < plans.length && plans[focusIndex] != null;
+        if(s.everReady && s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();
         s.blocks = blocks;
         s.position = readyPosition;
       }
@@ -978,7 +984,7 @@ final class RebuildController {
           || now < s.providerRetry) return;
       if (s.cacheReading == null) s.cacheReading = new boolean[s.blocks.size()];
       int index = currentIndex(s);
-      if(!s.everReady && s.plans[index]!=null && s.states[index]==READY)s.everReady=true;
+      if(!s.everReady && s.plans[index]!=null && s.states[index]==READY) {s.everReady=true;if(s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();}
       boolean ahead = playbackAhead && now >= s.prefetchPausedUntil
           && (s.plans[index] != null || s.states[index] == FAILED
               || s.jobs[index] != null && s.jobs[index].sent);
@@ -1021,9 +1027,13 @@ final class RebuildController {
           && s.cacheKey.equals(lookup.key) && s.jobs[lookup.block.index]==lookup.job) {
         valid=true;
         s.cacheChecked[lookup.block.index]=true;
+        if(lookup.bootstrap) { if(cached!=null)s.bootstrapCacheHit++;else s.bootstrapCacheMiss++; }
         if(cached!=null) {
           s.plans[lookup.block.index]=cached;s.states[lookup.block.index]=READY;
-          if(!lookup.bootstrap || s.plans[currentIndex(s)]!=null) s.everReady=true;
+          if(!lookup.bootstrap || s.plans[currentIndex(s)]!=null) {
+            s.everReady=true;
+            if(s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();
+          }
           admitted=true;
         }
       }
@@ -1032,7 +1042,8 @@ final class RebuildController {
     TokenCostAudit.recordUnitCacheOutcome(1,admitted?1:0);
     if(lookup.bootstrap) CaptionDiagnostics.mark(s.context,"REBUILD_BOOTSTRAP_CACHE",
         "session="+s.id+";block="+lookup.block.index+";outcome="+(admitted?"hit":"miss")
-        +";lane=source_io;elapsed_ms="+SystemClock.elapsedRealtime()+";video_ms="+s.position);
+        +";bootstrap_cache_hit="+s.bootstrapCacheHit+";bootstrap_cache_miss="+s.bootstrapCacheMiss
+         +";lane=source_io;elapsed_ms="+SystemClock.elapsedRealtime()+";video_ms="+s.position);
     if(admitted) CaptionDiagnostics.mark(s.context,"REBUILD_CACHE_RESTORED",
         "session="+s.id+";block="+lookup.block.index+";network_calls=0;path=memory_then_disk_before_network");
   }
@@ -1046,16 +1057,17 @@ final class RebuildController {
     synchronized (s) {
       if (!current(s) || s.blocks == null || s.blocks.isEmpty() || now < s.providerRetry) return;
       int index = currentIndex(s);
-      if(!s.everReady && s.plans[index]!=null && s.states[index]==READY)s.everReady=true;
+      if(!s.everReady && s.plans[index]!=null && s.states[index]==READY) {s.everReady=true;if(s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();}
       if(!s.everReady) {
         String reason=s.sourceOnly?"source_only":!playbackAhead?"paused_or_clock_stale"
             :now<s.prefetchPausedUntil?"seek_storm":s.source==null?"source_not_ready"
-            :s.jobs[index]==null || !s.jobs[index].sent?"focus_not_sent":"eligible";
+            :s.jobs[index]==null || !s.jobs[index].sent?"focus_not_sent":"focus_not_accepted";
         String mark=index+":"+reason;
         if(!mark.equals(s.bootstrapMark)) {
           s.bootstrapMark=mark;
           notice(notices,"REBUILD_BOOTSTRAP_ELIGIBILITY","session="+s.id+";block="+(index+1)
-              +";reason="+reason+";elapsed_ms="+now+";video_ms="+s.position);
+              +";reason="+reason+";bootstrap_remote_suppressed=true;focus_accepted_at="+s.focusAcceptedAt
+               +";first_prefetch_sent_at="+s.firstPrefetchSentAt+";elapsed_ms="+now+";video_ms="+s.position);
         }
       }
       int focusDispatched = dispatched(s, true);
@@ -1092,8 +1104,8 @@ final class RebuildController {
         if (i > index && !allowAhead) break;
         if (i > index && prefetchDispatched >= MAX_PREFETCH_CONCURRENCY) break;
         boolean focus = i == index;
-        if (!focus && !s.everReady && (i!=index+1 || s.source==null || s.sourceOnly
-            || s.jobs[index]==null || !s.jobs[index].sent)) break;
+        // N30: cache-only bootstrap. No speculative translation before focus acceptance.
+        if (!focus && !s.everReady) break;
         if (s.states[i] != WAITING || s.retryAt[i] > now) {
           // D3: an existing job for this block is reused, whichever lane it came from.
           if (s.jobs[i] != null && s.plans[i] == null && s.states[i] == RUNNING)
@@ -1249,6 +1261,7 @@ final class RebuildController {
         }
         s.jobs[job.index] = null;
         s.everReady = true;
+        if(job.priority && s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();
       }
       permit.close();
       permit = null;
@@ -1274,13 +1287,15 @@ final class RebuildController {
               + ";events="
               + accepted.events.size()
               + ";session="+s.id+";request="+job.traceId+";review_risks="+RebuildReview.score(accepted.issues)
+              + ";focus_accepted_at="+s.focusAcceptedAt+";first_prefetch_sent_at="+s.firstPrefetchSentAt
               + ";attempts="
               + s.attempts[b.index]);
     } catch (Exception e) {
       if (!current(s)) return;
       String code = e instanceof RebuildProtocol.Invalid ? ((RebuildProtocol.Invalid) e).code
           : e instanceof RebuildApi.Failure ? ((RebuildApi.Failure) e).code
-          : e.getClass().getSimpleName();
+          : e instanceof RebuildApi.TransportFailure ? ((RebuildApi.TransportFailure)e).reason
+           : e.getClass().getSimpleName();
       boolean fatal = e instanceof RebuildApi.Failure && ((RebuildApi.Failure) e).configuration;
       String configurationStatus = fatal
           ? String.format(Locale.ROOT, CaptionStrings.settings(s.context, "api_config_error"), code) : "";

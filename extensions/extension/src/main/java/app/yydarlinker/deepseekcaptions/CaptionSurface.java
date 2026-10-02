@@ -23,7 +23,18 @@ final class CaptionSurface {
       player = new WeakReference<>(null),
       nativeView = new WeakReference<>(null);
 
+  private static boolean geometryInvalid=true;
+  private static WeakReference<View> observedRoot=new WeakReference<>(null);
+  private static final WeakHashMap<View,WeakReference<View>> renderedSurfaces=new WeakHashMap<>();
+  private static final View.OnLayoutChangeListener GEOMETRY_LAYOUT=(v,l,t,r,b,ol,ot,or,ob)->{
+    if(l!=ol||t!=ot||r!=or||b!=ob)invalidateGeometry();
+  };
+  static long refreshSearchCount, renderedSearchCount, geometrySearchNanos;
+  static void invalidateGeometry(){geometryInvalid=true;renderedSurfaces.clear();}
+
   static void activity(Activity a) {
+    View old=observedRoot.get();if(old!=null)old.removeOnLayoutChangeListener(GEOMETRY_LAYOUT);
+    observedRoot.clear();invalidateGeometry();
     activity = new WeakReference<>(a);
     shorts = new WeakReference<>(null);
     player = new WeakReference<>(null);
@@ -44,6 +55,10 @@ final class CaptionSurface {
     Activity a = activity.get();
     if (a == null || a.getWindow() == null) return null;
     View root = a.getWindow().getDecorView();
+    if(observedRoot.get()!=root){View old=observedRoot.get();if(old!=null)old.removeOnLayoutChangeListener(GEOMETRY_LAYOUT);observedRoot=new WeakReference<>(root);root.addOnLayoutChangeListener(GEOMETRY_LAYOUT);invalidateGeometry();}
+    if(!geometryInvalid && visible(player.get()))return player.get();
+    geometryInvalid=false;refreshSearchCount++;
+    long started=System.nanoTime();
     Set<Integer> ids = new HashSet<>();
     for (String name : SHORTS) {
       int id = a.getResources().getIdentifier(name, "id", a.getPackageName());
@@ -52,6 +67,7 @@ final class CaptionSurface {
     View shortView = discover(root, ids);
     if (shortView != null) {
       player = new WeakReference<>(shortView);
+      geometrySearchNanos+=System.nanoTime()-started;
       return shortView;
     }
     View best = null;
@@ -74,12 +90,13 @@ final class CaptionSurface {
       }
     }
     player = new WeakReference<>(best);
+    geometrySearchNanos+=System.nanoTime()-started;
     return best;
   }
 
   static View player() {
     View v = player.get();
-    return visible(v) ? v : refresh();
+    return !geometryInvalid && visible(v) ? v : refresh();
   }
 
   static View discover(View root, Set<Integer> ids) {
@@ -126,6 +143,10 @@ final class CaptionSurface {
 
   static Rect renderedBounds(View root, View host) {
     if (root == null || host == null) return null;
+    WeakReference<View> cached=renderedSurfaces.get(root);
+    if(cached!=null && visible(cached.get()))return relative(cached.get(),host);
+    renderedSearchCount++;
+    View selected=null;
     ArrayDeque<View> q = new ArrayDeque<>();
     q.add(root);
     Rect best = null;
@@ -138,6 +159,7 @@ final class CaptionSurface {
         Rect b = relative(v, host);
         if (b != null && (long) b.width() * b.height() > area) {
           best = b;
+          selected=v;
           area = (long) b.width() * b.height();
         }
       }
@@ -146,6 +168,7 @@ final class CaptionSurface {
         for (int i = 0; i < g.getChildCount(); i++) q.add(g.getChildAt(i));
       }
     }
+    if(selected!=null){renderedSurfaces.put(root,new WeakReference<>(selected));selected.removeOnLayoutChangeListener(GEOMETRY_LAYOUT);selected.addOnLayoutChangeListener(GEOMETRY_LAYOUT);}
     return best;
   }
 

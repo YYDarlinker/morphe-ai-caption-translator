@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"翻译要求"</string>
     <string name="cap_use_ai" formatted="false">"使用 AI"</string>
     <string name="cap_use_youtube" formatted="false">"使用 YouTube"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"AI 字幕翻译 · 开启"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"AI 字幕翻译 · 关闭"</string>
+    <string name="cap_ai_summary" formatted="false">"使用你配置的 AI 服务实时翻译视频字幕"</string>
+    <string name="cap_languages_title" formatted="false">"自动翻译语言"</string>
+    <string name="cap_languages_summary" formatted="false">"选择要加入 YouTube 自动翻译菜单的语言"</string>
+    <string name="cap_languages_count" formatted="false">"已选 %1$d 种语言"</string>
+    <string name="cap_languages_save" formatted="false">"保存"</string>
+    <string name="cap_languages_existing" formatted="false">"已存在"</string>
+    <string name="cap_languages_new" formatted="false">"新增"</string>
+    <string name="cap_languages_unavailable" formatted="false">"不可用"</string>
+    <string name="cap_languages_empty" formatted="false">"未选择语言；保留原生菜单"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

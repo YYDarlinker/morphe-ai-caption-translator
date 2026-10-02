@@ -109,16 +109,17 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     fun mutable(m:Method)=mutableClassDefBy(m.definingClass).methods.filter { it.id()==m.id() }.unique("mutable method")
     val runtime=mutableClassDefBy(BRIDGE)
     fun bind(name:String, body:String) {
-        val stub=runtime.methods.filter { it.name==name && it.parameterTypes.toList()==listOf(OBJECT) }.unique(name)
+        val args=if(name=="cloneTranslation") listOf(OBJECT,STRING) else listOf(OBJECT)
+        val stub=runtime.methods.filter { it.name==name && it.parameterTypes.toList()==args }.unique(name)
         val m=ImmutableMethod(BRIDGE,name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,
-            MutableMethodImplementation(4)).toMutable()
+            MutableMethodImplementation(3+args.size)).toMutable()
         m.addInstructionsWithLabels(0,body.trimIndent());runtime.methods.remove(stub);runtime.methods.add(m)
     }
     bind("language","check-cast p0, ${track.type}\niget-object v0, p0, ${language.id()}\nreturn-object v0")
     bind("vss","check-cast p0, ${track.type}\niget-object v0, p0, ${vss.id()}\nreturn-object v0")
     bind("url","check-cast p0, ${track.type}\niget-object v0, p0, ${url.id()}\nreturn-object v0")
     bind("displayName","check-cast p0, ${track.type}\niget-object v0, p0, ${display.id()}\nreturn-object v0")
-    if(simplified) {
+    if(ai || simplified) {
     bind("cloneSimplified", """
         check-cast p0, ${track.type}
         new-instance v0, ${builder.type}
@@ -134,6 +135,27 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
         invoke-virtual {v0, v1}, ${urlSetter.id()}
         iget-object v1, p0, ${vss.id()}
         invoke-static {v1}, $BRIDGE->simplifiedVss($STRING)$STRING
+        move-result-object v1
+        invoke-virtual {v0, v1}, ${vssSetter.id()}
+        invoke-virtual {v0}, ${build.id()}
+        move-result-object v0
+        return-object v0
+    """)
+    bind("cloneTranslation", """
+        check-cast p0, ${track.type}
+        new-instance v0, ${builder.type}
+        invoke-direct {v0, p0}, ${copy.id()}
+        const-string v1, "zh-Hans"
+        invoke-virtual {v0, v1}, ${languageSetter.id()}
+        invoke-static {p1}, Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;->translationLabel($STRING)$STRING
+        move-result-object v1
+        iput-object v1, v0, ${builderDisplay.id()}
+        iget-object v1, p0, ${url.id()}
+        invoke-static {v1, p1}, $BRIDGE->translationUrl($STRING$STRING)$STRING
+        move-result-object v1
+        invoke-virtual {v0, v1}, ${urlSetter.id()}
+        iget-object v1, p0, ${vss.id()}
+        invoke-static {v1, p1}, $BRIDGE->translationVss($STRING$STRING)$STRING
         move-result-object v1
         invoke-virtual {v0, v1}, ${vssSetter.id()}
         invoke-virtual {v0}, ${build.id()}
@@ -344,7 +366,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
 
     } // optional cross-video memory
 
-    if(simplified) {
+    if(ai || simplified) {
     // Both modern protobuf settings and legacy CC rows consume this shared metadata field.
     val metadataField=listCode.mapNotNull { it.field() }.first { it.definingClass==listMethod.definingClass && it.type.startsWith("L") }
     val metadata=classDefBy(metadataField.type)

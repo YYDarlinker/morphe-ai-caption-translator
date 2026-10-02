@@ -48,7 +48,7 @@ final class RebuildPlanner {
         if(out.isEmpty() && span>=6000 && i+1<s.words.size() && safeCut(s,i,context) && resourceScore(s,i,context)>=50) break;
         if (boundary(s, i)) {
           lastBoundary = i;
-          if (span >= aim || i + 1 == s.words.size() || s.words.get(i + 1).start - w.end >= 900)
+          if (span >= aim || i + 1 == s.words.size() || hardBreakBefore(s, i + 1))
             break;
         }
       }
@@ -155,6 +155,13 @@ final class RebuildPlanner {
     String text=s.words.get(i).text;
     if(text.endsWith(",") || text.endsWith("，") || text.endsWith(";") || text.endsWith("；"))return 30;
     return i+1<s.words.size() && s.words.get(i).cue!=s.words.get(i+1).cue ? 10 : 0;
+  }
+
+  /** Same hard source ownership boundary as RebuildProtocol; punctuation is only a soft cut. */
+  static boolean hardBreakBefore(RebuildSource s, int token) {
+    return token > 0 && token < s.words.size()
+        && (s.words.get(token).start - s.words.get(token - 1).end >= 650
+            || s.words.get(token).text.startsWith(">>"));
   }
 
   static boolean boundary(RebuildSource s, int i) {

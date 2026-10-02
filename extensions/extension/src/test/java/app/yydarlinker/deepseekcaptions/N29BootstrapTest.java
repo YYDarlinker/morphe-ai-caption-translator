@@ -75,30 +75,27 @@ public class N29BootstrapTest {
   RebuildPlanner.Block b=s.blocks.get(index);return RebuildProtocol.parseBound(new JSONObject().put("block",b.id()).put("events",new JSONArray().put(new JSONObject()
     .put("from",b.from).put("to",b.to).put("source",s.source.text(b.from,b.to)).put("text","这是一条完整的测试字幕。"))).toString(),s.source,b,s.languageContext);
  }
- @Test public void originalSessionSevenFixedWallTimesUseRealSentAndPublicationBarriers()throws Exception {
-  RebuildController.Session s=fixture(2);wall(815,s,815);schedule(s);await(firstSeen);until(()->s.jobs[0].sent);schedule(s);
-  if(BEFORE){assertNull(s.jobs[1]);assertEquals(1,secondSeen.getCount());}
-  else {await(secondSeen);assertNull("focus response must still be held",s.plans[0]);assertFalse(s.everReady);assertFalse(s.jobs[1].priority);}
-  wall(3350,s,3350);firstRelease.countDown();until(()->s.plans[0]!=null && s.states[0]==RebuildController.READY);
-  if(BEFORE){wall(3448,s,3448);schedule(s);await(secondSeen);}else {assertEquals(1,blockCalls.get(1).get());}
-  long neighborSent=BEFORE?3448:815,neighborReady=neighborSent+5621;
-  if(!BEFORE){wall(neighborReady,s,neighborReady);secondRelease.countDown();until(()->s.plans[1]!=null && s.states[1]==RebuildController.READY);}
-  wall(7040,s,7040);RebuildController.time(7040);assertEquals(BEFORE,s.plans[1]==null);
-  if(BEFORE){wall(neighborReady,s,neighborReady);secondRelease.countDown();until(()->s.plans[1]!=null);}
-  assertEquals(2,h.calls.get());assertEquals(1,blockCalls.get(0).get());assertEquals(1,blockCalls.get(1).get());assertEquals(1,s.attempts[0]);assertEquals(1,s.attempts[1]);
-  N28CGeometryTest.export("n29-startup-fixed-"+(BEFORE?"before":"after")+".json",new JSONObject().put("first_sent_wall_ms",815).put("first_network_ms",2535)
-    .put("neighbor_sent_wall_ms",neighborSent).put("neighbor_network_ms",5621).put("neighbor_ready_wall_ms",neighborReady).put("video_boundary_ms",7040)
-    .put("boundary_wait_ms",Math.max(0,neighborReady-7040)).put("provider_calls",h.calls.get()).put("first_still_held_at_neighbor_send",!BEFORE));
- }
- @Test public void validPrewarmSessionDoesNotNeedAnAlreadyVisibleCaption()throws Exception {
-  RebuildController.Session s=fixture(3);s.visible=false;wall(815,s,815);schedule(s);await(firstSeen);schedule(s);await(secondSeen);
-  assertNull(s.plans[0]);assertNull(s.jobs[2]);assertEquals(2,h.calls.get());
- }
- @Test public void onlyAdjacentUsesOneCacheReservationThenExistingJobIsReused()throws Exception {
-  RebuildController.Session s=fixture(3);wall(815,s,815);schedule(s);await(firstSeen);schedule(s);await(secondSeen);
-  assertNull(s.jobs[2]);assertEquals(0,s.attempts[2]);assertFalse(s.everReady);RebuildController.Job neighbor=s.jobs[1];
-  for(int i=0;i<10;i++)schedule(s);assertSame(neighbor,s.jobs[1]);assertEquals(1,cacheReads.get());assertEquals(1,s.attempts[1]);assertEquals(2,h.calls.get());
- }
+@Test public void originalSessionSevenFixedWallTimesUseRealSentAndPublicationBarriers()throws Exception {
+   RebuildController.Session s=fixture(2);wall(815,s,815);schedule(s);await(firstSeen);until(()->s.jobs[0].sent);schedule(s);
+   assertNull("N30 suppresses speculative remote bootstrap",s.jobs[1]);assertEquals(1,secondSeen.getCount());
+   wall(3350,s,3350);firstRelease.countDown();until(()->s.plans[0]!=null && s.states[0]==RebuildController.READY);
+   wall(3448,s,3448);schedule(s);await(secondSeen);
+   long neighborSent=3448,neighborReady=neighborSent+5621;
+   wall(7040,s,7040);RebuildController.time(7040);assertNull(s.plans[1]);
+   wall(neighborReady,s,neighborReady);secondRelease.countDown();until(()->s.plans[1]!=null);
+   assertEquals(2,h.calls.get());assertEquals(1,blockCalls.get(0).get());assertEquals(1,blockCalls.get(1).get());assertEquals(1,s.attempts[0]);assertEquals(1,s.attempts[1]);
+   N28CGeometryTest.export("n30-startup-fixed-after.json",new JSONObject().put("first_sent_wall_ms",815).put("first_network_ms",2535)
+     .put("neighbor_sent_wall_ms",neighborSent).put("neighbor_network_ms",5621).put("neighbor_ready_wall_ms",neighborReady).put("video_boundary_ms",7040)
+     .put("boundary_wait_ms",Math.max(0,neighborReady-7040)).put("provider_calls",h.calls.get()).put("bootstrap_remote_requests",0));
+  }
+  @Test public void validPrewarmSessionDoesNotNeedAnAlreadyVisibleCaption()throws Exception {
+   RebuildController.Session s=fixture(3);s.visible=false;wall(815,s,815);schedule(s);await(firstSeen);schedule(s);
+   assertNull(s.plans[0]);assertNull(s.jobs[1]);assertNull(s.jobs[2]);assertEquals(1,h.calls.get());
+  }
+  @Test public void onlyAdjacentUsesOneCacheReservationThenExistingJobIsReused()throws Exception {
+   RebuildController.Session s=fixture(3);wall(815,s,815);schedule(s);await(firstSeen);schedule(s);until(()->cacheReads.get()==1);
+   for(int i=0;i<10;i++)schedule(s);assertNull(s.jobs[1]);assertNull(s.jobs[2]);assertEquals(0,s.attempts[1]);assertFalse(s.everReady);assertEquals(1,h.calls.get());
+  }
  @Test public void adjacentCacheHitHasNoNeighborApiCallWhileFocusIsInFlight()throws Exception {
   RebuildController.Session s=fixture(2);assertTrue(RebuildCache.write(h.a,s.cacheKey,s.source,s.blocks.get(1),plan(s,1),s.languageContext));
   wall(815,s,815);schedule(s);await(firstSeen);schedule(s);until(()->s.plans[1]!=null);assertEquals(1,h.calls.get());assertEquals(0,s.attempts[1]);assertFalse(s.everReady);
@@ -124,8 +121,8 @@ public class N29BootstrapTest {
   until(()->!s.cacheReading[1]);assertNull(s.plans[1]);assertNull(s.jobs[1]);assertEquals(1,h.calls.get());
  }
  @Test public void deliberatelySlowNeighborStillHasHonestPendingBoundary()throws Exception {
-  RebuildController.Session s=fixture(2);wall(815,s,815);schedule(s);await(firstSeen);schedule(s);await(secondSeen);
-  wall(3350,s,3350);firstRelease.countDown();until(()->s.plans[0]!=null);wall(7040,s,7040);RebuildController.time(7040);
+  RebuildController.Session s=fixture(2);wall(815,s,815);schedule(s);await(firstSeen);schedule(s);assertNull(s.jobs[1]);
+  wall(3350,s,3350);firstRelease.countDown();until(()->s.plans[0]!=null);schedule(s);await(secondSeen);wall(7040,s,7040);RebuildController.time(7040);
   assertNull(s.plans[1]);assertEquals(RebuildController.RUNNING,s.states[1]);assertTrue(CaptionDiagnostics.fullText(h.a).contains("pending_translation"));assertEquals(2,h.calls.get());
  }
 }

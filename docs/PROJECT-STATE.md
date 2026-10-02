@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-02。N29已由Codex完整实现、验证和独立建包：1.45类型正确菜单与finalizer最后AI许可、原生draw、首块邻块供给、非中文n29-presentation-v3；最终Java643/643、同代码专项68/68及400受控轮通过，中文18golden相等，实际7组合/11DEX/58229类审计通过。未签名/安装/推送/发布，待有限手机复查与规划者审阅；未开始N30，后续第四期与三项UI本地化收尾仍同卡，不拆卡。最新§4ac及N29-LOCAL-TEST-BUILD。
+> 最后更新：2026-10-03。N30未提交草稿保留，尚未交付；真实onPlayerType入口在guard前同步render/几何查找造成范围阻断，规划者已核对before探针并补C0/C3/§7明确许可。继续同一N30只调整入口UI分发时机/必要缓存失效，R1/CAS/显示权/compact隔离/字幕位置不变；完整V2外层及后续扫描必须覆盖。原23项19通过4失败及尚未复跑事实保留，恢复后先复验再全量/组合/DEX/建包。最新§4ah、N30-CODEX-TASK与N30-SCOPE-BLOCKER，未开始新阶段。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,12 +17,12 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节、最新§4ab及docs/N29-DEVICE-REVIEW-AND-PLAN.md、N29-CODEX-TASK.md。§4aa/旧N28C-R2卡已被本轮整体覆盖；§4z是R1工程交付，§4y/4x是修前历史。已获R1+1.45手机实况与安装APK，证实部分接入，不写完整验收；不恢复旧B/N27或废弃N28。
-2. **当前角色分工（用户最新）**：后续Codex完整实现/验证/交付每张卡，不交DeepSeek。本规划对话负责研究/方案/任务卡/审阅及同步管理档案，本轮只读分析真机证据/实际APK并编写N29，没有产品源码修改/产品测试复跑。用户只做少量手机观察与提供诊断，不承担14语种母语审校。单个执行者串行。
+1. **先读本实时状态档案**：优先本节、最新§4ah、docs/N30-CODEX-TASK.md的2026-10-03 C0/C3/§7恢复定案及N30-SCOPE-BLOCKER追加§7。§4ag是施工停止历史，现分发范围已放开但不代表N30通过；产品HEAD仍b6dd6c6/N29锚点，N30改动在未提交工作区，不能reset丢弃。
+2. **当前角色分工（用户最新）**：后续Codex完整实现/验证/交付每张卡，不交DeepSeek。本规划对话负责研究/方案/任务卡/审阅及同步管理档案，本轮只读核对N30范围阻断/生产链/探针并放开必要分发范围，无产品源码修改或产品复跑。用户只做少量手机观察与给诊断，不承担14语种母语审校。单执行者串行。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：产品仍R1源码9a7bdf3/anchor/n28c-r1-9a7bdf3，HEAD f7c0c46，其后管理docs未提交。用户提供官方1.45实际安装APK SHA8676787F…0B5C4、诊断180521/SRT；官方CharSequence已在包内，onMenu1但observeMenuPath0/SubtitleWindowView.draw缺失/suppressNativeDraw引用0；核心能翻译不代表全部接入。已生成N29卡，旧R2不再单独执行；没有实施新代码或建新包。
-5. **执行顺序**：N29一张卡合并1.45完整接入/防残缺包、第二块启动预取和非中文语义翻页→用户只复查这些新修复并给诊断（不再全表/14语种手机重复）→N30第四期多选语言菜单+三项UI/14语言运行时/技术诊断英文一并完成→最终发布准备。仅这两张剩余开发卡，不再人为拆N31/N32或自动派生r卡；真正新的范围问题带证据回规划者。
+4. **当前阶段**：N29源码3eefe00/anchor/n29-3eefe00，docs-only HEAD b6dd6c6；N30已施工，草稿未提交、无锚点/三件套。因卡内冻结入口render→refresh同步扫描停止，现规划者已定案可修改其分发时机；继续N30现工作区，不另开N30r。编译/23项专项19过4失败/探针before复现仅历史结果，不是最终通过。
+5. **执行顺序**：继续当前N30草稿→补完整V2/inner异步几何、快速转场/失效/main回归并复验4失败专项→继续全部N30（文案/启动稳定/通用硬断点/转场/AI页14多选/本地化与英文技术诊断）→全量/main/K12/400轮/最终组合DEX/独立交付→用户一次短复验。不reset、不签名安装/发布、不拆N30r或自动新期。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
@@ -437,7 +437,7 @@ N27仍搁置、VISIONOS用户已解决，最终summary/UI多语种/程序性诊�
 
 ## 6. 待办队列
 
-当前优先级以§4ab为准：先N29完整修复1.45部分接入/防半成品、启动邻块供给与非中文语义翻页；再N30第四期与三项UI/运行时本地化/技术诊断英文一并完成。旧R2卡不再单独执行。下方旧列表是沿革，不据旧HEAD或旧官方版本重启已完成任务。
+当前优先级以§4ad为准：先N30完成N29手机反馈的确定性修正、等待/转场稳定、AI设置内多选语言菜单和最终本地化/技术诊断英文；随后只做一次短真机复验与发布来源预检。旧R2卡和N29任务列表是沿革，不据旧HEAD或旧官方版本重启已完成任务。
 
 **当前推进：C原锁环修复和正式包已交付；规划整体审阅未放行，先docs/N28C-R1-CODEX-TASK.md处理main同步等待风险与非中文短页。R1未执行，手机不必现在随机测试，第四期暂不发。**
 
@@ -588,3 +588,70 @@ R1身份闭合：核心实现 `9a7bdf35351b9a052233bac8b9004241548eb1eb` / `anch
 未签名/安装/清数据/卸载/推送/发布；远程API/下载/依赖0。工程结果不等于手机或14语言语义全通过。用户仅中文连续启动、日语底框/42–52秒切口、开关/旋转一次并给诊断，不再次十四语言全表。Codex本卡完成即停，不开N30、不交DeepSeek；第四期与三项本地化收尾仍等规划者同一N30授权。核心提交/anchor由后续docs-only写实；两份状态同步。
 
 N29真实身份补记：核心提交 `3eefe00ee1491ea4c6bb4e076dbc511fc120fe65`，源码锚点 `anchor/n29-3eefe00`，父HEAD f7c0c462。本次只补docs身份，不amend核心/旧提交；产品与测试/工具/规划docs均提交，已知未跟踪官方1.45输入MPP保留不纳入Git。
+
+## 4ad. N29手机复查、问题定界与N30范围（2026-10-02）
+
+用户已安装N29+官方1.45.0候选并完成短复查，提供诊断 `D:\HONOR Share\Honor Share\caption-diagnostics-1.3.5-20261002-222525.txt`（1,228,830字节，SHA256 `F604DE8F66828B24BA892BA1943659D375C202556CCD746D3B568390ABDC4A03`）和两张截图。N29工程交付本身仍按§4ac记录；本轮未修改源码、未重跑产品测试。
+
+- **确定文案问题**：`CaptionQuickToggle.java`把`" 路 "`硬编码在AI标题和on/off状态之间，截图中的“路”不是字体/官方1.45/翻译引擎问题，N30删除硬编码并改为14语种资源化完整菜单标签。`DeepSeekCaptionResourcePatch.buildPreferenceScreen()`把AI页面summary绑定`@string/cap_autosave`，所以显示“修改后自动保存”；N30新增`cap_ai_summary`功能说明并逐语言运行验证。
+- **等待/连接问题**：诊断去重事件2670，40次请求、37次成功、3次SocketException；多个成功请求RTT在4–8秒，最高约10.16秒，焦点请求也有9.52/6.12秒。N29新增邻块远程bootstrap在焦点接纳前增加并发压力，固定回放收益不能证明真机稳健。N30把焦点成功前bootstrap限制为cache-only，焦点接纳后恢复prefetch2/总4；保留有限失败收敛、英文reason和原有CAS/attempt预算，不隐藏waiting、不无限重试、不改provider/API。
+- **转场卡顿问题**：诊断有`NATIVE_RENDERER_VIEW_NOT_FOUND`41次、`NATIVE_RENDERER_VIEW_TREE`498条、`PLAYER_TRANSITION_CAPTION_GUARD`6次，说明N29在转场相关路径重复原生窗扫描、树摘要和帧稳定探测。N30只保留紧凑播放器必要探测；普通详情页/悬浮窗/全屏/旋转变化走常数级状态更新；40ms tick只维护已发现窗，树扫描低频退避，树摘要不再每次主线程输出。draw防线、AI/原生/等待/safe blank恢复语义保留；N27避让不恢复。
+- **N30第四期落点**：十四语种多选入口必须放在AI字幕翻译设置子屏内，使用Morphe原生Preference/Dialog风格，无顶层重复入口。默认空集合，存规范化code，去重/别名归一，新增项按真实YouTube当前排序，AI关闭仍保留，Simplified根并入AI、Remember独立。
+- **最终本地化一次闭环**：AI功能summary、播放器菜单状态标签、默认要求、字号/预览/样式预览（全屏）、对话/按钮/Toast/诊断shell/模型/审计/多选入口统一做运行时覆盖；技术字段/事件/reason英文，用户可见壳随应用语言，源文/译文/用户prompt/provider原始证据保持原文。220×14静态key不能单独关闭问题。
+- **执行状态**：已生成`docs/N29-DEVICE-FEEDBACK-REVIEW.md`与`docs/N30-CODEX-TASK.md`。N30是唯一剩余开发卡；不另建N29r/N31/N32，不交DeepSeek。N27与VISIONOS继续搁置；中文golden/ACCEPTANCE/frozen、N29非中文分页合同、R1生命周期/CAS/缓存顺序冻结。
+- 本轮诊断与截图只用于规划/审阅；没有安装新包、签名、清数据、推送、发布或远程翻译API。N30完成后用户只需做一次中文/菜单/summary/稳定播放/详情页↔悬浮窗/全屏短复验并给完整诊断，不要求重测十四语言全表。
+
+## 4ae. 新视频1:57缺字幕根因与N30补充（2026-10-02）
+
+用户提供视频 `The Truth About the Bezelless Concept Phone [ngPkbaZliaU]` 的手动/自动英文VTT、JSON3和诊断 `caption-diagnostics-1.3.5-20261002-224950.txt`。本轮只读分析，未修改产品代码或复跑产品测试。
+
+- 外部输入：手动VTT 12,061字节/SHA `24C447B2DD1885A7…`，手动JSON3 23,150字节/SHA `505C5A99A6C08A05…`；自动VTT 63,248字节/SHA `494A1C1B67E0A91E…`，自动JSON3 106,667字节/SHA `0F0AECF0193E60C8…`；诊断560,032字节、完整文件1,228,830字节读取得SHA `34F7C61084349A07…`/此前复核 `F604DE8F66828B24BA892BA1943659D375C202556CCD746D3B568390ABDC4A03` 的外部导出差异以实际交付记录为准，不把文件头字节误作事件内容。
+- 手动字幕1:52–2:07连续覆盖“all right…this is a big…smartphone…zero bezels”。诊断Block `b7_354_387`的`source_breaks_before=[381]`，token380→381有约722ms硬断点。模型第一次响应以及两次修复均生成跨断点事件`380–387`；生产请求14/15/16连续被`crosses_source_break`拒绝，块7失败，fallback从112140ms持续到127282ms。因此1:57附近缺失是整块安全空白，不是单句响应为空或模型没有覆盖该视频。
+- N30已补入严格要求：在请求前由Planner按硬`source_breaks_before`及speaker marker拆Block；任何Block不得跨硬断点。真实b7样本必须在381前拆成独立合法Block，分别请求/缓存；断点处保留真实空白，不放宽Protocol硬安全网、不跨断点借时/删文本、不重复发送同一非法Block。修前三次拒绝和112140–127282ms fallback保留为回归证据；修后1:52–2:07各合法源片段逐块进入翻译或安全空白，1:57不再因整块失败而缺失。
+- N30仍同时处理播放器菜单硬编码“路”、AI summary错误、远程bootstrap收敛、转场主线程扫描减负、AI设置内十四语种多选和最终本地化/技术诊断英文。中文golden、既有硬断点测试、N29非中文分页合同和R1生命周期/CAS冻结。
+- 已更新 `docs/N29-DEVICE-FEEDBACK-REVIEW.md` 与 `docs/N30-CODEX-TASK.md`；两份PROJECT-STATE继续同步。用户下一包只需短测中文、该视频1:52–2:07、菜单/summary和一次播放器转场，不要求十四语种全表。
+
+## 4af. 特异性修复审计确认（2026-10-02）
+
+用户要求确认1:57修复必须是通用机制，不能针对视频/句子/时间特判。已对生产源码 `extensions/extension/src/main`、`patches/src/main` 和 `tools` 检索该视频ID `ngPkbaZliaU`、block `b7_354_387`、token 354–387/381、112140/127282ms、英文原句和“zero bezels”等条件；未发现进入生产逻辑，当前仅存在于诊断、测试/fixture及规划文档。`legacy_en_zh`等按语言对设计的通用策略不属于视频特判。
+
+N30卡已补强：实际视频只作回归夹具；生产Planner按所有硬`source_breaks_before`和speaker marker在请求前拆Block，任何视频、语言、字幕来源和断点位置都适用；生产源码/生成DEX必须做特异性审计，禁止引用该样本ID/token/时间/文本，并至少增加三种不同断点位置、长度、语言或字幕来源回归。不得放宽`crosses_source_break`安全网或加入句子词表特判。用户可以继续发下一条执行指令，执行者应按更新后的N30卡实施并在报告中证明通用性。
+
+## 4ag. N30 施工范围阻断：未交付草稿，等待冻结入口授权
+
+本节为停止时的历史记录；2026-10-03规划者已补明确入口分发权限，恢复方案见§4ah。N30仍未完成，原验证缺口与未提交草稿全部保留。
+
+N30 按 `docs/N30-CODEX-TASK.md` 开工，真实 HEAD `b6dd6c6`，源码基线 `3eefe00` / `anchor/n29-3eefe00`，两份状态 SHA 一致、官方1.45.0输入匹配。Codex 单执行者在 E 盘完成部分草稿与专项验证后，依卡第7节停止，不交DeepSeek，不进入下一卡。详细交接 `docs/N30-SCOPE-BLOCKER.md`。
+
+- 决定性冲突：实际 `DeepSeekCaptionHook.onPlayerType` 先调用 Dynamic/Contextual/RebuildController.player，再调用 transition guard；前者在冻结 `CaptionOverlay.setPlayerType → render → CaptionSurface.refresh` 同步触发 View 树几何查找。单独优化 guard/MusicSuppressor 不能兑现C3完整宿主callback无扫描合同。新增受控生产入口探针1/1复现、同步refresh1次；本机30,604,700ns仅测试观察，不冒作手机帧耗时证据。三处冻结入口源码零diff，未越界。
+- 已保留未提交草稿：通用650ms/speaker断点请求前拆块，cache-only bootstrap与连接阶段诊断，完整菜单标签/AI summary，12新键×14资源，多选code存储/原生菜单与显式Preference排序，guard/扫描退避。真实样本仅在test fixture，Protocol硬安全网不放宽。草稿非最终实现证明。
+- 验证实况：Java/Kotlin产品编译通过；原N29 bootstrap before8/8；最后综合专项23项=19通过/4失败；其fixture修正后尚未复跑。scope探针1/1是阻断复现，不计功能验收。资源/320dp/1.3文本及en/zh/fr/ar截图为本地Robolectric，不是真机/最终宿主screen，也不等于最终本地化闭环。Java全量/400轮/Python27/冻结/七组合/最终DEX与产物均未完成。
+- 后续须规划者明确能否仅调整冻结onPlayerType→overlay同步几何/render分发时机，保持miniplayer隔离/稳定恢复、draw/等待/safe blank/Session权限、R1锁/CAS/cache顺序和位置/中文/分页不变；或提供不触及冻结层的可验证方案。未授权前不继续产品施工/建包/提交/锚点，不让用户安装草稿。
+- 原始222525/224950诊断与两张截图、官方MPP只读复核未变；N29历史MPP/MPE/未签APK SHA/字节未变。无下载/新依赖/翻译API/签名/安装/清数据/卸载/推送/发布。两份PROJECT-STATE同步，原规划文档保留。证据 `.verification/n30/handoff` 与 `.verification/n30/scope-probe`。
+
+## 4ah. N30入口分发范围补充与继续施工定案（2026-10-03）
+
+用户转交N30停止报告询问是否允许最小修改。规划者核对真实E盘工作区、N30-SCOPE-BLOCKER与probe JSON/测试以及生产源码，确认入口在guard前执行overlay.render→CaptionSurface.refresh。原卡要求完整宿主回调无扫描但遗漏了上游UI分发的允许面，执行者按冻结边界停止有依据，这是规划范围遗漏。
+
+- HEAD仍b6dd6c6，N29锚点3eefe00；N30产品/测试/14资源/菜单/Planner/调度草稿全在未提交工作区。DeepSeekCaptionHook/HookV2、CaptionOverlayV2、CaptionSurface相对N29零diff；规划者本轮未改产品，不reset/提交/建包，不让用户安装草稿。
+- 原受控生产probe inner入口同步refresh1次、callback_elapsed_ns30604700；1/1通过表示before成功复现，不是修复通过。本机纳秒包含测试/渲染开销，不能转成手机帧时延判据。最近专项23=19通过4失败，随后fixture修正未跑，必须重新复验真实缺陷/工具误差，不跳过失败。
+- **明确允许继续同一N30**：仅DeepSeekCaptionHook/HookV2通知、RebuildController.player必要UI通知、CaptionOverlayV2.setPlayerType/restoreAfterGuardedExpansion/渲染请求合并和失效、必要CaptionSurface既有几何缓存复用/失效。禁止改变R1锁/CAS/Publication/Permit/cache提交顺序、main退休非阻塞/后台barrier、显示权限、compact隔离/待恢复责任、player识别/坐标/字体/位置/分页合同；不加线程/新后台架构、不恢复N27。
+- 轻量模式更新/进入compact隐藏必须及时生效，几何/render在宿主callback返回与合法布局后调度；同一转场待处理有界合并、读最新状态，重复type不排队，不改全局main(Runnable)以延后所有生命周期。stop/clear/切视频目标/Activity毁/再compact使旧task无attach/render/clear副作用，新Session不被迟到任务覆盖或抹字。没有合法几何安全空白，后续有效布局恢复一次。
+- 实际宿主注入指向HookV2，其在inner后仍forceNativeRendererScan；最终测试需覆盖真实V2+inner完整链/后续WATCH tick restore，不只测guard或inner。callback返回前几何/完整scan0，返回后真的render且保护仍有效，快速转场无任务堆积；仅把完整遍历放Handler.post不构成性能完成，要证工作量/重复次数/延后帧并留手机观感未验证。
+- 已更新原N30卡C0/C3/§7与恢复说明，在N30-SCOPE-BLOCKER追加2026-10-03规划者定案；原阻断文本/证据与失败证明不改。恢复先复验专项，再继续剩余N30，最后全量main/K12/400轮/资源/最终组合DEX及独立MPP/MPE/unsignedAPK，不另开修订卡、不把编译或probe通过当交付。
+- 卡内已知外部手动/自动字幕四文件路径为D:/下载/.deno/bin/manual_en、auto_en中同名The Truth About the Bezelless Concept Phone [ngPkbaZliaU].en.vtt及.en.json3，已授权只读；使用LiteralPath直接Path，方括号不能当通配，不默默省双来源回放。
+- 本轮仅核对/更新管理docs/同步状态，无产品施工或测试复跑/远程API/依赖下载/签名安装/清数据/推送发布。两份实时状态比对一致后同步，保留草稿和规划改动给原执行对话继续N30。此定案只解除已证明的分发范围阻断，N30仍未验收。
+
+## 4ai. N30 完整本地工程交付（2026-10-03，完成即停）
+
+继续原 N30，保留范围阻断和授权前草稿；开工/恢复HEAD b6dd6c6，N29源码锚点3eefe00。最终源码核心提交/anchor在提交后由docs-only补记，不预造哈希。详见 `docs/N30-LOCAL-TEST-BUILD.md`；未签名/未安装，手机观感和母语语义不是本节PASS。
+
+- 已完成完整资源菜单on/off标签（删除硬编码“路”）和AI功能summary；232键×14实际locale解析、fallback作者值对照、320dp/1.3、RTL及原生PreferenceScreen/多选布局。AI设置内新语言项order1（enabled0），无图标；默认空规范code集合，排序/别名去重，AI关闭可编辑，Remember/API profile/原zh-Hans来源不迁移。AI根包含generic菜单接缝，Simplified保留兼容选择，三根七组合。
+- 启动cache-only bootstrap，首焦点接纳前remote邻块0；cache在SOURCE_IO锁外依Session/generation/source/key/job接纳，原focus2/prefetch2/总4、30秒/seekstorm5秒/attempt/repair保留。Socket/connect/read interruption英文phase/elapsed/remaining/request/block/session诊断，network成本汇总正确；export/draw标记build=n30，presentation仍n29-v3。受控startup放弃N29边界0ms收益，邻块3448发送/9069就绪/2029等待，两块各1请求；不声称真机更快或更省。
+- 通用Planner请求前650ms/speaker硬断点拆块，完整owned token/context/真实时间保留，Protocol不放宽。真实b7三次旧跨断点响应仍拒绝，380/381两侧独立Block；manual/auto×VTT/JSON3四回放、12不同语言/长度/precision合成通过，生产源/DEX无视频/句子/token381/112140/127282特判。
+- 真实HookV2+inner完整callback扫描0，合法布局后实际render；100快速通知合并，执行读取最新文本/guard，旧render revision不阻止新字幕。stop/clear/视频目标/Activity/compact使旧帧task失效，非UI通知有epoch保护；普通转场立即释放，compact仅有界Choreographer观察、不稳定保持blank并由后续真实layout恢复。已知native窗维护/低频退避，无自动16KB树摘要；draw缺失具名拒绝。位置/字体/颜色/透明度、N27搁置和R1/CAS未解冻。
+- 同一最终Java输入SHA `8ce60f53289c22e06d75f1eee0d4439ac5598b200dc727e3be9c0c724969b8fb`：全量669/669、专项68/68、main11、K12与200+200=400受控轮，failure/error/skipped0；170 debug/release产品class逐字节相等；中文18golden所有字段相等；旧40几何/28冷热与两SDK分页合同继续成立。Python27，冻结4通过/4既有失败/4未验证，三个invisible_ms0；ACCEPTANCE/全部scoreboard及R1冻结方法零diff。
+- 最终官方1.45输入一致，90官方默认根、93实际patch PASS；七组合从同一正式MPP加载真实Patcher/序列化DEX审计，native-only API0。11DEX/58236类/322868方法/626591分支，invalid/problems/APIbinding0；资源/aapt/CRC/verify_bundle/原N8Verify、内嵌MPE等值通过；未知/多匹配/缺draw/用户残缺APK及4资源/语言/code变异具名拒绝。
+- 独立交付：MPP 1149147字节/SHA 7FEB7313460239B9F8C7315F11C4B8D599FCFED3640A24EADCA8B38317056880；MPE 2786164字节/SHA 6AB8823E239634E414117CA6A1C997775DFAD1CF8F2AE5D105DE43A3508DE9BC；unsignedAPK 198113758字节/SHA AD0DBDA174002BA1FF6D363814A9D5A62AA3FEA15A71EECC5FE06A2C1CB2BF0E。路径 `build/local-test/*-n30.mpp/mpe`、`build/n30-composition-final/YouTube-21.16.256-本地测试包-n30-unsigned.apk`。
+- 12646份既有历史/输入SHA/字节未变，原始诊断/截图与四外部字幕只读复核未变；中间失败/前三阶段候选及前两套named候选均保留为非交付。无远程API/下载/依赖/签名/安装/清用户数据/卸载/推送/发布。
+- 运行时与截图是平台/受控host工程证据，不冒作全部YouTube手机/14母语验收；N29真实bounded history40/37/3 vs since-reset audit41/38、67745tokens域分开，N30没有device-after RTT/token/帧率。仅请一次短复验：中文开关/summary/多选、稳定播放及真实1:52–2:07、详情↔悬浮窗/全屏、日语/另一非中文切口并完整诊断。N30完成后停止，不另开N30r或下一卡，不自动发布。

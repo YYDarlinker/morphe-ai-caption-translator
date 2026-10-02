@@ -22,7 +22,7 @@ public final class CaptionQuickToggle {
         if(!visible){shortsMenuAt=0;shortsVideo="";return index;}
         boolean shorts=shortsMenuAt>0&&inShorts&&android.os.SystemClock.uptimeMillis()-shortsMenuAt<1500&&shortsVideo.equals(PageCaptionController.currentVideoIdSnapshot());
         if(!topMenu()&&!shorts)return index;shortsMenuAt=0;
-        String text=CaptionStrings.settings(a,"ai_title")+" 路 "+CaptionStrings.settings(a,DeepSeekConfig.enabled(a)?"on":"off");
+        String text=CaptionStrings.settings(a,DeepSeekConfig.enabled(a)?"ai_quick_toggle_on":"ai_quick_toggle_off");
         int id=a.getResources().getIdentifier("deepseek_caption_settings","drawable",a.getPackageName());Drawable icon=id==0?null:a.getDrawable(id);
         int next=addNativeRow(panel,icon,text,v->{if(toggle(a))dismissNative();},index);
         if(next<0)return index;

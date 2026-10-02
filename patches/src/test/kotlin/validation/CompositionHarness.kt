@@ -91,8 +91,8 @@ fun main(args:Array<String>){
             }
             throw IllegalStateException("Patch failed; real partial state preserved",failure)
         }
-        check(((hooks["augmentTranslations"]?:0)>0)==expected.getValue("simplifiedInstalled"))
-        check(((hooks["augmentMetadata"]?:0)>0)==expected.getValue("simplifiedInstalled"))
+        check(((hooks["augmentTranslations"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include the generic language-menu seam"}
+        check(((hooks["augmentMetadata"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include generic translation metadata"}
         check(((hooks["resolveRemembered"]?:0)>0)==expected.getValue("memoryInstalled"))
         check(((hooks["suppressNativeDraw"]?:0)>0)==ai)
         check((hooks["initialize"]?:0)==1){"Duplicate shared initialization"}

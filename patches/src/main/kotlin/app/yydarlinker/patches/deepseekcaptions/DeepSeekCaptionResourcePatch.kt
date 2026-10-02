@@ -198,7 +198,8 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
             val screen = document.createElement("PreferenceScreen")
             screen.setAttribute("android:key", PREF_KEY)
             screen.setAttribute("android:title", "@string/cap_ai_title")
-            screen.setAttribute("android:summary", "@string/cap_autosave")
+            screen.setAttribute("android:summary", "@string/cap_ai_summary")
+            screen.setAttribute("android:singleLineTitle", "false")
             // The entry renders as an ordinary sub-screen row of the page it sits on, exactly like the
             // narration row next to it: no icon, no icon layout, and no reserved icon space. Every one of
             // the 25 nested sub-screens the host ships is attribute-free in the same way, so this matches
@@ -209,6 +210,14 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                 "deepseek_caption_enabled",
                 "启用 AI 字幕翻译",
             )
+
+            screen.addPreference(
+                "app.yydarlinker.deepseekcaptions.CaptionLanguagesPreference",
+                "deepseek_caption_languages",
+                "自动翻译语言",
+                "选择要加入 YouTube 自动翻译菜单的语言",
+            ).setAttribute("android:order", "1")
+            screen.childByKey("deepseek_caption_enabled")?.setAttribute("android:order", "0")
 
             screen.addPreference(
                 "app.yydarlinker.deepseekcaptions.CaptionFlyoutPreference",
@@ -307,6 +316,11 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                     "字幕诊断",
                     "展开查看，可手动刷新或复制",
                 )
+            }
+            var order = 0
+            for (node in (0 until screen.childNodes.length).mapNotNull { screen.childNodes.item(it) as? Element }) {
+                node.setAttribute("android:order", (order++).toString())
+                node.setAttribute("android:iconSpaceReserved", "false")
             }
             return screen
         }

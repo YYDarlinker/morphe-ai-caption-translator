@@ -25,10 +25,10 @@ final class CaptionPlayerTransitionGuard {
     private static final String[] PLAYER_IDS = {
             "inset_overlay_view_layout", "player_overlays", "player_overlay", "watch_player"
     };
-    private static final int MIN_OBSERVATION_FRAMES = 6;
-    private static final int NO_MOTION_FALLBACK_FRAMES = 12;
-    private static final int STABLE_FRAMES_REQUIRED = 4;
-    private static final int MAX_OBSERVATION_FRAMES = 42;
+    private static final int MIN_OBSERVATION_FRAMES = 3;
+    private static final int NO_MOTION_FALLBACK_FRAMES = 3;
+    private static final int STABLE_FRAMES_REQUIRED = 2;
+    private static final int MAX_OBSERVATION_FRAMES = 12;
     private static final int PIXEL_TOLERANCE = 1;
 
     private static WeakReference<Activity> activityRef = new WeakReference<>(null);
@@ -41,26 +41,40 @@ final class CaptionPlayerTransitionGuard {
      */
     private static boolean expansionRestorePending;
     private static long generation;
+    private static Probe pendingProbe;
+    private static String latestType="";
+    private static WeakReference<View> playerRectView=new WeakReference<>(null);
+    static long observedFrameCount, probeNanos;
+    private static WeakReference<View> recoveryLayoutRoot=new WeakReference<>(null);
+    private static final View.OnLayoutChangeListener RECOVERY_LAYOUT=(v,l,t,r,b,ol,ot,or,ob)->{
+        if(expansionRestorePending&&!compactPlayer&&pendingProbe==null)startReadOnlyProbe(latestType,true);
+    };
+    private static void removeRecoveryLayout(){View v=recoveryLayoutRoot.get();if(v!=null)v.removeOnLayoutChangeListener(RECOVERY_LAYOUT);recoveryLayoutRoot.clear();}
+    private static void awaitValidLayout(Activity activity){View root=decor(activity);if(root==null)return;removeRecoveryLayout();recoveryLayoutRoot=new WeakReference<>(root);root.addOnLayoutChangeListener(RECOVERY_LAYOUT);}
 
     private CaptionPlayerTransitionGuard() {}
 
     static void setActivity(Activity activity) {
+        removeRecoveryLayout();
         activityRef = new WeakReference<>(activity);
-        generation++;
+        generation++;pendingProbe=null;playerRectView.clear();
     }
 
     static void onPlayerType(String rawType) {
         String type = rawType == null ? "" : rawType.trim();
         boolean nextCompact = !CaptionSurface.isShorts() && compact(type);
+        boolean same=type.equals(latestType);latestType=type;
+        if(same && pendingProbe!=null)return;
 
         // Renderer discovery may walk a bounded part of the player View tree. Keep that work out of
         // the same animation-critical window already used for overlay geometry and CC state guards.
+        CaptionMusicSuppressor.pauseDiscoveryForPlayerTransition(true);
         CaptionMusicSuppressor.beginNativeRendererTransition();
         CaptionButtonController.onPlayerTransition(type);
         CaptionLifecycleRestore.onPlayerTransition(type);
 
         if (nextCompact) {
-            generation++;
+            generation++;pendingProbe=null;playerRectView.clear();removeRecoveryLayout();
             compactPlayer = true;
             expansionRestorePending = true;
             // Start the quarantine before YouTube's compact/expand choreography can issue layouts.
@@ -78,6 +92,10 @@ final class CaptionPlayerTransitionGuard {
         if (!expandingFromCompact) {
             // Fullscreen/orientation changes remain visible and use real layout events only.
             CaptionOverlay.setPlayerType(type);
+            generation++;
+            CaptionButtonController.onPlayerStable();
+            CaptionMusicSuppressor.endNativeRendererTransition();
+            return;
         }
 
         if (!DynamicCaptionController.isVisibleActive()) {
@@ -90,7 +108,8 @@ final class CaptionPlayerTransitionGuard {
             return;
         }
 
-        startReadOnlyProbe(type, expandingFromCompact);
+        // Non-compact intermediate types update the restore target, never restart the observation.
+        if(pendingProbe==null)startReadOnlyProbe(type, expandingFromCompact);
     }
 
     private static void startReadOnlyProbe(String targetType, boolean delayedOverlayRestore) {
@@ -98,12 +117,15 @@ final class CaptionPlayerTransitionGuard {
         Activity activity = activityRef.get();
         View frameClock = decor(activity);
         if (activity == null || frameClock == null) {
-            MAIN.postDelayed(() -> finish(token, targetType, delayedOverlayRestore, 0), 180L);
+            // Missing geometry is not permission to display at an unverified location.
+            CaptionMusicSuppressor.endNativeRendererTransition();
+            awaitValidLayout(activity);
             return;
         }
 
         Probe probe = new Probe(token, targetType, delayedOverlayRestore);
-        frameClock.postOnAnimation(probe);
+        pendingProbe=probe;
+        android.view.Choreographer.getInstance().postFrameCallback(probe);
     }
 
     private static void finish(
@@ -113,6 +135,9 @@ final class CaptionPlayerTransitionGuard {
             int observedFrames
     ) {
         if (token != generation) return;
+        long frameSpan=pendingProbe==null?0:Math.max(0,pendingProbe.lastFrameNanos-pendingProbe.firstFrameNanos);
+        pendingProbe=null;removeRecoveryLayout();
+        targetType=latestType;
         if (delayedOverlayRestore) {
             // One atomic restore. CaptionOverlay no longer starts a 20/36-frame geometry tail here.
             CaptionOverlay.restoreAfterGuardedExpansion(targetType);
@@ -126,9 +151,8 @@ final class CaptionPlayerTransitionGuard {
             CaptionDiagnostics.mark(
                     activity,
                     "PLAYER_TRANSITION_STABLE",
-                    "Player transition stable; " +
-                            (delayedOverlayRestore ? "restoring AI caption display once" : "releasing AI caption-track guard") +
-                            " (observed " + observedFrames + " frames)"
+                    "type="+targetType+";observed_frames="+observedFrames+";observed_frame_ns="+frameSpan
+                            +";geometry_probe_total_us="+(probeNanos/1000)+";overlay_restore="+delayedOverlayRestore
             );
         }
     }
@@ -142,6 +166,8 @@ final class CaptionPlayerTransitionGuard {
         View root = decor(activity);
         if (root == null) return null;
 
+        View cached=playerRectView.get();
+        if(cached!=null && cached.isAttachedToWindow() && cached.isShown()) {Rect r=new Rect();if(cached.getGlobalVisibleRect(r)&&r.width()>1&&r.height()>1)return r;}
         Rect best = null;
         long bestArea = -1L;
         for (String name : PLAYER_IDS) {
@@ -165,6 +191,7 @@ final class CaptionPlayerTransitionGuard {
             if (area > bestArea) {
                 bestArea = area;
                 best = rect;
+                playerRectView=new WeakReference<>(candidate);
             }
         }
         return best;
@@ -187,13 +214,14 @@ final class CaptionPlayerTransitionGuard {
                 type.contains("DISMISSED");
     }
 
-    private static final class Probe implements Runnable {
+    private static final class Probe implements Runnable, android.view.Choreographer.FrameCallback {
         final long token;
         final String targetType;
         final boolean delayedOverlayRestore;
         int frames;
         int stableFrames;
         boolean sawMotion;
+        long firstFrameNanos,lastFrameNanos;
         Rect previous;
 
         Probe(long token, String targetType, boolean delayedOverlayRestore) {
@@ -202,18 +230,21 @@ final class CaptionPlayerTransitionGuard {
             this.delayedOverlayRestore = delayedOverlayRestore;
         }
 
+        @Override public void doFrame(long frameTimeNanos){lastFrameNanos=frameTimeNanos;if(firstFrameNanos==0)firstFrameNanos=frameTimeNanos;run();}
         @Override
         public void run() {
             if (token != generation) return;
             Activity activity = activityRef.get();
             View frameClock = decor(activity);
             if (activity == null || frameClock == null) {
-                finish(token, targetType, delayedOverlayRestore, frames);
+                CaptionMusicSuppressor.endNativeRendererTransition();
                 return;
             }
 
+            long started=System.nanoTime();
             Rect current = readPlayerRect(activity);
-            frames++;
+            probeNanos+=System.nanoTime()-started;
+            frames++;observedFrameCount++;
             if (current != null && previous != null) {
                 if (nearlySame(previous, current)) {
                     stableFrames++;
@@ -230,10 +261,18 @@ final class CaptionPlayerTransitionGuard {
             boolean stable = enoughFrames && stableFrames >= STABLE_FRAMES_REQUIRED &&
                     (sawMotion || frames >= NO_MOTION_FALLBACK_FRAMES);
             if (stable || frames >= MAX_OBSERVATION_FRAMES) {
+                if (!stable) {
+                    pendingProbe=null;awaitValidLayout(activity);
+                    CaptionMusicSuppressor.endNativeRendererTransition();
+                    CaptionButtonController.onPlayerStable();
+                    CaptionDiagnostics.mark(activity,"PLAYER_TRANSITION_SAFE_BLANK",
+                        "reason=geometry_not_stable;observed_frames="+frames);
+                    return; // Keep quarantine; no forced restore at the observation ceiling.
+                }
                 finish(token, targetType, delayedOverlayRestore, frames);
                 return;
             }
-            frameClock.postOnAnimation(this);
+            android.view.Choreographer.getInstance().postFrameCallback(this);
         }
     }
 }

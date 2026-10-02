@@ -23,6 +23,7 @@ static final String[][] SOURCES={
 {"各方案独立保存；清空恢复随界面语言变化的默认要求","prompt_summary"},
 {"无法新增方案，请检查输入及 30 套方案上限。","profile_add_failed"},
 {"Subtitel terbaca wajar.","preview"},
+{"选择要加入 YouTube 自动翻译菜单的语言","languages_summary"},
 {"0% 为透明，100% 为不透明；松手保存","opacity_hint"},
 {"排查翻译或时间问题时，可展开查看并复制记录","diagnostic_hint"},
 {"请先填写 API Key；模型也可手动输入","configure_api"},
@@ -105,6 +106,7 @@ static final String[][] SOURCES={
 {"收起字幕诊断","collapse"},
 {"展开字幕诊断","expand"},
 {"自动保存失败","message_bbbcd9c8bf80"},
+{"自动翻译语言","languages_title"},
 {"缓存与诊断","cache_diagnostics"},
 {"已自动保存","saved"},
 {"使用 AI","use_ai"},
@@ -371,6 +373,18 @@ static final String[][] ENGLISH={
 {"translation","Translation"},
 {"translation_requirements","Translation instructions"},
 {"use_ai","Use AI"},
-{"use_youtube","Use YouTube"}
+{"use_youtube","Use YouTube"},
+{"ai_quick_toggle_on","AI caption translation · On"},
+{"ai_quick_toggle_off","AI caption translation · Off"},
+{"ai_summary","Translate video captions live with your AI service"},
+{"languages_title","Auto-translate languages"},
+{"languages_summary","Choose languages to add to YouTube’s auto-translate menu"},
+{"languages_count","%1$d languages selected"},
+{"languages_save","Save"},
+{"languages_existing","Already available"},
+{"languages_new","Added"},
+{"languages_unavailable","Unavailable"},
+{"languages_empty","No languages selected; the native menu is unchanged"},
+{"languages_entry","%1$s · %2$s"}
 };
 }

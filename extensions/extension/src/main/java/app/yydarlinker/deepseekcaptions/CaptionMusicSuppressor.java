@@ -28,8 +28,8 @@ import java.util.WeakHashMap;
 final class CaptionMusicSuppressor {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final long TICK_MS = 40L;
-    private static final long INITIAL_NATIVE_SCAN_MS = 180L;
-    private static final long FALLBACK_NATIVE_SCAN_MS = 400L;
+    private static final long INITIAL_NATIVE_SCAN_MS = 320L;
+    private static final long FALLBACK_NATIVE_SCAN_MS = 5_000L;
     private static final long NATIVE_NOT_FOUND_LOG_MS = 1_800L;
     private static final int MAX_NATIVE_SCAN_VIEWS = 1_200;
     private static final String[] PLAYER_IDS = {
@@ -48,6 +48,13 @@ final class CaptionMusicSuppressor {
     private static long nativeSearchStartedAtMs;
     private static long nextNativeScanAtMs;
     private static boolean nativeNotFoundLogged;
+    private static boolean discoveryPaused, debugTreeRequested;
+    private static int misses;
+    static long scanCount, scanNanos, treeSummaryCount;
+
+    static void pauseDiscoveryForPlayerTransition(boolean paused) { discoveryPaused=paused; }
+    /** Detailed evidence is opt-in, never exported on every missing-view tick. */
+    static void sampleNativeRendererTree() { debugTreeRequested=true; forceNativeRendererScan(); }
 
     private static final Runnable TICK = () -> {
         posted = false;
@@ -80,6 +87,15 @@ final class CaptionMusicSuppressor {
         MAIN.postDelayed(TICK, TICK_MS);
     }
 
+    /** The real HookV2 transition callback only marks recovery; the existing tick performs it. */
+    static void requestNativeRendererScanAfterTransition() {
+        if(Looper.myLooper()!=Looper.getMainLooper()){MAIN.post(CaptionMusicSuppressor::requestNativeRendererScanAfterTransition);return;}
+        // An attached native window is already covered by the draw hook and known-view mask.
+        if(!keepKnownRenderersMasked())forceNativeRescan=true;
+        // Do not restart miss backoff for duplicate types or emit another missing-view summary.
+        kick();
+    }
+
     /** Force one fresh player-local lookup after a video/player rebuild without adding a new loop. */
     static void forceNativeRendererScan() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -107,57 +123,52 @@ final class CaptionMusicSuppressor {
             MAIN.post(CaptionMusicSuppressor::endNativeRendererTransition);
             return;
         }
-        forceNativeRescan = true;
-        nextNativeScanAtMs = 0L;
-        nativeNotFoundLogged = false;
-        if (RebuildController.ownsNativeTrack()) { maskNativeRenderer(); kick(); }
+        discoveryPaused=false;
+        // Release in constant work; detached views can be rediscovered by the bounded fallback tick.
+        keepKnownRenderersMasked();
+        if (RebuildController.ownsNativeTrack()) kick();
     }
 
     private static void sanitize() { /* Text belongs exclusively to the accepted event plan. */ }
 
     /**
-     * Keep cached windows transparent every 40 ms and repeat bounded discovery for replacement
-     * windows on the same tick. The fast scan exists during initial AI takeover; it then backs off
-     * to 400 ms. Discovery continues during blank/waiting states and player rebuilds.
+     * Keep cached windows transparent every 40 ms. Discovery only runs after an explicit
+     * recovery signal or a bounded low-frequency backoff; no tree dump is implicit.
      */
     private static void maskNativeRenderer() {
         Activity activity = activityRef.get();
         if (activity == null || activity.isFinishing()) return;
 
-        boolean forced = forceNativeRescan;
-        forceNativeRescan = false;
         boolean knownAttached = keepKnownRenderersMasked();
         long now = SystemClock.uptimeMillis();
-        if (nativeSearchStartedAtMs == 0L) nativeSearchStartedAtMs = now;
-        if (!forced && now < nextNativeScanAtMs) return;
-
-        long age = now - nativeSearchStartedAtMs;
-        nextNativeScanAtMs = now +
-                (age <= NATIVE_NOT_FOUND_LOG_MS ? INITIAL_NATIVE_SCAN_MS : FALLBACK_NATIVE_SCAN_MS);
-
-        boolean found = scanPlayerRoots(activity);
-        if (!found) {
-            // Player IDs vary across builds; fall back to role identity in the bounded decor tree.
-            View decor = activity.getWindow() == null ? null : activity.getWindow().getDecorView();
-            found = scanTree(activity, decor, true);
+        if (discoveryPaused || (!forceNativeRescan && knownAttached) || now < nextNativeScanAtMs) return;
+        boolean forced=forceNativeRescan; forceNativeRescan=false;
+        if (nativeSearchStartedAtMs == 0L) nativeSearchStartedAtMs=now;
+        long started=System.nanoTime();
+        boolean found=scanPlayerRoots(activity);
+        if(!found && forced) {
+            // Explicit initial/rebuild recovery only; never repeated full-decor scans on a miss.
+            View decor=activity.getWindow()==null?null:activity.getWindow().getDecorView();
+            found=scanTree(activity,decor,true);
         }
-
-        if (found || knownAttached) {
-            nativeNotFoundLogged = false;
-            return;
+        scanCount++;scanNanos+=System.nanoTime()-started;
+        if(forced || misses==0)CaptionDiagnostics.mark(activity,"NATIVE_RENDERER_SCAN_SUMMARY",
+            "scan_count="+scanCount+";scan_total_us="+(scanNanos/1000)+";tree_summary_count="+treeSummaryCount+";found="+found);
+        if(found) { misses=0;nativeNotFoundLogged=false;nextNativeScanAtMs=now+FALLBACK_NATIVE_SCAN_MS; }
+        else {
+            misses++;
+            nextNativeScanAtMs=now+Math.min(FALLBACK_NATIVE_SCAN_MS,INITIAL_NATIVE_SCAN_MS*(1L<<Math.min(4,misses-1)));
+            if(!nativeNotFoundLogged) {
+                nativeNotFoundLogged=true;
+                CaptionDiagnostics.mark(activity,"NATIVE_RENDERER_VIEW_NOT_FOUND",
+                    "reason=player_local_renderer_absent;retry_backoff_ms="+(nextNativeScanAtMs-now));
+            }
         }
-
-        if (!nativeNotFoundLogged && age >= NATIVE_NOT_FOUND_LOG_MS) {
-            nativeNotFoundLogged = true;
-            CaptionDiagnostics.mark(
-                    activity,
-                    "NATIVE_RENDERER_VIEW_NOT_FOUND",
-                    "TimedText is invisible, but no YouTube native caption window was found to hide in this player"
-            );
-            String summary = treeSummary(activity.getWindow() == null ? null : activity.getWindow().getDecorView());
-            for (int offset = 0; offset < summary.length(); offset += 1400)
-                CaptionDiagnostics.mark(activity, "NATIVE_RENDERER_VIEW_TREE",
-                        "offset=" + offset + ";" + summary.substring(offset, Math.min(offset + 1400, summary.length())));
+        if(debugTreeRequested) {
+            debugTreeRequested=false;
+            String summary=treeSummary(activity.getWindow()==null?null:activity.getWindow().getDecorView());
+            treeSummaryCount++;
+            CaptionDiagnostics.mark(activity,"NATIVE_RENDERER_VIEW_TREE","sample=explicit;"+summary);
         }
     }
 
@@ -170,6 +181,7 @@ final class CaptionMusicSuppressor {
             if (view == null || !view.isAttachedToWindow()) {
                 if (view != null) view.setAlpha(entry.getValue());
                 iterator.remove();
+                forceNativeRescan=true;nextNativeScanAtMs=0L;
                 continue;
             }
             attached = true;
@@ -303,6 +315,7 @@ final class CaptionMusicSuppressor {
         nativeSearchStartedAtMs = 0L;
         nextNativeScanAtMs = 0L;
         nativeNotFoundLogged = false;
+        discoveryPaused=false;debugTreeRequested=false;misses=0;
     }
 
     private static String treeSummary(View root) {

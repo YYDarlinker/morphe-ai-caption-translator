@@ -230,11 +230,19 @@ public class N28BProductionTest {
       JSONArray cues=new JSONArray().put(RebuildR2SourceTest.cue(0,500,"Bonjour",false))
           .put(RebuildR2SourceTest.cue(marker.equals("silence")?1200:500,500,marker.equals("speaker")?">> Salut":"Salut",false));
       h.engine.fixtureBody=new JSONObject().put("events",cues).toString();
-      RebuildController.Session s=start("fr","ar");h.await(()->s.states!=null && s.states[0]==RebuildController.WAITING && s.attempts[0]==1);
-      assertEquals(1,s.blocks.size());assertTrue(s.reasons[0],s.reasons[0].startsWith("crosses_source_break"));assertNull(s.plans[0]);
+      RebuildController.Session s=start("fr","ar");ready(s);h.await(()->s.blocks.size()==2&&s.states[1]==RebuildController.READY);
+      assertEquals(2,s.blocks.size());assertNotNull(s.plans[0]);assertNotNull(s.plans[1]);
+      // Preserve the original hard rejection at the production protocol boundary. The N30 planner
+      // must now avoid requesting this illegal owner, not ask it and wait for a failure/repair.
+      RebuildPlanner.Block illegal=new RebuildPlanner.Block(0,0,s.source.words.size()-1,s.source);
+      String crossing=new JSONObject().put("block",illegal.id()).put("events",new JSONArray().put(new JSONObject()
+          .put("from",illegal.from).put("to",illegal.to).put("source",s.source.text(illegal.from,illegal.to)).put("text",translated))).toString();
+      try{RebuildProtocol.parseBound(crossing,s.source,illegal,s.languageContext);fail("hard source break was weakened");}
+      catch(RebuildProtocol.Invalid invalid){assertEquals("crosses_source_break",invalid.code);}
+      for(RebuildPlanner.Block block:s.blocks)for(int i=block.from+1;i<=block.to;i++)assertFalse(RebuildPlanner.hardBreakBefore(s.source,i));
       trace.put(new JSONObject().put("source","fr").put("target","ar").put("ui","default").put("policy",s.languageContext.scope())
           .put("cacheKeyHash",s.cacheKey).put("systemPromptHash",RebuildCache.hash(new JSONObject(requests.get(requests.size()-1)).getJSONArray("messages").getJSONObject(0).getString("content")))
-          .put("network",true).put("cache",false).put("calls",1).put("rejection","crosses_source_break").put("boundary",marker).put("accepted",false));
+          .put("network",true).put("cache",false).put("calls",2).put("hard_rejection_preserved","crosses_source_break").put("boundary",marker).put("legal_planned_blocks",2).put("accepted",true));
     }export("source-boundary");
   }
   @Test public void localizedDatesMagnitudeAndMultipleNumbersAreObservedUnknown()throws Exception {

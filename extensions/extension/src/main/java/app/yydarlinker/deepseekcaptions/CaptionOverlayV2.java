@@ -85,6 +85,45 @@ final class CaptionOverlay {
   private static String playerType = "";
   private static long lastScan, lastLayout;
   private static boolean dirty = true;
+  // One frame-aligned UI request. Never postpone model authority, clear or compact quarantine.
+  private static volatile long playerRenderEpoch;
+  static long playerDispatchIdentity(){return playerRenderEpoch;}
+  private static Runnable playerRenderTask;
+  private static WeakReference<View> playerFrameClock = new WeakReference<>(null);
+  private static boolean playerRenderPending, applyingPlayerRender;
+  static long deferredRenderCount, deferredRenderNanos;
+
+  private static void invalidatePlayerRender() {
+    playerRenderEpoch++;
+    View clock=playerFrameClock.get();
+    if(clock!=null && playerRenderTask!=null)clock.removeCallbacks(playerRenderTask);
+    if(playerRenderTask!=null)MAIN.removeCallbacks(playerRenderTask);
+    playerRenderTask=null;playerFrameClock.clear();playerRenderPending=false;
+  }
+  private static void requestPlayerRender() {
+    if(playerRenderTask!=null || suppressed || guardedExpansion
+        || pendingText.isEmpty()&&pendingIdentity.isEmpty())return;
+    Activity owner=activityRef.get();
+    if(owner==null || owner.isFinishing() || owner.isDestroyed() || owner.getWindow()==null)return;
+    View clock=owner.getWindow().getDecorView();
+    final long epoch=playerRenderEpoch;
+    playerRenderPending=true;
+    playerRenderTask=()->{
+      // A stale callback has no attach/render/hide side effects, including on a newer Session.
+      if(epoch!=playerRenderEpoch || activityRef.get()!=owner || owner.isFinishing() || owner.isDestroyed())return;
+      playerRenderTask=null;playerFrameClock.clear();playerRenderPending=false;
+      if(suppressed || guardedExpansion || currentGuard!=null&&!currentGuard.isValid()
+          || pendingText.isEmpty()&&pendingIdentity.isEmpty())return;
+      long started=System.nanoTime();applyingPlayerRender=true;
+      try{render();deferredRenderCount++;}finally{applyingPlayerRender=false;deferredRenderNanos+=System.nanoTime()-started;}
+      CaptionDiagnostics.mark(owner,"PLAYER_TRANSITION_RENDER_DISPATCH",
+          "type="+playerType+";deferred_render_count="+deferredRenderCount+";render_total_us="+(deferredRenderNanos/1000)
+          +";geometry_search_count="+CaptionSurface.refreshSearchCount+";native_scan_count="+CaptionMusicSuppressor.scanCount
+          +";tree_summary_count="+CaptionMusicSuppressor.treeSummaryCount);
+    };
+    playerFrameClock=new WeakReference<>(clock);
+    clock.postOnAnimation(playerRenderTask);
+  }
   private static float downY, initial;
   private static long downAt;
   private static boolean dragging;
@@ -103,6 +142,7 @@ final class CaptionOverlay {
     main(
         () -> {
           if (activityRef.get() != a) {
+            invalidatePlayerRender();
             detach();
             normalVideoWidth = 0;
             playerType = "";
@@ -223,6 +263,7 @@ final class CaptionOverlay {
             if (!g.isValid()) return;
             COMMAND.incrementAndGet();
           } else if (command != COMMAND.get()) return;
+          invalidatePlayerRender();
           pendingText = "";
           pendingIdentity = "";
           pendingPages = Collections.emptyList();
@@ -249,6 +290,7 @@ final class CaptionOverlay {
           pendingIdentity = "";
           pendingPages = Collections.emptyList();
           shownPage = -1;
+          invalidatePlayerRender();
           pendingStatus = false;
           fallback = null;
           currentGuard = null;
@@ -260,6 +302,8 @@ final class CaptionOverlay {
   static void refreshStyle(Context c) {
     main(
         () -> {
+          // An explicit user style refresh is not a player notification; apply the latest mode now.
+          invalidatePlayerRender();
           dirty = true;
           render();
         });
@@ -282,33 +326,21 @@ final class CaptionOverlay {
   }
 
   static void setPlayerType(String type) {
-    main(
-        () -> {
-          String s = type == null ? "" : type.toUpperCase(java.util.Locale.ROOT);
-          boolean changed = !s.equals(playerType);
-          if (changed) {
-            playerType = s;
-            normalVideoWidth = 0;
-          }
-          suppressed =
-              !CaptionSurface.isShorts()
-                  && (s.contains("MINIM")
-                      || s.contains("HIDDEN")
-                      || s.contains("DISMISSED")
-                      || s.contains("PICTURE_IN_PICTURE"));
-          dirty = true;
-          render();
-          // This callback may arrive before YouTube updates the video bounds.
-          if (changed) {
-            normalVideoWidth = 0;
-            dirty = true;
-          }
-        });
+    main(() -> {
+      String next=type==null?"":type.toUpperCase(java.util.Locale.ROOT);
+      boolean changed=!next.equals(playerType);
+      if(changed){playerType=next;normalVideoWidth=0;CaptionSurface.invalidateGeometry();dirty=true;}
+      suppressed=!CaptionSurface.isShorts() && (next.contains("MINIM") || next.contains("HIDDEN")
+          || next.contains("DISMISSED") || next.contains("PICTURE_IN_PICTURE"));
+      if(suppressed){invalidatePlayerRender();hideView();return;}
+      if(changed)requestPlayerRender();
+    });
   }
 
   static void beginGuardedExpansion() {
     main(
         () -> {
+          invalidatePlayerRender();
           guardedExpansion = true;
           hideView();
         });
@@ -319,9 +351,10 @@ final class CaptionOverlay {
         () -> {
           guardedExpansion = false;
           suppressed = false;
-          CaptionSurface.refresh();
+          CaptionSurface.invalidateGeometry();
           dirty = true;
           setPlayerType(type);
+          requestPlayerRender();
         });
   }
 
@@ -398,6 +431,8 @@ final class CaptionOverlay {
   }
 
   private static void render() {
+    // WATCH, time and restore requests merge until the player frame runs.
+    if(playerRenderPending && !applyingPlayerRender){requestPlayerRender();return;}
     Activity a = activityRef.get();
     if (a == null
         || a.isFinishing()

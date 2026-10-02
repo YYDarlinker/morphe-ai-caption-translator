@@ -220,4 +220,16 @@
     <string name="cap_translation_requirements" formatted="false">"Translation instructions"</string>
     <string name="cap_use_ai" formatted="false">"Use AI"</string>
     <string name="cap_use_youtube" formatted="false">"Use YouTube"</string>
+    <string name="cap_ai_quick_toggle_on" formatted="false">"AI caption translation · On"</string>
+    <string name="cap_ai_quick_toggle_off" formatted="false">"AI caption translation · Off"</string>
+    <string name="cap_ai_summary" formatted="false">"Translate video captions live with your AI service"</string>
+    <string name="cap_languages_title" formatted="false">"Auto-translate languages"</string>
+    <string name="cap_languages_summary" formatted="false">"Choose languages to add to YouTube’s auto-translate menu"</string>
+    <string name="cap_languages_count" formatted="false">"%1$d languages selected"</string>
+    <string name="cap_languages_save" formatted="false">"Save"</string>
+    <string name="cap_languages_existing" formatted="false">"Already available"</string>
+    <string name="cap_languages_new" formatted="false">"Added"</string>
+    <string name="cap_languages_unavailable" formatted="false">"Unavailable"</string>
+    <string name="cap_languages_empty" formatted="false">"No languages selected; the native menu is unchanged"</string>
+    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
 </resources>

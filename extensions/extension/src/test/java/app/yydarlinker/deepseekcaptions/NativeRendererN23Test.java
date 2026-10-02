@@ -56,10 +56,12 @@ public class NativeRendererN23Test {
   @Test public void lateRendererDiscoveryContinuesAfterMissAndLogsTree() {
     CaptionMusicSuppressor.forceNativeRendererScan();
     Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(2200));
+    CaptionMusicSuppressor.sampleNativeRendererTree();
     String diagnostics=CaptionDiagnostics.fullText(activity);
     assertTrue(diagnostics.contains("NATIVE_RENDERER_VIEW_TREE"));
     assertTrue(diagnostics.contains("visibility="));assertTrue(diagnostics.contains("size="));
     SubtitleWindowView window=new SubtitleWindowView(activity);player.addView(window);
+    CaptionMusicSuppressor.forceNativeRendererScan(); // Explicit host View-rebuild signal, not a 40 ms full-tree poll.
     Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(480));
     assertEquals(0f,window.getAlpha(),0f);
   }

@@ -16,6 +16,16 @@ fun main(args:Array<String>){
     val support=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
     val flags=support.methods.filter { it.name.endsWith("Installed") }.associate { method -> method.name to method.implementation!!.instructions.filterIsInstance<WideLiteralInstruction>().single().wideLiteral }
     println("FEATURES=$flags")
+    val forbiddenStrings=listOf("ngPkbaZliaU","b7_354_387","zero bezels","all right this is a big smartphone")
+    for(cls in classes.values.filter { it.type.startsWith("Lapp/yydarlinker/deepseekcaptions/") })for(method in cls.methods) {
+        for(ins in method.implementation?.instructions?:emptyList()) {
+            val string=(ins as? ReferenceInstruction)?.reference as? com.android.tools.smali.dexlib2.iface.reference.StringReference
+            check(string==null || forbiddenStrings.none { bad->string.string.contains(bad,true) }){"N30 video-specific production condition in "+cls.type}
+            val literal=(ins as? WideLiteralInstruction)?.wideLiteral
+            check(literal !in listOf(112140L,127282L,381L)){"N30 sample-specific numeric literal in "+cls.type+"->"+method.name}
+        }
+    }
+    println("N30_PRODUCTION_SPECIFICITY_PASS fixture_ids_text_times=0")
     val hostHooks=mutableMapOf<String,Int>()
     classes.values.filterNot { it.type.startsWith("Lapp/yydarlinker/") }.forEach { cls -> cls.methods.forEach { m ->
         m.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.forEach { ins ->
@@ -24,6 +34,26 @@ fun main(args:Array<String>){
         }
     } }
     println("HOST_HOOKS=$hostHooks")
+    if(flags["aiInstalled"]==1L || flags["simplifiedInstalled"]==1L) {
+        check((hostHooks["augmentTranslations"]?:0)>0){"N30 language menu hook missing"}
+        val bridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")
+        val clone=bridge.methods.singleOrNull { it.name=="cloneTranslation" && it.parameterTypes.map { p->p.toString() }==listOf("Ljava/lang/Object;","Ljava/lang/String;") } ?: error("N30 generic translation clone missing")
+        val refs=clone.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().map { it.reference }
+        check(refs.filterIsInstance<MethodReference>().count { it.name=="translationUrl" }==1){"N30 generic target URL clone incomplete"}
+        check(refs.filterIsInstance<MethodReference>().count { it.name=="translationVss" }==1){"N30 generic VSS clone incomplete"}
+        check(refs.filterIsInstance<MethodReference>().count { it.name=="translationLabel" }==1){"N30 generic label clone incomplete"}
+        println("N30_MENU_BRIDGE_COMPLETE generic_clone=1 canonical_codes=14")
+    }
+    if(flags["aiInstalled"]==1L) {
+        val v2=classes.getValue("Lapp/yydarlinker/deepseekcaptions/DeepSeekCaptionHookV2;")
+        val outer=v2.methods.single { it.name=="onPlayerType" }
+        val outerCalls=outer.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? MethodReference }
+        check(outerCalls.none { it.name=="forceNativeRendererScan" }){"N30 outer V2 still has synchronous scan exit"}
+        check(outerCalls.count { it.name=="requestNativeRendererScanAfterTransition" }==1)
+        val typeHooks=classes.values.filterNot { it.type.startsWith("Lapp/yydarlinker/") }.flatMap { it.methods.toList() }.flatMap { it.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.toList()?:emptyList() }.mapNotNull { it.reference as? MethodReference }.filter { it.name=="onPlayerType" && it.definingClass.startsWith("Lapp/yydarlinker/deepseekcaptions/") }
+        check(typeHooks.size==1 && typeHooks.single().definingClass==v2.type){"N30 host test entry and final HookV2 injection differ"}
+        println("N30_TRANSITION_ENTRY_COMPLETE hook_v2=1 inline_force_scan=0")
+    }
     val requiredAI=flags["aiInstalled"]==1L || (hostHooks["rewriteUrl"]?:0)>0 || (hostHooks["onMenu"]?:0)>0
     if(requiredAI) {
         val required=listOf("onMenu","observeMenuPath","suppressNativeDraw","initialize","onNativeTrackApplied","consumePathCopy","rewriteUrl")

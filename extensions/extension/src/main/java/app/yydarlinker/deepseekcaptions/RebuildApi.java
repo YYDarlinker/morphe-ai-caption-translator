@@ -22,6 +22,26 @@ final class RebuildApi {
     }
   }
 
+  static final class TransportFailure extends IOException {
+    final String reason, phase;
+    final long elapsedMs, remainingMs;
+    TransportFailure(Exception cause, String phase, long start, long deadline) {
+      super(cause.getClass().getSimpleName(), cause);
+      this.phase=phase;
+      reason = transportReason(cause, phase);
+      elapsedMs=TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start);
+      remainingMs=Math.max(0,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));
+    }
+  }
+  static String transportReason(Exception error, String phase) {
+    if(error instanceof TransportFailure)return ((TransportFailure)error).reason;
+    if(error instanceof ConnectException || error instanceof UnknownHostException
+        || error instanceof NoRouteToHostException)return "connection_establishment_failed";
+    if(error instanceof SocketException)return "connection_socket_exception";
+    if(error instanceof InterruptedIOException)return "connect".equals(phase)?"connection_establishment_timeout":"read_interrupted";
+    return "connect".equals(phase)?"connection_establishment_failed":"read_interrupted";
+  }
+
   private static final Set<String> portable = Collections.synchronizedSet(new HashSet<>());
   private static final Set<String> negotiated = Collections.synchronizedSet(new HashSet<>());
 
@@ -177,7 +197,10 @@ final class RebuildApi {
         TokenCostAudit.recordUnitQualityOutcome(audit, 0, 1, 1);
         throw invalid;
       } catch (Exception error) {
-        trace(control,"REBUILD_HTTP_FAILURE","attempt="+attempt+";reason="+(error instanceof Failure ? ((Failure)error).code : error.getClass().getSimpleName()));
+        trace(control,"REBUILD_HTTP_FAILURE","attempt="+attempt+";reason="+(error instanceof Failure ? ((Failure)error).code
+            : error instanceof TransportFailure ? ((TransportFailure)error).reason : error.getClass().getSimpleName())
+            +(error instanceof TransportFailure ? ";phase="+((TransportFailure)error).phase
+              +";elapsed_ms="+((TransportFailure)error).elapsedMs+";remaining_deadline_ms="+((TransportFailure)error).remainingMs : ""));
         if (error instanceof Failure && ((Failure) error).configuration) {
           if (blocked.size() > 128) blocked.clear();
           blocked.put(identity, ((Failure) error).code);
@@ -185,7 +208,8 @@ final class RebuildApi {
         TokenCostAudit.recordFailure(
             audit,
             attempt,
-            error instanceof Failure ? ((Failure) error).code : error.getClass().getSimpleName());
+            error instanceof Failure ? ((Failure) error).code
+                : error instanceof TransportFailure ? "network_"+((TransportFailure)error).reason : error.getClass().getSimpleName());
         throw error;
       }
     }
@@ -214,6 +238,8 @@ final class RebuildApi {
       DeepSeekApiClient.RequestControl control,
       long deadline)
       throws Exception {
+    long started=System.nanoTime();
+    String phase="connect";
     HttpURLConnection c =
         (HttpURLConnection) new URL(ProviderEndpoint.chat(cfg.baseUrl)).openConnection();
     try (NetworkDeadline guard = new NetworkDeadline(c, deadline)) {
@@ -233,6 +259,7 @@ final class RebuildApi {
       try (OutputStream out = c.getOutputStream()) {
         out.write(bytes);
       }
+      phase="read";
       if (control != null) control.onRequestBodySent();
       RawCaptionSource.checkActive(control);
       c.setReadTimeout(RawCaptionSource.remaining(deadline));
@@ -257,6 +284,9 @@ final class RebuildApi {
       } catch (Exception ignored) {
       }
       return new Response(code, new String(out.toByteArray(), StandardCharsets.UTF_8), retry);
+    } catch (IOException failure) {
+      // Do not reinterpret transport failures as semantic or structural repair errors.
+      throw new TransportFailure(failure,phase,started,deadline);
     } finally {
       c.disconnect();
       if (control != null) control.onConnection(null);

@@ -9,7 +9,7 @@
 - 官方输入仅 `patches-1.45.0.mpp`，SHA256 `DBA660DF61D95131A22242CABE9C44B4B04861B7BA6EBEFFE91C4B3647D55B93`；原版 YouTube 21.16.256 / minSdk28，不使用用户已打补丁 APK 作为宿主。产品版本仍 1.3.5，官方 1.45.0 未改成产品版本号。
 - 222525/224950 原诊断及两张截图只读；manual/auto 各 VTT/JSON3 四文件直接 LiteralPath 读取并复核，完整身份 `.verification/n30/source-inputs.json`。
 - 既有 JDK21、SDK36、Patcher1.14.1 与缓存依赖离线使用。远程翻译 API、下载、新依赖、签名、安装、清用户数据、卸载、推送、发布全部 0；本地 MockWebServer 受控请求不是远程翻译 API。
-- 源码核心提交/锚点：将在核心提交后由 docs-only 身份补记；此处不预先编造哈希。
+- 已验证源码核心提交：`d5ca720ecf0c83349ea232d929ee09b11840c65a`；锚点：`anchor/n30-d5ca720`。本报告身份补记为 docs-only 后继，不改变已验证的产品源码/三件套。
 
 ## 2. 四项用户问题的根因与修复
 

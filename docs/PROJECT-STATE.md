@@ -644,7 +644,7 @@ N30 按 `docs/N30-CODEX-TASK.md` 开工，真实 HEAD `b6dd6c6`，源码基线 `
 
 ## 4ai. N30 完整本地工程交付（2026-10-03，完成即停）
 
-继续原 N30，保留范围阻断和授权前草稿；开工/恢复HEAD b6dd6c6，N29源码锚点3eefe00。最终源码核心提交/anchor在提交后由docs-only补记，不预造哈希。详见 `docs/N30-LOCAL-TEST-BUILD.md`；未签名/未安装，手机观感和母语语义不是本节PASS。
+继续原 N30，保留范围阻断和授权前草稿；开工/恢复HEAD b6dd6c6，N29源码锚点3eefe00。最终源码核心提交 `d5ca720ecf0c83349ea232d929ee09b11840c65a` / `anchor/n30-d5ca720`（提交后docs-only身份补记）；当前产品源码与三件套仍对应该核心。详见 `docs/N30-LOCAL-TEST-BUILD.md`；未签名/未安装，手机观感和母语语义不是本节PASS。
 
 - 已完成完整资源菜单on/off标签（删除硬编码“路”）和AI功能summary；232键×14实际locale解析、fallback作者值对照、320dp/1.3、RTL及原生PreferenceScreen/多选布局。AI设置内新语言项order1（enabled0），无图标；默认空规范code集合，排序/别名去重，AI关闭可编辑，Remember/API profile/原zh-Hans来源不迁移。AI根包含generic菜单接缝，Simplified保留兼容选择，三根七组合。
 - 启动cache-only bootstrap，首焦点接纳前remote邻块0；cache在SOURCE_IO锁外依Session/generation/source/key/job接纳，原focus2/prefetch2/总4、30秒/seekstorm5秒/attempt/repair保留。Socket/connect/read interruption英文phase/elapsed/remaining/request/block/session诊断，network成本汇总正确；export/draw标记build=n30，presentation仍n29-v3。受控startup放弃N29边界0ms收益，邻块3448发送/9069就绪/2029等待，两块各1请求；不声称真机更快或更省。

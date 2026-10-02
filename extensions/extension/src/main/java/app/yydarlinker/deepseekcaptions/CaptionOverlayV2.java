@@ -18,6 +18,7 @@ import java.util.function.Supplier;
 final class CaptionOverlay {
   interface RenderGuard {
     boolean isValid();
+    default void onApplied() {}
   }
 
   private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -32,51 +33,30 @@ final class CaptionOverlay {
   static final class LayoutBudget {
     final int width;
     final float minimumPx, preferredPx;
-
-    LayoutBudget(int w, float px) {
-      this(w,px,px);
+    final CaptionRenderSpec renderSpec;
+    LayoutBudget(int w,float px) { this(w,px,px); }
+    LayoutBudget(int w,float px,float preferred) { this(w,px,preferred,CaptionRenderSpec.LEGACY); }
+    LayoutBudget(int w,float px,float preferred,CaptionRenderSpec spec) {
+      width=w; minimumPx=px; preferredPx=preferred; renderSpec=spec;
     }
-
-    LayoutBudget(int w,float px,float preferred) {
-      width=w; minimumPx=px; preferredPx=preferred;
+    LayoutBudget withSpec(CaptionRenderSpec spec) {
+      return renderSpec==spec ? this : new LayoutBudget(width,minimumPx,preferredPx,spec);
     }
-
     boolean fits(String value) {
-      if (value.isEmpty()) return true;
-      TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-      paint.setTypeface(Typeface.DEFAULT);
-      paint.setTextSize(minimumPx);
-      return StaticLayout.Builder.obtain(value, 0, value.length(), paint, Math.max(1, width))
-              .setIncludePad(false)
-              .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
-              .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
-              .build()
-              .getLineCount()
-          <= 2;
+      return value.isEmpty() || renderSpec.fits(value,minimumPx,width,2);
     }
-
     boolean fitsPreferred(String value) {
-      if (value.isEmpty()) return true;
-      TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-      paint.setTypeface(Typeface.DEFAULT);
-      paint.setTextSize(preferredPx);
-      return StaticLayout.Builder.obtain(value, 0, value.length(), paint, Math.max(1, width))
-          .setIncludePad(false)
-          .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
-          .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
-          .build().getLineCount() <= 2;
+      return value.isEmpty() || renderSpec.fits(value,preferredPx,width,2);
     }
-
     boolean canPresent(RebuildProtocol.Event event) {
-      return !RebuildPageLayout.plan(event.text, event.start, event.end,
-          this::fitsPreferred).isEmpty();
+      return !RebuildPageLayout.plan(event.text,event.start,event.end,this::fitsPreferred).isEmpty();
     }
-
+    boolean canPresent(RebuildProtocol.Event event,CaptionRenderSpec spec) {
+      return spec.legacy ? withSpec(spec).canPresent(event)
+          : !RebuildPageLayout.plan(event.text,event.start,event.end,this,spec).isEmpty();
+    }
     int preferredColumns() { return Math.max(1,(int)(width/Math.max(1,preferredPx))); }
-
-    int approximateColumns() {
-      return Math.max(1, (int) (width / Math.max(1, minimumPx)));
-    }
+    int approximateColumns() { return Math.max(1,(int)(width/Math.max(1,minimumPx))); }
   }
 
   private static volatile LayoutBudget layoutBudget;
@@ -87,6 +67,10 @@ final class CaptionOverlay {
 
   private static String pendingText = "", pendingIdentity = "", lastNotice = "";
   private static String lastBlankIdentity;
+  private static CaptionRenderSpec pendingRenderSpec=CaptionRenderSpec.LEGACY;
+  private static String lastPresentationNotice="";
+  private static android.os.LocaleList legacyPaintLocales;
+  private static boolean targetPaintLocalesApplied;
   private static long pendingStart = -1, pendingEnd = -1, pendingPosition = -1;
   private static List<RebuildPageLayout.Page> pendingPages = Collections.emptyList();
   private static int shownPage = -1;
@@ -159,6 +143,11 @@ final class CaptionOverlay {
     show(s, false, g, f, id, start, end, position);
   }
 
+  static void showEvent(String s,RenderGuard g,Supplier<String> f,String id,
+      long start,long end,long position,CaptionRenderSpec spec) {
+    show(s,false,g,f,id,start,end,position,false,spec);
+  }
+
   static void showWaitingEvent(String s, RenderGuard g, String id,
       long start, long end, long position) {
     show(s, false, g, null, id, start, end, position, true);
@@ -190,11 +179,20 @@ final class CaptionOverlay {
 
   private static void show(String s, boolean status, RenderGuard g, Supplier<String> f, String id,
       long start, long end, long position, boolean waiting) {
+    show(s,status,g,f,id,start,end,position,waiting,CaptionRenderSpec.LEGACY);
+  }
+
+  private static void show(String s,boolean status,RenderGuard g,Supplier<String> f,String id,
+      long start,long end,long position,boolean waiting,CaptionRenderSpec spec) {
     if (g != null && !g.isValid()) return;
-    long command = COMMAND.incrementAndGet();
+    long command = g == null ? COMMAND.incrementAndGet() : COMMAND.get();
     main(
         () -> {
-          if (command != COMMAND.get() || g != null && !g.isValid()) return;
+          if (g != null) {
+            if (!g.isValid()) return;
+            COMMAND.incrementAndGet();
+          } else if (command != COMMAND.get()) return;
+          pendingRenderSpec = spec;
           pendingText = s == null ? "" : s;
           pendingIdentity = id;
           pendingStart = start;
@@ -208,6 +206,7 @@ final class CaptionOverlay {
           fallback = f;
           dirty = true;
           render();
+          if (g != null) g.onApplied();
         });
   }
 
@@ -217,10 +216,13 @@ final class CaptionOverlay {
 
   static void hide(RenderGuard g) {
     if (g != null && !g.isValid()) return;
-    long command = COMMAND.incrementAndGet();
+    long command = g == null ? COMMAND.incrementAndGet() : COMMAND.get();
     main(
         () -> {
-          if (command != COMMAND.get() || g != null && !g.isValid()) return;
+          if (g != null) {
+            if (!g.isValid()) return;
+            COMMAND.incrementAndGet();
+          } else if (command != COMMAND.get()) return;
           pendingText = "";
           pendingIdentity = "";
           pendingPages = Collections.emptyList();
@@ -228,14 +230,21 @@ final class CaptionOverlay {
           fallback = null;
           currentGuard = g;
           hideView();
+          if (g != null) g.onApplied();
         });
   }
 
   static void clear() {
-    long command = COMMAND.incrementAndGet();
+    clear(null);
+  }
+
+  /** Session cleanup cannot invalidate a newer session's queued render command. */
+  static void clear(RenderGuard guard) {
+    if (guard != null && !guard.isValid()) return;
+    long command = guard == null ? COMMAND.incrementAndGet() : COMMAND.get();
     main(
         () -> {
-          if (command != COMMAND.get()) return;
+          if (command != COMMAND.get() || guard != null && !guard.isValid()) return;
           pendingText = "";
           pendingIdentity = "";
           pendingPages = Collections.emptyList();
@@ -359,6 +368,7 @@ final class CaptionOverlay {
     anchor.setClipToPadding(false);
     anchor.setElevation(dp(a, 12));
     TextView text = new TextView(a);
+    legacyPaintLocales=text.getTextLocales();targetPaintLocalesApplied=false;
     text.setTag("yydarlinker.deepseek.caption.overlay");
     text.setTextColor(Color.WHITE);
     text.setGravity(Gravity.CENTER);
@@ -402,6 +412,13 @@ final class CaptionOverlay {
     if (!attach(a)) return;
     FrameLayout host = hostRef.get(), anchor = anchorRef.get();
     TextView text = textRef.get();
+    // Keep the untouched legacy font defaults; restore them only after an explicit target style.
+    if(pendingRenderSpec.legacy && targetPaintLocalesApplied) {
+      text.setTextLocales(legacyPaintLocales);targetPaintLocalesApplied=false;
+    } else if(!pendingRenderSpec.legacy && !targetPaintLocalesApplied) {
+      legacyPaintLocales=text.getTextLocales();targetPaintLocalesApplied=true;
+    }
+    pendingRenderSpec.apply(text);
     long now = SystemClock.uptimeMillis();
     if (now - lastScan >= 500) {
       CaptionSurface.refresh();
@@ -451,30 +468,28 @@ final class CaptionOverlay {
     int width = Math.max(1, Math.round(b.width() * (CaptionSurface.isShorts() ? .78f : .92f)));
     int inner = Math.max(1, width - text.getPaddingLeft() - text.getPaddingRight());
     layoutBudget =
-        new LayoutBudget(inner,minimum,preferred);
+        new LayoutBudget(inner,minimum,preferred,pendingRenderSpec);
     float size = preferred;
     String shown = pendingText;
     String mode = pendingStatus ? "status" : "caption";
     boolean ownedCaption = !pendingStatus && !pendingWaiting && !pendingText.isEmpty()
         && pendingStart >= 0 && pendingEnd > pendingStart;
     pendingPages = ownedCaption
-        ? RebuildPageLayout.plan(pendingText, pendingStart, pendingEnd,
-            value -> linesPx(value, preferred, inner) <= 2,
-            value -> linesPx(value, preferred, inner) <= 1)
+        ? RebuildPageLayout.plan(pendingText,pendingStart,pendingEnd,layoutBudget,pendingRenderSpec)
         : Collections.emptyList();
     shownPage = RebuildPageLayout.indexAt(pendingPages, pendingPosition);
     if (shownPage >= 0) {
       shown = pendingPages.get(shownPage).text;
       if (pendingPages.size() > 1) mode = "caption_page";
     } else if (!ownedCaption) {
-      while (size > minimum && linesPx(shown, size, inner) > 2)
+      while (size > minimum && linesPx(shown, size, inner,pendingRenderSpec) > 2)
         size = Math.max(minimum, size - .5f);
     }
     // A failed time/CPS/seam gate must not show the invalid translation as a single page.
-    if (shownPage < 0 && (ownedCaption || linesPx(shown, size, inner) > 2)) {
+    if (shownPage < 0 && (ownedCaption || linesPx(shown, size, inner,pendingRenderSpec) > 2)) {
       mode = "original_fallback";
       shown = fallback == null ? "" : fallback.get();
-      if (shown == null || shown.isEmpty() || linesPx(shown, size, inner) > 2) {
+      if (shown == null || shown.isEmpty() || linesPx(shown, size, inner,pendingRenderSpec) > 2) {
         mode = "overflow_status";
         shown = "";
       }
@@ -513,14 +528,14 @@ final class CaptionOverlay {
               + ";density=" + metrics.density
               + ";fontScale=" + a.getResources().getConfiguration().fontScale
               + ";lines="
-              + linesPx(shown, size, inner)
+              + linesPx(shown, size, inner,pendingRenderSpec)
               + (shownPage >= 0 ? ";page=" + (shownPage + 1) + "/" + pendingPages.size()
                   + ";page_range=" + pendingPages.get(shownPage).start + "-"
                   + pendingPages.get(shownPage).end
-                  + (pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS
+                  + (pendingRenderSpec.legacy && pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS
                       ? ";duration_exception=owned_window_lt_1200" : "")
                   : ";pagination_unresolved=true");
-      if (shownPage >= 0 && pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS)
+      if (pendingRenderSpec.legacy && shownPage >= 0 && pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS)
         CaptionDiagnostics.mark(a, "REBUILD_LAYOUT_TIME_EXCEPTION", detail);
       if (mode.equals("original_fallback") || mode.equals("overflow_status"))
         CaptionDiagnostics.mark(a, "REBUILD_LAYOUT_FALLBACK", detail);
@@ -534,6 +549,8 @@ final class CaptionOverlay {
     }
     text.setText(shown);
     if (shown.isEmpty()) {
+      if(ownedCaption && !pendingRenderSpec.legacy)
+        presentationDiagnostics(a,pendingText,preferred,inner,pendingEnd-pendingStart,"hard_geometry_unresolved");
       hideView();
       lastBlankIdentity = pendingIdentity;
       return;
@@ -543,7 +560,7 @@ final class CaptionOverlay {
     text.setMaxLines(2);
     text.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
     text.setTextColor(pendingStatus ? 0xE6FFFFFF : Color.WHITE);
-    int compact = compactWidthPx(shown, size, inner) + text.getPaddingLeft() + text.getPaddingRight();
+    int compact = compactWidthPx(shown,size,inner,pendingRenderSpec) + text.getPaddingLeft() + text.getPaddingRight();
     text.setMaxWidth(compact);
     text.getLayoutParams().width = compact;
     GradientDrawable bg = new GradientDrawable();
@@ -553,6 +570,15 @@ final class CaptionOverlay {
     text.measure(
         View.MeasureSpec.makeMeasureSpec(compact, View.MeasureSpec.EXACTLY),
         View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+    if(ownedCaption && !pendingRenderSpec.legacy) {
+      long span=shownPage>=0 ? pendingPages.get(shownPage).end-pendingPages.get(shownPage).start
+          : pendingEnd-pendingStart;
+      if(!pendingRenderSpec.fits(shown,text.getLayout(),compact-text.getPaddingLeft()-text.getPaddingRight(),2)) {
+        presentationDiagnostics(a,shown,size,inner,span,"hard_textview_geometry");
+        text.setText(""); hideView(); lastBlankIdentity=pendingIdentity; return;
+      }
+      presentationDiagnostics(a,shown,size,compact-text.getPaddingLeft()-text.getPaddingRight(),span,"");
+    }
     int height = text.getMeasuredHeight();
     boolean landscape = b.width() > b.height();
     float y =
@@ -572,6 +598,23 @@ final class CaptionOverlay {
     anchor.bringToFront();
   }
 
+  private static void presentationDiagnostics(Activity a,String shown,float size,int width,
+      long duration,String reason) {
+    String notice=pendingIdentity+"|"+pendingRenderSpec.targetCode+"|"+shown+"|"+size+"|"+width
+        +"|"+duration+"|"+reason+"|"+shownPage;
+    if(notice.equals(lastPresentationNotice)) return;
+    lastPresentationNotice=notice;
+    String detail="id="+pendingIdentity+";"+pendingRenderSpec.fields(shown,duration,size,width);
+    if(!reason.isEmpty()) CaptionDiagnostics.mark(a,"REBUILD_PRESENTATION_HARD_REJECT",
+        detail+";hard_reject=true;reason="+reason);
+    else {
+      CaptionDiagnostics.mark(a,"REBUILD_PRESENTATION",detail+";hard_reject=false");
+      String watch=pendingRenderSpec.watches(shown,duration,size,width);
+      if(!watch.isEmpty()) CaptionDiagnostics.mark(a,"REBUILD_PRESENTATION_WATCH",
+          detail+";advisory_only=true;watch="+watch+";repair_candidate=false");
+    }
+  }
+
   static int compactWidth(Context a, String value, float sp, int maximum) {
     return compactWidthPx(value,TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_SP,sp,a.getResources().getDisplayMetrics()),maximum);
@@ -581,6 +624,20 @@ final class CaptionOverlay {
     int target = linesPx(value,sizePx,maximum), low=1, high=maximum;
     while(low<high){int mid=(low+high)/2;if(linesPx(value,sizePx,mid)<=target)high=mid;else low=mid+1;}
     return Math.min(maximum,low+1); // one pixel rounding guard; never omit text
+  }
+
+  static int compactWidthPx(String value,float sizePx,int maximum,CaptionRenderSpec spec) {
+    if(spec.legacy) return compactWidthPx(value,sizePx,maximum);
+    int target=spec.layout(value,sizePx,maximum).getLineCount(),low=1,high=maximum;
+    while(low<high) {
+      int mid=(low+high)/2;
+      if(spec.fits(value,sizePx,mid,target)) high=mid; else low=mid+1;
+    }
+    int result=Math.min(maximum,low+1);
+    return spec.fits(value,sizePx,result,target) ? result : maximum;
+  }
+  static int linesPx(String value,float sizePx,int width,CaptionRenderSpec spec) {
+    return spec.layout(value,sizePx,width).getLineCount();
   }
 
   static int lines(Context a, String s, float sp, int width) {

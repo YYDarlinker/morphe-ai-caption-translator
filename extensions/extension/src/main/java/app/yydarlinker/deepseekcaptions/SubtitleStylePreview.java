@@ -94,7 +94,12 @@ public final class SubtitleStylePreview extends android.preference.Preference {
      * are the only things the caller supplies.
      */
     static TextView sampleLabel(Context c,String sample,int sizeTier,int opacity,float screenWidthPx,float contentWidth){
+        return sampleLabel(c,sample,sizeTier,opacity,screenWidthPx,contentWidth,RebuildController.previewRenderSpec());
+    }
+    static TextView sampleLabel(Context c,String sample,int sizeTier,int opacity,float screenWidthPx,float contentWidth,
+            CaptionRenderSpec spec){
         android.util.DisplayMetrics d=c.getResources().getDisplayMetrics();TextView label=new TextView(c);
+        spec.apply(label);
         label.setIncludeFontPadding(false);label.setGravity(Gravity.CENTER);label.setTextColor(Color.WHITE);label.setText(sample);label.setMaxLines(MAX_SAMPLE_LINES);label.setEllipsize(null);
         label.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);label.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
         int padX=Math.round(6*d.density),padY=Math.round(4*d.density);label.setPadding(padX,padY,padX,padY);
@@ -103,7 +108,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
                 SubtitleStyleMetrics.targetGlyphHeightPx(sizeTier,screenWidthPx,true));
         // The box is measured over the full-screen reference and the whole frame is scaled once afterwards,
         // so the authored sample has to fit the reference budget, not the on-screen pixel width.
-        int compact=Math.min(maximum,CaptionOverlay.compactWidthPx(sample,sizePx,maximum))+2*padX;
+        int compact=Math.min(maximum,CaptionOverlay.compactWidthPx(sample,sizePx,maximum,spec))+2*padX;
         label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sizePx);label.setShadowLayer(d.density,0,d.density,0xD0000000);
         GradientDrawable bg=new GradientDrawable();bg.setColor(SubtitleStyleMetrics.alpha(opacity)<<24);bg.setCornerRadius(4*d.density);label.setBackground(bg);
         label.measure(View.MeasureSpec.makeMeasureSpec(compact,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));

@@ -8,7 +8,7 @@ import android.icu.util.VersionInfo;
 import android.os.Build;
 import java.util.*;
 
-/** Platform ICU boundaries in UTF-16 offsets. Only measurement; never changes input or pagination. */
+/** Platform ICU boundaries in UTF-16 offsets. Input is never normalized or reordered. */
 final class CaptionUnicode {
   static final String COUNTER_VERSION="n28a-counters-v1";
   static final String BOUNDARY_VERSION="android-icu+devanagari-virama-v1";
@@ -87,19 +87,25 @@ final class CaptionUnicode {
     return false;
   }
   static int readingUnits(String text,CaptionLanguageProfile profile) {
+    return readingUnits(text,profile,profile.locale);
+  }
+  static int readingUnits(String text,CaptionLanguageProfile profile,Locale locale) {
     Objects.requireNonNull(text);Objects.requireNonNull(profile);
     if(profile.readingCounter==CaptionLanguageProfile.ReadingCounter.LEGACY_CODEPOINTS)
       return text.codePointCount(0,text.length()); // Exact legacy semantics, including controls/newlines.
-    int[] boundaries=characterBoundaries(text,profile.locale);int count=0;
+    int[] boundaries=characterBoundaries(text,locale);int count=0;
     for(int i=1;i<boundaries.length;i++)if(base(text,boundaries[i-1],boundaries[i])>=0)count++;
     return count;
   }
   /** Integer half units: 1 whole CPL unit = 2 halfUnits. Not Paint width, not CPS. */
   static int lineHalfUnits(String text,CaptionLanguageProfile profile) {
+    return lineHalfUnits(text,profile,profile.locale);
+  }
+  static int lineHalfUnits(String text,CaptionLanguageProfile profile,Locale locale) {
     Objects.requireNonNull(text);Objects.requireNonNull(profile);
     if(profile.lineCounter==CaptionLanguageProfile.LineCounter.LEGACY_CHINESE)
       return 2*text.codePointCount(0,text.length()); // Recording only; not a legacy pager replacement.
-    int[] boundaries=characterBoundaries(text,profile.locale);int halves=0;
+    int[] boundaries=characterBoundaries(text,locale);int halves=0;
     for(int i=1;i<boundaries.length;i++) {
       int cp=base(text,boundaries[i-1],boundaries[i]);if(cp<0)continue;
       int weight=2;

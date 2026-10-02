@@ -35,6 +35,7 @@ final class RebuildCache {
             .append('|')
             .append(hash(RebuildApi.prompt(c, target,context)));
     if(!context.canApplyEnglishToChinese)b.append('|').append(context.scope());
+    if(!context.renderSpec.legacy)b.append('|').append(context.renderSpec.presentationPolicy);
     for (RebuildSource.Word w : s.words)
       b.append('\n')
           .append(w.start)
@@ -79,45 +80,135 @@ final class RebuildCache {
     }
   }
 
-  static synchronized boolean write(
-      Context c, String key, RebuildPlanner.Block b, RebuildProtocol.Plan p) {
-    if(RebuildReview.score(p.issues)>0)return false;
-    File dir = directory(c), dest = new File(dir, key + "-" + b.id() + ".json");
-    File tmp = null;
+  /** One CAS orders publication admission and revocation; no lifecycle monitor is acquired. */
+  static final class Publication {
+    static final int OPEN = 0, RETIRED = 1, STOPPED = 2;
+    private static final class State {
+      final int mode;
+      final List<Permit> permits;
+      State(int mode, List<Permit> permits) { this.mode = mode; this.permits = permits; }
+    }
+    private final java.util.concurrent.atomic.AtomicReference<State> state =
+        new java.util.concurrent.atomic.AtomicReference<>(new State(OPEN, Collections.emptyList()));
+
+    boolean isOpen() { return state.get().mode == OPEN; }
+    boolean finishSent() { return state.get().mode == RETIRED; }
+
+    Permit reserve() {
+      Permit permit = new Permit(this);
+      for (;;) {
+        State before = state.get();
+        if (before.mode != OPEN) return null;
+        List<Permit> pending = new ArrayList<>(before.permits);
+        pending.add(permit);
+        if (state.compareAndSet(before, new State(OPEN, Collections.unmodifiableList(pending))))
+          return permit;
+      }
+    }
+
+    // Only atomic state exchange: safe in the Controller's short state-only critical section.
+    void revoke(boolean stop) {
+      for (;;) {
+        State before = state.get();
+        int mode = stop || before.mode == STOPPED ? STOPPED : RETIRED;
+        if (before.mode == mode || state.compareAndSet(before, new State(mode, before.permits)))
+          return;
+      }
+    }
+
+    void drain() {
+      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+      for (Permit permit : state.get().permits) {
+        try {
+          if (!permit.done.await(Math.max(0, deadline - System.nanoTime()),
+              java.util.concurrent.TimeUnit.NANOSECONDS))
+            throw new IllegalStateException("publication_commit_timeout");
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException("publication_commit_interrupted", interrupted);
+        }
+      }
+    }
+
+    private void release(Permit permit) {
+      for (;;) {
+        State before = state.get();
+        List<Permit> pending = new ArrayList<>(before.permits);
+        pending.remove(permit);
+        if (state.compareAndSet(before,
+            new State(before.mode, Collections.unmodifiableList(pending)))) break;
+      }
+      permit.done.countDown();
+    }
+  }
+
+  static final class Permit implements AutoCloseable {
+    private final Publication publication;
+    private final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+    private final java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+    Permit(Publication publication) { this.publication = publication; }
+    public void close() { if (closed.compareAndSet(false, true)) publication.release(this); }
+  }
+
+  /** Fully serialized/fsynced candidate. Preparation never holds a lifecycle lock or permit. */
+  static final class Prepared implements AutoCloseable {
+    final File temporary, destination;
+    Prepared(File temporary, File destination) { this.temporary = temporary; this.destination = destination; }
+    boolean commit() {
+      try {
+        synchronized (RebuildCache.class) {
+          java.nio.file.Files.move(temporary.toPath(), destination.toPath(),
+              java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+              java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        }
+        return true;
+      } catch (IOException failure) { return false; }
+    }
+    public void close() { temporary.delete(); }
+  }
+
+  static Prepared prepare(Context c, String key, RebuildSource source, RebuildPlanner.Block block,
+      RebuildProtocol.Plan plan, CaptionLanguageContext context) {
+    if (RebuildReview.score(plan.issues) > 0) return null;
+    File temporary = null;
     try {
-      tmp = File.createTempFile("events-", ".tmp", dir);
-      try (FileOutputStream out = new FileOutputStream(tmp)) {
-        out.write(p.json.getBytes(StandardCharsets.UTF_8));
+      if (!context.canApplyEnglishToChinese) {
+        RebuildProtocol.Plan verified = RebuildProtocol.parseBound(plan.json, source, block, context);
+        if (RebuildReview.score(verified.issues) > 0) return null;
+      }
+      File dir = directory(c);
+      temporary = File.createTempFile("events-", ".tmp", dir);
+      try (FileOutputStream out = new FileOutputStream(temporary)) {
+        out.write(plan.json.getBytes(StandardCharsets.UTF_8));
         out.getFD().sync();
       }
-      java.nio.file.Files.move(
-          tmp.toPath(),
-          dest.toPath(),
-          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-          java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-      File[] all = dir.listFiles((x, n) -> n.endsWith(".json"));
-      if (all == null) return true;
-      Arrays.sort(all, Comparator.comparingLong(File::lastModified).reversed());
-      long bytes = 0;
-      for (int i = 0; i < all.length; i++) {
-        bytes += all[i].length();
-        if (i >= 256 || bytes > 64L * 1024 * 1024) all[i].delete();
-      }
-      return true;
-    } catch (Exception ignored) {
-      return false;
-    } finally {
-      if (tmp != null) tmp.delete();
+      return new Prepared(temporary, new File(dir, key + "-" + block.id() + ".json"));
+    } catch (Exception failure) {
+      if (temporary != null) temporary.delete();
+      return null;
     }
+  }
+
+  static synchronized void trim(Context c) {
+    File[] all = directory(c).listFiles((x, n) -> n.endsWith(".json"));
+    if (all == null) return;
+    Arrays.sort(all, Comparator.comparingLong(File::lastModified).reversed());
+    long bytes = 0;
+    for (int i = 0; i < all.length; i++) {
+      bytes += all[i].length();
+      if (i >= 256 || bytes > 64L * 1024 * 1024) all[i].delete();
+    }
+  }
+
+  static boolean write(Context c, String key, RebuildPlanner.Block block, RebuildProtocol.Plan plan) {
+    return write(c, key, null, block, plan, CaptionLanguageContext.LEGACY);
   }
   static boolean write(Context c,String key,RebuildSource source,RebuildPlanner.Block block,
       RebuildProtocol.Plan plan,CaptionLanguageContext context) {
-    if(context.canApplyEnglishToChinese)return write(c,key,block,plan);
-    try {
-      // Same source ownership and language policy on write and on a future cold read.
-      RebuildProtocol.Plan verified=RebuildProtocol.parseBound(plan.json,source,block,context);
-      if(RebuildReview.score(verified.issues)>0)return false;
-      return write(c,key,block,plan);
-    } catch(Exception invalid) { return false; }
+    try (Prepared prepared = prepare(c, key, source, block, plan, context)) {
+      if (prepared == null || !prepared.commit()) return false;
+      trim(c);
+      return true;
+    }
   }
 }

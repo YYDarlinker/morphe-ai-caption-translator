@@ -131,12 +131,15 @@ final class RebuildReview {
   }
   static RebuildProtocol.Plan withLayoutReview(RebuildProtocol.Plan plan, CaptionOverlay.LayoutBudget budget,
                                                CaptionLanguageContext context) {
-    if(context.canApplyEnglishToChinese)return withLayoutReview(plan,budget);
+    if(context.canApplyEnglishToChinese)return withLayoutReview(plan,budget==null ? null : budget.withSpec(context.renderSpec));
     if(budget==null)return plan;
     List<Issue> all=new ArrayList<>(plan.issues);
-    for(RebuildProtocol.Event e:plan.events)if(!budget.canPresent(e))
-      all.add(new Issue(e.from,e.to,"readability_observation",
-          "Measured legacy_n26 presentation capacity exceeded; advisory only; pagination policy is unchanged.",false));
+    for(RebuildProtocol.Event e:plan.events)if(!budget.canPresent(e,context.renderSpec))
+      all.add(context.renderSpec.legacy
+          ? new Issue(e.from,e.to,"readability_observation",
+              "Measured legacy_n26 presentation capacity exceeded; advisory only; pagination policy is unchanged.",false)
+          : new Issue(e.from,e.to,"presentation_geometry_observation",
+              "Preferred-font geometry is unresolved; retain accepted source/text, no paid repair; remeasure at presentation.",false));
     return new RebuildProtocol.Plan(plan.events,plan.json,Collections.unmodifiableList(all),plan.reboundEvents);
   }
   static boolean splitsFlaggedSubject(RebuildSource source,RebuildProtocol.Plan previous,

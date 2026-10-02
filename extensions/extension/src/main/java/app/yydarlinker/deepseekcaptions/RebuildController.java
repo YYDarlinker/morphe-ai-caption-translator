@@ -42,10 +42,17 @@ final class RebuildController {
   private static final RebuildClock CLOCK = new RebuildClock();
   private static volatile Session active;
   private static volatile String video = "";
+  private static volatile long publicationEpoch;
   private static WeakReference<Activity> activity = new WeakReference<>(null);
   private static boolean tickPosted;
   private static volatile boolean compact;
   private static long restoreUntil;
+
+  /** Preview reads the already-bound target; no UI-locale guess or mutable language setting. */
+  static CaptionRenderSpec previewRenderSpec() {
+    Session s=active;
+    return s==null || s.cancelled ? CaptionRenderSpec.LEGACY : s.languageContext.renderSpec;
+  }
 
   static final class Session {
     final long id = IDS.incrementAndGet();
@@ -65,6 +72,11 @@ final class RebuildController {
     int sourceFailures, repairCount;
     volatile int generation;
     volatile long renderRevision;
+    volatile long appliedRenderRevision;
+    volatile long renderSubmission;
+    final RebuildCache.Publication publication = new RebuildCache.Publication();
+    boolean[] cacheReading;
+    Job sourceJob;
     String cacheKey = "", lastShown = "";
     String fallbackReason = "";
     long fallbackStart = -1;
@@ -113,32 +125,52 @@ final class RebuildController {
     }
 
     void cancel() {
-      retire();
-      retired = false;
+      publication.revoke(true);
+      finishRetirement();
+      List<HttpURLConnection> disconnect;
       synchronized (connections) {
-        for (HttpURLConnection c : connections)
-          try { c.disconnect(); } catch (Exception ignored) { }
+        disconnect = new ArrayList<>(connections);
         connections.clear();
       }
+      for (HttpURLConnection c : disconnect)
+        try { c.disconnect(); } catch (Exception ignored) { }
     }
 
     /** Revoke publication on a scope change; an already sent HTTP may finish in its own scope. */
     void retire() {
-      synchronized(this){
-        endFallback(this,position,"session_end");
+      publication.revoke(false);
+      finishRetirement();
+    }
+
+    private void finishRetirement() {
+      publication.drain();
+      List<Notice> notices = new ArrayList<>();
+      synchronized (this) {
+        if (!cancelled) generation++;
+        cancelled = true;
+        retired = publication.finishSent();
+        endFallback(this, position, "session_end", notices);
         pausedDisplayPosition = -1;
         pausedHookState = null;
         pendingFocus = null;
+        if (pendingPlans != null) Arrays.fill(pendingPlans, null);
+        sourceJob = null;
+        loading = false;
+        renderRevision++;
       }
-      cancelled = true;
-      retired = true;
-      generation++;
+      flush(this, notices);
     }
 
     void noteSeek(long now) {
+      List<Notice> notices = new ArrayList<>();
+      synchronized (this) { noteSeek(now, notices); }
+      flush(this, notices);
+    }
+
+    private void noteSeek(long now, List<Notice> notices) {
       if (lastSeekAt >= 0 && now - lastSeekAt <= SEEK_STORM_WINDOW_MS) {
         prefetchPausedUntil = now + SEEK_STORM_PAUSE_MS;
-        CaptionDiagnostics.mark(context, "REBUILD_PREFETCH_PAUSED",
+        notice(notices, "REBUILD_PREFETCH_PAUSED",
             "session=" + id + ";pause_ms=" + SEEK_STORM_PAUSE_MS + ";until_ms=" + prefetchPausedUntil);
       }
       lastSeekAt = now;
@@ -174,7 +206,7 @@ final class RebuildController {
     }
 
     public boolean isCancelled() {
-      return cancelled || (!current(session) && !(sent && session.retired));
+      return cancelled || (!current(session) && !(sent && session.publication.finishSent()));
     }
 
     public void onConnection(HttpURLConnection c) {
@@ -234,8 +266,10 @@ final class RebuildController {
     }
   }
 
-  static synchronized boolean current(Session s) {
-    return s != null && active == s && !s.cancelled && (video.isEmpty() || video.equals(s.owner));
+  static boolean current(Session s) {
+    String owner = video;
+    return s != null && active == s && s.publication.isOpen() && !s.cancelled
+        && (owner.isEmpty() || owner.equals(s.owner));
   }
 
   static boolean visible() {
@@ -259,29 +293,68 @@ final class RebuildController {
     tick();
   }
 
-  static synchronized void video(String id) {
+  static void video(String id) {
     if (id == null || id.trim().isEmpty()) return;
     id = id.trim();
-    boolean changed = !id.equals(video);
-    video = id;
+    boolean changed;
+    Session previous = null;
+    long epoch;
+    synchronized (RebuildController.class) {
+      changed = !id.equals(video);
+      video = id;
+      if (changed && active != null && !id.equals(active.owner)) {
+        previous = active;
+        previous.publication.revoke(true);
+        active = null;
+        publicationEpoch++;
+      }
+      epoch = publicationEpoch;
+    }
+    if (previous != null) {
+      previous.cancel();
+      clear(epoch);
+      CaptionMusicSuppressor.kick();
+    }
     if (changed) {
       CLOCK.reset(SystemClock.elapsedRealtime());
       Activity currentActivity = activity.get();
       if (currentActivity != null)
         CaptionDiagnostics.mark(currentActivity, "REBUILD_STARTUP_PHASE",
             "phase=video_loaded;elapsed_ms=" + SystemClock.elapsedRealtime() + ";video=" + id);
-      Session s = active;
-      if (s != null && !id.equals(s.owner)) stop();
     }
     SemanticCaptionTimeline.onVideoId(id);
   }
 
-  static synchronized void stop() {
-    Session s = active;
-    active = null;
+  static void stop() {
+    Session s;
+    long epoch;
+    synchronized (RebuildController.class) {
+      s = active;
+      if (s != null) s.publication.revoke(true);
+      active = null;
+      epoch = ++publicationEpoch;
+    }
     if (s != null) s.cancel();
-    CaptionOverlay.clear();
+    clear(epoch);
     CaptionMusicSuppressor.kick();
+  }
+
+  private static void clear(long epoch) {
+    CaptionOverlay.clear(() -> publicationEpoch == epoch
+        && (active == null || active.renderRevision == 0));
+  }
+
+  private static final class Notice {
+    final String stage, detail;
+    Notice(String stage, String detail) { this.stage = stage; this.detail = detail; }
+  }
+
+  private static void notice(List<Notice> notices, String stage, String detail) {
+    notices.add(new Notice(stage, detail));
+  }
+
+  private static void flush(Session s, List<Notice> notices) {
+    for (Notice n : notices) CaptionDiagnostics.mark(s.context, n.stage, n.detail);
   }
 
   static void player(String type) {
@@ -358,13 +431,9 @@ final class RebuildController {
                 + target
                 + "|"
                 + original);
-    Session s;
-    synchronized (RebuildController.class) {
-      if (!video.isEmpty() && !video.equals(owner)) return;
-      Session prev = active;
-      // Track identity uses cache identity, not an expiring signature.
-      try {
-        key =
+    // Track identity uses cache identity, not an expiring signature. All preparation is lock-free.
+    try {
+      key =
             SourceCaptionCache.key(CaptionEngine.sourceCaptionUrl(url))
                 + "|"
                 + languageContext.fingerprint(cfg)
@@ -374,31 +443,50 @@ final class RebuildController {
                 + target
                 + "|"
                 + original;
-      } catch (Exception ignored) {
-      }
-      if(!languageContext.canApplyEnglishToChinese)key += "|"+languageContext.scope();
+    } catch (Exception ignored) {
+    }
+    if(!languageContext.canApplyEnglishToChinese)key += "|"+languageContext.scope();
+    Session candidate = new Session(c.getApplicationContext(), url, owner, key, target, cfg,
+        original, show, languageContext);
+    boolean unavailable = !original && !cfg.ready();
+    String unavailableStatus = unavailable ? CaptionStrings.get(c, "configure_api") : "";
+    Session s, previous = null;
+    long epoch;
+    synchronized (RebuildController.class) {
+      if (!video.isEmpty() && !video.equals(owner)) return;
+      Session prev = active;
       if (current(prev) && prev.identity.equals(key)
           && prev.languageContext.scope().equals(languageContext.scope())) {
-        prev.url = url;
-        prev.visible |= show;
-        if (prev.source == null && prev.sourceFailures > 0) {
-          prev.terminal = false;
-          prev.sourceRetry = 0;
-        }
         s = prev;
       } else {
-        if (prev != null) prev.retire();
-        s = new Session(c.getApplicationContext(), url, owner, key, target, cfg, original, show,languageContext);
+        previous = prev;
+        if (prev != null) prev.publication.revoke(false);
+        s = candidate;
         active = s;
-        CaptionDiagnostics.mark(s.context, "LANGUAGE_PROFILE_BOUND",
-            "session=" + s.id + ";" + s.languageContext.diagnosticFields());
-        CaptionOverlay.clear();
+        publicationEpoch++;
+      }
+      epoch = publicationEpoch;
+    }
+    if (previous != null) previous.retire();
+    long initialPosition = position(s);
+    synchronized (s) {
+      if (!current(s)) return;
+      s.url = url;
+      s.visible |= show;
+      if (s.source == null && s.sourceFailures > 0) {
+        s.terminal = false;
+        s.sourceRetry = 0;
+      }
+      s.position = initialPosition;
+      if (unavailable) {
+        s.terminal = true;
+        s.status = unavailableStatus;
       }
     }
-    s.position = position(s);
-    if (!original && !cfg.ready()) {
-      s.terminal = true;
-      s.status = CaptionStrings.get(c, "configure_api");
+    if (s == candidate) {
+      CaptionDiagnostics.mark(s.context, "LANGUAGE_PROFILE_BOUND",
+          "session=" + s.id + ";" + s.languageContext.diagnosticFields());
+      clear(epoch);
     }
     CaptionDiagnostics.mark(
         c,
@@ -416,15 +504,20 @@ final class RebuildController {
     Session s = active;
     if (!current(s)) return;
     PlaybackState state = playbackState();
+    long presentation = CLOCK.presentation(now);
+    List<Notice> notices = new ArrayList<>();
+    List<HttpURLConnection> disconnect = new ArrayList<>();
+    int generation;
     synchronized (s) {
-      if(seek){endFallback(s,s.position,"seek"); CaptionDiagnostics.mark(s.context,"REBUILD_SEEK","session="+s.id+";from="+s.position+";to="+ms); }
-      s.position = CLOCK.presentation(now);
+      if (!current(s)) return;
+      if(seek){endFallback(s,s.position,"seek",notices); notice(notices,"REBUILD_SEEK","session="+s.id+";from="+s.position+";to="+ms); }
+      s.position = presentation;
       // Explicit hooks take precedence over paused media jitter, including a small rewind.
       s.pausedDisplayPosition = state != null && state.getState() == PlaybackState.STATE_PAUSED
           ? Math.max(0, ms) : -1;
       s.pausedHookState = s.pausedDisplayPosition >= 0 ? state : null;
       if (seek) {
-        s.noteSeek(now);
+        s.noteSeek(now, notices);
         s.generation++;
         s.lastShown = "";
         s.displayedEvent=""; s.withheldEvent="";
@@ -432,11 +525,14 @@ final class RebuildController {
           for (Job j : s.jobs)
             if (j != null && !j.sent && s.blocks != null && !covers(s.blocks.get(j.index), ms)) {
               j.cancelled = true;
-              if (j.connection != null) j.connection.disconnect();
+              if (j.connection != null) disconnect.add(j.connection);
             }
       }
+      generation = s.generation;
     }
-    if (seek) CaptionOverlay.hide();
+    flush(s, notices);
+    for (HttpURLConnection c : disconnect) c.disconnect();
+    if (seek) CaptionOverlay.hide(() -> current(s) && s.generation == generation);
     CaptionOverlay.position(displayPosition(s));
     kick(s);
     scheduleTick();
@@ -521,8 +617,10 @@ final class RebuildController {
     if (!current(s)) return;
     // Surface detection must also run while a former miniplayer has hidden the overlay.
     CaptionOverlay.refreshSurface();
+    long observed = position(s);
     synchronized (s) {
-      s.position = position(s);
+      if (!current(s)) return;
+      s.position = observed;
     }
     CaptionOverlay.position(displayPosition(s));
     kick(s);
@@ -534,11 +632,13 @@ final class RebuildController {
     CaptionMusicSuppressor.kick();
     boolean load = false;
     synchronized (s) {
+      if (!current(s)) return;
       if (s.source == null
           && !s.loading
           && !s.terminal
           && SystemClock.elapsedRealtime() >= s.sourceRetry) {
         s.loading = true;
+        s.sourceJob = new Job(s, -1, false);
         load = true;
       }
     }
@@ -551,16 +651,21 @@ final class RebuildController {
   }
 
   private static void load(Session s) {
-    Job control = new Job(s, -1, false);
+    Job control;
+    synchronized (s) {
+      if (!current(s) || s.sourceJob == null) return;
+      control = s.sourceJob;
+    }
     try {
       startup(s, "source_load_start", "");
       RawCaptionSource.Source raw =
           RawCaptionSource.load(s.context, s.url, false, !s.sourceOnly, control);
       if (!current(s)) return;
+      long availablePosition = position(s);
       synchronized (s) {
-        if (!current(s)) return;
+        if (!current(s) || s.sourceJob != control) return;
         s.raw = raw;
-        s.position = position(s);
+        s.position = availablePosition;
       }
       startup(s, "source_available", "position_ms=" + s.position);
       // The parsed source cues are already time-bounded. Show the current one while
@@ -592,6 +697,7 @@ final class RebuildController {
       int[] states = new int[blocks.size()];
       int restored = 0;
       boolean[] checked=new boolean[blocks.size()];
+      int cacheGeneration = s.generation;
       long focus=position();int focusIndex=0;
       for(RebuildPlanner.Block b:blocks)if(b.start<=focus)focusIndex=b.index;
       for (RebuildPlanner.Block b : blocks) {
@@ -605,24 +711,37 @@ final class RebuildController {
         }
       }
       CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=cache;ms="+(SystemClock.elapsedRealtime()-phase));
+      long readyPosition = position(s);
+      RebuildProtocol.Plan[] pending = new RebuildProtocol.Plan[plans.length];
+      int[] attempts = new int[blocks.size()];
+      long[] retryAt = new long[blocks.size()];
+      String[] reasons = new String[blocks.size()];
+      Arrays.fill(reasons, "");
+      Job[] jobs = new Job[blocks.size()];
       synchronized (s) {
-        if (!current(s)) return;
+        if (!current(s) || s.sourceJob != control) return;
+        if (cacheGeneration != s.generation) {
+          Arrays.fill(plans, null);
+          Arrays.fill(states, WAITING);
+          Arrays.fill(checked, false);
+          restored = 0;
+        }
         s.source = source;
         s.cacheKey = key;
         s.plans = plans;
-        s.pendingPlans = new RebuildProtocol.Plan[plans.length];
+        s.pendingPlans = pending;
         s.states = states;
-        s.attempts = new int[blocks.size()];
-        s.retryAt = new long[blocks.size()];
-        s.reasons = new String[blocks.size()];
-        Arrays.fill(s.reasons, "");
-        s.jobs = new Job[blocks.size()];
+        s.attempts = attempts;
+        s.retryAt = retryAt;
+        s.reasons = reasons;
+        s.jobs = jobs;
         s.cacheChecked=checked;
         s.loading = false;
+        s.sourceJob = null;
         s.status = "";
         s.everReady = restored > 0;
         s.blocks = blocks;
-        s.position = position(s);
+        s.position = readyPosition;
       }
       startup(s, "engine_ready", "position_ms=" + s.position);
       if (!blocks.isEmpty() && s.position >= blocks.get(0).end)
@@ -656,18 +775,23 @@ final class RebuildController {
     } catch (Exception e) {
       if (!current(s)) return;
       SourceRecoveryPolicy.Failure f = SourceRecoveryPolicy.classify(e);
+      String failureStatus = CaptionStrings.get(s.context,
+          !f.retryable ? "source_unavailable" : "source_retry");
+      int failureCount;
       synchronized (s) {
+        if (!current(s) || s.sourceJob != control) return;
         s.loading = false;
+        s.sourceJob = null;
         s.sourceFailures++;
         s.terminal = !f.retryable;
         s.sourceRetry =
             SystemClock.elapsedRealtime()
                 + SourceRecoveryPolicy.delay(s.sourceFailures, f.retryAfterMs);
-        s.status =
-            CaptionStrings.get(s.context, s.terminal ? "source_unavailable" : "source_retry");
+        s.status = failureStatus;
+        failureCount = s.sourceFailures;
       }
       CaptionDiagnostics.mark(
-          s.context, "REBUILD_SOURCE_ERROR", f.category + ";attempt=" + s.sourceFailures);
+          s.context, "REBUILD_SOURCE_ERROR", f.category + ";attempt=" + failureCount);
       render(s);
     }
   }
@@ -724,7 +848,7 @@ final class RebuildController {
    * Drops the retained newest foreground request without dispatching it: the block goes back to WAITING so
    * the next landing can reuse it, and no attempt or repair quota is charged.
    */
-  private static void retirePendingFocus(Session s, String reason, int nextBlock) {
+  private static void retirePendingFocus(Session s, String reason, int nextBlock, List<Notice> notices) {
     Job pending = s.pendingFocus;
     if (pending == null) return;
     s.pendingFocus = null;
@@ -734,18 +858,79 @@ final class RebuildController {
       s.states[pending.index] = WAITING;
       s.retryAt[pending.index] = SystemClock.elapsedRealtime() + 500;
     }
-    CaptionDiagnostics.mark(s.context, "REBUILD_FOCUS_PENDING_REPLACED",
+    notice(notices, "REBUILD_FOCUS_PENDING_REPLACED",
         "session=" + s.id + ";request=" + pending.traceId + ";block=" + pending.index
             + ";reason=" + reason + ";next_block=" + nextBlock
             + ";attempts_consumed=0;session_repairs_consumed=0"
             + ";replaced_total=" + s.replacedFocus);
   }
 
+  private static final class CacheLookup {
+    final int generation;
+    final RebuildSource source;
+    final RebuildPlanner.Block block;
+    final String key;
+    final Job job;
+    CacheLookup(Session s, RebuildPlanner.Block block) {
+      generation = s.generation; source = s.source; key = s.cacheKey;
+      this.block = block; job = s.jobs[block.index];
+    }
+  }
+
+  private static void restoreCandidates(Session s, long now, boolean playbackAhead) {
+    List<CacheLookup> lookups = new ArrayList<>();
+    synchronized (s) {
+      if (!current(s) || s.blocks == null || s.blocks.isEmpty() || s.cacheChecked == null
+          || now < s.providerRetry) return;
+      if (s.cacheReading == null) s.cacheReading = new boolean[s.blocks.size()];
+      int index = currentIndex(s);
+      boolean ahead = playbackAhead && now >= s.prefetchPausedUntil
+          && (s.plans[index] != null || s.states[index] == FAILED
+              || s.jobs[index] != null && s.jobs[index].sent);
+      int prefetch = dispatched(s, false);
+      for (int i = index; i < s.blocks.size(); i++) {
+        RebuildPlanner.Block b = s.blocks.get(i);
+        if (b.start > s.position + 30000 || i > index
+            && (!ahead || !s.everReady || prefetch >= MAX_PREFETCH_CONCURRENCY)) break;
+        if (s.states[i] == WAITING && s.retryAt[i] <= now && s.plans[i] == null
+            && !s.cacheChecked[i] && !s.cacheReading[i]) {
+          s.cacheReading[i] = true;
+          lookups.add(new CacheLookup(s, b));
+        }
+      }
+    }
+    for (CacheLookup lookup : lookups) {
+      RebuildProtocol.Plan cached = RebuildCache.read(s.context, lookup.key, lookup.source,
+          lookup.block, s.languageContext);
+      boolean admitted = false;
+      synchronized (s) {
+        s.cacheReading[lookup.block.index] = false;
+        if (current(s) && s.generation == lookup.generation && s.source == lookup.source
+            && s.cacheKey.equals(lookup.key) && s.jobs[lookup.block.index] == lookup.job) {
+          s.cacheChecked[lookup.block.index] = true;
+          if (cached != null) {
+            s.plans[lookup.block.index] = cached;
+            s.states[lookup.block.index] = READY;
+            s.everReady = true;
+            admitted = true;
+          }
+        }
+      }
+      TokenCostAudit.recordUnitCacheOutcome(1, admitted ? 1 : 0);
+      if (admitted) CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_RESTORED",
+          "session=" + s.id + ";block=" + lookup.block.index + ";network_calls=0"
+              + ";path=memory_then_disk_before_network");
+    }
+  }
+
   private static void schedule(Session s) {
     List<Job> start = new ArrayList<>();
+    List<Notice> notices = new ArrayList<>();
     long now = SystemClock.elapsedRealtime();
+    boolean playbackAhead = !paused() && CLOCK.fresh(now);
+    restoreCandidates(s, now, playbackAhead);
     synchronized (s) {
-      if (!current(s) || s.blocks == null || now < s.providerRetry) return;
+      if (!current(s) || s.blocks == null || s.blocks.isEmpty() || now < s.providerRetry) return;
       int index = currentIndex(s);
       int focusDispatched = dispatched(s, true);
       int prefetchDispatched = dispatched(s, false);
@@ -753,7 +938,7 @@ final class RebuildController {
       if (s.pendingFocus != null
           && (s.pendingFocus.cancelled || s.pendingFocus.index != index)) {
         retirePendingFocus(s,
-            s.pendingFocus.cancelled ? "cancelled_by_seek" : "superseded_by_seek", index);
+            s.pendingFocus.cancelled ? "cancelled_by_seek" : "superseded_by_seek", index, notices);
       }
       // D2: the newest landing takes the free foreground slot immediately when one exists.
       if (s.pendingFocus != null && focusDispatched < MAX_FOCUS_CONCURRENCY) {
@@ -762,7 +947,7 @@ final class RebuildController {
         markDispatched(s, promote);
         start.add(promote);
         focusDispatched++;
-        CaptionDiagnostics.mark(s.context, "REBUILD_FOCUS_PENDING_PROMOTED",
+        notice(notices, "REBUILD_FOCUS_PENDING_PROMOTED",
             "session=" + s.id + ";request=" + promote.traceId + ";block=" + promote.index
                 + ";focus_in_flight=" + focusDispatched);
       }
@@ -774,8 +959,7 @@ final class RebuildController {
       boolean allowAhead =
           focusUnderWay
               && now >= s.prefetchPausedUntil
-              && !paused()
-              && CLOCK.fresh(now);
+              && playbackAhead;
       for (int i = index; i < s.blocks.size(); i++) {
         RebuildPlanner.Block b = s.blocks.get(i);
         if (b.start > s.position + 30000) break;
@@ -786,27 +970,15 @@ final class RebuildController {
         if (s.states[i] != WAITING || s.retryAt[i] > now) {
           // D3: an existing job for this block is reused, whichever lane it came from.
           if (s.jobs[i] != null && s.plans[i] == null && s.states[i] == RUNNING)
-            CaptionDiagnostics.mark(s.context, "REBUILD_BLOCK_REUSED",
+            notice(notices, "REBUILD_BLOCK_REUSED",
                 "session=" + s.id + ";block=" + b.index
                     + ";reason=" + (s.jobs[i].priority ? "in_flight_focus" : "in_flight_prefetch")
                     + ";request=" + s.jobs[i].traceId + ";dispatched=" + s.jobs[i].dispatched);
           continue;
         }
-        // A ready memory plan wins first; lazy disk restoration never waits for a network lane.
-        if (s.plans[i] == null && s.cacheChecked != null && !s.cacheChecked[i]) {
-          s.cacheChecked[i] = true;
-          RebuildProtocol.Plan cached = RebuildCache.read(s.context, s.cacheKey, s.source, b,s.languageContext);
-          TokenCostAudit.recordUnitCacheOutcome(1, cached == null ? 0 : 1);
-          if (cached != null) {
-            s.plans[i] = cached;
-            s.states[i] = READY;
-            s.everReady = true;
-            CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_RESTORED",
-                "session=" + s.id + ";block=" + b.index + ";network_calls=0"
-                    + ";path=memory_then_disk_before_network");
-            continue;
-          }
-        }
+        // Disk candidates are reserved/read outside the monitor before any lane is charged.
+        if (s.cacheReading != null && s.cacheReading[i]
+            || s.cacheChecked != null && !s.cacheChecked[i]) continue;
         int maxAttempts =
             RebuildReview.hasSemanticRepairRisk(s.plans[i])
                 ? RebuildReview.MAX_SEMANTIC_ATTEMPTS
@@ -828,10 +1000,10 @@ final class RebuildController {
         s.jobs[i] = job;
         if (focus && focusDispatched >= MAX_FOCUS_CONCURRENCY) {
           // Both foreground slots are busy: keep only this newest landing and drop any older pending one.
-          if (s.pendingFocus != null) retirePendingFocus(s, "superseded_by_newer_focus", i);
+          if (s.pendingFocus != null) retirePendingFocus(s, "superseded_by_newer_focus", i, notices);
           s.states[i] = RUNNING;
           s.pendingFocus = job;
-          CaptionDiagnostics.mark(s.context, "REBUILD_FOCUS_PENDING_HELD",
+          notice(notices, "REBUILD_FOCUS_PENDING_HELD",
               "session=" + s.id + ";request=" + job.traceId + ";block=" + b.index
                   + ";focus_in_flight=" + focusDispatched + ";prefetch_in_flight=" + prefetchDispatched);
           break;
@@ -842,6 +1014,7 @@ final class RebuildController {
         else prefetchDispatched++;
       }
     }
+    flush(s, notices);
     for (Job j : start) {
       RebuildPlanner.Block b = s.blocks.get(j.index);
       CaptionDiagnostics.mark(
@@ -888,26 +1061,53 @@ final class RebuildController {
     Session s = job.session;
     RebuildPlanner.Block b = s.blocks.get(job.index);
     RebuildProtocol.Plan accepted = null;
+    RebuildCache.Prepared prepared = null;
+    RebuildCache.Permit permit = null;
+    List<Notice> notices = new ArrayList<>();
     try {
       job.slotWaitMs = SystemClock.elapsedRealtime() - job.queuedAt;
       RawCaptionSource.checkActive(job);
-      boolean restoredFromCache=false;
       if(accepted==null) accepted =
           RebuildApi.translate(
               s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index],job.languageContext);
+      RebuildProtocol.Plan candidate = accepted, old;
+      int generation;
+      boolean subjectSplit;
+      for (;;) {
+        synchronized (s) {
+          if (!current(s) || s.jobs[job.index] != job) return;
+          if (job.cancelled) { finishCancelled(s, job); return; }
+          old = s.plans[job.index];
+          generation = s.generation;
+        }
+        subjectSplit = RebuildReview.splitsFlaggedSubject(s.source, old, candidate, job.languageContext);
+        accepted = RebuildReview.prefer(old, candidate, s.source, job.languageContext);
+        if (prepared != null) { prepared.close(); prepared = null; }
+        if (RebuildReview.score(accepted.issues) == 0)
+          prepared = RebuildCache.prepare(s.context, s.cacheKey, s.source, b, accepted, job.languageContext);
+        synchronized (s) {
+          if (!current(s) || s.jobs[job.index] != job) return;
+          if (job.cancelled) { finishCancelled(s, job); return; }
+          if (s.generation != generation || s.plans[job.index] != old) continue;
+          permit = s.publication.reserve();
+          if (permit == null) return;
+        }
+        break;
+      }
+      // Preparation/fsync is outside all lifecycle monitors. Admission and revoke share one CAS.
+      boolean durable = prepared != null && prepared.commit();
       synchronized (s) {
-        if (!current(s)) return;
-        if (job.cancelled) { finishCancelled(s, job); return; }
-        if(restoredFromCache)s.attempts[job.index]=Math.max(0,s.attempts[job.index]-1);
-        RebuildProtocol.Plan candidate=accepted;
-        RebuildProtocol.Plan old=s.plans[job.index];
-        boolean subjectSplit=RebuildReview.splitsFlaggedSubject(s.source,old,candidate,job.languageContext);
-        accepted = RebuildReview.prefer(old,candidate,s.source,job.languageContext);
+        if (!current(s) || s.jobs[job.index] != job) return;
+        if (job.cancelled || s.generation != generation) {
+          finishCancelled(s, job);
+          if (s.cacheChecked != null) s.cacheChecked[job.index] = false;
+          return;
+        }
         if(subjectSplit)
-          CaptionDiagnostics.mark(s.context,"REBUILD_REPAIR_SUBJECT_SPLIT_REJECTED",
+          notice(notices,"REBUILD_REPAIR_SUBJECT_SPLIT_REJECTED",
               "session="+s.id+";request="+job.traceId+";block="+b.index+";attempts="+s.attempts[job.index]);
         if(old!=null && accepted==old && candidate!=old && RebuildReview.score(old.issues)>0)
-          CaptionDiagnostics.mark(s.context,"REBUILD_REPAIR_NO_PROGRESS",
+          notice(notices,"REBUILD_REPAIR_NO_PROGRESS",
               "session="+s.id+";request="+job.traceId+";block="+b.index+";old_risks="+RebuildReview.score(old.issues)+";candidate_risks="+RebuildReview.score(candidate.issues));
         RebuildProtocol.Event onScreen=old==null?null:old.at(s.position);
         String onScreenId=onScreen==null?"":job.index+":"+onScreen.from+"-"+onScreen.to;
@@ -923,22 +1123,22 @@ final class RebuildController {
         s.jobs[job.index] = null;
         s.everReady = true;
       }
+      permit.close();
+      permit = null;
+      if (RebuildReview.score(accepted.issues) == 0) {
+        if (!durable) CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_WRITE_FAILED",
+            "session=" + s.id + ";block=" + b.index);
+        else RebuildCache.trim(s.context);
+      }
+      flush(s, notices);
       for(RebuildReview.Issue issue:accepted.issues)
         CaptionDiagnostics.mark(s.context,"REBUILD_QUALITY_WARNING","session="+s.id+";request="+job.traceId+";block="+b.index+";advisory=true;repair_candidate="+issue.repair+";"+issue.describe());
-      if(DeepSeekConfig.displayTextDebugEnabled(s.context)) for(RebuildProtocol.Event event:accepted.events) {
+      if(s.languageContext.renderSpec.legacy && DeepSeekConfig.displayTextDebugEnabled(s.context)) for(RebuildProtocol.Event event:accepted.events) {
         int count=(int)event.text.codePoints().filter(c->!Character.isWhitespace(c)).count();
         double cps=count*1000.0/Math.max(1,event.end-event.start);
         if(count>48 || cps>12)CaptionDiagnostics.mark(s.context,"REBUILD_READABILITY_WARNING","block="+b.index+";range="+event.from+"-"+event.to+";duration="+(event.end-event.start)+";characters="+count+";cps="+String.format(Locale.ROOT,"%.2f",cps)+";advisory_only=true");
       }
-      // Finish durable storage before reporting acceptance, so a new session cannot
-      // observe the accepted block while its cache write is still queued.
-      synchronized(RebuildController.class) {
-        if(!current(s))return;
-        if (!restoredFromCache && RebuildReview.score(accepted.issues) == 0
-            && !RebuildCache.write(s.context, s.cacheKey, s.source,b,accepted,job.languageContext))
-          CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_WRITE_FAILED",
-              "session=" + s.id + ";block=" + b.index);
-      }
+      if (!current(s)) return;
       CaptionDiagnostics.mark(
           s.context,
           "REBUILD_EVENTS_ACCEPTED",
@@ -951,22 +1151,26 @@ final class RebuildController {
               + s.attempts[b.index]);
     } catch (Exception e) {
       if (!current(s)) return;
+      String code = e instanceof RebuildProtocol.Invalid ? ((RebuildProtocol.Invalid) e).code
+          : e instanceof RebuildApi.Failure ? ((RebuildApi.Failure) e).code
+          : e.getClass().getSimpleName();
+      boolean fatal = e instanceof RebuildApi.Failure && ((RebuildApi.Failure) e).configuration;
+      String configurationStatus = fatal
+          ? String.format(Locale.ROOT, CaptionStrings.settings(s.context, "api_config_error"), code) : "";
+      String rejectionReason = code + (e instanceof RebuildProtocol.Invalid
+          && !((RebuildProtocol.Invalid)e).detail.isEmpty() ? "; " + ((RebuildProtocol.Invalid)e).detail : "");
+      String redactedReason = CaptionQualityTrace.redact(rejectionReason, s.config.apiKey, 400);
+      notices.clear();
       synchronized (s) {
+        if (!current(s) || s.jobs[job.index] != job) return;
         if (job.cancelled) {
           finishCancelled(s, job);
         } else {
           s.jobs[job.index] = null;
-          String code =
-              e instanceof RebuildProtocol.Invalid
-                  ? ((RebuildProtocol.Invalid) e).code
-                  : e instanceof RebuildApi.Failure
-                      ? ((RebuildApi.Failure) e).code
-                      : e.getClass().getSimpleName();
-          s.reasons[job.index] = code + (e instanceof RebuildProtocol.Invalid && !((RebuildProtocol.Invalid)e).detail.isEmpty() ? "; "+((RebuildProtocol.Invalid)e).detail : "");
-          boolean fatal = e instanceof RebuildApi.Failure && ((RebuildApi.Failure) e).configuration;
+          s.reasons[job.index] = rejectionReason;
           if (fatal) {
             s.terminal = true;
-            s.status = String.format(java.util.Locale.ROOT, CaptionStrings.settings(s.context, "api_config_error"), code);
+            s.status = configurationStatus;
           }
           boolean filtered =
               e instanceof RebuildApi.Failure
@@ -987,15 +1191,15 @@ final class RebuildController {
           if (code.equals("http_429") || code.startsWith("http_5"))
             s.providerRetry =
                 Math.max(s.providerRetry, SystemClock.elapsedRealtime() + Math.max(5000, delay));
-          CaptionDiagnostics.mark(
-              s.context,
+          notice(
+              notices,
               "REBUILD_EVENTS_REJECTED",
               "block="
                   + b.index
                   + ";reason="
                   + code
                   + ";session="+s.id+";request="+job.traceId
-                  + ";detail="+CaptionQualityTrace.redact(s.reasons[job.index],s.config.apiKey,400)
+                  + ";detail="+redactedReason
                   + ";attempts="
                   + s.attempts[b.index]
                   + ";session_repairs="
@@ -1004,23 +1208,28 @@ final class RebuildController {
           if(s.plans[job.index]!=null && !fatal) s.states[job.index]=READY;
         }
       }
+      flush(s, notices);
     } finally {
+      if (permit != null) permit.close();
+      if (prepared != null) prepared.close();
       job.trace("REBUILD_WAIT_BREAKDOWN", "purpose=" + (job.priority ? "focus" : "prefetch")
           + ";slot_wait_ms=" + job.slotWaitMs + ";network_ms=" + job.networkMs
           + ";validation_ms=" + Math.max(0, SystemClock.elapsedRealtime() - job.queuedAt - job.slotWaitMs - job.networkMs)
           + ";validation_repair_retries=" + Math.max(0, s.attempts[job.index] - 1)
           + ";http_rounds=" + job.httpRounds + ";cancelled=" + job.cancelled
           + ";dispatched=" + job.dispatched + ";sent=" + job.sent);
+      notices.clear();
       synchronized (s) {
         int focusLeft = dispatched(s, true, job), prefetchLeft = dispatched(s, false, job);
         if (job.dispatched)
-          CaptionDiagnostics.mark(s.context, "REBUILD_LANE_RELEASED",
+          notice(notices, "REBUILD_LANE_RELEASED",
               "session=" + s.id + ";request=" + job.traceId + ";block=" + job.index
                   + ";purpose=" + (job.priority ? "focus" : "prefetch")
                   + ";focus_in_flight=" + focusLeft + ";prefetch_in_flight=" + prefetchLeft
                   + ";translation_in_flight=" + (focusLeft + prefetchLeft)
                   + ";pending_focus_block=" + (s.pendingFocus == null ? -1 : s.pendingFocus.index));
       }
+      flush(s, notices);
       if (current(s)) kick(s);
     }
   }
@@ -1047,8 +1256,8 @@ final class RebuildController {
     return cue == null ? "" : cue.text;
   }
 
-  private static void endFallback(Session s,long position,String cause) {
-    if(!s.fallbackReason.isEmpty())CaptionDiagnostics.mark(s.context,"REBUILD_FALLBACK_END",
+  private static void endFallback(Session s,long position,String cause,List<Notice> notices) {
+    if(!s.fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_END",
         "session="+s.id+";start="+s.fallbackStart+";end="+position+";cause="+cause+";reason="+CaptionQualityTrace.redact(s.fallbackReason,s.config.apiKey,400));
     s.fallbackReason="";s.fallbackStart=-1;
   }
@@ -1075,7 +1284,7 @@ final class RebuildController {
 
   private static RebuildDisplayMerge.Merged displayMergeForCurrent(Session s,
       RebuildProtocol.Event event, long position) {
-    if (s.source == null || event == null) return null;
+    if (!s.languageContext.renderSpec.legacy || s.source == null || event == null) return null;
     if (RebuildDisplayMerge.isLead(event)) {
       RebuildProtocol.Event next = adjacentEvent(s, event, true);
       RebuildDisplayMerge.Merged deferred = RebuildDisplayMerge.merge(s.source, event, next);
@@ -1097,14 +1306,17 @@ final class RebuildController {
 
   private static void render(Session s) {
     if (!current(s) || !s.visible) return;
+    String translating = CaptionStrings.get(s.context, "caption_translating");
+    List<Notice> notices = new ArrayList<>();
     String text = "";
     String fallbackReason = "";
     boolean status = false;
     int generation;
-    long revision, selectedAt, observedAt;
+    long revision, submission, selectedAt, observedAt;
     String eventId = "none";
     long eventStart = -1, eventEnd = -1;
     synchronized (s) {
+      if (!current(s) || !s.visible) return;
       generation = s.generation;
       observedAt = s.position;
       selectedAt = displayPosition(s);
@@ -1114,14 +1326,14 @@ final class RebuildController {
       } else if (s.source == null && s.raw != null && !s.sourceOnly && !s.terminal) {
         CaptionDocument.Cue cue = originalCue(s, selectedAt);
         if (cue != null) {
-          text = CaptionStrings.get(s.context, "caption_translating");
+          text = translating;
           eventId = "source:raw:" + cue.startMs + "_" + cue.endMs;
           eventStart = cue.startMs;
           eventEnd = cue.endMs;
           fallbackReason = "pending_engine";
         }
       } else if (s.source == null) {
-        text = s.status.isEmpty() ? CaptionStrings.get(s.context, "caption_translating") : s.status;
+        text = s.status.isEmpty() ? translating : s.status;
         status = true;
       } else if (s.sourceOnly) text = original(s, selectedAt);
       else if (s.terminal) {
@@ -1158,12 +1370,13 @@ final class RebuildController {
                 text = merged.text;
               }
               boolean late = merged == null && !eventId.equals(s.displayedEvent)
+                  && s.languageContext.renderSpec.legacy
                   && (eventId.equals(s.withheldEvent) || lateUnreadable(e,selectedAt));
               if(blocked || late) {
-                if(late && !eventId.equals(s.withheldEvent))CaptionDiagnostics.mark(s.context,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
+                if(late && !eventId.equals(s.withheldEvent))notice(notices,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
                 if(late)s.withheldEvent=eventId;
                 // Keep the existing owned window; only the diagnostic explains a rejection.
-                text = blocked ? "" : CaptionStrings.get(s.context, "caption_translating");
+                text = blocked ? "" : translating;
                 eventId = "source:" + eventId;
                 fallbackReason=blocked?"event_review":"late_unreadable";
               } else s.displayedEvent=eventId;
@@ -1178,7 +1391,7 @@ final class RebuildController {
               eventStart=Math.max(cue.startMs,block.start);
               eventEnd=Math.min(cue.endMs,block.end);
               if(eventStart<=selectedAt && selectedAt<eventEnd) {
-                text=s.states[i]==FAILED ? "" : CaptionStrings.get(s.context, "caption_translating");
+                text=s.states[i]==FAILED ? "" : translating;
                 eventId="source:"+i+":"+eventStart+"_"+eventEnd;
               }
             }
@@ -1186,18 +1399,33 @@ final class RebuildController {
         }
       }
       if(!fallbackReason.equals(s.fallbackReason)) {
-        endFallback(s,s.position,"state_change");
+        endFallback(s,s.position,"state_change",notices);
         s.fallbackReason=fallbackReason;s.fallbackStart=s.position;
-        if(!fallbackReason.isEmpty())CaptionDiagnostics.mark(s.context,"REBUILD_FALLBACK_BEGIN",
+        if(!fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_BEGIN",
             "session="+s.id+";position="+s.position+";reason="+CaptionQualityTrace.redact(fallbackReason,s.config.apiKey,400));
       }
       String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
-      if (signature.equals(s.lastShown)) return;
-      s.lastShown = signature;
-      revision = ++s.renderRevision;
+      if (signature.equals(s.lastShown) && s.appliedRenderRevision == s.renderRevision) {
+        revision = -1;
+        submission = -1;
+      } else {
+        if (!signature.equals(s.lastShown)) {
+          s.lastShown = signature;
+          s.renderRevision++;
+        }
+        revision = s.renderRevision;
+        submission = ++s.renderSubmission;
+      }
     }
-    CaptionOverlay.RenderGuard guard =
-        () -> current(s) && s.generation == generation && s.renderRevision == revision && s.visible;
+    flush(s, notices);
+    if (revision < 0) return;
+    CaptionOverlay.RenderGuard guard = new CaptionOverlay.RenderGuard() {
+      public boolean isValid() {
+        return current(s) && s.generation == generation && s.renderRevision == revision
+            && s.renderSubmission == submission && s.visible;
+      }
+      public void onApplied() { if (isValid()) s.appliedRenderRevision = revision; }
+    };
     if (status) CaptionOverlay.showStatus(text, guard);
     else if (text.isEmpty() && fallbackReason.isEmpty()) CaptionOverlay.hide(guard);
     else if (fallbackReason.equals("pending_engine") || fallbackReason.equals("pending_translation")
@@ -1207,7 +1435,7 @@ final class RebuildController {
     else
       CaptionOverlay.showEvent(
           text, guard, () -> "", s.id + ":" + generation + ":" + eventId,
-          eventStart, eventEnd, selectedAt);
+          eventStart, eventEnd, selectedAt,s.languageContext.renderSpec);
     if (DeepSeekConfig.displayTextDebugEnabled(s.context))
       CaptionDiagnostics.mark(
           s.context,

@@ -9,6 +9,7 @@ final class CaptionLanguageContext {
   static final CaptionLanguageContext LEGACY = new CaptionLanguageContext("en", "zh-Hans");
   final String sourceCode, targetCode, sourceProvenance;
   final CaptionLanguageProfile profile;
+  final CaptionRenderSpec renderSpec;
   final boolean canApplyEnglishToChinese, chineseFamily, englishSource;
   private CaptionLanguageContext(String source, String target) {
     sourceCode=CaptionLanguageProfile.normalizeCode(source);
@@ -16,6 +17,7 @@ final class CaptionLanguageContext {
     sourceProvenance=sourceCode.equals("UNKNOWN") ? "UNKNOWN" : "url_lang";
     profile=CaptionLanguageProfile.fromCode(targetCode);
     chineseFamily=Locale.forLanguageTag(targetCode).getLanguage().equals("zh");
+    renderSpec=new CaptionRenderSpec(targetCode,profile,chineseFamily);
     englishSource=Locale.forLanguageTag(sourceCode).getLanguage().equals("en");
     canApplyEnglishToChinese=englishSource
         && (profile.id.equals("zh-Hans") || profile.id.equals("zh-Hant"));
@@ -54,6 +56,6 @@ final class CaptionLanguageContext {
         +";policy_version="+POLICY_VERSION+";source_provenance="+sourceProvenance
         +";reading_counter="+profile.readingCounterId()+";line_counter="+profile.lineCounterId()
         +";direction="+profile.direction+";strategy="+(canApplyEnglishToChinese ? "legacy_en_zh" : "neutral")
-        +";presentation_policy=legacy_n26";
+        +";presentation_policy="+renderSpec.presentationPolicy;
   }
 }

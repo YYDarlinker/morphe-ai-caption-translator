@@ -50,6 +50,16 @@ final class RebuildPageLayout {
         expandedSeams(text, offset), true);
   }
 
+  /** Target-aware production entry. Chinese retains the exact N26 algorithm above. */
+  static List<Page> plan(String text,long start,long end,CaptionOverlay.LayoutBudget budget,
+      CaptionRenderSpec spec) {
+    if(budget==null || spec==null) return Collections.emptyList();
+    CaptionOverlay.LayoutBudget measured=budget.withSpec(spec);
+    if(spec.legacy) return plan(text,start,end,measured::fitsPreferred,
+        value -> spec.layout(value,measured.preferredPx,measured.width).getLineCount()<=1);
+    return CaptionLanguagePager.plan(text,start,end,measured,spec);
+  }
+
   private static List<Page> choose(String text, long start, long end,
       Predicate<String> fitsTwo, Predicate<String> fitsOne, int[] offset,
       List<Integer> seams, boolean fallback) {

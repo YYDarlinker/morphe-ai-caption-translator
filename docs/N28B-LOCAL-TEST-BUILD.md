@@ -6,7 +6,7 @@
 
 唯一施工仓库 `E:\Projects\morphe-caption-v2`；开工 HEAD `c518823`，源码 `d683e59` / `anchor/n28a-d683e59`。开工规划者改动为 CODEX-EXECUTION-WORKFLOW、PROJECT-STATE、N28A-REVIEW 和 N28B-CODEX-TASK；全部保留随卡提交。两份实时状态开工 SHA 相同：`4ABDF88AA70FB233E0E0EA25ECE23096F50504589E52662E6582CD80D37581F7`。未读取撤回 N28 的实现/旧改动测试来恢复产品。
 
-实际产品修改十个既有 Java 文件：CaptionLanguageContext、DeepSeekConfig、RebuildController、RebuildApi、RebuildProtocol、RebuildPlanner、RebuildReview、RebuildSemantics、RebuildNumbers、RebuildCache。没有新增可变 currentLanguage，全链路使用一个 immutable Session/Job context；新增逻辑类型是 RebuildNumbers.Result enum。源码提交与锚点：`N28B_SOURCE_COMMIT_PENDING`（首次实现提交后以 docs-only 写实）。
+实际产品修改十个既有 Java 文件：CaptionLanguageContext、DeepSeekConfig、RebuildController、RebuildApi、RebuildProtocol、RebuildPlanner、RebuildReview、RebuildSemantics、RebuildNumbers、RebuildCache。没有新增可变 currentLanguage，全链路使用一个 immutable Session/Job context；新增逻辑类型是 RebuildNumbers.Result enum。源码提交与锚点：`d02d7ccefbd3847d7c1df3b0306e22a3a14429f0（短d02d7cc，anchor/n28b-d02d7cc）`（首次实现提交后以 docs-only 写实）。
 
 冻结 blob 与 N28A 完全相同：RebuildPageLayout、CaptionOverlayV2 / LayoutBudget、字号/FontMetrics/RTL/触摸、NativeCaptionBridge、TargetLanguage、RebuildSource、CaptionUnicode、CaptionLanguageProfile，所有 patch Kotlin/指纹与资源（27 个跟踪文件）、build 配置、依赖、ACCEPTANCE 和 frozen-baseline。源 word/token/quote/time/静音/显式 speaker 生成未改。调度槽位、预取/storm、超时、重试额度和 provider 鉴权/参数协商/response format 未改。所有用户值、保存函数、UI 默认显示/资源、Keystore 与 profile 管理均保留。
 

@@ -15,7 +15,7 @@ import org.robolectric.*;
 import org.robolectric.annotation.*;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28,shadows={RebuildIntegrationTest.Keys.class,RebuildLayoutTest.Geometry.class})
+@Config(sdk=28,shadows={N29InstallationSafetyTest.Installed.class,RebuildIntegrationTest.Keys.class,RebuildLayoutTest.Geometry.class})
 @GraphicsMode(GraphicsMode.Mode.NATIVE) @LooperMode(LooperMode.Mode.PAUSED)
 public class N28BProductionTest {
   RebuildIntegrationTest h;

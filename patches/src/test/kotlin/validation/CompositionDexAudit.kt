@@ -16,6 +16,46 @@ fun main(args:Array<String>){
     val support=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
     val flags=support.methods.filter { it.name.endsWith("Installed") }.associate { method -> method.name to method.implementation!!.instructions.filterIsInstance<WideLiteralInstruction>().single().wideLiteral }
     println("FEATURES=$flags")
+    val hostHooks=mutableMapOf<String,Int>()
+    classes.values.filterNot { it.type.startsWith("Lapp/yydarlinker/") }.forEach { cls -> cls.methods.forEach { m ->
+        m.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.forEach { ins ->
+            val r=ins.reference as? MethodReference
+            if(r!=null && r.definingClass.startsWith("Lapp/yydarlinker/deepseekcaptions/"))hostHooks[r.name]=(hostHooks[r.name]?:0)+1
+        }
+    } }
+    println("HOST_HOOKS=$hostHooks")
+    val requiredAI=flags["aiInstalled"]==1L || (hostHooks["rewriteUrl"]?:0)>0 || (hostHooks["onMenu"]?:0)>0
+    if(requiredAI) {
+        val required=listOf("onMenu","observeMenuPath","suppressNativeDraw","initialize","onNativeTrackApplied","consumePathCopy","rewriteUrl")
+        val missing=required.filter { (hostHooks[it]?:0)!=1 }
+        check(missing.isEmpty()) { "AI finalizer incomplete: missing/nonunique host hooks ${missing.map { it+"="+(hostHooks[it]?:0) }}" }
+        check(flags["aiInstalled"]==1L) { "AI finalizer incomplete: immutable installation permission not published" }
+        val renderer=classes.getValue("Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;")
+        val draw=renderer.methods.filter { it.name=="draw" && it.parameterTypes.map { t->t.toString() }==listOf("Landroid/graphics/Canvas;") && it.returnType=="V" }.singleOrNull()
+        check(draw!=null) { "AI finalizer incomplete: SubtitleWindowView.draw missing/nonunique" }
+        val dc=draw!!.implementation!!.instructions.toList()
+        check(dc.filterIsInstance<ReferenceInstruction>().any { (it.reference as? MethodReference)?.name=="suppressNativeDraw" })
+        check(dc.any { it.opcode==com.android.tools.smali.dexlib2.Opcode.INVOKE_SUPER })
+        val filter=classes.getValue("Lapp/morphe/extension/youtube/patches/components/PlayerFlyoutMenuComponentsFilter;")
+        val detector=filter.methods.filter { it.name=="isFiltered" }.single()
+        val params=detector.parameterTypes.map { it.toString() };val bytes=params.indexOf("[B");val path=params.getOrNull(bytes-1)
+        check(bytes>0 && path in listOf("Ljava/lang/String;","Ljava/lang/CharSequence;")) { "Unsupported serialized menu path: $params" }
+        val observer=detector.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? MethodReference }.single { it.name=="observeMenuPath" }
+        check(observer.parameterTypes.map { it.toString() }==listOf(path,"[B")) { "Menu path observer descriptor mismatch" }
+        val instruction=detector.implementation!!.instructions.first() as com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
+        val parameterWords=(if(AccessFlags.STATIC.isSet(detector.accessFlags))0 else 1)+params.sumOf { if(it in listOf("J","D"))2 else 1 }
+        val expectedStart=detector.implementation!!.registerCount-parameterWords+(if(AccessFlags.STATIC.isSet(detector.accessFlags))0 else 1)+params.take(bytes-1).sumOf { if(it in listOf("J","D"))2 else 1 }
+        check(instruction.startRegister==expectedStart && instruction.registerCount==2) { "Menu observer parameter register mismatch" }
+        val fragment=classes.getValue("Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;")
+        val copy=fragment.methods.single { it.name=="onPreferenceLongClick" }
+        val calls=copy.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().mapNotNull { it.reference as? MethodReference }
+        val original=calls.single { it.name=="aiCaptionOriginalLongClick" }
+        val inner=fragment.methods.single { it.name==original.name }
+        check(inner.accessFlags==copy.accessFlags && AccessFlags.PRIVATE.isSet(inner.accessFlags) && calls.any { it.name=="consumePathCopy" }) { "Internal copy delegate must remain private for invoke-direct" }
+        check(copy.implementation!!.instructions.any { it.opcode==com.android.tools.smali.dexlib2.Opcode.INVOKE_DIRECT_RANGE && ((it as? ReferenceInstruction)?.reference as? MethodReference)?.name==inner.name })
+        check((hostHooks["onNativeSelection"]?:0)==0 && (hostHooks["onNativeSelectionWithReason"]?:0)==0) { "Duplicate manual-only dispatch" }
+        println("AI_FINALIZER_COMPLETE draw=1 menu=1 observer=1 initialize=1 selection=1 copy=1 path=$path registers=$expectedStart")
+    }
     // Type matching alone accepted amof.a in 1.2.5. Trace the value to the host's
     // named videoId builder property instead, including memory-only compositions.
     val nativeBridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")

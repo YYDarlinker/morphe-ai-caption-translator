@@ -69,8 +69,13 @@ public final class NativeCaptionBridge {
         }
     }
 
+    private static final java.util.concurrent.atomic.AtomicBoolean drawObserved=new java.util.concurrent.atomic.AtomicBoolean();
     public static boolean suppressNativeDraw() {
-        return enabled() && DynamicCaptionController.isVisibleActive();
+        if(CaptionAddonSupport.aiInstalled() && context!=null && drawObserved.compareAndSet(false,true))
+            CaptionDiagnostics.mark(context,"NATIVE_DRAW_HOOK_CONNECTED","build=n29;official=1.45.0;presentation=n29-presentation-v3;hook=SubtitleWindowView.draw");
+        // Holding an accepted AI track survives waiting, safe blanks and rotation; source-only
+        // keeps its previously recognized visible-overlay behavior rather than being redefined.
+        return enabled() && (RebuildController.ownsNativeTrack() || DynamicCaptionController.isVisibleActive());
     }
     public static List<?> augmentTranslations(List<?> original) {
         if(!CaptionAddonSupport.simplifiedInstalled() || original==null || original.isEmpty()) return original;

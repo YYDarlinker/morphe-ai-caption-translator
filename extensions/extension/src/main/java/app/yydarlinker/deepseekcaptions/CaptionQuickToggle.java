@@ -4,6 +4,9 @@ import android.app.Activity;import android.content.Context;import android.graphi
 public final class CaptionQuickToggle {
     private static long shortsMenuAt;
     private static String shortsVideo="";
+    public static void observeMenuPath(CharSequence path,byte[] buffer){
+        if(path!=null)observeMenuPath(path.toString(),buffer);
+    }
     public static void observeMenuPath(String path,byte[] buffer){
         if(!shortsOpen()||path==null||!path.startsWith("overflow_menu_item.e")||buffer==null)return;
         if(path.contains("captions_sheet")||path.contains("quality_sheet"))return;
@@ -19,7 +22,7 @@ public final class CaptionQuickToggle {
         if(!visible){shortsMenuAt=0;shortsVideo="";return index;}
         boolean shorts=shortsMenuAt>0&&inShorts&&android.os.SystemClock.uptimeMillis()-shortsMenuAt<1500&&shortsVideo.equals(PageCaptionController.currentVideoIdSnapshot());
         if(!topMenu()&&!shorts)return index;shortsMenuAt=0;
-        String text=CaptionStrings.settings(a,"ai_title")+" · "+CaptionStrings.settings(a,DeepSeekConfig.enabled(a)?"on":"off");
+        String text=CaptionStrings.settings(a,"ai_title")+" 路 "+CaptionStrings.settings(a,DeepSeekConfig.enabled(a)?"on":"off");
         int id=a.getResources().getIdentifier("deepseek_caption_settings","drawable",a.getPackageName());Drawable icon=id==0?null:a.getDrawable(id);
         int next=addNativeRow(panel,icon,text,v->{if(toggle(a))dismissNative();},index);
         if(next<0)return index;

@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-02。N28C-R1已补真实main Looper现状/非阻塞生命周期、同key提交顺序与非中文1200ms合同并独立未签名交付；最终614/614、400受控轮、原44专项+2 SDK实例46/46、18 golden、14冷热/40几何、84/84与11DEX通过。40几何24完整1000ms单页/16容量安全空白，非中文违规多页0；原C/B及证据SHA不变。工程通过不等于真机/OEM/远程/母语语义验收；只做一次有限手机复验，第四期暂不发。最新§4z / N28C-R1-LOCAL-TEST-BUILD.md；两份状态同步，规划审阅/旧失败历史保留。
+> 最后更新：2026-10-02。N29已由Codex完整实现、验证和独立建包：1.45类型正确菜单与finalizer最后AI许可、原生draw、首块邻块供给、非中文n29-presentation-v3；最终Java643/643、同代码专项68/68及400受控轮通过，中文18golden相等，实际7组合/11DEX/58229类审计通过。未签名/安装/推送/发布，待有限手机复查与规划者审阅；未开始N30，后续第四期与三项UI本地化收尾仍同卡，不拆卡。最新§4ac及N29-LOCAL-TEST-BUILD。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,19 +17,19 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节、最新§4z与docs/N28C-R1-LOCAL-TEST-BUILD.md；§4y/N28C-REVIEW.md是R1之前的规划审阅，§4x是原锁环修复前历史。C原锁环已修，R1两个工程缺口已修订交付；手机/OEM/远程/母语仍未验，不恢复旧B/N27或废弃N28。
-2. **当前角色分工（用户最新）**：后续Codex完整实现/验证/交付每张卡，不交DeepSeek。本规划对话负责研究/方案/任务卡/审阅及同步管理档案；本轮只读审阅C并提出R1，无产品源码改动/产品测试复跑。用户只做有限手机观察与提供诊断，不承担14语种母语审校。单个执行者串行。
+1. **先读本实时状态档案**：优先本节、最新§4ab及docs/N29-DEVICE-REVIEW-AND-PLAN.md、N29-CODEX-TASK.md。§4aa/旧N28C-R2卡已被本轮整体覆盖；§4z是R1工程交付，§4y/4x是修前历史。已获R1+1.45手机实况与安装APK，证实部分接入，不写完整验收；不恢复旧B/N27或废弃N28。
+2. **当前角色分工（用户最新）**：后续Codex完整实现/验证/交付每张卡，不交DeepSeek。本规划对话负责研究/方案/任务卡/审阅及同步管理档案，本轮只读分析真机证据/实际APK并编写N29，没有产品源码修改/产品测试复跑。用户只做少量手机观察与提供诊断，不承担14语种母语审校。单个执行者串行。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：N28C-R1工程交付完成（614全量/400受控/84组合/11DEX、正式独立unsigned三件套）；核心实现9a7bdf3/anchor/n28c-r1-9a7bdf3，docs-only身份附记不改产品。原4d98eec/ce372cf/anchor/n28c-4d98eec与原C/B交付保留。下一步只做一次正式R1有限手机复验并回规划者分析，不要求回测旧B，第四期暂不发。
-5. **执行顺序**：N28C-R1主线程响应/非中文最短页修订与完整验证交付→用户少量启动/中文/播放/版式/RTL观察并给诊断→再第四期菜单→最终三项UI/本地化/技术诊断英文。旧B已有锁环，不先装它做死锁排查；R1不做其他功能。
+4. **当前阶段**：产品仍R1源码9a7bdf3/anchor/n28c-r1-9a7bdf3，HEAD f7c0c46，其后管理docs未提交。用户提供官方1.45实际安装APK SHA8676787F…0B5C4、诊断180521/SRT；官方CharSequence已在包内，onMenu1但observeMenuPath0/SubtitleWindowView.draw缺失/suppressNativeDraw引用0；核心能翻译不代表全部接入。已生成N29卡，旧R2不再单独执行；没有实施新代码或建新包。
+5. **执行顺序**：N29一张卡合并1.45完整接入/防残缺包、第二块启动预取和非中文语义翻页→用户只复查这些新修复并给诊断（不再全表/14语种手机重复）→N30第四期多选语言菜单+三项UI/14语言运行时/技术诊断英文一并完成→最终发布准备。仅这两张剩余开发卡，不再人为拆N31/N32或自动派生r卡；真正新的范围问题带证据回规划者。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
 
 ## 1. 项目与路径
 
-- 产品：Morphe 字幕补丁（.mpp，v1.3.5 基线约 1.1MB），YouTube 自动翻译 → 用户自配 OpenAI 兼容 API → 播放器内字幕。目标 YouTube 21.07.247（N18r 起组合构建实际使用 21.16.256 + 官方 1.44.0），最低 SDK 28。
+- 产品：Morphe字幕补丁（.mpp，v1.3.5本地测试基线约1.1MB），YouTube自动翻译→用户自配OpenAI兼容API→播放器字幕。实际宿主21.16.256/minSdk28；历史发布声明仍21.07.247，N29须修为真实验证的21.16.256。历史工程包用官方1.44.0；后续基线1.45.0，用户已组合实机但接缝不完整，N29修复见§4ab。不可把官方1.45号当本项目产品版本。
 - 工作仓库：`E:\Projects\morphe-caption-v2`（从 GitHub main=v1.3.5 全新克隆）。
 - 只读档案：`E:\Projects\morphe-ai-caption-translator-next`（旧研究区，39 提交/10 分支；ADR-006、P4d 失败报告在内；**禁止延续其任务序列，仅点名时查阅**）。
 - 材料（均在仓库根目录）：`caption-diagnostics-1.3.5-20260927-084217.txt`（旧真机）、`caption-diagnostics-1.3.5-20260929-155802.txt`（0929 诊断）、英文源 SRT、`字幕参考.zip`；真机诊断输出目录 `D:\HONOR Share\Honor Share\`。
@@ -55,7 +55,7 @@
 2. 审阅执行者按卡产出的计分板/测试/组合/DEX及哈希证据；冻结须维持4通过/4既有失败/4未验证、三类不可见时长全0。未亲自运行的结果明确为执行者报告。
 3. 必要时只读源码、diff、fixture与真实诊断；区分离线证据、实际运行证据和用户真机签字；不足以判定的项目不能写“完成”。
 4. 报告本卡结论、整体进度与开放问题，将新反馈/决策同步两份档案。用户已经定案的选择不反复询问。
-5. 研究与具体设计由规划者完成，DeepSeek只执行细化卡。禁止为翻绿放宽安全网、偷改冻结事实/验收判据或恢复被回退的样例特判。
+5. 研究与具体设计由本聊天规划者完成；后续由Codex完整执行细化卡、验证/建包/交付，用户已取消DeepSeek接力。禁止为翻绿放宽安全网、偷改冻结事实/验收判据或恢复被回退的样例特判。
 
 ## 4. 案例状态（A01–A17）
 
@@ -437,6 +437,8 @@ N27仍搁置、VISIONOS用户已解决，最终summary/UI多语种/程序性诊�
 
 ## 6. 待办队列
 
+当前优先级以§4ab为准：先N29完整修复1.45部分接入/防半成品、启动邻块供给与非中文语义翻页；再N30第四期与三项UI/运行时本地化/技术诊断英文一并完成。旧R2卡不再单独执行。下方旧列表是沿革，不据旧HEAD或旧官方版本重启已完成任务。
+
 **当前推进：C原锁环修复和正式包已交付；规划整体审阅未放行，先docs/N28C-R1-CODEX-TASK.md处理main同步等待风险与非中文短页。R1未执行，手机不必现在随机测试，第四期暂不发。**
 
 - ~~N17a 修复卡~~ ✅ `d40cfa3`（孤字页 ≥8 汉字格硬门槛）。
@@ -520,7 +522,7 @@ N27仍搁置、VISIONOS用户已解决，最终summary/UI多语种/程序性诊�
 
 ## 4z. N28C-R1工程闭合与有限手机复验（2026-10-02）
 
-本节是当前状态，覆盖§4y的“R1尚未执行”，但不删除该规划审阅或原C/B失败证明。
+本节记录R1完整交付，覆盖§4y的“R1尚未执行”，但不删除该规划审阅或原C/B失败证明。后续用户指定1.45.0的下一步调整以§4aa为准。
 
 - Codex已在真实HEAD ce372cf、产品4d98eec/anchor/n28c-4d98eec的docs-only后继上串行完成。产品仅5文件生命周期/Cache顺序/Pager/RenderSpec/最小Overlay reason；原65测试、中文fixture/18 golden、所有业务/配置/资源/build/预算冻结。
 - 主线程真实Android Looper在实际commit屏障未释放时可以完成stop/换视频/native关闭/真实开关关闭/切目标并执行下一条消息；新目标已显示而旧文件仍收尾。UI返回是逻辑撤销/旧UI无效，不是物理完成；后台await共用5秒截止且timeout/interrupted明确失败，保留状态/资格。
@@ -534,3 +536,53 @@ N27仍搁置、VISIONOS用户已解决，最终summary/UI多语种/程序性诊�
 - 未签名/安装/清用户数据/推送/发布；零远程翻译API、零新依赖/下载。手机YouTube/OEM字体ICU/远程实况/母语语义未覆盖，不能把614绿或交付当全验收。第四期暂不发，本卡完成即停。
 
 R1身份闭合：核心实现 `9a7bdf35351b9a052233bac8b9004241548eb1eb` / `anchor/n28c-r1-9a7bdf3`。后续仅docs补记真实身份；产品/测试/资源/build与此锚点相同。最终HEAD和清洁工作区记录见`.verification/n28c-r1/final-state.json`，不以原591或614绿色替代未覆盖的手机/OEM/远程/语义验收。
+
+## 4aa. R1工程审阅、官方1.45.0真实包核查与R2定案（2026-10-02）
+
+用户请求告知R1下一步，提供根目录patches-1.45.0.mpp，并指定后续所有版本按该官方版本适配、发版YouTube兼容声明更新。此决定改变原“立即测R1”的顺序，不取消R1成果；先兼容迁移后只测一次候选，避免两轮重复装机。
+
+- 真实仓库HEAD f7c0c462dcd31f57f1336678007793570cbd4818，产品9a7bdf3/anchor/n28c-r1-9a7bdf3；后继仅2docs，核查前仅用户1.45输入未跟踪。三件套实际SHA与交付相同；已读源码修订/交付/final-state，认可R1工程闭合，未亲自复跑614/400/84。手机/OEM/远程/语义未覆盖。
+- 官方输入11,039,984字节/SHA256 DBA660DF61D95131A22242CABE9C44B4B04861B7BA6EBEFFE91C4B3647D55B93，与GitHub v1.45.0资产size/digest一致（2026-10-02T08:55:35Z发布）。本地Patcher1.14.1加载Patch定义成功，162项（旧150）；未进行1.45真实patcher组合。
+- 实际官方YT非实验targets为21.16.256/21.13.164/20.31.42（SDK28）、20.21.37（SDK26）；实验21.39.522/21.38.130/21.28.208（SDK29）、21.23.492（SDK28）。继续现有原版21.16.256、项目SDK28，无需先换宿主/下载。当前Constants/生成patches-list/README21.07.247陈旧，新卡只声明真实验证的21.16.256，不照抄全部官方目标。
+- 确定接口冲突：实际1.45 PlayerFlyoutMenuComponentsFilter.isFiltered路径String变CharSequence，当前CaptionQuickTogglePatch的String guard必不满足；新增类型正确桥接，保留null/非String/Shorts/视频owner限制，不删严格唯一/签名校验。FlyoutInfo/Shorts/PlayerType/AbstractPreferenceFragment/ThemeUtils/CustomDialog此次公开接口未缺失；真实内部结构/资源/排序/最终DEX还待组合验证。
+- 默认行为风险：AutoCaptionsPatch.disableAutoCaptions新BOTH_ENABLED分支提前跳过150ms手动guard，Settings默认亦BOTH_ENABLED。R2只在AI已安装且用户开关ON、官方guard已结束时返回original，恢复旧已认可手动CC语义；初始guard与AI关闭/未安装保持原1.45行为，不改共享偏好/默认、不以临时字幕可见性决定模式，不重做CC触摸/播放。
+- 新官方具名YT91（旧84），21.16匹配default90（旧83）；这些不是组合PASS分母。新组合完整选择新default及依赖，实际报告，不为凑旧84裁掉项。Universal Spoof signature default=false，不擅自打开。
+- 已编写docs/N28C-R1-REVIEW-AND-OFFICIAL-145.md、docs/N28C-R2-CODEX-TASK.md、docs/N28C-DEVICE-CHECKLIST.md。R2严格只兼容接缝/元数据/独立构建，Controller/Cache/Pager/Overlay/中文golden/请求预算全部冻结；真实新MPP组合-n28c-r2、最终全部DEX审计/7组合、metadata生成与包内targets一致，不覆盖R1或旧证据。允许docs-only HEAD和已知用户输入，不因此再次机械停工。
+- 发布待办：validate/release仍有旧1.3.5 recovered Smali路径，不能作为新代码验证/发版来源；未来新正式发布须走当前Java/Kotlin源码并核对生成元数据/真实资产。此卡不顺带重写整套CI，不改已发布v1.3.5 URL/日期/资产，不将官方1.45版本号套给本产品。
+- 后续用户只需对R2一次5–10分钟正常启动/中文、手动CC及AI开关、seek/换视频/旋转、英文及已有RTL/长词观察，发完整诊断+异常时段+设备Android。没有语种项跳过，不要求14语种阅读/截图，不清cache。AI OFF时官方Always show可能仍显示原生字幕，须与AI继续请求/渲染区分。收到实况后再第四期；三项summary/14语种运行时/旧程序性诊断中文仍未关闭，N27继续搁置，VISIONOS用户已解决不处理。
+- 本轮仅只读源码/包/官方资料，编译已有工具做metadata/DEX ABI读取、实际SHA核对、管理docs和状态同步；没有产品修改、产品测试/建包、远程翻译API、新依赖/下载、签名/安装/清数据/推送/发布。原始核查证据.verification/official-145-review。两份状态同步后，规划docs留给R2执行者保留随卡提交。
+
+## 4ab. R1+官方1.45手机实况、最终APK缺draw根因与两卡收敛（2026-10-02）
+
+用户已按清单测试，反馈高强度操作后日语原生底框持续闪现，AI关再开可暂时恢复；第一句后第二句又waiting；非中文应像中文在标点及可理解语义位置翻页。用户明确要求加快收尾并生成下一卡。已获实际安装APK路径，不能再按“用户尚未测R1”安排两轮重复装机。
+
+- 当前实际HEAD f7c0c462dcd31f57f1336678007793570cbd4818、产品9a7bdf3，源码未动；已知规划docs/官方输入保留。新增用户YouTube_Morphe-v21.16.256-patches-v1.3.5.apk=199,492,582/SHA256 8676787F0C5DB0636CA72C8DAC08071B6263BFEC7DBA4D592E408BBC0EF0B5C4，只读，不作原版重补丁输入。
+- 真机诊断D:/HONOR Share/Honor Share/caption-diagnostics-1.3.5-20261002-180521.txt=1,262,317/SHA256 BCD70B494B0C1EB21E2357727602078F40D1ACC72C6EBBEA2F1444874A4D36F5；mH5TlcMo_m4英文SRT SHA B86A06B339D36D63FFF0B75598B5DF6C3C3EB80230863717E713CA542DAAE9C8。2436history/27quality，跨通道去重2438事件/约389.6s；观看263s、28调用27成功1SocketException、52,627tokens。请求仅zh-Hans15/ar6/ja6，93响应事件，不能写14语言真机都已验或结构接纳即语义通过。
+- 实际APK classes2官方isFiltered确为CharSequence/AutoCaptions新BOTH_ENABLED提前return，证实用新官方；但onMenu宿主调用1、observeMenuPath0，classes6的SubtitleWindowView完全没有draw覆盖，suppressNativeDraw helper有定义但引用0；selection dispatcher1，核心仍可跑。原R1+1.44工程APK有真实draw防线。源码QuickToggle在先插onMenu后因String guard不匹配而中断，之后draw/copy接缝未安装；实际残缺形态吻合。未直接获得Manager日志，异常怎样被处理仍需真实patcher重现，不虚称已证明Manager吞异常。
+- 黑框方向已从纯扫描推测升级为最终APK核心draw钩子缺失。ja session43连续VIEW_NOT_FOUND，重启49于1790935464250又mask到SubtitleWindowView。先修CharSequence完整finalize/审计/AI许可最后发布，恢复draw防线；不先新造高频扫描/监听架构或重开N27。上轮“必然不能混用”表述修正为“可以产出并运行部分接入包，完整兼容不合格”。
+- 启动：session7首HTTP1790935147260、接纳9809，next HTTP9893，晚2633ms；视频7040块边界后wall1790935153482–55577等待2095ms。ja49在28.111s首可见后29.066s又pending，到35.048s出（墙钟约6797ms）。schedule/restoreCandidates的everReady门使后续请求串行。N29授权当前请求真实sent后仅邻块index+1提前cache→prefetch，播放fresh/未暂停/无seek storm，旧focus2/prefetch2/总4/30秒/attempt预算保持；不冻旧字/隐藏waiting/延迟播放。提前结束最多多一个bootstrap投机块，正常同段请求数不增加，不保证极慢网络零等待。
+- 非中文实样：ja145–169/42.719–51.974秒被切“誇張す | る…中国 | の…”。lineBreak候选不是语义翻页，DP两行罚1800大于每页200/标点奖励80。N29采用平台ICU sentence/word/line+Unicode标点层次，完整句/可行强边界优先、词兜底、真正超几何长词才字素应急；减少应急/弱切口→页数→平衡，去掉单行偏好造成的额外拆页。中文legacy与18golden不动，1200/两行/字素/源首尾保持；非中文n29-presentation-v3隔离，不改prompt/n28b策略/中文cache，不清全cache。ICU/Unicode/Netflix官方原则已联网复核。
+- 译文语义开放项：ja49 b4在“more impressed with Russia … than … China”出现“中国…方が感心する”比较方向风险；现无可保证低回退的纯规则修正，不把它硬塞成一个视频专门规则/新增付费评审或宣称分页修正了语义。保存原响应与SRT；非中文母语自然度仍未完全验证。
+- 1.45官方Always show不再仅凭改动就强制shim。N29先受控验实际手动CC关闭链，只有确证AI OFF意图被撤销才做仅完整AI已安装/开关ON/guard已结束尊重original的最小接缝；原生/AI OFF保持官方行为，不改共享偏好。Compatibility/真实MPP生成patches-list/README21.16声明一起修，官方新defaults完整选择，实际PASS/DEX数量动态报告。
+- **仅两张剩余卡**：N29（当前）接入/防残缺、原生draw、首块邻块供给、非中文语义翻页；审阅后N30第四期多选14语种菜单+三项UI/实际运行语言切换+技术诊断英文一起闭合、发布来源/元数据预检。N30不再拆N31/N32，不新增DeepSeek接力；AI入口介绍仍旁白后/无图标，用户自定义要求不覆盖，菜单默认空/AI OFF保留/去重遵真实YouTube排序/Remember独立。已知三问题不能再仅凭220×14静态键齐全关掉。
+- 已生成docs/N29-DEVICE-REVIEW-AND-PLAN.md、docs/N29-CODEX-TASK.md；旧N28C-R2-CODEX-TASK.md置历史覆盖提示，不能再单独串行执行。明确许可定点更新与新合同直接冲突的旧测试断言并保存before/更强替代，不机械停工；中文golden/ACCEPTANCE/frozen仍禁改。R1 CAS/锁/主线程/后台barrier/同key保护不重构；Controller新资格改后既有400受控轮复核。
+- 用户下一包只复查漏框/开关、启动第二块等待和日语42–52秒原句，给完整诊断/异常时段，不再要求十四语言读取或全表重复。冻结4/4/4与旧事实不变，用户反馈进live观察；N27搁置，VISIONOS已解决。
+- 本轮仅只读源码/最终APKDEX/日志/SRT/官方标准与管理写入，原始证据.verification/n28-device-review；ADB无设备，没有新手机操作/安装/签名/产品建包/产品测试复跑/远程翻译API/新增依赖/下载/推送/发布。两份PROJECT-STATE已同步，规划docs留给N29保留随卡提交。
+
+## 4ac. N29完整交付（2026-10-02，Codex，工程通过/手机待复查）
+
+执行HEAD f7c0c462、产品锚点9a7bdf3，旧docs规划保留。原1.45实际Patcher重现String guard失败，部分状态aiInstalled1/onMenu1/observe0/draw0/copy0与用户包吻合；不冒称Manager吞异常。现接受已知完整String/CharSequence签名、宽度推p寄存器、先验late guards、必要hook唯一计数后最后发布AI许可；生产rewriteUrl/NativeBridge未安装零API/原生直通/不清AI设置。真实最终onMenu/observe/draw/initialize/selection/copy各1，manual-only0，private copy正确；用户坏包、未知/多匹配、人工缺draw由同一审计非0具名拒绝。持轨waiting/安全空白/rotation阻断draw，OFF/离轨恢复，source-only旧语义保持，未重构扫描器。官方CC实际序列128真值表及生产链未复现Always show撤销手动Off，未装shim/不改官方偏好。
+
+启动仅sent focus后的index+1 cache-before-prefetch、既有SOURCE_IO异步/短锁接纳，focus2/prefetch2/总4/30秒/storm/预算/R1 CAS等不变。真实屏障固定时间回放邻块3448→815ms、就绪9069→6436ms，7040ms边界wait2029→0，两块各1请求；手机原tick壁钟2095ms另记。慢服务器仍真实pending，提前结束最多多1紧邻投机块。
+
+非中文平台ICU sentence/word/line+Unicode保护、应急/弱切口→页数→平衡，无单行1800罚；真正超几何不可分单元才应急，不用时间不足切正常词。n29-presentation-v3隔离，中文legacy/n28b/prompt/key不变。原ja145–169全文同58.32203px/1160px三页碎词→两页“一方で、 | 中国の…”，42719–48173/48173–51974ms；13组原诊断尺寸×SDK28/35完整before/after保留，98–126/ar也验。b4比较方向风险原响应/SRT保存，未改prompt/视频特判/付费语义审校。
+
+最终同输入SHA 74132d8ec69ffbe96fa2acac15a75d1b8415ff3913b9cee5c13fb8384091af21：Java643/643=614+新29，专项68/68，main/K12/permit下条消息/同key/迟到/切目标继续成立，200+200=400轮。中文18golden逐字段相等，原40几何/14目标28冷热、新40×SDK2合同通过；Python27，本地化220×14。冻结4/4/4，三个invisible_ms0，ACCEPTANCE/frozen零diff。原测试定点变化仅安装fixture、非中文版本和no-spam真实事件filter；完整before及所有失败/中间非交付包保留，不跳失败/加时限。最终scope proof恢复并冻结miniplayer/R1生命周期，Controller仅4原方法改；debug/release166class相等。
+
+正式官方1.45默认根90、PASS93，7组合均真实Patcher序列化/审计，最终11DEX/58229类/322812方法/626445分支，invalid/dex/binding0。共享Constants/生成JSON/README仅21.16.256/minSdk28，产品1.3.5/原资产URL日期不变。CRC/资源/设置/Collator/aapt/verify_bundle/N8Verify及MPE内嵌等值通过。12643历史文件SHA/字节一致；大用户APK/官方MPP不提交。
+
+交付：E:\Projects\morphe-caption-v2\build\local-test\patches-1.3.5-本地测试包-n29.mpp；1137101 B；SHA256 F2A4818A5B5DE9159BEFAEE735E375A1D280D687A88853CB30639DF38F82B394。
+交付：E:\Projects\morphe-caption-v2\build\local-test\extension-1.3.5-本地测试包-n29.mpe；2766868 B；SHA256 E96301FF59D73740582E59CAC6D3C2E461ACF4151779B43B121512B31AD3B45E。
+交付：E:\Projects\morphe-caption-v2\build\n29-composition-final\YouTube-21.16.256-本地测试包-n29-unsigned.apk；198090986 B；SHA256 7D741BE68E4C215B800FD378042BDAED793C86658D28FC19A00CA13461EF5EF9。
+
+未签名/安装/清数据/卸载/推送/发布；远程API/下载/依赖0。工程结果不等于手机或14语言语义全通过。用户仅中文连续启动、日语底框/42–52秒切口、开关/旋转一次并给诊断，不再次十四语言全表。Codex本卡完成即停，不开N30、不交DeepSeek；第四期与三项本地化收尾仍等规划者同一N30授权。核心提交/anchor由后续docs-only写实；两份状态同步。

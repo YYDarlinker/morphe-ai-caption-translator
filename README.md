@@ -51,7 +51,7 @@ Detailed design and verification limits are in `docs/ARCHITECTURE.md`.
 
 ## Import into Morphe
 
-Use Expert mode. For AI, keep the compatible official default patch set (including `Captions` and player-flyout/settings support), then select `AI caption translator`. Optionally select `Add Simplified Chinese to auto-translate` and/or `Remember caption selection`. Those two optional patches also work without selecting AI. To retain the former all-in-one feature set, select all three. The tested original package is YouTube `21.07.247`; incompatible structural bindings fail closed.
+Use Expert mode. For AI, keep the compatible official default patch set (including `Captions` and player-flyout/settings support), then select `AI caption translator`. Optionally select `Add Simplified Chinese to auto-translate` and/or `Remember caption selection`. Those two optional patches also work without selecting AI. To retain the former all-in-one feature set, select all three. The verified composition input is original YouTube `21.16.256` (minSdk 28) with the complete compatible official `1.45.0` default set. Incompatible or incomplete structural bindings fail closed. Other stable/experimental host versions are not claimed as verified.
 
 Release source: `https://github.com/YYDarlinker/morphe-ai-caption-translator`
 

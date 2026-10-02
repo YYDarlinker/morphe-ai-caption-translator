@@ -180,7 +180,7 @@ public class N28CProductionTest {
     row(next,"default",1,false);export("playback-switch");
   }
   String presentationLines(String text) {
-    StringBuilder lines=new StringBuilder();for(String line:text.split("\\n"))if(line.contains("REBUILD_PRESENTATION"))lines.append(line).append('\n');return lines.toString();
+    StringBuilder lines=new StringBuilder();for(String line:text.split("\\n"))if(line.matches("\\d+ \\| REBUILD_PRESENTATION.*"))lines.append(line).append('\n');return lines.toString();
   }
   @Test public void repeatedGeometryAndPositionDoNotSpamWatches()throws Exception {
     source("One complete source sentence.",800);translated="A complete sentence stays visible with all its letters despite fast timing.";RebuildController.Session s=start("fr","en");ready(s);presented(s);

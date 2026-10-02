@@ -32,7 +32,7 @@ public class N28CCounterTest {
   }
   @Test public void nonChineseMinimumTimeAndPolicyDoNotChangeChineseNamespace() {
     assertEquals(1200,CaptionLanguagePager.MIN_PAGE_MS);
-    assertEquals("n28c-presentation-v2",spec("en").presentationPolicy);
+    assertEquals("n29-presentation-v3",spec("en").presentationPolicy);
     assertEquals("legacy_n26",spec("zh-Hans").presentationPolicy);
   }
   @Test public void lineCandidatesNeverSplitNbspCrLfOrCompleteClusters() {

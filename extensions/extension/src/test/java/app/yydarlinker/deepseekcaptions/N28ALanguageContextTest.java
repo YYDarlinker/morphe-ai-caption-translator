@@ -8,7 +8,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.*;
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28,shadows={N28ALanguageContextTest.NoKey.class})
+@Config(sdk=28,shadows={N29InstallationSafetyTest.Installed.class,N28ALanguageContextTest.NoKey.class})
 @LooperMode(LooperMode.Mode.PAUSED)
 public class N28ALanguageContextTest {
   @Implements(SecureApiKey.class) public static class NoKey {

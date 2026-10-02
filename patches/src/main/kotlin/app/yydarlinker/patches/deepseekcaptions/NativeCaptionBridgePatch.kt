@@ -41,12 +41,25 @@ private fun <T> Iterable<T>.unique(role: String): T {
 /** Bind once after all bundles execute; no copied official extension or cross-bundle dependency. */
 internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplified:Boolean, memory:Boolean) {
     val featureRuntime=mutableClassDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
+    fun publishFeatures() {
     for((name,enabled) in listOf("aiInstalled" to ai,"simplifiedInstalled" to simplified,"memoryInstalled" to memory)) {
         val stub=featureRuntime.methods.single { it.name==name }
         val replacement=ImmutableMethod(featureRuntime.type,name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,MutableMethodImplementation(1)).toMutable()
         replacement.addInstructions(0,"const/4 v0, ${if(enabled) "0x1" else "0x0"}\nreturn v0")
         featureRuntime.methods.remove(stub);featureRuntime.methods.add(replacement)
     }
+    }
+    val quickToggle=if(ai) prepareCaptionQuickToggle() else null
+    val renderer=if(ai) mutableClassDefBy("Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;") else null
+    if(renderer!=null && (renderer.superclass==null || renderer.methods.any { it.name=="draw" && it.parameterTypes.toList()==listOf("Landroid/graphics/Canvas;") }))
+        throw PatchException("AI captions: native draw override unavailable or already exists")
+    val fragment=if(ai) mutableClassDefBy("Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;") else null
+    val copyPath=fragment?.methods?.filter { it.name=="onPreferenceLongClick" && it.returnType=="Z" &&
+        it.parameterTypes.map { t->t.toString() }==listOf("Landroid/widget/AdapterView;","Landroid/view/View;","I","J") }
+        ?.unique("official breadcrumb long-press handler")
+    val originalName="aiCaptionOriginalLongClick"
+    if(fragment!=null && (copyPath?.implementation==null || AccessFlags.STATIC.isSet(copyPath.accessFlags) || fragment.methods.any { it.name==originalName }))
+        throw PatchException("AI settings: handler unavailable or already wrapped")
     val track=getAllClassesWithString("AUTO_TRANSLATE_CAPTIONS_OPTION").map { classDefBy(it.type) }
         .filter { "Landroid/os/Parcelable;" in it.interfaces }.unique("caption model")
     val sentinel=track.methods.filter { it.returnType=="Z" && it.hasText("AUTO_TRANSLATE_CAPTIONS_OPTION") }
@@ -394,12 +407,9 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     }
     java.util.logging.Logger.getLogger("AI captions").info("Shared translation metadata readers hooked: ${reads.size}; mode-aware memory ready")
     } // optional metadata augmentation
-    if(!ai)return
-    installCaptionQuickToggle()
-    val renderer=mutableClassDefBy("Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;")
-    if(renderer.methods.any { it.name=="draw" && it.parameterTypes.toList()==listOf("Landroid/graphics/Canvas;") })
-        throw PatchException("AI captions: native draw override already exists")
-    val draw=ImmutableMethod(renderer.type,"draw",listOf(ImmutableMethodParameter("Landroid/graphics/Canvas;",null,null)),
+    if(!ai){publishFeatures();return}
+    quickToggle!!()
+    val draw=ImmutableMethod(renderer!!.type,"draw",listOf(ImmutableMethodParameter("Landroid/graphics/Canvas;",null,null)),
         "V",AccessFlags.PUBLIC.value,null,null,MutableMethodImplementation(3)).toMutable()
     draw.addInstructionsWithLabels(0,"""
         invoke-static {}, $BRIDGE->suppressNativeDraw()Z
@@ -411,13 +421,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
         return-void
     """.trimIndent())
     renderer.methods.add(draw)
-    val fragment=mutableClassDefBy("Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;")
-    val copyPath=fragment.methods.filter { it.name=="onPreferenceLongClick" && it.returnType=="Z" &&
-        it.parameterTypes.map { t -> t.toString() }==listOf("Landroid/widget/AdapterView;","Landroid/view/View;","I","J") }
-        .unique("official breadcrumb long-press handler")
-    val originalName="aiCaptionOriginalLongClick"
-    if(fragment.methods.any { it.name==originalName }) throw PatchException("AI settings: handler already wrapped")
-    val original=ImmutableMethod(fragment.type,originalName,copyPath.parameters,copyPath.returnType,
+    val original=ImmutableMethod(fragment!!.type,originalName,copyPath!!.parameters,copyPath.returnType,
         copyPath.accessFlags,copyPath.annotations,null,copyPath.implementation).toMutable()
     val wrapper=ImmutableMethod(fragment.type,copyPath.name,copyPath.parameters,copyPath.returnType,
         copyPath.accessFlags,copyPath.annotations,null,MutableMethodImplementation(7)).toMutable()
@@ -433,5 +437,16 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
         return v0
     """.trimIndent())
     fragment.methods.remove(copyPath);fragment.methods.add(original);fragment.methods.add(wrapper)
+    val required=mapOf("onMenu" to 1,"observeMenuPath" to 1,"suppressNativeDraw" to 1,"initialize" to 1,"onNativeTrackApplied" to 1,"consumePathCopy" to 1)
+    val counts=mutableMapOf<String,Int>()
+    classDefForEach { initial ->
+        if(!initial.type.startsWith("Lapp/yydarlinker/")) classDefBy(initial.type).methods.forEach { m ->
+            m.code().mapNotNull { it.call() }.filter { it.definingClass.startsWith("Lapp/yydarlinker/deepseekcaptions/") }.forEach { r -> counts[r.name]=(counts[r.name]?:0)+1 }
+        }
+    }
+    required.forEach { (name,expected) -> if((counts[name]?:0)!=expected) throw PatchException("AI captions: finalizer incomplete: $name expected=$expected actual=${counts[name]?:0}") }
+    if((counts["onNativeSelectionWithReason"]?:0)!=0 || (counts["onNativeSelection"]?:0)!=0) throw PatchException("AI captions: duplicate manual selection dispatcher")
+    // Immutable patch-time permission is published only after every mandatory seam succeeds.
+    publishFeatures()
 
 }

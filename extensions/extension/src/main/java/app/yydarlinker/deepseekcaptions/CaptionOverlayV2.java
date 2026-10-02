@@ -607,6 +607,8 @@ final class CaptionOverlay {
     if(notice.equals(lastPresentationNotice)) return;
     lastPresentationNotice=notice;
     String detail="id="+pendingIdentity+";"+pendingRenderSpec.fields(shown,duration,size,width);
+    if(!pendingRenderSpec.legacy && !pendingPages.isEmpty()) detail+=";"+CaptionLanguagePager.seamSummary(pendingText,pendingPages,
+        new CaptionOverlay.LayoutBudget(width,size,size,pendingRenderSpec),pendingRenderSpec);
     if(!reason.isEmpty()) CaptionDiagnostics.mark(a,"REBUILD_PRESENTATION_HARD_REJECT",
         detail+";hard_reject=true;reason="+reason);
     else {

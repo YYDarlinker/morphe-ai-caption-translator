@@ -61,6 +61,25 @@ final class CaptionUnicode {
       if(Arrays.binarySearch(characters,n)>=0) out.add(n);
     return integers(out);
   }
+  private static final class SemanticIterators {
+    Locale locale; BreakIterator word,sentence;
+    void locale(Locale value) {
+      if(value.equals(locale))return;
+      locale=value;word=BreakIterator.getWordInstance(value);sentence=BreakIterator.getSentenceInstance(value);
+    }
+  }
+  private static final ThreadLocal<SemanticIterators> SEMANTIC=ThreadLocal.withInitial(SemanticIterators::new);
+  static int[] wordBoundaries(String text,Locale locale) {return semanticBoundaries(text,locale,false);}
+  static int[] sentenceBoundaries(String text,Locale locale) {return semanticBoundaries(text,locale,true);}
+  private static int[] semanticBoundaries(String text,Locale locale,boolean sentences) {
+    Objects.requireNonNull(text);Objects.requireNonNull(locale);
+    SemanticIterators local=SEMANTIC.get();local.locale(locale);
+    BreakIterator iterator=sentences?local.sentence:local.word;iterator.setText(text);
+    int[] graphemes=characterBoundaries(text,locale);List<Integer> out=new ArrayList<>();
+    for(int n=iterator.first();n!=BreakIterator.DONE;n=iterator.next())
+      if(Arrays.binarySearch(graphemes,n)>=0)out.add(n);
+    return integers(out);
+  }
   private static int[] integers(List<Integer> values) {
     int[] out=new int[values.size()];for(int i=0;i<out.length;i++)out[i]=values.get(i);return out;
   }

@@ -71,7 +71,7 @@ public final class DeepSeekCaptionHook {
             // Fall through to the ordinary caption path rather than breaking YouTube captions.
         }
 
-        if(initialContext==null || !DeepSeekConfig.enabled(initialContext))return originalUrl;
+        if(!CaptionAddonSupport.aiInstalled() || initialContext==null || !DeepSeekConfig.enabled(initialContext))return originalUrl;
 
         // Prefetched/departed Shorts requests are not selections of the foreground video.
         // Never replace the visible session (or its overlay) with another video's source URL.

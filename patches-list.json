@@ -24,7 +24,7 @@
           ],
           "targets": [
             {
-              "version": "21.07.247",
+              "version": "21.16.256",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": 28,
@@ -55,7 +55,7 @@
           ],
           "targets": [
             {
-              "version": "21.07.247",
+              "version": "21.16.256",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": 28,
@@ -86,7 +86,7 @@
           ],
           "targets": [
             {
-              "version": "21.07.247",
+              "version": "21.16.256",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": 28,

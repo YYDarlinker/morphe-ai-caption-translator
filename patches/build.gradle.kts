@@ -72,7 +72,7 @@ tasks.register<JavaExec>("verifyComposition") {
     classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
     mainClass.set("validation.CompositionHarnessKt")
     maxHeapSize="6G"
-    listOf("input","official","addon","output","selection","compile").forEach { key ->
+    listOf("input","official","addon","output","selection","compile","fault","compile-failed","dex-only").forEach { key ->
         providers.gradleProperty("composition.$key").orNull?.let { args("--$key",it) }
     }
 }

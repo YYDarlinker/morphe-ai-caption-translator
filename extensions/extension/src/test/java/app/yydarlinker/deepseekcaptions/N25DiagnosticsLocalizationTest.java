@@ -51,12 +51,17 @@ public class N25DiagnosticsLocalizationTest {
                 // The panel speaks the interface language: its headings are the catalog values. A heading
                 // that carries a value is checked by its template's fixed part, since the rendered line
                 // substitutes the value into it.
-                // N31 keeps technical report headings English; its actual UI shell has a separate matrix.
-                assertTrue(ui.startsWith("Engine: Event rebuild / "));
-                assertTrue(ui.contains("Mode: "));
-                assertTrue(ui.contains("Display text debug: off"));
-                assertTrue(ui.contains("Timing decisions and errors (preserved with timestamps):"));
-                assertTrue(ui.contains("Recent trace:"));
+                for(String key:new String[]{"engine","mode","display_debug","timing_decisions","recent_trace"}){
+                    String value=CaptionStrings.settings(c,key);
+                    String fixed=value.replace("%1$s","").replace("  "," ").trim();
+                    assertTrue(tag+" must render '"+key+"' in the interface language (looked for '"
+                                    +fixed+"' in '"+ui+"')",
+                            fixed.isEmpty()||ui.contains(fixed));
+                }
+                assertTrue(tag+" must render the debug state in the interface language",
+                        ui.contains(String.format(java.util.Locale.ROOT,
+                                CaptionStrings.settings(c,"display_debug"),
+                                CaptionStrings.settings(c,"off"))));
                 // The export keeps the raw headings, so an old report and a new one are comparable. A
                 // locale whose own word for "Engine" is the English word cannot be distinguished this way,
                 // so the check is skipped only for that exact collision and always uses the joined line.

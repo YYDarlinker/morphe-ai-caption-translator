@@ -90,7 +90,6 @@ public class ProfileUiRegressionTest {
     @Test public void cancelledDeleteRetainsEverythingAndLastProfileCannotBeDeleted(){
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
         open();manage();click("profile_delete");click("profile_keep");assertTrue(ApiProfiles.list(a).containsKey(b));
-        ShadowDialog.getLatestDialog().dismiss();idle();
         ApiProfiles.delete(a,b);open();manage();assertNull(label(tree(),text("profile_delete")));
         try{ApiProfiles.delete(a,"default");fail();}catch(IllegalStateException expected){}
     }
@@ -127,7 +126,7 @@ public class ProfileUiRegressionTest {
         assertEquals(DeepSeekConfig.defaultPrompt(a),editor.getText().toString());assertTrue(editor.isEnabled());assertTrue(editor.isFocusableInTouchMode());
         editor.setText("Keep technical names unchanged.");assertTrue(p.flushProfile());
         assertEquals("Keep technical names unchanged.",ApiProfiles.values(a,b).getString("prompt",""));
-        ApiProfiles.select(a,"default");assertEquals(DeepSeekConfig.DEFAULT_PROMPT,DeepSeekConfig.load(a).prompt);
+        ApiProfiles.select(a,"default");assertEquals(DeepSeekConfig.defaultPrompt(a),DeepSeekConfig.load(a).prompt);
     }
     @Test public void scrollRecreationCommitsUnsavedPromptAndNeverReusesAnotherPreferenceInstance(){
         DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
@@ -143,7 +142,7 @@ public class ProfileUiRegressionTest {
         for(String lang:locales){
             Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.forLanguageTag(lang)));
             Context c=a.createConfigurationContext(config);String expected=CaptionStrings.settings(c,"default_prompt");
-            assertEquals(DeepSeekConfig.DEFAULT_PROMPT,DeepSeekConfig.load(c).prompt);assertEquals(expected,DeepSeekConfig.defaultPrompt(c));defaults.add(expected);
+            assertEquals(expected,DeepSeekConfig.load(c).prompt);defaults.add(expected);
         }
         assertEquals(14,defaults.size());assertFalse(ApiProfiles.values(a).contains("prompt"));
         DeepSeekConfig.savePrompt(a,"用户明确写下的要求 — Keep this exact text.");
@@ -153,10 +152,8 @@ public class ProfileUiRegressionTest {
     }
     @Test public void oldHardcodedDefaultIsLocalizedWithoutRewritingCustomData(){
         ApiProfiles.values(a).edit().putString("prompt",DeepSeekConfig.DEFAULT_PROMPT).apply();
-        assertEquals(DeepSeekConfig.DEFAULT_PROMPT,DeepSeekConfig.load(a).prompt);
-        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        assertEquals(DeepSeekConfig.defaultPrompt(a),((EditText)p.getView(null,new LinearLayout(a)).findViewById(android.R.id.edit)).getText().toString());
-        DeepSeekConfig.savePrompt(a,DeepSeekConfig.DEFAULT_PROMPT);assertFalse(ApiProfiles.values(a).contains("prompt"));
+        assertEquals(DeepSeekConfig.defaultPrompt(a),DeepSeekConfig.load(a).prompt);
+        DeepSeekConfig.savePrompt(a,DeepSeekConfig.defaultPrompt(a));assertFalse(ApiProfiles.values(a).contains("prompt"));
     }
 
     @Test public void staleDetachedEditorRebindsAfterProfileEpochEvenWhenNotRegistered(){
@@ -165,7 +162,7 @@ public class ProfileUiRegressionTest {
         ApiProfiles.unregister(p); // Scrolled off the screen: it no longer receives notifications.
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);ApiProfiles.select(a,"default");
         ((EditText)old.findViewById(android.R.id.edit)).setText("stale delayed edit");assertTrue(p.flushProfile());
-        assertEquals(DeepSeekConfig.DEFAULT_PROMPT,DeepSeekConfig.load(a).prompt);
+        assertEquals(DeepSeekConfig.defaultPrompt(a),DeepSeekConfig.load(a).prompt);
         View fresh=p.getView(old,parent);assertNotSame(old,fresh);
         assertEquals(DeepSeekConfig.defaultPrompt(a),((EditText)fresh.findViewById(android.R.id.edit)).getText().toString());
     }
@@ -191,7 +188,7 @@ public class ProfileUiRegressionTest {
         LinearLayout parent=new LinearLayout(a);View old=p.getView(null,parent);
         Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.JAPAN));
         a.getResources().updateConfiguration(config,a.getResources().getDisplayMetrics());
-        View fresh=p.getView(old,parent);assertSame(old,fresh);
+        View fresh=p.getView(old,parent);assertNotSame(old,fresh);
         assertEquals(DeepSeekConfig.defaultPrompt(a),((EditText)fresh.findViewById(android.R.id.edit)).getText().toString());
         assertFalse(ApiProfiles.values(a).contains("prompt"));
     }

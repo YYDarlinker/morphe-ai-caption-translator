@@ -46,8 +46,7 @@ public final class DeepSeekEnabledPreference extends AddonSwitchPreference {
 
     @Override protected void onBindView(android.view.View view) {
         boolean saved=DeepSeekConfig.enabled(getContext());
-        if(isChecked()!=saved)setChecked(saved);
-        updateSummary();
+        if(isChecked()!=saved){setChecked(saved);updateSummary();}
         super.onBindView(view);
     }
 
@@ -57,5 +56,4 @@ public final class DeepSeekEnabledPreference extends AddonSwitchPreference {
         else if (current.apiKey.isEmpty()) setSummary(CaptionStrings.settings(getContext(), "message_1cc3c4b0aab0"));
         else setSummary(CaptionStrings.settings(getContext(), "message_2c107e436145"));
     }
-    @Override void rebindUi(){updateSummary();super.rebindUi();}
 }

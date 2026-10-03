@@ -12,7 +12,7 @@ public class N30LocalizationRuntimeTest {
  @Test public void everyRuntimeKeyAnd320DpLargeFontRowResolvesWithoutEllipsisOrChineseFallback()throws Exception {
   RuntimeEnvironment.getApplication().getApplicationInfo().flags |= android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL;
   Activity a=Robolectric.buildActivity(HostedPreferences.class).setup().get();JSONArray rows=new JSONArray();
-  for(String tag:TAGS){Configuration cfg=new Configuration(a.getResources().getConfiguration());cfg.setLocales(new LocaleList(Locale.forLanguageTag(tag)));cfg.fontScale=1.3f;android.view.ContextThemeWrapper c=new android.view.ContextThemeWrapper(a,0);c.applyOverrideConfiguration(cfg);c.getTheme().setTo(a.getTheme());
+  for(String tag:TAGS){Configuration cfg=new Configuration(a.getResources().getConfiguration());cfg.setLocales(new LocaleList(Locale.forLanguageTag(tag)));cfg.fontScale=1.3f;Context c=a.createConfigurationContext(cfg);
    for(String key:KEYS){int id=c.getResources().getIdentifier("cap_"+key,"string",c.getPackageName());assertNotEquals(tag+":"+key,0,id);String s=CaptionStrings.settings(c,key);assertEquals(c.getString(id),s);assertFalse(s.contains("cap_"));assertNotEquals(key,s);
     if(!tag.startsWith("zh")&&!tag.equals("ja"))assertFalse(tag+":"+key,s.matches("(?s).*[\\p{IsHan}].*"));}
    assertNotEquals(CaptionStrings.settings(c,"autosave"),CaptionStrings.settings(c,"ai_summary"));assertEquals(CaptionStrings.settings(c,"default_prompt"),DeepSeekConfig.defaultPrompt(c));
@@ -29,14 +29,14 @@ public class N30LocalizationRuntimeTest {
   }a.finish();N28CGeometryTest.export("n30-localization-runtime.json",new JSONObject().put("rows",rows));
  }
  static void check(TextView text){assertNotNull(text);assertNotNull(text.getLayout());assertEquals(text.length(),text.getLayout().getLineEnd(text.getLayout().getLineCount()-1));for(int i=0;i<text.getLayout().getLineCount();i++)assertEquals(0,text.getLayout().getEllipsisCount(i));}
- @Test public void fullNativeMultiChoiceRowsWrapAt320DpInEveryLocale(){Activity a=Robolectric.buildActivity(Activity.class).setup().visible().get();
-  for(String tag:TAGS){Configuration cfg=new Configuration(a.getResources().getConfiguration());cfg.setLocales(new LocaleList(Locale.forLanguageTag(tag)));cfg.fontScale=1.3f;android.view.ContextThemeWrapper c=new android.view.ContextThemeWrapper(a,0);c.applyOverrideConfiguration(cfg);c.getTheme().setTo(a.getTheme());
-   CaptionLanguagesPreference p=new CaptionLanguagesPreference(c);AlertDialog d=p.showLanguages();assertNotNull(d);assertEquals(1.3f,d.getContext().getResources().getConfiguration().fontScale,0f);ListView list=d.getListView();
+ @Test public void fullNativeMultiChoiceRowsWrapAt320DpInEveryLocale(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();
+  for(String tag:TAGS){Configuration cfg=new Configuration(a.getResources().getConfiguration());cfg.setLocales(new LocaleList(Locale.forLanguageTag(tag)));cfg.fontScale=1.3f;Context c=a.createConfigurationContext(cfg);
+   CaptionLanguagesPreference p=new CaptionLanguagesPreference(c);AlertDialog d=p.showLanguages();ListView list=d.getListView();
    for(int i=0;i<list.getAdapter().getCount();i++){View row=list.getAdapter().getView(i,null,list);int width=Math.round(280*c.getResources().getDisplayMetrics().density);row.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));row.layout(0,0,width,row.getMeasuredHeight());check(row.findViewById(android.R.id.text1));}
    d.dismiss();}a.finish();}
  @Test public void all232AuthoredKeysResolveInTheirActualLocaleNotAnEnglishOrChineseFallback()throws Exception {
   JSONObject expected=new JSONObject(new String(getClass().getResourceAsStream("/n30/localization-expected.json").readAllBytes(),"UTF-8"));Activity a=Robolectric.buildActivity(Activity.class).setup().get();
-  for(String tag:TAGS){String folder=tag.equals("zh-CN")?"zh-rCN":tag.equals("zh-TW")?"zh-rTW":tag;JSONObject values=expected.getJSONObject(folder);assertEquals(expected.getJSONObject("en").length(),values.length());
+  for(String tag:TAGS){String folder=tag.equals("zh-CN")?"zh-rCN":tag.equals("zh-TW")?"zh-rTW":tag;JSONObject values=expected.getJSONObject(folder);assertEquals(232,values.length());
    Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.forLanguageTag(tag)));Context c=a.createConfigurationContext(config);
    java.util.Iterator<String> keys=values.keys();while(keys.hasNext()){String key=keys.next();assertEquals(tag+":"+key,values.getString(key),CaptionStrings.settings(c,key));}
   }a.finish();

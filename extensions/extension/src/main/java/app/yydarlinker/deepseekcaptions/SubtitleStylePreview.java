@@ -11,7 +11,7 @@ import java.util.*;
 
 /** Theme-aware 16:9 preview scaled from the calibrated full-screen reference. */
 @SuppressWarnings("deprecation")
-public final class SubtitleStylePreview extends CaptionUiPreference {
+public final class SubtitleStylePreview extends android.preference.Preference {
     static final float LANDSCAPE_REFERENCE_WIDTH_PX=2736f;
     /** Catalog key holding the one-line sample each supported interface language renders. */
     static final String SAMPLE_KEY="preview_sample";
@@ -32,7 +32,6 @@ public final class SubtitleStylePreview extends CaptionUiPreference {
      * tests that prove a localized sample stays inside the video frame; nothing in production reads it.
      */
     static RectF LAST_CAPTION_BOX;
-    static String LAST_DRAWN_SAMPLE;
 
     /**
      * Where the caption lands once the full-screen reference frame has been scaled into the preview. The
@@ -67,7 +66,7 @@ public final class SubtitleStylePreview extends CaptionUiPreference {
         LinearLayout.LayoutParams previewParams=new LinearLayout.LayoutParams(-1,-2);
         previewParams.topMargin=CaptionSettingsStyle.dp(c,6);
         root.addView(preview,previewParams);
-        TextView hint=new TextView(c);CaptionUiViewBindings.text(hint,c,"preview_hint");CaptionSettingsStyle.caption(hint);
+        TextView hint=new TextView(c);hint.setText(CaptionStrings.settings(c,"preview_hint"));CaptionSettingsStyle.caption(hint);
         LinearLayout.LayoutParams hintParams=new LinearLayout.LayoutParams(-1,-2);
         hintParams.topMargin=CaptionSettingsStyle.dp(c,2);
         root.addView(hint,hintParams);
@@ -117,7 +116,7 @@ public final class SubtitleStylePreview extends CaptionUiPreference {
     }
     static final class Preview extends View {
         int sizeTier;int opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);sizeTier=s.captionSizeTier;opacity=s.backgroundOpacity;CaptionUiViewBindings.description(this,c,"preview");}
+        Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);sizeTier=s.captionSizeTier;opacity=s.backgroundOpacity;setContentDescription(CaptionStrings.settings(c,"preview"));}
         @Override protected void onMeasure(int widthSpec,int heightSpec){int width=MeasureSpec.getSize(widthSpec);int height=Math.round(stageHeight(width));setMeasuredDimension(width,resolveSize(height,heightSpec));}
         @Override protected void onDraw(Canvas c){
             android.util.DisplayMetrics d=getResources().getDisplayMetrics();float radius=12*d.density;paint.setColor(CaptionSettingsStyle.tint(CaptionSettingsStyle.primary(getContext()),7));c.drawRoundRect(0,0,getWidth(),getHeight(),radius,radius,paint);
@@ -130,9 +129,8 @@ public final class SubtitleStylePreview extends CaptionUiPreference {
             // The sample is the localized line the user would read in full screen; the frame is the exact
             // 2736x1264 full-screen reference scaled once, so the glyphs stay at the full-screen ratio.
             String sample=LOCALIZE_SAMPLE?sample(getContext()):CaptionStrings.get(getContext(),SAMPLE_KEY);
-            LAST_DRAWN_SAMPLE=sample;
             // Simulate the full-size content frame first; shrink the entire view exactly once.
-            TextView label=sampleLabel(CaptionUiLocale.context(getContext()),sample,sizeTier,opacity,
+            TextView label=sampleLabel(getContext(),sample,sizeTier,opacity,
                     LANDSCAPE_REFERENCE_WIDTH_PX,contentW);
             float pos=DeepSeekConfig.captionPositionY(getContext(),true);
             float boxX=(contentW-label.getMeasuredWidth())/2f;

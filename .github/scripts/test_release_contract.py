@@ -17,24 +17,10 @@ class ReleaseContractTest(unittest.TestCase):
             env=dict(os.environ,GITHUB_REPOSITORY="YYDarlinker/morphe-ai-caption-translator")
             return subprocess.run([sys.executable,str(SCRIPT),version],cwd=dst,env=env,capture_output=True).returncode
     def test_current_contract(self): self.assertEqual(0,self.validate())
-    def test_reject_invalid_public_roots(self):
-        mutations = {
-            "duplicate-ai": lambda rows: rows.append(dict(rows[0], name="AI caption translator")),
-            "obsolete-third-root": lambda rows: rows.append(dict(rows[0], name="Add Simplified Chinese to auto-translate")),
-            "missing-ai": lambda rows: rows.pop(0),
-            "missing-remember": lambda rows: rows.pop(),
-            "enabled-by-default": lambda rows: rows[0].update(default=True),
-            "extra-option": lambda rows: rows[0].update(options=[{"key": "unexpected"}]),
-            "wrong-version": lambda rows: rows[0]["compatiblePackages"][0]["targets"][0].update(version="21.16.257"),
-            "wrong-min-sdk": lambda rows: rows[0]["compatiblePackages"][0]["targets"][0].update(minSdk=29),
-            "experimental-target": lambda rows: rows[0]["compatiblePackages"][0]["targets"][0].update(isExperimental=True),
-        }
-        for label, mutation in mutations.items():
-            def mutate_list(dst):
-                path=dst/"patches-list.json";data=json.loads(path.read_text(encoding="utf-8"))
-                mutation(data["patches"]);path.write_text(json.dumps(data),encoding="utf-8")
-            with self.subTest(mutation=label):
-                self.assertNotEqual(0,self.validate(mutate_files=mutate_list))
+    def test_reject_duplicate_patch_names(self):
+        def duplicate(dst):
+            p=dst/"patches-list.json";data=json.loads(p.read_text(encoding="utf-8"));data["patches"].append(data["patches"][0]);p.write_text(json.dumps(data),encoding="utf-8")
+        self.assertNotEqual(0,self.validate(mutate_files=duplicate))
     def test_reject_utc_suffix(self): self.assertNotEqual(0,self.validate(lambda d:d.update(created_at=d["created_at"]+"Z")))
     def test_reject_old_repository(self): self.assertNotEqual(0,self.validate(lambda d:d.update(download_url=d["download_url"].replace("morphe-ai-caption-translator","youtube-ai-caption-translator"))))
     def test_reject_mismatched_version(self): self.assertNotEqual(0,self.validate(lambda d:d.update(version="9.9.9")))

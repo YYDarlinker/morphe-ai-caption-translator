@@ -17,8 +17,6 @@ public final class LanguageMenuOrder {
     }
     static int rank(String code){String s=code==null?"":code.toLowerCase(Locale.ROOT);return s.equals("zh-hans")||s.equals("zh-cn")?1:s.equals("zh-hant")||s.equals("zh-tw")||s.equals("zh-hk")?2:0;}
     static String label(String code){if(rank(code)==1)return simplifiedLabel();return Locale.forLanguageTag(code==null?"":code).getDisplayName(locale());}
-    /** Display-only overload; native menu comparison and insertion still use locale() above. */
-    static String label(String code,Locale display){if(rank(code)==1)return simplifiedLabel(display);return Locale.forLanguageTag(code==null?"":code).getDisplayName(display);}
     static String sortLabel(String text){return java.text.Normalizer.normalize(text==null?"":text,java.text.Normalizer.Form.NFKC).replaceAll("\\s+", "");}
     static int compare(String a,String b){return Collator.getInstance(locale()).compare(sortLabel(label(a)),sortLabel(label(b)));}
     static <T> List<T> sorted(List<T> values,Function<T,String> code){return insertSimplified(values,code,v->label(code.apply(v)));}

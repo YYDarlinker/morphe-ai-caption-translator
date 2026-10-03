@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"Gunakan YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"Terjemahan subtitel AI · Aktif"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"Terjemahan subtitel AI · Nonaktif"</string>
-    <string name="cap_ai_summary" formatted="false">"Setelah diaktifkan, pilih bahasa dalam daftar ‘Terjemahkan otomatis’ YouTube untuk menerjemahkan subtitel secara real time menggunakan layanan AI yang telah dikonfigurasi."</string>
+    <string name="cap_ai_summary" formatted="false">"Terjemahkan subtitel langsung dengan layanan AI Anda"</string>
     <string name="cap_languages_title" formatted="false">"Bahasa terjemahan otomatis"</string>
-    <string name="cap_languages_summary" formatted="false">"Tambahkan bahasa yang dipilih ke daftar bahasa ‘Terjemahkan otomatis’ YouTube. Anda dapat memilih beberapa bahasa."</string>
+    <string name="cap_languages_summary" formatted="false">"Pilih bahasa untuk ditambahkan ke menu terjemahan YouTube"</string>
     <string name="cap_languages_count" formatted="false">"%1$d bahasa dipilih"</string>
     <string name="cap_languages_save" formatted="false">"Simpan"</string>
     <string name="cap_languages_existing" formatted="false">"Sudah tersedia"</string>
@@ -232,6 +232,4 @@
     <string name="cap_languages_unavailable" formatted="false">"Tidak tersedia"</string>
     <string name="cap_languages_empty" formatted="false">"Tidak ada bahasa dipilih; menu asli tidak berubah"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
-    <string name="cap_model_empty" formatted="false">"ID model tidak boleh kosong"</string>
-    <string name="cap_api_address_invalid" formatted="false">"Masukkan URL dasar HTTP(S) yang valid dan kompatibel dengan OpenAI, tanpa kredensial tertanam atau fragmen."</string>
 </resources>

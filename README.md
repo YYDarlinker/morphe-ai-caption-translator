@@ -9,7 +9,7 @@ Version 1.3.5 restores a nearby R2.12 Java snapshot and the exact supplied event
 Source-network recovery, seek-demanded missing captions and lower startup overhead are described in
 [caption recovery and verification boundaries](docs/CAPTION-RECOVERY-1.3.3.md). The inline scheme-B profile manager is included.
 
-Two independently selectable caption patches: `AI caption translator` and `Remember caption selection`. AI includes the 14-language menu selection (including Simplified Chinese), an in-player engine selector and settings in 14 UI languages. Menu selections default to empty and existing selections are preserved. Historical revision notes below retain their original scope.
+Three independently selectable caption patches: the AI translator, a locale-ordered Simplified Chinese menu entry, and native-compatible caption selection memory. AI includes an in-player engine selector; settings support 14 UI languages. See [feature boundaries, upgrade instructions and validation limits](docs/MODULAR-CAPTIONS-1.2.0.md). Historical revision notes below retain their original scope.
 
 Version 1.2.6 corrects a regression in 1.2.5: a playback nonce was mistaken for the video ID, rejecting valid caption selections and preventing both AI startup and language memory. Ownership now comes from the actual caption model. See [cause, corrected verification and upgrade steps](docs/CAPTIONS-1.2.6.md).
 
@@ -44,14 +44,14 @@ The caption engine uses an anchored joint translation plan:
 - displayed timestamps always come from the original source atoms, never translated-text length;
 - English provider captions can be calibrated against English auto-generated captions as a clock-only reference;
 - YouTube's native subtitle renderer is suppressed while the AI overlay owns captions;
-- the AI patch adds selected language entries in the app's localized ordering, including `zh-Hans`, even while the AI engine is off;
+- the optional Simplified Chinese patch adds a localized, locale-ordered `zh-Hans` entry;
 - every automatic-translation language selected through the native menu uses the configured API.
 
 Detailed design and verification limits are in `docs/ARCHITECTURE.md`.
 
 ## Import into Morphe
 
-Use Expert mode. For AI, keep the compatible official default patch set (including `Captions` and player-flyout/settings support), then select `AI caption translator`. Optionally select `Remember caption selection`; it also works independently with native captions and does not add languages. AI's language menu selection remains available while the AI engine is off, without translation API requests. The composition input is original YouTube `21.16.256` (minSdk 28) with the complete compatible official `1.45.0` default set. Incompatible or incomplete structural bindings fail closed. Other stable/experimental host versions are not claimed as verified.
+Use Expert mode. For AI, keep the compatible official default patch set (including `Captions` and player-flyout/settings support), then select `AI caption translator`. Optionally select `Add Simplified Chinese to auto-translate` and/or `Remember caption selection`. Those two optional patches also work without selecting AI. To retain the former all-in-one feature set, select all three. The verified composition input is original YouTube `21.16.256` (minSdk 28) with the complete compatible official `1.45.0` default set. Incompatible or incomplete structural bindings fail closed. Other stable/experimental host versions are not claimed as verified.
 
 Release source: `https://github.com/YYDarlinker/morphe-ai-caption-translator`
 
@@ -99,7 +99,7 @@ This project's regular release channel is for normal source installation; it doe
 
 The regular release pipeline uses Morphe's changelog generator and semantic-release, builds the Android MPP and extension, executes tests, validates the generated manifest, and checks root DEX / extension / version / repository identity before uploading. Version 1.3.5 uses the recovered Smali build documented above. Published assets are not replaced in place.
 
-Optional feature ownership is explicit. Do not select another AI translator or language insertion patch with the AI root, or another subtitle-memory patch with the memory root. Installed sources may remain; this restriction concerns selected overlapping functionality.
+Optional feature ownership is now explicit. Do not select another AI translator with the AI root, another Simplified Chinese remapping/insertion patch with the language root, or another subtitle-memory patch with the memory root. Installed sources may remain; this restriction concerns selected overlapping functionality.
 
 ## Continuity revision (explicit-anchors-r3)
 

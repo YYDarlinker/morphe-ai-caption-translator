@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。用户安装可加载的撤回版后，手机15:25:58真实语言行click在Dialog.show抛BadToken(token null)；新APK BFF42C48…设置methods同1bc。版本对照证明原N31就把本地化ConfigurationContext错当Dialog窗口owner，N30用Activity则不含该回归；另有已证原N31 ART receiver类型bug，删除第三root与两bug无关。N32已重定案为typed安全＋通用Activity-owned窗口/全共享Dialog＋真实列表返回链＋最后两根；不整仓退N30、不改用户手机。最新§4aq/N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW§6及N32-CODEX-TASK，产品仍原N31恢复。
+> 最后更新：2026-10-03。用户已明确放弃失败的N31/N32，以N30完成源码重新开发；本规划聊天已恢复所有tracked非docs文件至d5ca720，并保留backup/n32-wip-c88abcc、全部旧包/失败证据及历史文档。N31仅可提取翻译文案，31/32其他实现禁止复用。最新§4ar及N30-SECOND-RESTORATION.md；新诊断build=n30，正在逐段审阅并制定新卡，未重新建包、未修改手机。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,7 +17,7 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节、最新§4aq、docs/N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW.md最新§6及重写N32-CODEX-TASK.md。§4ap FB7原31是VerifyError，最新BFF撤回可开版是BadToken，不能混用；§4ao原31回退仍准确，基线dc304cb/恢复282d155与docs后继，不能回到旧二根包继续交付。
+1. **先读本实时状态档案**：优先本节与最新§4ar、docs/N30-SECOND-RESTORATION.md；用户最新决定覆盖§4ao–4aq的“保留N31/执行N32”。N31/N32均已停止，后续从N30产品树独立实现；旧任务卡不可恢复执行。
 2. **当前角色分工（用户最新）**：本规划对话负责读手机已有logs/dumpsys/pull installed APK、版本源码/AOSP只读对照、任务与档案；本轮双源码子agent只读审阅无产品编辑，新Codex执行N32实现/验证。用户手机不push/安装/启动/app_process/清数据，最终用户自己传合成。单执行者施工，不交DeepSeek、不把源码审阅当after实测。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
@@ -765,3 +765,11 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - N32卡已整体精简重定序：ART types→Activity/WMS全部窗口→真实list/返回→2root3组合，保留UI14/default用户数据/诊断原始文案/N30安全网，严格before/after主测试不要Robolectric fake窗口/仅Class.forName；最终本地只读emulator主动验证，手机用户自行安装。N31对话补充本地-only/两根/诊断原样/加速要求保留。
 - 双agent本轮独立只读版本对照结果一致，未改任何产品。新证据.verification/n32-device-review/installed-navigation-current.apk、navigation-current-input、crash-latest-user/current-navigation-language/current-navigation-fragment、withdrawn-navigation-root-cause/versionblobs、android-window-context-source-excerpts/source-sha。旧N32卡before副本保留，N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW追加§6。
 - 本轮无产品修改/构建测试复跑/远程翻译/下载/依赖/手机写入/安装/清数据/Git推送发布。两份PROJECT-STATE一致后同步；当前仅docs可提交后继，下一新对话按更新卡N32施工，不再补旧通用页hack。
+
+## 4ar. 用户停止失败N32、恢复N30并独立重新规划（2026-10-03）
+
+- 用户报告暂存N32中测试API/刷新模型/保存诊断无响应、语言窗风格偏离N30/Morphe、繁体标签错误。执行者以c88abcc暂存后停止，不是交付；695离线测试不能覆盖这些问题。
+- 用户授权本规划聊天直接恢复N30开发环境，并要求下一阶段独立设计，N31仅允许文字翻译成果，禁止其他31/32实现复用。
+- 全tracked非docs树已恢复到d5ca720 / anchor/n30-d5ca720，恢复前c88abcc以backup/n32-wip-c88abcc保留。旧文档/包/失败证据保留，用户官方输入1.45.0未改。
+- 新要求：说明添加到原生自动翻译列表、纯语言名无视频可用状态且宿主风格；中文（繁体）准确命名；AI summary说明选自动翻译目标后用AI实时翻译；14语种所有设置角落独立闭环；直接删除独立简体中文root；深入分析200407诊断和manual/auto四源文件，通用修复漏/晚/短呈现。
+- 最新诊断build=n30、32/32HTTP成功，不等于字幕呈现或语义合格；需从源时间/事件/排版检查。规划者本轮不实现新功能、不签名/安装/启动手机、不远程API。后续新卡完成即停。

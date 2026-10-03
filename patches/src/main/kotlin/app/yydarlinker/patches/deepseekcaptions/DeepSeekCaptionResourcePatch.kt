@@ -160,8 +160,6 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
         fun Element.addCategory(title: String): Element {
             val category = ownerDocument.createElement("PreferenceCategory")
             category.setAttribute("android:title", captionResourceTitle(title))
-            category.setAttribute("android:key", "cap_ui_category_" + captionResourceTitle(title).removePrefix("@string/cap_"))
-            category.setAttribute("android:persistent", "false")
             appendChild(category)
             return category
         }

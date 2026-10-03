@@ -53,5 +53,4 @@ public final class DeepSeekDisplayTextDebugPreference extends AddonSwitchPrefere
         setSummary(CaptionStrings.settings(getContext(),
                 enabled ? "message_261f1c6f0fde" : "message_f496dd228d0b"));
     }
-    @Override void rebindUi(){updateSummary(isChecked());super.rebindUi();}
 }

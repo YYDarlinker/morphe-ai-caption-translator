@@ -43,7 +43,7 @@ public final class CaptionQuickToggle {
     }
     public static android.widget.LinearLayout nativeContainer(Object panel){return null;}
     static boolean setEngine(Context context,boolean enabled){
-        if(enabled && DeepSeekConfig.load(context).apiKey.isEmpty()){Toast.makeText(CaptionUiLocale.context(context),CaptionStrings.settings(context,"configure_api"),Toast.LENGTH_LONG).show();return false;}
+        if(enabled && DeepSeekConfig.load(context).apiKey.isEmpty()){Toast.makeText(context,CaptionStrings.settings(context,"configure_api"),Toast.LENGTH_LONG).show();return false;}
         boolean previous=DeepSeekConfig.enabled(context);
         // Saving the user's mode is independent of an ephemeral native player/track reference.
         // In particular, OFF must never be rolled back to ON by a stale Shorts manager.
@@ -55,9 +55,9 @@ public final class CaptionQuickToggle {
         CaptionMusicSuppressor.forceNativeRendererScan();CaptionMusicSuppressor.kick();
         CaptionDiagnostics.mark(context,"ENGINE_MODE_SAVED","enabled="+enabled+";native="+refreshed.name()+";session="+DynamicCaptionController.isVisibleActive()+";choice_known="+CaptionChoice.known());
         if(previous!=enabled&&refreshed==NativeCaptionBridge.Refresh.DEFERRED)
-            Toast.makeText(CaptionUiLocale.context(context),CaptionStrings.settings(context,enabled?"mode_pending":"mode_off_pending"),Toast.LENGTH_LONG).show();
+            Toast.makeText(context,CaptionStrings.settings(context,enabled?"mode_pending":"mode_off_pending"),Toast.LENGTH_LONG).show();
         else if(enabled&&CaptionChoice.isOn()&&!CaptionChoice.translates())
-            Toast.makeText(CaptionUiLocale.context(context),CaptionStrings.settings(context,"choose_translation"),Toast.LENGTH_LONG).show();
+            Toast.makeText(context,CaptionStrings.settings(context,"choose_translation"),Toast.LENGTH_LONG).show();
         return true;
     }
     public static boolean shortsOpen(){return false;}

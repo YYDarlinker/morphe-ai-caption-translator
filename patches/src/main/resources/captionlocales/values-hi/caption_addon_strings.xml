@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"YouTube इस्तेमाल करें"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"AI उपशीर्षक अनुवाद · चालू"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"AI उपशीर्षक अनुवाद · बंद"</string>
-    <string name="cap_ai_summary" formatted="false">"सक्षम करने के बाद, YouTube की ‘अपने-आप अनुवाद करें’ सूची में भाषा चुनें। आपकी कॉन्फ़िगर की गई AI सेवा सबटाइटल का रीयल-टाइम अनुवाद करेगी।"</string>
+    <string name="cap_ai_summary" formatted="false">"अपनी AI सेवा से वीडियो उपशीर्षकों का लाइव अनुवाद करें"</string>
     <string name="cap_languages_title" formatted="false">"अपने-आप अनुवाद की भाषाएँ"</string>
-    <string name="cap_languages_summary" formatted="false">"चुनी गई भाषाओं को YouTube की ‘अपने-आप अनुवाद करें’ भाषा सूची में जोड़ें। आप एक साथ कई भाषाएँ चुन सकते हैं।"</string>
+    <string name="cap_languages_summary" formatted="false">"YouTube अनुवाद मेन्यू में जोड़ने के लिए भाषाएँ चुनें"</string>
     <string name="cap_languages_count" formatted="false">"%1$d भाषाएँ चुनी गईं"</string>
     <string name="cap_languages_save" formatted="false">"सहेजें"</string>
     <string name="cap_languages_existing" formatted="false">"पहले से उपलब्ध"</string>
@@ -232,6 +232,4 @@
     <string name="cap_languages_unavailable" formatted="false">"उपलब्ध नहीं"</string>
     <string name="cap_languages_empty" formatted="false">"कोई भाषा नहीं चुनी गई; मूल मेन्यू नहीं बदलेगा"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
-    <string name="cap_model_empty" formatted="false">"मॉडल ID खाली नहीं हो सकता"</string>
-    <string name="cap_api_address_invalid" formatted="false">"मान्य HTTP(S) OpenAI-संगत बेस URL दर्ज करें। इसमें उपयोगकर्ता नाम, पासवर्ड या फ़्रैगमेंट न हो।"</string>
 </resources>

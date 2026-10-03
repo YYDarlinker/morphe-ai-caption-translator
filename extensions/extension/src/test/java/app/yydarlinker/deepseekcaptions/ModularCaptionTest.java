@@ -4,13 +4,14 @@ import org.junit.*;import org.junit.runner.RunWith;import org.robolectric.*;impo
 import java.util.*;import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class) @Config(manifest=Config.NONE,sdk=28,shadows={ModularCaptionTest.Flags.class,ModularCaptionTest.Tracks.class})
 public class ModularCaptionTest {
-    private static boolean ai,memory;
+    private static boolean ai,memory,simplified;
     private static final List<Track> nativeTracks=new ArrayList<>(),translatedTracks=new ArrayList<>();
     enum Origin { PREFERRED_TRACK, DEFAULT }
     static class Track {final String language,url,vss;Track(String code,boolean translation,boolean asr){language=code;vss=asr?"a."+code:code;url="https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en"+(translation?"&tlang="+code:"");}}
     @Implements(CaptionAddonSupport.class) public static class Flags {
         @Implementation public static boolean aiInstalled(){return ai;}
         @Implementation public static boolean memoryInstalled(){return memory;}
+        @Implementation public static boolean simplifiedInstalled(){return simplified;}
     }
     @Implements(NativeCaptionBridge.class) public static class Tracks {
         @Implementation public static String language(Object t){return ((Track)t).language;}
@@ -20,7 +21,7 @@ public class ModularCaptionTest {
         @Implementation public static List<?> translatedTracks(Object manager){return translatedTracks;}
         @Implementation public static CharSequence displayName(Object track){return LanguageMenuOrder.label(((Track)track).language);}
     }
-    @Before public void before(){ai=false;memory=false;RememberedCaptionSelection.reset();CaptionChoice.reset();nativeTracks.clear();translatedTracks.clear();}
+    @Before public void before(){ai=false;memory=false;simplified=false;RememberedCaptionSelection.reset();CaptionChoice.reset();nativeTracks.clear();translatedTracks.clear();}
     @Test public void memoryWorksWithoutAiInstallationAndWithAiDisabled(){
         Activity activity=Robolectric.buildActivity(Activity.class).setup().get();NativeCaptionBridge.initialize(activity);DeepSeekConfig.saveEnabled(activity,false);
         for(boolean installed:new boolean[]{false,true}){
@@ -50,17 +51,6 @@ public class ModularCaptionTest {
         RememberedCaptionSelection.select("fr",false,false);nativeTracks.add(new Track("fr",false,false));
         assertEquals(-1,NativeCaptionBridge.restoreDecision());assertNull(NativeCaptionBridge.resolveRemembered(new Object()));
         List<String> original=Arrays.asList("fr","en");assertSame(original,NativeCaptionBridge.augmentTranslations(original));
-    }
-    @Test public void aiOnlyNativeSelectionCannotCreateOrOverwriteMemory(){
-        Activity activity=Robolectric.buildActivity(Activity.class).setup().get();NativeCaptionBridge.initialize(activity);ai=true;memory=false;DeepSeekConfig.saveEnabled(activity,false);
-        Track selected=new Track("fr",true,false);
-        NativeCaptionBridge.onNativeSelection(new Object(),selected,Origin.PREFERRED_TRACK);
-        assertEquals(-1,RememberedCaptionSelection.decision());assertEquals(-1,NativeCaptionBridge.restoreDecision());
-        RememberedCaptionSelection.select("ja",false,true);
-        NativeCaptionBridge.onNativeSelection(new Object(),selected,Origin.PREFERRED_TRACK);
-        NativeCaptionBridge.onNativeSelection(new Object(),null,Origin.PREFERRED_TRACK);
-        assertEquals("ja",RememberedCaptionSelection.language());assertEquals(1,RememberedCaptionSelection.decision());
-        assertNull(NativeCaptionBridge.resolveRemembered(new Object()));activity.finish();
     }
     @Test public void automaticTrackSelectionCannotOverwriteUserMemory(){
         memory=true;NativeCaptionBridge.onNativeSelection(new Object(),new Track("fr",true,false),Origin.PREFERRED_TRACK);

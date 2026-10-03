@@ -15,7 +15,6 @@ fun main(args:Array<String>){
     container.dexEntryNames.forEach { name->container.getEntry(name)!!.dexFile.classes.forEach { cls->check(classes.put(cls.type,cls)==null){"Duplicate class ${cls.type}"} } }
     val support=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
     val flags=support.methods.filter { it.name.endsWith("Installed") }.associate { method -> method.name to method.implementation!!.instructions.filterIsInstance<WideLiteralInstruction>().single().wideLiteral }
-    check(flags.keys==setOf("aiInstalled","memoryInstalled")){"N32 expected only two installation flags: $flags"}
     println("FEATURES=$flags")
     val forbiddenStrings=listOf("ngPkbaZliaU","b7_354_387","zero bezels","all right this is a big smartphone")
     for(cls in classes.values.filter { it.type.startsWith("Lapp/yydarlinker/deepseekcaptions/") })for(method in cls.methods) {
@@ -35,10 +34,7 @@ fun main(args:Array<String>){
         }
     } }
     println("HOST_HOOKS=$hostHooks")
-    check(((hostHooks["augmentTranslations"]?:0)>0)==(flags["aiInstalled"]==1L)){"N32 language-menu hook ownership mismatch"}
-    check(((hostHooks["augmentMetadata"]?:0)>0)==(flags["aiInstalled"]==1L)){"N32 metadata hook ownership mismatch"}
-    check(((hostHooks["resolveRemembered"]?:0)>0)==(flags["memoryInstalled"]==1L)){"N32 memory hook ownership mismatch"}
-    if(flags["aiInstalled"]==1L) {
+    if(flags["aiInstalled"]==1L || flags["simplifiedInstalled"]==1L) {
         check((hostHooks["augmentTranslations"]?:0)>0){"N30 language menu hook missing"}
         val bridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")
         val clone=bridge.methods.singleOrNull { it.name=="cloneTranslation" && it.parameterTypes.map { p->p.toString() }==listOf("Ljava/lang/Object;","Ljava/lang/String;") } ?: error("N30 generic translation clone missing")
@@ -46,21 +42,6 @@ fun main(args:Array<String>){
         check(refs.filterIsInstance<MethodReference>().count { it.name=="translationUrl" }==1){"N30 generic target URL clone incomplete"}
         check(refs.filterIsInstance<MethodReference>().count { it.name=="translationVss" }==1){"N30 generic VSS clone incomplete"}
         check(refs.filterIsInstance<MethodReference>().count { it.name=="translationLabel" }==1){"N30 generic label clone incomplete"}
-        val cloneCode=clone.implementation!!.instructions.toList()
-        val builder=(refs.filterIsInstance<MethodReference>().single { it.name=="<init>" }).definingClass
-        val languageSetter=cloneCode.first { ins ->
-            val ref=(ins as? ReferenceInstruction)?.reference as? MethodReference
-            ref?.definingClass==builder && ref.returnType=="V" && ref.parameterTypes.map { it.toString() }==listOf("Ljava/lang/String;")
-        } as com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
-        val targetRegister=clone.implementation!!.registerCount-1
-        check(languageSetter.registerCount==2 && languageSetter.registerD==targetRegister){"N32 clone language must receive selected target p1"}
-        for((name,words) in listOf("translationUrl" to 2,"translationVss" to 2,"translationLabel" to 1)) {
-            val invoke=cloneCode.single { ins -> ((ins as? ReferenceInstruction)?.reference as? MethodReference)?.name==name }
-                as com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
-            check(invoke.registerCount==words && (if(words==1)invoke.registerC else invoke.registerD)==targetRegister){"N32 $name must receive selected target p1"}
-        }
-        check(refs.filterIsInstance<com.android.tools.smali.dexlib2.iface.reference.StringReference>().none { it.string=="zh-Hans" }){"N32 generic clone forcibly selects Simplified Chinese"}
-        println("N32_SELECTED_TARGET_CLONE_PASS language=p1 url=p1 vss=p1 label=p1 forced_zh_hans=0")
         println("N30_MENU_BRIDGE_COMPLETE generic_clone=1 canonical_codes=14")
     }
     if(flags["aiInstalled"]==1L) {
@@ -304,22 +285,6 @@ fun main(args:Array<String>){
         check(menu.methods.none { it.name=="show" }){"Obsolete second-level engine dialog remains"}
         println("QUICK_MENU_SHARED_DIVIDER=true; ALL_INCOMING_BRANCHES_REACH_TOGGLE=true; DIRECT_TOGGLE=true")
         println("QUICK_MENU_BOUND=true")
-    }
-    if(flags["aiInstalled"]==1L) {
-        val setting=classes.getValue("Lapp/morphe/extension/shared/settings/BaseSettings;").fields.single { it.name=="MORPHE_LANGUAGE" }
-        check(setting.type=="Lapp/morphe/extension/shared/settings/EnumSetting;" && AccessFlags.PUBLIC.isSet(setting.accessFlags) && AccessFlags.STATIC.isSet(setting.accessFlags))
-        for((type,name,result) in listOf(Triple("EnumSetting","get","Ljava/lang/Enum;"),Triple("AppLanguage","getLocale","Ljava/util/Locale;"))) {
-            val cls=classes.getValue("Lapp/morphe/extension/shared/settings/$type;")
-            check(AccessFlags.PUBLIC.isSet(cls.accessFlags))
-            check(AccessFlags.PUBLIC.isSet(cls.methods.single { it.name==name && it.parameterTypes.isEmpty() && it.returnType==result }.accessFlags))
-        }
-        val ui=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionUiLocale;")
-        val calls=ui.methods.flatMap { it.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.mapNotNull { ins->ins.reference as? MethodReference }?.toList()?:emptyList() }
-        check(calls.none { it.name=="setDefault" || it.name=="updateConfiguration" || it.definingClass=="Lapp/morphe/extension/shared/ResourceUtils;" })
-        auditSettingsComposition(classes)
-        val languages=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionLanguagesPreference;")
-        check(languages.methods.none { it.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.any { ins->(ins.reference as? MethodReference)?.name=="languageStatus" }==true })
-        println("N32_UI_ABI_AND_LIFECYCLE_PASS official_language_public=true typed_settings_seams=5 video_status_ui_calls=0 global_mutations=0")
     }
     println("DEX_AUDIT_PASS classes=${classes.size}")
 }

@@ -55,9 +55,9 @@ final class DeepSeekConfig {
         String prompt = p.getString(PROMPT, "");
         boolean programDefault = prompt == null || prompt.trim().isEmpty()
                 || LEGACY_CHINESE_PROMPT.equals(prompt) || DEFAULT_PROMPT.equals(prompt);
-        // Business identity stays on the N30 Chinese baseline; display resolves independently.
+        // Absence is a dynamic default, not a Chinese string frozen into each profile.
         if (prompt == null || prompt.trim().isEmpty() || LEGACY_CHINESE_PROMPT.equals(prompt)
-                || DEFAULT_PROMPT.equals(prompt)) prompt = DEFAULT_PROMPT;
+                || DEFAULT_PROMPT.equals(prompt)) prompt = defaultPrompt(context);
         return new Snapshot(
                 global.getBoolean(ENABLED, false),
                 safe(p.getString(BASE_URL, DEFAULT_BASE_URL), DEFAULT_BASE_URL),
@@ -95,14 +95,14 @@ final class DeepSeekConfig {
     static void saveBaseUrl(Context context, String value) {
         String clean = value == null ? "" : value.trim();
         if (!(clean.startsWith("https://") || clean.startsWith("http://"))) {
-            throw new IllegalArgumentException("api_url_scheme");
+            throw new IllegalArgumentException("API 地址必须以 https:// 或 http:// 开头");
         }
         synchronized(ApiProfiles.LOCK){String endpoint=ProviderEndpoint.validate(clean);SecureApiKey.bindLegacyOrigin(context);ApiProfiles.values(context).edit().putString(BASE_URL, endpoint).apply();}
     }
 
     static void saveModel(Context context, String value) {
         String clean = value == null ? "" : value.trim();
-        if (clean.isEmpty()) throw new IllegalArgumentException("model_empty");
+        if (clean.isEmpty()) throw new IllegalArgumentException("模型不能为空");
         synchronized(ApiProfiles.LOCK){ApiProfiles.values(context).edit().putString(MODEL, clean).apply();}
     }
 
@@ -114,7 +114,7 @@ final class DeepSeekConfig {
         String clean = value == null ? "" : value.trim();
         synchronized (ApiProfiles.LOCK) {
             SharedPreferences.Editor edit = ApiProfiles.values(context).edit();
-            if (clean.isEmpty() || clean.equals(DEFAULT_PROMPT)
+            if (clean.isEmpty() || clean.equals(defaultPrompt(context)) || clean.equals(DEFAULT_PROMPT)
                     || clean.equals(LEGACY_CHINESE_PROMPT)) edit.remove(PROMPT);
             else edit.putString(PROMPT, clean);
             edit.apply();

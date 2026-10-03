@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"使用 YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"AI 字幕翻譯 · 開啟"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"AI 字幕翻譯 · 關閉"</string>
-    <string name="cap_ai_summary" formatted="false">"啟用後，在 YouTube 的「自動翻譯」清單中選取語言，使用已設定的 AI 服務即時翻譯字幕。"</string>
+    <string name="cap_ai_summary" formatted="false">"使用你設定的 AI 服務即時翻譯影片字幕"</string>
     <string name="cap_languages_title" formatted="false">"自動翻譯語言"</string>
-    <string name="cap_languages_summary" formatted="false">"將所選語言加入 YouTube 的「自動翻譯」語言清單，可同時選取多種語言。"</string>
+    <string name="cap_languages_summary" formatted="false">"選擇要加入 YouTube 自動翻譯選單的語言"</string>
     <string name="cap_languages_count" formatted="false">"已選 %1$d 種語言"</string>
     <string name="cap_languages_save" formatted="false">"儲存"</string>
     <string name="cap_languages_existing" formatted="false">"已存在"</string>
@@ -232,6 +232,4 @@
     <string name="cap_languages_unavailable" formatted="false">"無法使用"</string>
     <string name="cap_languages_empty" formatted="false">"未選擇語言；保留原生選單"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
-    <string name="cap_model_empty" formatted="false">"模型 ID 不可留空"</string>
-    <string name="cap_api_address_invalid" formatted="false">"請輸入有效的 HTTP(S) OpenAI 相容介面網址，不要包含使用者名稱、密碼或片段標記。"</string>
 </resources>

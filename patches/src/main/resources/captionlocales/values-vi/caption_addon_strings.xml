@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"Dùng YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"Dịch phụ đề bằng AI · Bật"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"Dịch phụ đề bằng AI · Tắt"</string>
-    <string name="cap_ai_summary" formatted="false">"Sau khi bật, hãy chọn ngôn ngữ trong danh sách ‘Dịch tự động’ của YouTube để dịch phụ đề theo thời gian thực bằng dịch vụ AI đã cấu hình."</string>
+    <string name="cap_ai_summary" formatted="false">"Dịch phụ đề trực tiếp bằng dịch vụ AI bạn đã cấu hình"</string>
     <string name="cap_languages_title" formatted="false">"Ngôn ngữ dịch tự động"</string>
-    <string name="cap_languages_summary" formatted="false">"Thêm các ngôn ngữ đã chọn vào danh sách ‘Dịch tự động’ của YouTube. Bạn có thể chọn nhiều ngôn ngữ cùng lúc."</string>
+    <string name="cap_languages_summary" formatted="false">"Chọn ngôn ngữ để thêm vào trình đơn dịch YouTube"</string>
     <string name="cap_languages_count" formatted="false">"Đã chọn %1$d ngôn ngữ"</string>
     <string name="cap_languages_save" formatted="false">"Lưu"</string>
     <string name="cap_languages_existing" formatted="false">"Đã có"</string>
@@ -232,6 +232,4 @@
     <string name="cap_languages_unavailable" formatted="false">"Không khả dụng"</string>
     <string name="cap_languages_empty" formatted="false">"Chưa chọn ngôn ngữ; giữ nguyên trình đơn gốc"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
-    <string name="cap_model_empty" formatted="false">"ID mô hình không được để trống"</string>
-    <string name="cap_api_address_invalid" formatted="false">"Nhập URL cơ sở HTTP(S) hợp lệ và tương thích với OpenAI, không chứa thông tin đăng nhập hoặc phần fragment."</string>
 </resources>

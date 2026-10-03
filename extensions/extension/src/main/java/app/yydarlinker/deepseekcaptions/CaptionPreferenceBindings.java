@@ -42,7 +42,7 @@ public final class CaptionPreferenceBindings {
         if(p instanceof CaptionUiPreference)((CaptionUiPreference)p).rebindUi();
     }
     public static void rebind(PreferenceGroup tree){
-        if(tree==null)return;bind(tree);
+        if(tree==null)return;CaptionUiWindows.bind(tree);bind(tree);
         if(tree instanceof PreferenceScreen){android.app.Dialog dialog=((PreferenceScreen)tree).getDialog();
             if(dialog!=null && dialog.isShowing() && owns(tree)){
                 dialog.setTitle(tree.getTitle());CaptionUiLocale.direction(dialog.getWindow().getDecorView(),tree.getContext());
@@ -53,12 +53,16 @@ public final class CaptionPreferenceBindings {
             if(p instanceof PreferenceGroup)rebind((PreferenceGroup)p);
         }
     }
-    public static void onSettingsLoaded(PreferenceFragment fragment){rebind(fragment.getPreferenceScreen());}
+    public static void onSettingsLoaded(PreferenceFragment fragment){
+        if(fragment==null)return;
+        CaptionUiWindows.bind(fragment.getPreferenceScreen(),fragment.getActivity());
+        rebind(fragment.getPreferenceScreen());
+    }
     private static final Set<View> observed=Collections.newSetFromMap(new WeakHashMap<View,Boolean>());
     public static void onSettingsView(View view){
         if(!(view instanceof android.widget.ListView) || !observed.add(view))return;
         java.lang.ref.WeakReference<android.widget.ListView> weak=new java.lang.ref.WeakReference<>((android.widget.ListView)view);
-        view.getViewTreeObserver().addOnGlobalLayoutListener(()->{
+        android.view.ViewTreeObserver.OnGlobalLayoutListener layout=()->{
             android.widget.ListView list=weak.get();if(list==null)return;
             android.widget.ListAdapter adapter=list.getAdapter();if(adapter==null)return;
             for(int i=0;i<list.getChildCount();i++){
@@ -67,9 +71,18 @@ public final class CaptionPreferenceBindings {
                 // The adapter's actual Preference identity determines ownership, never a row number/title.
                 if(item instanceof Preference && owns((Preference)item))view((Preference)item,list.getChildAt(i));
             }
+        };
+        view.getViewTreeObserver().addOnGlobalLayoutListener(layout);
+        view.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
+            @Override public void onViewAttachedToWindow(View attached){}
+            @Override public void onViewDetachedFromWindow(View detached){
+                if(detached.getViewTreeObserver().isAlive())detached.getViewTreeObserver().removeOnGlobalLayoutListener(layout);
+                observed.remove(detached);detached.removeOnAttachStateChangeListener(this);
+            }
         });
     }
     public static void view(Preference preference,View view){
+        CaptionUiWindows.bind(preference,view);
         if(owns(preference)){CaptionUiLocale.direction(view,preference.getContext());CaptionLanguagesPreference.wrap(view);
             android.widget.TextView title=view.findViewById(android.R.id.title),summary=view.findViewById(android.R.id.summary);
             if(title!=null && !android.text.TextUtils.equals(title.getText(),preference.getTitle()))title.setText(preference.getTitle());

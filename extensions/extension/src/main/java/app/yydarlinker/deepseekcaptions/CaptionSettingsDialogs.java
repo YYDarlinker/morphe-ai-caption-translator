@@ -16,13 +16,17 @@ final class CaptionSettingsDialogs {
 
     /** Host-styled confirmation, with the platform dialog only when the host class is absent. */
     static Dialog confirm(Context c,String title,String message,String confirmLabel,Runnable onConfirm){
-        Context display=CaptionUiLocale.context(c);
+        String operation="confirm:"+title;
+        Dialog existing=CaptionUiWindows.find(c,operation);if(existing!=null)return existing;
+        CaptionUiWindows.Session window=CaptionUiWindows.acquire(c,operation);if(window==null)return null;
+        Context display=window.context;
+        Runnable confirm=window.guard(onConfirm);
         try{
             Object result=Class.forName("app.morphe.extension.shared.ui.CustomDialog")
                     .getMethod("create",Context.class,CharSequence.class,CharSequence.class,
                             EditText.class,CharSequence.class,Runnable.class,Runnable.class,
                             CharSequence.class,Runnable.class,boolean.class,boolean.class)
-                    .invoke(null,display,title,message,null,confirmLabel,onConfirm,null,
+                    .invoke(null,display,title,message,null,confirmLabel,confirm,null,
                             null,null,false,true);
             Pair<?,?> pair=(Pair<?,?>)result;Dialog dialog=(Dialog)pair.first;
             // Official 1.45's system-string helper can also ignore its locale argument. Supply both
@@ -32,15 +36,15 @@ final class CaptionSettingsDialogs {
             ProfileActionStrip actions=new ProfileActionStrip(display);
             android.widget.Button cancel=actions.add(CaptionStrings.settings(c,"cancel"),dialog::dismiss);
             CaptionUiViewBindings.text(cancel,c,"cancel");
-            actions.addPrimary(confirmLabel,()->{onConfirm.run();dialog.dismiss();});
+            actions.addPrimary(confirmLabel,()->{confirm.run();dialog.dismiss();});
             LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.topMargin=CaptionSettingsStyle.dp(c,16);
             main.addView(actions,params);
-            dialog.show();CaptionUiLocale.direction(dialog.getWindow().getDecorView(),c);return dialog;
+            return CaptionUiWindows.show(window,dialog)?dialog:null;
         }catch(ReflectiveOperationException | ClassCastException | LinkageError unavailable){
             AlertDialog dialog=new AlertDialog.Builder(display).setTitle(title).setMessage(message)
                     .setNegativeButton(CaptionStrings.settings(c,"cancel"),null)
-                    .setPositiveButton(confirmLabel,(d,which)->onConfirm.run()).create();
-            dialog.show();CaptionUiLocale.direction(dialog.getWindow().getDecorView(),c);return dialog;
+                    .setPositiveButton(confirmLabel,(d,which)->confirm.run()).create();
+            return CaptionUiWindows.show(window,dialog)?dialog:null;
         }
     }
 
@@ -48,7 +52,10 @@ final class CaptionSettingsDialogs {
         return show(c,title,content,closeLabel,null);
     }
     static Dialog show(Context c,String title,View content,String closeLabel,View footer){
-        Context display=CaptionUiLocale.context(c);
+        String operation="settings:"+title;
+        Dialog existing=CaptionUiWindows.find(c,operation);if(existing!=null)return existing;
+        CaptionUiWindows.Session window=CaptionUiWindows.acquire(c,operation);if(window==null)return null;
+        Context display=window.context;
         CaptionUiViewBindings.refresh(content,c);
         // A bounded scroll area also keeps actions reachable in landscape and with large fonts.
         ScrollView scroll = new ScrollView(c) {
@@ -96,8 +103,6 @@ final class CaptionSettingsDialogs {
             }
             dialog=builder.create();
         }
-        dialog.show();
-        CaptionUiLocale.direction(dialog.getWindow().getDecorView(),c);
-        return dialog;
+        return CaptionUiWindows.show(window,dialog)?dialog:null;
     }
 }

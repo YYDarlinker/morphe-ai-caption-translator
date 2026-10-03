@@ -90,6 +90,7 @@ public class ProfileUiRegressionTest {
     @Test public void cancelledDeleteRetainsEverythingAndLastProfileCannotBeDeleted(){
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
         open();manage();click("profile_delete");click("profile_keep");assertTrue(ApiProfiles.list(a).containsKey(b));
+        ShadowDialog.getLatestDialog().dismiss();idle();
         ApiProfiles.delete(a,b);open();manage();assertNull(label(tree(),text("profile_delete")));
         try{ApiProfiles.delete(a,"default");fail();}catch(IllegalStateException expected){}
     }

@@ -72,7 +72,7 @@ tasks.register<JavaExec>("verifyComposition") {
     classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
     mainClass.set("validation.CompositionHarnessKt")
     maxHeapSize="6G"
-    listOf("input","official","addon","output","selection","compile","fault","compile-failed","dex-only").forEach { key ->
+    listOf("input","official","addon","output","selection","compile","fault","compile-failed","dex-only","repeat").forEach { key ->
         providers.gradleProperty("composition.$key").orNull?.let { args("--$key",it) }
     }
 }
@@ -82,4 +82,23 @@ tasks.register<JavaExec>("auditComposition") {
     mainClass.set("validation.CompositionDexAuditKt")
     maxHeapSize="4G"
     providers.gradleProperty("composition.apk").orNull?.let { args(it) }
+}
+
+tasks.register<JavaExec>("auditSettingsComposition") {
+    dependsOn(tasks.named("testClasses"))
+    classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
+    mainClass.set("validation.SettingsHookAudit")
+    maxHeapSize="4G"
+    providers.gradleProperty("composition.apk").orNull?.let { args(it) }
+    providers.gradleProperty("composition.settingsBase").orNull?.let { args(it) }
+}
+
+tasks.register<JavaExec>("verifySettingsHookRegression") {
+    dependsOn(tasks.named("testClasses"))
+    classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
+    mainClass.set("validation.SettingsHookRegression")
+    maxHeapSize="4G"
+    listOf("settingsBefore","apk","settingsNegativeOutput").forEach { key->
+        providers.gradleProperty("composition.$key").orNull?.let { args(it) }
+    }
 }

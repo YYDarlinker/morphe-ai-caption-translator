@@ -94,8 +94,21 @@ def main() -> None:
     if len(names) != len(patches) or len(set(names)) != len(names) or any(not isinstance(name, str) or not name for name in names):
         fail("patch names must be nonempty and unique")
     if tuple(map(int, version.split("-")[0].split("."))) >= (1, 2, 0):
-        if set(names) != {"AI caption translator", "Add Simplified Chinese to auto-translate", "Remember caption selection"}:
-            fail("modular release must contain exactly the three declared public patches")
+        if set(names) != {"AI caption translator", "Remember caption selection"}:
+            fail("modular release must contain exactly the two declared public patches")
+        for patch in patches:
+            if patch.get("default") is not False or patch.get("options") != []:
+                fail("caption roots must be opt-in with no unadvertised options")
+            packages = patch.get("compatiblePackages")
+            if not isinstance(packages, list) or len(packages) != 1:
+                fail("caption roots must declare exactly one compatible package")
+            package = packages[0]
+            targets = package.get("targets")
+            if package.get("packageName") != "com.google.android.youtube" or not isinstance(targets, list) or len(targets) != 1:
+                fail("caption roots must target only the declared YouTube package/version")
+            target = targets[0]
+            if target.get("version") != "21.16.256" or target.get("minSdk") != 28 or target.get("isExperimental") is not False:
+                fail("caption roots must keep YouTube 21.16.256, minSdk 28, non-experimental")
 
     if not isinstance(bundle["description"], str):
         fail("description must be a string")

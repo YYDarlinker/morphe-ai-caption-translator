@@ -39,10 +39,10 @@ private fun <T> Iterable<T>.unique(role: String): T {
 }
 
 /** Bind once after all bundles execute; no copied official extension or cross-bundle dependency. */
-internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplified:Boolean, memory:Boolean) {
+internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, memory:Boolean) {
     val featureRuntime=mutableClassDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
     fun publishFeatures() {
-    for((name,enabled) in listOf("aiInstalled" to ai,"simplifiedInstalled" to simplified,"memoryInstalled" to memory)) {
+    for((name,enabled) in listOf("aiInstalled" to ai,"memoryInstalled" to memory)) {
         val stub=featureRuntime.methods.single { it.name==name }
         val replacement=ImmutableMethod(featureRuntime.type,name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,MutableMethodImplementation(1)).toMutable()
         replacement.addInstructions(0,"const/4 v0, ${if(enabled) "0x1" else "0x0"}\nreturn v0")
@@ -120,34 +120,12 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     bind("vss","check-cast p0, ${track.type}\niget-object v0, p0, ${vss.id()}\nreturn-object v0")
     bind("url","check-cast p0, ${track.type}\niget-object v0, p0, ${url.id()}\nreturn-object v0")
     bind("displayName","check-cast p0, ${track.type}\niget-object v0, p0, ${display.id()}\nreturn-object v0")
-    if(ai || simplified) {
-    bind("cloneSimplified", """
-        check-cast p0, ${track.type}
-        new-instance v0, ${builder.type}
-        invoke-direct {v0, p0}, ${copy.id()}
-        const-string v1, "zh-Hans"
-        invoke-virtual {v0, v1}, ${languageSetter.id()}
-        invoke-static {}, Lapp/yydarlinker/deepseekcaptions/LanguageMenuOrder;->simplifiedLabel()$STRING
-        move-result-object v1
-        iput-object v1, v0, ${builderDisplay.id()}
-        iget-object v1, p0, ${url.id()}
-        invoke-static {v1}, $BRIDGE->simplifiedUrl($STRING)$STRING
-        move-result-object v1
-        invoke-virtual {v0, v1}, ${urlSetter.id()}
-        iget-object v1, p0, ${vss.id()}
-        invoke-static {v1}, $BRIDGE->simplifiedVss($STRING)$STRING
-        move-result-object v1
-        invoke-virtual {v0, v1}, ${vssSetter.id()}
-        invoke-virtual {v0}, ${build.id()}
-        move-result-object v0
-        return-object v0
-    """)
+    if(ai) {
     bind("cloneTranslation", """
         check-cast p0, ${track.type}
         new-instance v0, ${builder.type}
         invoke-direct {v0, p0}, ${copy.id()}
-        const-string v1, "zh-Hans"
-        invoke-virtual {v0, v1}, ${languageSetter.id()}
+        invoke-virtual {v0, p1}, ${languageSetter.id()}
         invoke-static {p1}, Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;->translationLabel($STRING)$STRING
         move-result-object v1
         iput-object v1, v0, ${builderDisplay.id()}
@@ -172,7 +150,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
             addInstructions(i+1,"move-result-object v$r\nreturn-object v$r")
         }
     }
-    } // optional simplified language menu
+    } // AI-owned selected-language menu
     if(selector.returnType!="V" || selector.parameterTypes.size !in 2..3 ||
         (selector.parameterTypes.size==3 && selector.parameterTypes[2]!="I"))throw PatchException("Caption selector signature changed")
     // setSubtitleTrack is a USER entry point, not the automatic new-video path. Its final
@@ -367,7 +345,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
 
     } // optional cross-video memory
 
-    if(ai || simplified) {
+    if(ai) {
     // Both modern protobuf settings and legacy CC rows consume this shared metadata field.
     val metadataField=listCode.mapNotNull { it.field() }.first { it.definingClass==listMethod.definingClass && it.type.startsWith("L") }
     val metadata=classDefBy(metadataField.type)

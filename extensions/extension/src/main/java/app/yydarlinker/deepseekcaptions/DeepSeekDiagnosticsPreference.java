@@ -26,12 +26,12 @@ public final class DeepSeekDiagnosticsPreference extends CaptionUiPreference {
         Button copy=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"copy"),false,false,()->{});copy.setTag("ai_diagnostics_copy");copy.setOnClickListener(v->{ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);if(manager!=null){manager.setPrimaryClip(ClipData.newPlainText(CaptionStrings.settings(c,"diagnostics"),body.getText()));Toast.makeText(CaptionUiLocale.context(c),CaptionStrings.settings(c,"message_896c4b51d7e9"),Toast.LENGTH_SHORT).show();}});actions.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         ProfileActionStrip archiveActions=new ProfileActionStrip(c);
         Button save=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"save_diagnostics"),false,false,()->{});save.setTag("ai_diagnostics_save");archiveActions.addView(save,new LinearLayout.LayoutParams(0,-2,1));
-        save.setOnClickListener(v->{save.setEnabled(false);new Thread(()->{
+        save.setOnClickListener(v->{CaptionUiWindows.Lease requestWindow=CaptionUiWindows.capture(save);if(requestWindow==null)return;save.setEnabled(false);new Thread(()->{
             // The export keeps the stable raw report; only the toast text follows the interface language.
             String report=CaptionDiagnostics.fullText(c);String result;boolean success;
             try { result=saveFile(c,report);success=true; } catch(Exception e){result=e.getClass().getSimpleName();success=false;}
             String value=result;boolean ok=success;new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{
-                if(!save.isAttachedToWindow())return;save.setEnabled(true);
+                boolean current=requestWindow.current();requestWindow.close();if(!current)return;save.setEnabled(true);
                 if(ok && value==null)copyPages(c,report);
                 else Toast.makeText(CaptionUiLocale.context(c),String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,ok?"save_ok":"save_failed"),value),Toast.LENGTH_LONG).show();
             });
@@ -83,18 +83,23 @@ public final class DeepSeekDiagnosticsPreference extends CaptionUiPreference {
      * chunks. Each label and toast is one complete authored template, never a concatenated fragment.
      */
     private static void copyPages(Context c,String report){
+        String operation="diagnostic-copy";
+        if(CaptionUiWindows.find(c,operation)!=null)return;
+        CaptionUiWindows.Session window=CaptionUiWindows.acquire(c,operation);if(window==null)return;
         int length=60000,count=(report.length()+length-1)/length;String[] labels=new String[count];
         for(int i=0;i<count;i++)labels[i]=String.format(java.util.Locale.ROOT,
                 CaptionStrings.settings(c,"copy_part_label"),i+1,count);
-        new android.app.AlertDialog.Builder(CaptionUiLocale.context(c))
+        android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(window.context)
                 .setTitle(CaptionStrings.settings(c,"copy_parts_title"))
                 .setItems(labels,(d,index)->{
+            if(!window.current())return;
             ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);
             String chunk=report.substring(index*length,Math.min(report.length(),(index+1)*length));
             if(manager!=null)manager.setPrimaryClip(ClipData.newPlainText(
                     String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"copy_part_label"),index+1,count),chunk));
             Toast.makeText(CaptionUiLocale.context(c),String.format(java.util.Locale.ROOT,
                     CaptionStrings.settings(c,"copy_part_done"),index+1,count),Toast.LENGTH_LONG).show();
-        }).show();
+        }).create();
+        CaptionUiWindows.show(window,dialog);
     }
 }

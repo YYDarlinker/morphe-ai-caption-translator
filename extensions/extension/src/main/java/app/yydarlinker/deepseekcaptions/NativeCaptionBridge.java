@@ -95,7 +95,7 @@ public final class NativeCaptionBridge {
         return name==null?LanguageMenuOrder.label(code):name;
     }
     public static List<?> augmentTranslations(List<?> original) {
-        if((!CaptionAddonSupport.aiInstalled() && !CaptionAddonSupport.simplifiedInstalled()) || original==null || original.isEmpty())return original;
+        if(!CaptionAddonSupport.aiInstalled() || original==null || original.isEmpty())return original;
         long started=System.nanoTime();
         try {
             Set<String> chosen=CaptionLanguageSelection.menuCodes();
@@ -351,18 +351,11 @@ public final class NativeCaptionBridge {
     public static String nativeModelVideo(Object manager) { return ""; } // bound at patch time
     public static List<?> nativeTracks(Object manager) { return null; }
     public static List<?> translatedTracks(Object manager) { return null; }
-    public static String simplifiedUrl(String value) { return TargetLanguage.withCode(value,"zh-Hans"); }
-    public static String simplifiedVss(String value) {
-        if(value==null) return "tzh-Hans";
-        int separator=value.indexOf('.');
-        return "tzh-Hans"+(separator<0 ? "" : value.substring(separator));
-    }
     public static Object augmentMetadata(Object metadata) { return metadata; }
     public static CharSequence displayName(Object track) { return ""; }
     public static String language(Object track) { return ""; } // replaced at patch time
     public static String vss(Object track) { return ""; }
     public static String url(Object track) { return ""; }
-    public static Object cloneSimplified(Object track) { return null; }
     public static Object cloneTranslation(Object track,String code) { return null; }
     public static String translationUrl(String url,String code){return TargetLanguage.withCode(url,code);}
     public static String translationVss(String value,String code){int at=value==null?-1:value.indexOf('.');return "t"+code+(at<0?"":value.substring(at));}

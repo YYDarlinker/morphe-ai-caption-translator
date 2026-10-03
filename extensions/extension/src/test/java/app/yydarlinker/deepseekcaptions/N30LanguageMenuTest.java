@@ -12,11 +12,11 @@ import org.robolectric.*;
 import org.robolectric.annotation.*;
 @RunWith(RobolectricTestRunner.class) @Config(sdk=28,shadows={N30LanguageMenuTest.Flags.class,N30LanguageMenuTest.Host.class})
 public class N30LanguageMenuTest {
- static boolean ai,simplified;static int clones;
+ static boolean ai,memory;static int clones;
  static class Track {final String code,name,url,vss;Track(String c,String n){code=c;name=n;url="https://www.youtube.com/api/timedtext?v=menu-test&lang=en&tlang="+c+"&signature=KEEP";vss="t"+c+".source";}}
  @Implements(CaptionAddonSupport.class) public static class Flags {
   @Implementation public static boolean aiInstalled(){return ai;}
-  @Implementation public static boolean simplifiedInstalled(){return simplified;}
+  @Implementation public static boolean memoryInstalled(){return memory;}
  }
  @Implements(NativeCaptionBridge.class) public static class Host {
   @Implementation public static String language(Object t){return ((Track)t).code;}
@@ -25,7 +25,7 @@ public class N30LanguageMenuTest {
   @Implementation public static Object cloneTranslation(Object t,String c){clones++;return new Track(c,NativeCaptionBridge.translationLabel(c));}
  }
  Activity a;
- @Before public void before(){a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);ai=true;simplified=false;clones=0;
+ @Before public void before(){a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);ai=true;memory=false;clones=0;
   a.getSharedPreferences(CaptionLanguageSelection.STORE,0).edit().clear().commit();DeepSeekConfig.saveEnabled(a,false);RememberedCaptionSelection.reset();}
  @After public void after(){a.finish();}
  @Test public void emptyByDefaultPersistsCanonicalCodesAndRejectsWrongStorage(){
@@ -63,11 +63,39 @@ public class N30LanguageMenuTest {
   assertEquals("languages_existing",NativeCaptionBridge.languageStatus("en"));assertEquals("languages_new",NativeCaptionBridge.languageStatus("fr"));
   List<CaptionLanguageMetadata.Field> fields=CaptionLanguageMetadata.fields(after);assertEquals(3,fields.size());assertTrue(fields.stream().anyMatch(f->Arrays.equals(f.value,en)));
  }
- @Test public void legacyNativeOnlyAndRememberOnlySelectionsDoNotEnableAiOrChangeUserSet(){
-  CaptionLanguageSelection.save(a,Arrays.asList("ja","fr"));Set<String> saved=CaptionLanguageSelection.read(a);ai=false;
-  Track t=new Track("en","English");List<Track> before=Arrays.asList(t);assertSame(before,NativeCaptionBridge.augmentTranslations(before));
-  simplified=true;List<?> out=NativeCaptionBridge.augmentTranslations(before);assertEquals(2,out.size());assertFalse(DeepSeekConfig.enabled(a));assertEquals(saved,CaptionLanguageSelection.read(a));
-  assertFalse(NativeCaptionBridge.enabled());assertEquals("",RebuildController.activeUrl());
+ @Test public void nativeOnlyAndRememberOnlyNeverInjectLanguagesOrModifyStoredCodes(){
+  CaptionLanguageSelection.save(a,Arrays.asList("ja","fr","zh-Hans"));Set<String> saved=CaptionLanguageSelection.read(a);ai=false;
+  Track t=new Track("en","English");List<Track> before=Arrays.asList(t);byte[] metadata=entry("en","English");
+  for(boolean remembered:new boolean[]{false,true}){memory=remembered;
+   assertSame(before,NativeCaptionBridge.augmentTranslations(before));assertSame(metadata,CaptionLanguageMetadata.addSimplified(metadata));
+   assertTrue(CaptionLanguageSelection.menuCodes().isEmpty());assertEquals(0,clones);assertEquals(saved,CaptionLanguageSelection.read(a));
+   assertFalse(DeepSeekConfig.enabled(a));assertFalse(NativeCaptionBridge.enabled());assertEquals("",RebuildController.activeUrl());
+  }
+ }
+ @Test public void installedAiOffAddsExactlySelectedTargetsIncludingSimplifiedWithNoApi()throws Exception{
+  try(okhttp3.mockwebserver.MockWebServer server=new okhttp3.mockwebserver.MockWebServer()){
+   server.start();DeepSeekConfig.saveBaseUrl(a,server.url("/v1").toString());
+   CaptionLanguageSelection.save(a,Arrays.asList("fr","zh-Hans","zh_CN"));Set<String> saved=CaptionLanguageSelection.read(a);
+   List<Track> input=Arrays.asList(new Track("en","English"));List<?> output=NativeCaptionBridge.augmentTranslations(input);
+   assertEquals(3,output.size());List<String> added=new ArrayList<>();for(Object value:output)if(!input.contains(value))added.add(((Track)value).code);
+   Collections.sort(added);assertEquals(Arrays.asList("fr","zh-Hans"),added);assertEquals(2,clones);
+   assertSame(output,NativeCaptionBridge.augmentTranslations(output));assertEquals(2,clones);
+   ByteArrayOutputStream root=new ByteArrayOutputStream();CaptionLanguageMetadata.write(root,3,entry("en","English"));
+   byte[] metadata=CaptionLanguageMetadata.addSimplified(root.toByteArray());List<String> metadataCodes=new ArrayList<>();
+   for(CaptionLanguageMetadata.Field field:CaptionLanguageMetadata.fields(metadata))if(field.number==3)
+    for(CaptionLanguageMetadata.Field item:CaptionLanguageMetadata.fields(field.value))if(item.number==1)metadataCodes.add(new String(item.value,java.nio.charset.StandardCharsets.UTF_8));
+   Collections.sort(metadataCodes);assertEquals(Arrays.asList("en","fr","zh-Hans"),metadataCodes);assertSame(metadata,CaptionLanguageMetadata.addSimplified(metadata));
+   assertEquals(saved,CaptionLanguageSelection.read(a));assertEquals(-1,RememberedCaptionSelection.decision());assertFalse(DeepSeekConfig.enabled(a));
+   assertEquals(0,server.getRequestCount());assertEquals("",RebuildController.activeUrl());
+   org.json.JSONObject evidence=new org.json.JSONObject().put("ai_installed",ai).put("ai_enabled",DeepSeekConfig.enabled(a))
+    .put("api_requests",server.getRequestCount()).put("memory_decision",RememberedCaptionSelection.decision())
+    .put("stored_before",new org.json.JSONArray(saved)).put("stored_after",new org.json.JSONArray(CaptionLanguageSelection.read(a)))
+    .put("added_codes",new org.json.JSONArray(added)).put("metadata_codes",new org.json.JSONArray(metadataCodes));
+   CaptionLanguageSelection.save(a,Collections.emptySet());assertSame(input,NativeCaptionBridge.augmentTranslations(input));
+   assertEquals(0,server.getRequestCount());
+   N28CGeometryTest.export("n32-two-root-runtime.json",evidence.put("empty_selection_returns_native_input",NativeCaptionBridge.augmentTranslations(input)==input)
+    .put("host_model","production_menu_and_metadata_with_test_host_clone_adapter"));
+  }
  }
  @Test public void nativeDialogCancelDoesNotSaveAndSaveCanRemainEmptyWhileAiOff(){
   CaptionLanguagesPreference pref=new CaptionLanguagesPreference(a);AlertDialog dialog=pref.showLanguages();Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();dialog.getListView().performItemClick(dialog.getListView().getChildAt(0),0,0);

@@ -282,6 +282,9 @@ public final class DeepSeekModelPreference extends CaptionUiPreference implement
         }
         final String fingerprint = credentialFingerprint(config);
         final int generation = ++fetchGeneration;
+        final View requestView=boundView;
+        final CaptionUiWindows.Lease requestWindow=CaptionUiWindows.capture(requestView);
+        if(requestWindow==null)return;
         synchronized (CACHE_LOCK) {
             lastAttemptFingerprint = fingerprint;
             lastAttemptAtMs = SystemClockCompat.elapsedRealtime();
@@ -298,7 +301,8 @@ public final class DeepSeekModelPreference extends CaptionUiPreference implement
                     cachedModels = new ArrayList<>(models);
                 }
                 main.post(() -> {
-                    if (generation != fetchGeneration) return;
+                    boolean current=generation==fetchGeneration && boundView==requestView && requestWindow.current();requestWindow.close();
+                    if (!current) return;
                     if (refresh != null) {
                         refresh.setEnabled(true);
                         CaptionUiViewBindings.text(refresh,getContext(),"refresh");
@@ -312,7 +316,8 @@ public final class DeepSeekModelPreference extends CaptionUiPreference implement
                 }
                 final String detail = message;
                 main.post(() -> {
-                    if (generation != fetchGeneration) return;
+                    boolean current=generation==fetchGeneration && boundView==requestView && requestWindow.current();requestWindow.close();
+                    if (!current) return;
                     if (refresh != null) refresh.setEnabled(true);
                     setFailure("model_load_failed",detail,true);
                 });
@@ -343,10 +348,10 @@ public final class DeepSeekModelPreference extends CaptionUiPreference implement
     }
 
     private void showModelMenu() {
-        if (choices == null || !choices.isAttachedToWindow() || shownModels.isEmpty()
+        if (choices == null || !CaptionUiWindows.isCurrent(choices) || shownModels.isEmpty()
                 || boundRevision != ApiProfiles.revision()
                 || !boundProfile.equals(ApiProfiles.active(getContext()))) return;
-        dismissModelMenu();
+        if(modelMenu!=null && modelMenu.isShowing())return;
         Context context = getContext();
         int width = Math.min(context.getResources().getDisplayMetrics().widthPixels - dp(32),
                 Math.max(choices.getWidth(), dp(240)));
@@ -361,7 +366,7 @@ public final class DeepSeekModelPreference extends CaptionUiPreference implement
             TextView row = modelMenuRow(context, model, model.equals(selected), false, null, null);
             row.setOnClickListener(v -> {
                 dismissModelMenu();
-                if (editor == null || !boundProfile.equals(ApiProfiles.active(context))) return;
+                if (editor == null || !CaptionUiWindows.isCurrent(choices) || !boundProfile.equals(ApiProfiles.active(context))) return;
                 editor.setText(model);
                 editor.setSelection(model.length());
                 commitNow(model, true);
@@ -384,10 +389,9 @@ public final class DeepSeekModelPreference extends CaptionUiPreference implement
         popup.setOutsideTouchable(true);
         popup.setElevation(dp(8));
         popup.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
-        popup.setOnDismissListener(() -> { if (modelMenu == popup) modelMenu = null; });
         modelMenu = popup;
         CaptionUiViewBindings.refresh(surface,getContext());
-        popup.showAsDropDown(choices);
+        if(!CaptionUiWindows.popup(choices,popup,()->{if(modelMenu==popup)modelMenu=null;}))modelMenu=null;
     }
 
     static TextView modelMenuRow(Context context,String model,boolean selected,boolean heading,View reused,ViewGroup parent){

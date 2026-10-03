@@ -72,12 +72,15 @@ public final class DeepSeekActionPreference extends CaptionUiPreference {
     }
 
     private void testApi() {
+        final android.view.View requestView=boundUiView();
+        final CaptionUiWindows.Lease requestWindow=CaptionUiWindows.capture(requestView);
+        if(requestWindow==null)return;
         if(!ApiProfiles.flushCurrent()){
-            toast(CaptionStrings.settings(getContext(),"profile_invalid_edits"));return;
+            requestWindow.close();toast(CaptionStrings.settings(getContext(),"profile_invalid_edits"));return;
         }
         DeepSeekConfig.Snapshot config = DeepSeekConfig.load(getContext());
         if (config.apiKey.isEmpty()) {
-            toast(CaptionStrings.settings(getContext(),"enter_key"));
+            requestWindow.close();toast(CaptionStrings.settings(getContext(),"enter_key"));
             return;
         }
         final String testedProfile=ApiProfiles.active(getContext());
@@ -103,6 +106,8 @@ public final class DeepSeekActionPreference extends CaptionUiPreference {
             final String message = result;
             final boolean ok = available;
             postToUi(() -> {
+                boolean current=boundUiView()==requestView && requestWindow.current();requestWindow.close();
+                if(!current)return;
                 setEnabled(true);
                 summaryKey="api_test_retry_hint";
                 setSummary(CaptionStrings.settings(getContext(), "api_test_retry_hint"));

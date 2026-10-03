@@ -9,13 +9,21 @@ import java.util.Locale;
 public final class CaptionUiLocale {
     private CaptionUiLocale() {}
     private static final java.util.Map<Context,java.lang.ref.WeakReference<Snapshot>> contexts=new java.util.WeakHashMap<>();
+    /** A resource handle, with a weak origin for settings-owner resolution; never a dialog base. */
+    static final class ResourceContext extends ContextThemeWrapper {
+        final java.lang.ref.WeakReference<Context> origin;
+        ResourceContext(Context base,Configuration configuration) {
+            super(base.createConfigurationContext(configuration),0);
+            origin=new java.lang.ref.WeakReference<>(base);
+        }
+    }
     public static final class Snapshot {
         public final Context context;
         public final Locale locale;
         public final String source, identity;
         Snapshot(Context base, Locale selected, String source,Configuration configuration,String identity) {
             this.locale=selected; this.source=source;this.identity=identity;
-            ContextThemeWrapper themed=new ContextThemeWrapper(base.createConfigurationContext(configuration),0);
+            ContextThemeWrapper themed=new ResourceContext(base,configuration);
             themed.getTheme().setTo(base.getTheme());
             context=themed;
         }

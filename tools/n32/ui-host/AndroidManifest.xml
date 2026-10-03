@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.morphe.android.youtube" android:versionName="21.16.256" android:versionCode="1561068412">
+  <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35" />
+  <application android:label="N32 local WMS fixture" android:debuggable="true" android:supportsRtl="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <activity android:name="app.yydarlinker.n32fixture.N32UiHost" android:exported="true" android:configChanges="locale|layoutDirection|fontScale|screenSize|orientation" />
+    <activity android:name="app.yydarlinker.n32fixture.N32UiHost$StopHost" android:exported="false" />
+  </application>
+</manifest>

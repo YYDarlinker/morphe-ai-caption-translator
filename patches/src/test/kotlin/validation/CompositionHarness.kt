@@ -8,12 +8,25 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.nio.file.Files
 
-/** Each invocation is a fresh JVM/session, loading both actual MPPs without parent source output. */
+/** Load actual MPPs without parent source output; optional repetitions retain these same instances. */
 fun main(args:Array<String>){
     val values=args.toList().chunked(2).associate { it[0].removePrefix("--") to it[1] }
     fun file(key:String)=File(values.getValue(key)).canonicalFile
     fun load(key:String)=loadPatchesFromJar(setOf(file(key))).byPatchesFile.getValue(file(key))
     val official=load("official");val addon=load("addon")
+    val publicRoots=addon.mapNotNull { it.name }.sorted()
+    check(publicRoots==listOf("AI caption translator","Remember caption selection")){"N32 public roots must be exactly AI and Remember: $publicRoots"}
+    check(addon.all { !it.default }){"N32 public roots must be opt-in"}
+    println("N32_PUBLIC_ROOTS_PASS roots=$publicRoots count=${publicRoots.size}")
+    runCompositionSession(values,official,addon)
+    values["repeat"]?.split(";")?.forEachIndexed { index,selection ->
+        runCompositionSession(values+("selection" to selection)+("output" to file("output").resolve("repeat-${index+1}").path)-"repeat",official,addon)
+        println("N32_SAME_PROCESS_SESSION_PASS index=${index+1} selection=$selection")
+    }
+}
+
+private fun runCompositionSession(values:Map<String,String>,official:Set<Patch<*>>,addon:Set<Patch<*>>){
+    fun file(key:String)=File(values.getValue(key)).canonicalFile
     val names=values.getValue("selection").split("|").filter { it.isNotBlank() }
     val roots=names.map { name->addon.single { it.name==name } }
     val output=file("output");check(!output.exists()){ "Use a new output directory" };output.mkdirs()
@@ -65,7 +78,8 @@ fun main(args:Array<String>){
             println("REAL_PATCHER_DEX_SERIALIZED ${output.resolve("serialized-dex.zip").absolutePath}")
         }
         val flags=bytecode.classDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
-        val expected=mapOf("aiInstalled" to ai,"simplifiedInstalled" to names.contains("Add Simplified Chinese to auto-translate"),"memoryInstalled" to names.contains("Remember caption selection"))
+        val expected=mapOf("aiInstalled" to ai,"memoryInstalled" to names.contains("Remember caption selection"))
+        check(flags.methods.filter { it.name.endsWith("Installed") }.map { it.name }.toSet()==expected.keys){"N32 obsolete feature flag present"}
         for((name,on) in expected){
             val method=flags.methods.single { it.name==name }
             val literal=method.implementation!!.instructions.filterIsInstance<com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction>().single().wideLiteral
@@ -91,8 +105,8 @@ fun main(args:Array<String>){
             }
             throw IllegalStateException("Patch failed; real partial state preserved",failure)
         }
-        check(((hooks["augmentTranslations"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include the generic language-menu seam"}
-        check(((hooks["augmentMetadata"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include generic translation metadata"}
+        check(((hooks["augmentTranslations"]?:0)>0)==ai){"N32 selected-language menu must be owned by AI only"}
+        check(((hooks["augmentMetadata"]?:0)>0)==ai){"N32 selected-language metadata must be owned by AI only"}
         check(((hooks["resolveRemembered"]?:0)>0)==expected.getValue("memoryInstalled"))
         check(((hooks["suppressNativeDraw"]?:0)>0)==ai)
         check((hooks["initialize"]?:0)==1){"Duplicate shared initialization"}

@@ -55,6 +55,7 @@ public final class ApiProfilesPreference extends CaptionUiPreference {
     private void show(String title,LinearLayout body,String closeLabel,View footer){
         close();
         dialog=CaptionSettingsDialogs.show(getContext(),title,body,text(closeLabel),footer);
+        if(dialog==null)return;
         final Dialog shown=dialog;
         shown.setOnDismissListener(ignored->{
             if(dialog==shown){endRename();dialog=null;listDialog=null;expanded=null;rows.clear();listBody=null;notifyChanged();}
@@ -82,7 +83,7 @@ public final class ApiProfilesPreference extends CaptionUiPreference {
     private void error(String key){Toast.makeText(CaptionUiLocale.context(getContext()),text(key),Toast.LENGTH_LONG).show();}
     private boolean flush(){if(ApiProfiles.flushCurrent())return true;error("profile_invalid_edits");return false;}
     private boolean current(ProfileRow row){
-        return dialog!=null && dialog==listDialog && dialog.isShowing() && rows.get(row.id)==row
+        return CaptionUiWindows.valid(getContext()) && dialog!=null && dialog==listDialog && dialog.isShowing() && rows.get(row.id)==row
                 && ApiProfiles.list(getContext()).containsKey(row.id);
     }
     private boolean dirty(){return renameEditor!=null && !renameOriginal.equals(renameEditor.getText().toString());}
@@ -92,10 +93,13 @@ public final class ApiProfilesPreference extends CaptionUiPreference {
     }
 
     void showProfiles(){
+        if(dialog!=null && dialog.isShowing())return;
+        if(CaptionUiWindows.find(getContext(),"settings:"+text("profiles_title"))!=null)return;
         close();
         LinearLayout body=column();
         // show() disposes old state; populate afterwards so dismiss callbacks never invalidate new rows.
         show(text("profiles_title"),body,"cancel");
+        if(dialog==null)return;
         listBody=body;listDialog=dialog;
         for(String id:ApiProfiles.list(getContext()).keySet())addRow(id);
         View divider=new View(getContext());divider.setBackgroundColor(CaptionSettingsStyle.tint(CaptionSettingsStyle.primary(getContext()),24));
@@ -258,6 +262,7 @@ public final class ApiProfilesPreference extends CaptionUiPreference {
         ProfileActionStrip footer=new ProfileActionStrip(getContext());
         footer.add(text("cancel"),()->close());
         footer.addPrimary(text("profile_save"),()->{
+            if(dialog==null || !dialog.isShowing() || !CaptionUiWindows.valid(getContext()))return;
             String value=name.getText().toString().trim();if(value.isEmpty())value=defaultName();
             try{
                 if(!flush())return;
@@ -270,6 +275,7 @@ public final class ApiProfilesPreference extends CaptionUiPreference {
         show(text("profile_add"),body,"cancel",footer);
     }
     void clearCurrentKey(){
+        if(!CaptionUiWindows.valid(getContext()))return;
         if(!ApiProfiles.flushExceptKey()){error("profile_invalid_edits");return;}
         final String id=ApiProfiles.active(getContext());String name=ApiProfiles.list(getContext()).get(id);
         CaptionSettingsDialogs.confirm(getContext(),name,text("profile_clear_key_summary"),

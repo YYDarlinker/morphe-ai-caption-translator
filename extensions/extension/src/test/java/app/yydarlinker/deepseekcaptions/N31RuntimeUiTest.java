@@ -144,7 +144,7 @@ public class N31RuntimeUiTest {
                 for(int i=0;i<14;i++){String code=CaptionLanguageSelection.CODES.get(i);View row=list.getAdapter().getView(i,null,list);assertEquals(LanguageMenuOrder.label(code,CaptionUiLocale.snapshot(a).locale),((TextView)row.findViewById(android.R.id.text1)).getText().toString());assertEquals(chosen.contains(code),list.isItemChecked(i));assertTrue(row.isEnabled());}
                 assertEquals(expected(tag,"languages_save"),d.getButton(AlertDialog.BUTTON_POSITIVE).getText().toString());
                 save("languages-"+tag+"-"+enabled+".json",snapshot(d.getWindow().getDecorView()));
-                d.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();assertEquals(chosen,CaptionLanguageSelection.read(a));
+                d.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(chosen,CaptionLanguageSelection.read(a));
             }
             AlertDialog all=p.showLanguages();Shadows.shadowOf(Looper.getMainLooper()).idle();ListView list=all.getListView();
             for(int i=0;i<14;i++)if(!list.isItemChecked(i))list.performItemClick(list.getAdapter().getView(i,null,list),i,i);

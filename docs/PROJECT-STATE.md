@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。N31统一运行时UI语言/稳定key重绑/默认展示与业务值分层、两处准确功能说明与多选纯语言名已工程交付。680全量、68专项+2中文探针、234×14及56主/14降级实际树、七组合/全部DEX通过；中文18golden以原N30中文配置逐字段相等，旧英语UI请求漂移证据保留。三件套未签名未安装，本地核心提交与anchor见§4al身份补记；手机短复验仍待用户。N30交付/规划docs保留，不发布、不开下一卡。
+> 最后更新：2026-10-03。用户明确要求删除第二个冗余补丁；N31后续已将public列表收敛为AI caption translator＋Remember caption selection两根，14语言菜单（含简体中文）由AI独占，AI关闭仍可使用。682全量/12元数据/3组合及全部DEX通过；新三件套后缀n31-two-patches，原N31历史不覆盖。未签名未安装未发布，详见§4am/N31-PATCH-CONSOLIDATION。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -695,3 +695,10 @@ Java680/680，原专项68+原中文golden探针2、Morphe形态Dialog9；failure
 完成即停；用户保持系统语言只切Morphe中→日→英短查，手机/母语边界未验证；不要求用户全表母语审校。
 
 N31身份补记：核心提交 `dc304cbe3ae995e7e0edad2754b160c959cafce3` / `anchor/n31-dc304cb`；docs-only 后继仅登记身份，未修改已验证产品/测试/产物。
+
+
+## 4am. 用户指令：删除冗余独立语言补丁（2026-10-03）
+
+本轮用户明确覆写旧三根冻结：自动翻译14语言功能已在AI caption translator中，直接删除Add Simplified Chinese to auto-translate。已删public root、CaptionFeatures.simplified、simplifiedInstalled及独立强制zh-Hans加入；简体中文和其余13语言全部沿AI设置保存集合提供，AI开关关闭仍有效，默认空集合/用户selected_codes不变。保留Remember独立原生记忆；2根3个非空组合通过。README、生成patches-list及本地发行校验一致，旧公开URL/日期/patches-bundle不变，不发布。
+
+682/682 Java（680+2菜单归属/简体去重）、12/12元数据，原N31语言控件/中文18golden/activate继续相等；翻译调度/分页/cache/overlay源码逐字不变。最终11DEX/58261类/322981方法/626701分支与公开UI/native hooks、CRC/resources/aapt/min28/verify_bundle/N8Verify通过；MPP自身只有AI和Remember，内嵌MPE独立等值，旧root名与installed标记从DEX删除。新交付build/local-test/*-n31-two-patches及build/n31-two-patches-composition-final；全SHA/字节见N31-PATCH-CONSOLIDATION。55份历史捕获SHA/字节不变，旧N31全量交付保留。未签名/安装/清数据/推送/发布，远程API/下载/新依赖0。完成即停；实际核心commit/anchor另补记。

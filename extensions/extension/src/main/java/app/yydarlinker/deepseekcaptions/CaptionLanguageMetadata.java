@@ -7,7 +7,7 @@ public final class CaptionLanguageMetadata {
     private CaptionLanguageMetadata() {}
     public static byte[] addSimplified(byte[] original) {
         if(original==null || original.length>1024*1024) return original;
-        if(!CaptionAddonSupport.aiInstalled() && !CaptionAddonSupport.simplifiedInstalled())return original;
+        if(!CaptionAddonSupport.aiInstalled())return original;
         try {
             List<Field> root=fields(original);List<byte[]> languages=new ArrayList<>();byte[] prototype=null;
             Set<String> present=new HashSet<>();Map<String,String> labels=new LinkedHashMap<>();

@@ -94,8 +94,11 @@ def main() -> None:
     if len(names) != len(patches) or len(set(names)) != len(names) or any(not isinstance(name, str) or not name for name in names):
         fail("patch names must be nonempty and unique")
     if tuple(map(int, version.split("-")[0].split("."))) >= (1, 2, 0):
-        if set(names) != {"AI caption translator", "Add Simplified Chinese to auto-translate", "Remember caption selection"}:
-            fail("modular release must contain exactly the three declared public patches")
+        expected = {"AI caption translator", "Remember caption selection"}
+        if tuple(map(int, version.split("-")[0].split("."))) < (1, 3, 5):
+            expected.add("Add Simplified Chinese to auto-translate")
+        if set(names) != expected:
+            fail("release must contain exactly the declared public patches; language menu belongs to AI")
 
     if not isinstance(bundle["description"], str):
         fail("description must be a string")

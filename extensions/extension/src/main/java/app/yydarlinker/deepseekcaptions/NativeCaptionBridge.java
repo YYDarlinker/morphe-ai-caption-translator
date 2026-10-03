@@ -95,7 +95,7 @@ public final class NativeCaptionBridge {
         return name==null?LanguageMenuOrder.label(code):name;
     }
     public static List<?> augmentTranslations(List<?> original) {
-        if((!CaptionAddonSupport.aiInstalled() && !CaptionAddonSupport.simplifiedInstalled()) || original==null || original.isEmpty())return original;
+        if(!CaptionAddonSupport.aiInstalled() || original==null || original.isEmpty())return original;
         long started=System.nanoTime();
         try {
             Set<String> chosen=CaptionLanguageSelection.menuCodes();

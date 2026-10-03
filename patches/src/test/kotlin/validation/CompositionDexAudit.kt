@@ -34,7 +34,7 @@ fun main(args:Array<String>){
         }
     } }
     println("HOST_HOOKS=$hostHooks")
-    if(flags["aiInstalled"]==1L || flags["simplifiedInstalled"]==1L) {
+    if(flags["aiInstalled"]==1L) {
         check((hostHooks["augmentTranslations"]?:0)>0){"N30 language menu hook missing"}
         val bridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")
         val clone=bridge.methods.singleOrNull { it.name=="cloneTranslation" && it.parameterTypes.map { p->p.toString() }==listOf("Ljava/lang/Object;","Ljava/lang/String;") } ?: error("N30 generic translation clone missing")

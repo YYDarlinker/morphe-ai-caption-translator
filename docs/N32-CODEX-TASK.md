@@ -1,111 +1,108 @@
-# N32 Codex执行卡：原N31基线的设置导航修复与两根重新交付
+# N32 Codex执行卡：修复N31设置类型与窗口所有权，重新交付AI＋Remember两根
 
-> **2026-10-03最新补充定案**：已读取当前SDK37手机crash及实际安装APK，确证原N31 initialize/lambda返回hook的寄存器类型错误；当前未选独立简体根仍同样失败。先保证ART安全才有可执行的设置导航链，再调查已撤回方案的错页，最后同一最终包仅AI＋Remember。用户允许手机日志/包读取，但不允许向手机传入、安装、启动测试或改数据。详见N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW.md，旧N32规划before已保存。
+日期：2026-10-03（Asia/Shanghai）。本卡由新Codex执行对话完整实现、验证、独立建包、本地提交，完成即停。当前源码仍是用户指定的原N31恢复；本卡不整仓回退N30，只以N30正确的窗口所有权为合同重做N31失误的设置UI接缝，保留N31本地化成果。
 
-日期：2026-10-03（Asia/Shanghai）。由新Codex对话完整执行、验证、独立建包、本地提交；完成即停。用户已要求本规划对话先回退，当前产品已经恢复原N31，后续旧二根/设置crash修复不作为活动基线。不交DeepSeek、不恢复N27。
+本卡整体覆盖先前N32中“错页尚无任何实际click证据、优先怀疑Adapter误路由”的排序：当前手机已取得真实语言行click→Dialog.show→BadToken before，**先修两项确定根因**，再用完整导航after验证“通用页”观察是否消失；不等一个无证据的General人工错误才能施工，也不把未采集的视觉跳转写成已证明路由根因。
 
-## 1. 施工身份与已知风险
+## 1. 活动基线、输入与手机边界
 
-- 仓库仅E:\Projects\morphe-caption-v2；原产品基线dc304cbe3ae995e7e0edad2754b160c959cafce3 / anchor/n31-dc304cb。当前HEAD是新的回退提交或其docs-only后继，**不要把HEAD数值不同当阻断**：除规划docs外当前跟踪源码/测试/metadata/build与dc304cb相等即可开工，记真实HEAD。本卡及恢复状态获准保留随卡提交。
-- 实际恢复提交 `282d155fd08e126a36c4eec8b6ef8be85eff1827` / `anchor/n31-restored-282d155`；docs-only身份后继允许。该恢复点除docs外与dc304cb完全相同，不能因恢复commit名称不同再请求确认。
-- 指定原包build/local-test/patches-1.3.5-本地测试包-n31.mpp=1,165,680/SHA256 AF084C20C32636EBA051B2891BDAFC5419BD54A98DBB28974CD441BE18AF913C；原包不覆盖、不复用其文件名建新包。原N31三件套是只读对照，不作为待用户安装的修复包。
-- 阅读N31-ROLLBACK-AND-NAVIGATION-REVIEW、PROJECT-STATE最新回退章及原N31交付/原N31卡。开工比对两份状态，无差异跳过覆盖；差异读内容处理。
-- 旧HEAD150c91f在backup/n31-later-150c91f与.verification/n31-rollback-review快照；66a2584、1bc94ae、相关失败证据和包全保留。不得reset回旧修复、直接cherry-pick整提交以冒充新根因分析。
-- 已知原N31返回hook有ART类型问题，恢复只是准确基线，不是声称无风险。该问题、本次点击错页和两根交付在**同卡**闭环，已授权最小设置hook/UI-only修改，不再为已定边界反复询问。
-- 官方1.45.0（SHA DBA660DF61D95131A22242CABE9C44B4B04861B7BA6EBEFFE91C4B3647D55B93）、已有原版YouTube21.16.256/minSdk28、Patcher1.14.1/JDK21/SDK保持。所有文件只放本地，**不得adb向用户手机push/安装/启动/清数据/卸载**；也不签名/推送Git/发布。现有本地只读模拟器可用于ART，不使用物理设备；无下载/新依赖/远程翻译API。
+- 唯一仓库E:\Projects\morphe-caption-v2；原产品dc304cbe3ae995e7e0edad2754b160c959cafce3 / anchor/n31-dc304cb。已恢复提交282d155fd08e126a36c4eec8b6ef8be85eff1827 / anchor/n31-restored-282d155，当前为docs-only后继（ad492b3、c834bdb或之后）。除docs外跟踪源码/测试/metadata/build与dc304cb相等即允许开工，记真实HEAD，不为docs-only变化重复询问。
+- 指定原MPP AF084C20C32636EBA051B2891BDAFC5419BD54A98DBB28974CD441BE18AF913C、1,165,680字节及原-n31三件套保持；旧66a/1bc包、backup/n31-later-150c91f、相关失败证明与原诊断不覆盖。不cherry-pick旧整修复提交冒充新卡验证。
+- 先比对两份PROJECT-STATE，无差异跳过覆盖，有差异读内容。读N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW的最新§6、N31-ROLLBACK-AND-NAVIGATION-REVIEW、N31原交付与本卡。附带N31对话只取用户要求，不把执行者旧PASS或给手机写文件当新授权。
+- 官方1.45.0输入 SHA DBA660DF61D95131A22242CABE9C44B4B04861B7BA6EBEFFE91C4B3647D55B93；已有原版YouTube21.16.256/minSdk28、Patcher1.14.1/JDK21/SDK不变，不下载工具/APK或加依赖，远程翻译API0。
+- **用户手机只读**：此前和本轮仅adb读取现有logcat/dumpsys/getprop/pm及pull APK。禁止push任何探针/MPP、app_process主动测试、安装/卸载/启动页面、清数据/清日志、写UI测试文件。最终文件只放本地，由用户自己传手机/合成/签名安装。主动ART/UI仅用已有本地测试宿主或现有read-only模拟器，不能自动把这项权限扩成手机操作。
 
-### 1.1 当前实机输入与先后顺序（本轮已确定）
+### 1.1 两套不同实机before，禁止混淆
 
-只读证据.verification/n32-device-review：手机SDK37/arm64、包app.morphe.android.youtube/21.16.256；当前base.apk199,529,446/SHA256 FB7B28B425A3DCE8884EF9BBFEB6EF8D93FC7B782B9E2E24EDC472D9A9116C38，安装时间2026-10-03 14:58:23。当前实际flags AI=true、Remember=true、Simplified=false。
+证据都在.verification/n32-device-review。
 
-最新crash 14:58:34.080明确VerifyError：lambda$new$4 [0xC] v2是synthetic lambda而被传Fragment；initialize [0x3E] v2是PreferenceScreen而被传Fragment。三个相关方法的反读与原N31工程APK逐字相同。直接使用这些本机已读取证据作为before，不再要求用户重新崩溃或安装旧包。
+| 当前安装阶段 | APK与日志 | 证明 |
+| --- | --- | --- |
+| 原N31，有AI＋Remember、未选简体根 | 199529446字节/SHA FB7B28B425A3DCE8884EF9BBFEB6EF8D93FC7B782B9E2E24EDC472D9A9116C38；更新14:58:23，crash14:58:34.080 | initialize/lambda返回receiver VerifyError，不能加载设置；methods同原N31 |
+| 用户后来安装可加载的撤回版 | 199529446字节/SHA BFF42C488842FE793BCEA5028208D23FE47F831B867480676FAA99AB86E2E111；更新15:24:44，crash15:25:58.048 | methods同1bc94ae typed-hook；真实语言行click进入showLanguages，在Dialog.show:42报BadToken token null |
 
-**执行顺序固定为：先B1已知类型安全→再A/B2真实设置导航对照→C两根整理→最终全量与同一正式MPP/实际UI/ART交付。** 模块名保留沿革，不能先要求有VerifyError的原N31正常开菜单。当前手机状态无法重现已撤回方案的错页，不能伪称最新crash同时证明了导航根因。
+后者栈是`PreferenceScreen.onItemClick → 官方DebouncedItemClickListener → Preference.performClick → CaptionLanguagesPreference.onClick → showLanguages → Dialog.show`。正确语言handler确实被调用，不是仅存在helper或手工p.showLanguages。这足以证明当前弹窗不显示/应用重启根因；未捕获异常前General page实际创建路径，保持该边界。
 
-### 1.2 N31对话用户补充要求（原文已核对）
+## 2. A：两项根因与N30正确合同
 
-- 第二补丁的14语言功能已有于AI，故删独立Add Simplified public root；最终只AI caption translator＋Remember，所有语言在AI子屏选、AI运行OFF仍保留已选菜单能力。不能把独立强制zh-Hans来源重新塞回以满足旧测试。
-- 保持N31说明、14语言有效Morphe locale与动态控件绑定、默认展示/业务偏好分层、多选纯语言名无状态、位置/主题风格。语言切换功能不可因删hook而失效，不改系统语言/官方全局Locale解决。
-- 诊断原始数据中中文“原始证据/自定义/provider错误”按原样保留；只有自有技术标题/字段/stage/reason英文，UI交互壳本地化。不能翻译或删除数据去迎合残留扫描。
-- 文件本地交付，用户自己传手机/合成/签名安装。本轮允许read logcat/dumpsys/getprop/pm/pull APK，**不允许push任何探针或MPP、app_process测试、安装/卸载/清数据/自动打开YouTube页面**。主动ART/导航测试使用已有本地read-only模拟器/测试宿主；物理手机只读证据已完整，不另操作。
-- 缩短周期：只做上述两个bug与两根，不新增性能/语义模型/翻译API实验；必要专项后一次最终全量/交付。加速不能省真实导航测试，也不重复没有变化的历史大包构建。
+1. **原N31 Settings hook类型错误**：initialize/lambda$return前传p0，R8已复用成PreferenceScreen/synthetic lambda/boolean/exception，ART拒绝Fragment形参。旧N31即存在，选择简体root与否不相关。
+2. **原N31本地化资源Context错误作窗口owner**：CaptionUiLocale.Snapshot用ContextThemeWrapper(base.createConfigurationContext(config),0)并复制theme；CaptionLanguagesPreference把ui.context直接交AlertDialog.Builder。它有正确locale资源，却绕过Activity的WINDOW_SERVICE/parent window token。复制theme不能修WindowManager，手机实测token=null。
+3. N30语言Dialog Builder用原getContext（实际Activity UI owner）；N31为本地化改成资源Context，所以引入UI基础回归。原dc304cb/两根66a/typed-hook1bc的语言类/CaptionUiLocale完全相同：typed-hook修复仅暴露第二个潜伏bug。根数删除没有造成或解决它。
+4. 同样错误在CaptionSettingsDialogs.confirm/show的官方CustomDialog和platform fallback、Android9诊断分段复制及其他共享Dialog中，不只语言项。Toast/纯字符串/预览label有不同窗口需求，不能为修Dialog删除全部本地化。
 
+已有本地AOSP主源码核查保存在android-window-context-source-excerpts.txt/source-sha.json：SDK sources/android-37.0的Activity WINDOW_SERVICE、ContextWrapper/ContextImpl configuration、ContextThemeWrapper service委托、Dialog构造取WindowManager。它解释机制，不替代手机after或用户机型版本认定。
 
-## 2. A：先证明具体导航原因，不能先猜再改
+## 3. B：先闭合ART类型安全
 
-用户现象：点AI子屏内“自动翻译语言”进入官方“通用”设置。
+- 不再遍历所有return盲传p0。实例入口receiver只有在仍存活且正确类型时可传Fragment；getPreferenceScreen紧邻move-result用rebind(PreferenceGroup)，不能强cast Fragment；所有分支/异常路径正确。
+- 语言刷新放在MORPHE_LANGUAGE实际写入之后，取该阶段真实存活receiver（FiveRegister第一个实际寄存器是registerC，不是根据名字猜）。完整descriptor/访问位/唯一位置验证，不只按lambda名字任选。
+- 不用吞VerifyError/任意check-cast/手工相对PC逃过验证；必要分支使用ExternalLabel绑定真实BuilderInstruction，生成DEX序列化后检验所有调用类型与标签。
+- 把旧settings-crash审计作为对照，提取必要类型/时序检查审阅后集成新的最终auditComposition；旧FB7原包/错误receiver/写新语言前重绑负例非0拒绝。
+- 主动ART class-load实际4设置类通过后还要执行初始化/语言变更/点击，不把Class.forName成功当导航或挂窗成功。
 
-已经证明：原N31/二根/后续crash修复三APK的settings XML全树相同，语言项仍CaptionLanguagesPreference(key=deepseek_caption_languages, order1)。这几个运行时UI类与资源patch也一样；该类onClick仅showLanguages。因此不能把“删除了第三根”视为跳general的直接原因。
+## 4. C：重做通用Activity-safe窗口层，保留独立locale文本层
 
-检查和对照顺序：
+这是本卡已明确授权的通用修复范围，不需再为UI owner helper或这些Dialog接缝开新卡。
 
-1. 保留前述三候选只读源/DEX/资源与直接root-removal diff；分清66a2584根数清理和1bc94ae设置hook修改。若原包因ART错误无法加载，先保存其Verifier失败证明，使用最小类型修正的独立对照供导航试验，不能写“原包点击都正常”。
-2. 以同官方设置树和真实PreferenceAdapter从**视频页AI入口→AI子屏→点语言项**执行，不能直接调用showLanguages或Preference.onClick当主验证。包含官方Fragment.onPreferenceTreeClick与列表原listener的行为；仅模拟这个类的名字或return值不是实际宿主验证。
-3. 记录关键时点：当前Fragment/PreferenceScreen key、Dialog root、ListView adapter类型/header数量、firstVisiblePosition、点击position、adapter实际item的key/类/对象身份、原listener委托对象、语言Preference.onClick调用次数、打开Dialog类型与title、是否创建general-screen。不要记录API key等数据。
-4. 记录重绑前后对象/key/class/order/root和item→View配对；覆盖首次打开、从通用页返回再开、滑动复用、快速连续点、语言zh→ja→en变化、有/无视频。检查bind/notify/语言写入/官方排序发生在点击和adapter更新的哪个阶段。
-5. 做必要最小对照：N30无binder点击路径、已撤回1bc94ae候选、原N31最小类型安全对照；保持同根数仅换设置hook时序，根数3→2保持同安全hook。可以隔离暂时禁用click中的root rebind以验证假设，记录为实验，最终不能靠禁掉所有本地化或强行导航兜底。确定是标签/adapter对象错配还是原listener/Preference路由被改。N30是语言项原点击方式的功能对照，不将其所有业务回退。
-6. 重点排查N31新增onPreferenceTreeClick入口的全root重绑与onSettingsView的布局时View身份：它们可能在native点击/adapter通知中改变标题或旧View关联，产生视觉与对象不对应。分别记录clicked key/class、View文本、delegate绑定的PreferenceScreen、当前Dialog所属root；一般语言Preference不可替换为PreferenceScreen或配置General Intent/fragment。只有证据指向这些路径才定因，不能因为看起来可能就宣称用户导航根因已抓到。
-7. **before必须真实出现错误路由或解释确切失败分支**，保存关键身份/堆栈/实际View/源代码位置。若现有产物不能复现且没有用户当前包，报告这一事实和已完成排除项；不得写“已定位General错误并修复”、不得只按假设批量改点击Listener。继续能独立完成的已知类型审计与两根校验，但在真实导航验收缺口存在时不能宣称最终完成。
+### C1 owner解析与资源分层
 
-该门槛不要求用户先安装任何旧包，也不允许用一个人为错误listener的负例冒充用户原问题复现。
+1. 文本读取、locale/方向/字体配置继续CaptionUiLocale当前Morphe覆盖，不退回中文Activity资源；**资源Context不能直接作为普通Dialog owner**。
+2. 正常Dialog从当前实际设置Activity或保留其WINDOW_SERVICE的Activity-base主题wrapper创建。若要Dialog内部Android系统文字也本地化，使用以live Activity为base的ContextThemeWrapper，先applyOverrideConfiguration再访问resources/theme，或等价只覆盖资源/Inflater且WINDOW_SERVICE仍委托原owner的wrapper。不得继续把createConfigurationContext生成的ContextImpl当base，也不全局改系统/官方Resources。
+3. Preference.getContext可能已是资源wrapper/非Activity，不能简单instanceof不成功就取全局播放器Activity。先unwrap有效ContextWrapper链；必要在真实settings Fragment/PreferenceScreen/View加载时绑定当前settings Activity owner（弱引用、按树/窗口身份，生命周期失效），无关播放器/其他窗口不借用。不得把首个全局Activity作为所有对话框owner。
+4. 校验owner未finishing/destroyed、处于正确UI/window归属，使用main Looper。尚无有效owner/token不得创建普通窗口；记录一次英文受控原因并安全返回/等待下次用户操作，不改selected_codes或用户配置，不自动跳General，不派网络请求。owner变化/销毁释放旧Dialog和listener，不缓存带旧window token的context。
+5. 单个owner/同一个操作合并重复打开，关闭后可重新打开。不能仅调用setOwnerActivity、setType overlay/alert权限、手工assign token、catch BadToken吞掉或连续retry挂窗当根治。可以对真正生命周期竞争做受控清理，但有效owner正常点击必须实际显示Dialog。
 
-## 3. B：设置接缝最小修复，不改原生导航
+### C2 全部窗口调用点审计
 
-### B1 已知ART错误必须闭合
+生成docs/N32-WINDOW-OWNERSHIP-INVENTORY.md：构造点、资源locale来源、window owner来源、wrapper/system service、显示/取消/销毁/重开、token before/after测试证据、是否需窗口。
 
-原initialize/lambda$new$4返回前直接用p0当Fragment不安全：R8复用后其物理寄存器可能是PreferenceScreen、synthetic lambda、boolean或exception。按真实类型数据流选择：
+至少覆盖：
 
-- 入口p0只在仍为实例receiver时可用；已执行typed getPreferenceScreen的move-result可调用rebind(PreferenceGroup)，不能传给Fragment形参。
-- 语言重绑发生在MORPHE_LANGUAGE实际写入之后，使用该阶段真实存活且类型正确的Fragment receiver；不是在旧值阶段强刷，不遍历所有return盲用p0。
-- 匹配方法名+完整descriptor/访问位/唯一位置，分支处理覆盖；注入分支用ExternalLabel绑定真实BuilderInstruction，不猜PC、不过度增加寄存器或盲cast以隐藏错误。
-- 把必要寄存器/时序审计从旧修复提取并审阅后接回最终组合审计，旧包及错误receiver/旧语言阶段负例须非0拒绝。不是复制旧“ART pass”日志算本轮通过。
+- CaptionLanguagesPreference 14多选dialog与列表adapter；每行纯UI locale语言名/勾选，固定summary及AI说明不变；
+- CaptionSettingsDialogs.confirm/show：Morphe官方CustomDialog与平台fallback都使用有效owner，不能只修fallback；
+- API profile列表/新增/改名/更多/删除/清Key，模型选择/手动输入/错误Dialog，诊断清空确认、Android9分段复制；
+- 其他AlertDialog.Builder/new Dialog/PopupWindow/系统输入菜单及异步UI结果回调。PopupWindow按anchor归属验证，不能把它与Activity Dialog/Toast混为同一token合同；Toast与纯资源Context不作不必要架构变更。
 
-### B2 点击与本地化分离
+owner已结束的后台API/导出回调不挂旧窗口、不覆盖新页、不写回待撤销选择。保存/取消仍原集合规则，N31默认展示/业务偏好与custom数据原样。
 
-以A的实际根因为准最小修改。默认原则：语言Preference点击只开14项多选Dialog，不导航其他屏；官方general/其他行保持自身导航。
+## 5. D：实际列表点击和“通用”页面/返回验收
 
-- 不在原生onPreferenceTreeClick或ListView点击分发中重建/替换整棵Preference树或重设listener/adapter，不用标题、语言名或固定行号判断身份。该用户事件以点击对象身份分发；仅语言刷新不得改变其delegate、root、order或路由。可以删除/收紧全局click入口的root rebind，前提是初始化/真实语言写入/本补丁onBind仍保证14语言及Dialog刷新；这属于本卡已授权UI-only修复，不需再开冻结范围询问。
-- 普通点击通常不需要root级重新绑定；初始化/有效语言变更/子屏View创建是更适合的绑定阶段。若需要修改绑定时序，合并且去重为现有UI队列上的状态刷新，读取最新locale、只改本补丁对象的文字；不在list布局/回收时触发递归notify或改变item对应关系。
-- 单个View回收时按当前adapter实际Preference身份刷新，不让旧row绑定覆盖新的官方general行。支持header/cached/stale View，旧binder/listener任务关闭Dialog/换root时失效；改title不改变key/order/Intent/fragment/listener。
-- 不新加“如果语言项就直接showLanguages”全局拦截来掩盖错误root/adapter，不能禁止触发general页/重新指定Activity导航。真正的Preference对象须仍接收到唯一一次点击。
-- 保持N31 UI语言来源、default展示/业务分层、自定义prompt/API/profile/selected_codes原值，模型/诊断Dialog行为原样；无视频/AI关闭也能编辑选择。
+- 从正式host设置XML及官方settings Fragment路径创建页面，视频页→AI子屏→**真实ListView行点击**→语言Dialog.show实际可见。通过adapter原listener/官方debouncer/Preference.performClick，不能p.showLanguages或mock掉WindowManager作为主验收。
+- before使用当前BFF42 APK/BadToken栈和本地N31最小typed安全候选，证明原资源Context作为owner挂窗失败；after同操作真实显示14项窗口，不抛异常，勾选/保存/取消/返回仍AI子屏，退出不重新创建YouTube首页。
+- 记录clicked preference key/class、row文字、list/root/fragment/dialog类型、delegate和窗口owner/token、activity finish与dialog_open/close顺序。现有手机栈已证明handler正确，优先修窗口层；不再仅凭“用户看到通用”就假定root清理或固定行号route坏。
+- General视觉来源如果仍复现，记录真实Activity/Preference root/标题/返回链再最小定位。若根治BadToken后完整after不再出现General或重启，报告“已修确定窗口根因且所测完整链正常，原视觉General来源未独立采到”，不要虚称已证明其一切路由细节。不得硬编码General标题/行index/拦截所有官方导航，不能把缺一个独立General-before当理由忽略已确定的BadToken。
+- 仍审阅N31全root重绑在onPreferenceTreeClick入口的必要性：点击中不能换root/adapter/listener/order/Intent；类型安全初始化、写新语言后、子屏创建和owned onBind负责文案刷新。可以删除/收紧click入口whole-tree rebind以避免notify重入，须保持语言变化和所有owned UI不回中文；只有前后证据支持才说它是路由根因。
+- official General行自身应按原生进入和正常返回；不能因语言修复把官方页面导航全阻断。首次/滚动复用/rapid点击/语言zh→ja→en→fr→ar/有无视频/AI off-on覆盖，owner正常一次click只开一个Dialog。
 
-允许CaptionSettingsBindingPatch、必要CaptionPreferenceBindings/CaptionUiPreference/CaptionUiViewBindings/CaptionLanguagesPreference和官方settings UI-only接缝最小修改；禁止翻译/网络/缓存/分页/播放器/全局语言新架构。
+## 6. E：两个public补丁重新交付
 
-## 4. C：再删除冗余独立根，两根交付
+原N31 AI已经含通用14语言metadata/clone/selected_codes，本卡只删除冗余public Add Simplified Chinese，不再合并一套语言UI或把普通Preference变成Screen。
 
-基线N31的AI已含通用14语言metadata/clone与selected_codes；这一功能不需要再合并一份代码/把语言设置改成PreferenceScreen。
+- 公开集合精确AI caption translator＋Remember caption selection；删CaptionFeatures.simplified/standalone强制zh-Hans/simplifiedInstalled，简体中文随14候选/用户selected_codes加入；默认空集合、旧用户集合不清不迁移。
+- installed与enabled分开：AI installed但运行OFF仍新增已选语言/API0；Remember-only独立原生记忆、没有语言强制注入/API0；AI-only无多余记忆副作用。
+- 正式MPP加载元数据只有2根，AI-only/Remember-only/AI+Remember三非空组合3/3；同process多次patching不泄漏旧feature状态。生成patches-list/README/metadata发行校验一致，旧published URL/日期/assets不变。
+- 保存旧Standalone断言before，定点改两根归属更强合同；错误第三根/漏简中/重复zh-Hans/集合清空负例拒绝。不把旧7/7当当前两根验收。
 
-- 从public补丁定义删除Add Simplified Chinese to auto-translate；MPP公开集合精确为AI caption translator、Remember caption selection。
-- 删除CaptionFeatures.simplified、standalone强制zh-Hans来源与simplifiedInstalled标记/其控制分支；简体中文和另外13语种只按AI设置保存集合提供。默认空集合，不迁移/清空selected_codes，AI运行开关关闭不抹掉菜单能力。
-- Remember独立：未安装AI时原生记忆仍正常、API0，语言注入不意外启用；安装AI但关AI开关时已选语言仍加入原生自动翻译菜单、翻译API0。两种“installed”与“runtime enabled”不能混淆。
-- 沿原SharedPreferences/Keystore/目标source权限/native draw及初始化唯一性，不能删除共享能力。每次真实patcher新session重置features；同一进程多组合不泄漏前次选项。
-- 同步README、生成patches-list、本地metadata/发行校验从3根到2根；用正式MPP加载并generatePatchesList，不能手改JSON伪装。旧published URL/日期/assets不改，不发布。
-- 对本模块允许旧测试“Standalone Simplified一定存在”的断言定点更新且保留before；新增错误第三根/漏简中/重复zh-Hans、错误集合迁移负例。不要继续用7组合等旧分母声称二根验收，应3/3非空组合。
+## 7. 补充要求、冻结边界与验证
 
-## 5. 真正的导航/ART验收
+用户N31对话明确：最后两根、14语言AI子屏内、纯语言名无状态、正确功能说明、保持系统语言只切Morphe语言、诊断技术英文但source/prompt/provider数据原文、最终仅本地文件。其“加速”是收敛范围，不是删关键测试。
 
-- 首次打开视频设置、AI子屏、列表点击语言项出现一个14项multi-choice Dialog（纯语言名/勾选框/正确UI title和固定功能说明）；选/取消/保存/重新打开集合正确、返回仍AI子屏；不曾启动general屏，不留下第二个settings Fragment/root。
-- 真实ListView.performItemClick走实际adapter→原listener→Preference，而不是p.showLanguages。再点击general行确进general，不把官方行全部拦截。zh/ja/en/fr/ar、滚动后复用、rapid tap、rebind中点击、有/无视频、AI关/开覆盖；证明onClick恰1次、原listener与key/class/root对应。
-- 14本地化/320与420dp/1与1.3/RTL样本保持，真实UI更新不改请求hash/cache identity或用户custom；程序性诊断英文、源文/provider原样。
-- 正式组合序列化后ART验证实际4个settings类；先类加载/方法校验，然后执行设置initialize/语言变更/子屏实际点击链。Class.forName成功只能记“类型验证”，不能当“导航点击通过”。可用已有本地read-only emulator完成，记录SDK/ABI/脚本/包SHA和局限，不冒作本机SDK37手机after；禁止物理手机写入或主动测试。
-- 一次性精简debug链必须包含最终build/官方baseline、clicked Preference key/class、View文字、list/root/dialog标识与每次onClick/dialog_open序号；不逐帧dump整树、不记录用户API密钥。原始before与after在同一完整动作序列比较，保证即使未来遇类似错页也能诊断，而非仅增加一条“开窗成功”的helper日志。
-- 错误receiver/错误language时序、故意错误root/adapter导航、重复Dialog事件由同一审计/实际点击验收拒绝；负例数据不混入production。
-- 所有实现通用，禁止视频ID、具体时间/token/用户句子、中文标题匹配和固定列表position特判。
+冻结翻译源/目标选择权、650ms拆块/Protocol硬网、cache-only启动/连接retry、prompt/default business与custom分层、缓存scope、播放器合并render/原native draw、R1 lock/CAS/Permit/退休barrier、中文18golden、非中文n29-v3页合同、用户字号/位置/颜色和selected_codes/API profile/Keystore。N27/VISIONOS不处理，不引入视频/句子/token/时间特判。
 
-## 6. 冻结与验证规模
+允许CaptionSettingsBindingPatch及必要最终audit、CaptionUiLocale/新UI window-owner helper、CaptionSettingsDialogs、CaptionLanguagesPreference/诊断分页等真实窗口调用点、owned Preference binder的非侵入UI刷新/生命周期、两根移除与metadata/tests/docs；UI-only边界已定，无须为碰这些类机械暂停。不得全仓回退N30或取消本地化以省修复。
 
-原N31请求/默认与custom分层/菜单目标权限/650ms断点/cache-only启动/连接attempt/转场render任务合并失效/draw/R1锁-CAS-Publication同key/中文18golden/非中文n29-v3/字号颜色位置不变；N27不恢复，VISIONOS不处理。N31原3根回退只是基线，不把后续2根事实继续声明为当前交付。
+必要验证：
 
-- 原Java680加新导航/根归属/寄存器回归，实际failure/error/skipped0，原68专项/main11/K12/中文18golden保持；不强迫复制旧682数字。只局部UI/删除标志时不为凑轮数再无必要重复压力；沿现有规定所需400轮一并报告，若出现N31业务层修改须重新定界。
-- Python27、metadata实际测试数、234×14、实际14UI树/默认与用户数据对照；冻结4通过/4既有失败/4未验证，3 invisible_ms0、ACCEPTANCE/frozen零diff。
-- 原版21.16.256+官方1.45+**正式MPP自身**三组合：AI-only、Remember-only、AI+Remember。都序列化重读，type/branches/API access/hook/UI导航接缝审计、ART、CRC/resources/aapt/min28/verify_bundle/N8Verify通过。实际DEX/类数/patch数量如实报告，不硬套旧11/680/93。
-- 一次最终全量、正式交付；失败原日志与每个实验包保留，不能删失败/放宽时限/改输入翻绿。捕获的历史MPP/MPE/APK和失败证据前后hash不变。
+1. 已有本地真实Android环境WMS/ART，保证原缺token候选失败、最终有效Activity/window token显示成功。Robolectric的AlertDialog shadow可能允许资源Context挂窗，不能只沿旧p.showLanguages绿测；类型验证和窗口运行分别给报告。
+2. 真实settings tree点击/保存取消/返回和所有共享窗口矩阵；14语言×Activity中文的覆盖保持，DEFAULT/显式Morphe/主题/320及420dp/1.3/RTL；无合法owner/finishing/destroyed/旋转/旧settings Activity关闭的负例受控不崩，背景owner失效不改数据。有效窗口after不存在新General路由、异常或重启。
+3. 原Java680+必要新增/定点合同改后全量、原68/main/K12/中文18golden/14控件/default请求/用户字节不变；原调度400轮按既有验证完成，不为旧失败添sleep或放宽时限。Python27、metadata真实分母、234×14、冻结4通过4既有失败4未验证/3 invisible0、ACCEPTANCE/frozen零diff。
+4. 正式MPP自身+1.45+原版21.16.256的3组合，全部根DEX/指令边界/数据流寄存器类型/语言写入后时序/访问位/API/必要hooks、ART设置类和实际UI挂窗、resources/CRC/aapt/min28/verify_bundle/N8Verify、内嵌MPE=独立MPE。数据流错误、token错误、未知签名/缺hook、错root或重复窗口由同一审计/实际UI验证拒绝；负例不能成为production特判。
+5. before原log和候选不覆盖。各模块专项后一次最终全量与正式包，不能不断重建大APK掩盖未测试点击。历史输入/产物SHA保护，不回写手机或要求用户重装before以证bug。
 
-## 7. 独立交付与停止
+## 8. 独立交付和边界
 
-最终后缀统一-n32：build/local-test/patches-1.3.5-本地测试包-n32.mpp、extension-1.3.5-本地测试包-n32.mpe；build/n32-composition-final/YouTube-21.16.256-本地测试包-n32-unsigned.apk。原-n31、-two-patches、-settings-crash-fixed均留历史，不覆盖。
+后缀统一-n32：build/local-test/patches-1.3.5-本地测试包-n32.mpp、extension-1.3.5-本地测试包-n32.mpe；build/n32-composition-final/YouTube-21.16.256-本地测试包-n32-unsigned.apk。原31/两根/settings-crash-fixed所有历史保留。
 
-docs/N32-LOCAL-TEST-BUILD.md须明确原类型bug、导航真实原因与证据、对照变量、真实点击链/adapter/key/class/root、解决方法通用性、2根3组合、UI/ART区别、所有测试/SHA/字节、设备未覆盖边界。 当前手机before使用已读取FB7B28B4…APK和14:58:34日志，不重置/安装以重测；所有N31补充要求在报告中逐项映射到证据。若导航没有复现/当前用户包身份未知，必须如实保留该缺口，不能用合成点击或Class.forName冒充修复签字。
+报告docs/N32-LOCAL-TEST-BUILD.md应逐项说明两种before APK/日志身份、N30与原N31差异、ART receiver根因与资源Context/token根因、owner全调用inventory、真实列表/窗口/General返回链结果、2根3组合、所有测试/完整SHA/字节及物理手机after未覆盖。不能把本地SDK35 ART成功冒作SDK37手机点击成功，不能捏造原General视觉来源。
 
-本地一个核心commit/anchor/n32-<真实短哈希>、docs-only身份可补记，两份PROJECT-STATE同步、规划文档保留随卡提交。未签名/未传手机/未安装/未清数据/未推送/未发布，零API/下载/依赖。完成即停，用户自行用最终本地MPP合成安装，再点视频→AI→语言多选、保存/返回、通用页和中日英切换短验，不让用户回装旧坏包。
+本地核心commit/anchor/n32-真实短哈希，两份状态同步，docs-only身份后继允许。未签名/未传手机/未安装/未清数据/未Git推送/未发布，零远程API/下载/新依赖。完成即停；用户自行传最终MPP、合成签名覆盖安装，再短验打开Morphe、AI语言14选保存取消/返回、几个共享Dialog、中日英变更及官方General返回，不让用户回装旧坏包。

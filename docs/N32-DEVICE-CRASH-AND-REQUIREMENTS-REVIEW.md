@@ -1,5 +1,7 @@
 # N32补充核查：当前手机N31重启、撤回方案导航与用户补充要求
 
+> **最新结论以§6为准**：用户之后安装了可加载的撤回版；15:25:58真实点击报BadTokenException，确定原N31新增资源Context作窗口owner的第二回归。§1–5保留先前原N31 VerifyError证据与当时的导航未知边界，不继续按那时APK身份解释新手机现象。更新后的N32先修类型与通用窗口owner，不整仓回退N30。
+
 日期：2026-10-03（Asia/Shanghai）。规划者按用户本轮授权，读取手机现有日志/包信息并pull当前base.apk供本地静态核查；没有向手机写文件、安装、启动Activity、执行ART探针、卸载或清数据。项目保持前一轮原N31回退，无产品改动。
 
 ## 1. 实机事实
@@ -55,3 +57,37 @@ N32先完成类型安全保证，随后在本地可运行UI宿主/已有模拟�
 已完善docs/N32-CODEX-TASK.md：先已实机证实类型缺陷、再真实导航/绑定对照、最后2根3组合；加入当前手机原始输入和全部补充要求。计划保留N31本地化/14语言/用户数据/R1CAS/原N30性能与安全网，最终独立-n32包，不覆盖旧-n31等文件。
 
 手机只读证据：.verification/n32-device-review/device-input.json、phone-analysis-summary.json、crash-current.txt、phone-crash-key-lines.txt、package-info.txt、current-installed-settings-methods.txt、original-n31-settings-methods.txt、current-root-flags.txt、installed-current.apk。没有RTT/token/新UIafter结果，也没有导航故障已复现结论。
+
+## 6. 可加载的撤回版本现场新证据：N31窗口所有权回归（2026-10-03）
+
+用户已安装可加载设置的撤回版本，仍观察“语言项后显示通用页，返回时重启”。本轮只读取现有日志、窗口/Activity状态并pull新base.apk，没有主动点击、启动/安装/写手机。安装更新15:24:44；新APK199529446字节/SHA BFF42C488842FE793BCEA5028208D23FE47F831B867480676FAA99AB86E2E111。AbstractPreferenceFragment的initialize/lambda/TreeClick方法dump与撤回1bc94ae修复候选**完全相同**，证实当前可加载版身份，不能混用前一轮FB7B28B4原N31的日志。
+
+15:25:58.048，真实AndroidRuntime FATAL EXCEPTION main：
+
+`WindowManager.BadTokenException: Unable to add window -- token null is not valid; is your activity running?`
+
+直接栈是`Dialog.show → CaptionLanguagesPreference.showLanguages:42 → onClick:22 → Preference.performClick → PreferenceScreen.onItemClick → 官方DebouncedItemClickListener → ListView点击`。这已经是用户实际列表点击产生的before，不是直接调用测试helper。此时正确语言Preference的handler实际收到点击，然后在挂窗失败；不能继续把“listener一定选成General Preference”当主要根因。
+
+### 为什么N30正常，N31出问题
+
+N30构造语言Dialog使用`new AlertDialog.Builder(getContext())`，沿有效Activity UI/window管理服务。N31为本地化新增Snapshot，构造`ContextThemeWrapper(base.createConfigurationContext(configuration),0)`并复制Theme，然后把这个新资源Context传Builder。
+
+配置Context可以提供目标locale资源，但不是具有Activity窗口归属的UI owner；复制Theme不恢复Activity的WINDOW_SERVICE/默认token。Dialog构造时从传入Context取WindowManager，最终真实手机token=null。N31的资源语言改造错误地把**资源上下文**与**窗口所有者**当成同一职责，这正是本次无法显示语言弹窗/重启的通用根因。
+
+版本hash对照：CaptionLanguagesPreference N30 blob=bb2d494…，原N31 dc304cb/二根66a/修hook1bc/当前恢复均=33192c6…；CaptionUiLocale在N30不存在，上述N31变体均=51aa8ce…。所以原N31就有这个潜伏问题，先被VerifyError挡住；typed receiver修完后它才成为可执行路径。删除第三root与这个Context方法没有任何差异，不是根数减少造成。
+
+### 共享窗口风险和通用修复
+
+公共CaptionSettingsDialogs.confirm/show对官方CustomDialog.create和平台AlertDialog fallback都传同样资源Context，Android9诊断分段复制也直接Builder(CaptionUiLocale.context)。API profile/清Key/清诊断/模型等经公共工厂的真实弹窗都要核查。Toast、字符串查找、预览临时绘制无需相同application window token，不能因此取消全部本地化。
+
+修复分层：资源Context继续只用于字符串/布局方向/文本等；实际Dialog由当前活跃**设置Activity**（或保留其WINDOW_SERVICE的Activity-base主题wrapper）拥有。原Context本身可能已非Activity，需从真实Fragment/显示View/绑定的settings树记录正确owner，弱引用且生命周期失效；不能默认用主播放器Activity或全局application fallback。无合法owner要明确安全拒绝/记录原因，不把异常吞掉、不改变成overlay window、不手工猜token、不只setOwnerActivity来弥补已经构造错的WindowManager。
+
+### 对“通用页”描述保持准确
+
+已证明点击进入语言handler后因BadToken挂窗失败；尚未采到窗口异常前General Activity/Preference创建的完整路由事件，不能把用户看到的页面直接解释为已证明General导航代码新增。它可能是弹窗失败/返回过程中宿主页面露出或恢复，必须以完整前后台页面身份/事件验证。N32 now以真实BadToken点击before为确定机制修复依据，并在after完整点击/保存取消返回链断言语言Dialog实际可见、回AI子屏且未切General；**不得为等不到一个独立General before而忽略当前已证明根因，也不得反过来虚称已证明视觉General的全部来源**。
+
+### 是否回N30
+
+建议保留当前用户指定原N31恢复基线，以N30正确的窗口归属为合同，**重做N31 Dialog ownership层＋安全设置hook**；不整仓回退N30。两项工程回归已定位于N31新UI接缝，N30的翻译/缓存/播放器核心未因此变更；全回N30会撤销14语言读取、纯语言名/正确summary和default展示业务分层，再从头做同批需求，增加周期与回退风险。用户未明确要求本轮回N30，规划者也没有自行执行。
+
+N32卡已重新细化为类型安全、所有窗口Activity-safe、本地化保留、真实列表/General返回生命周期和最终2根；before均用当前两类手机证据，最终仍只本地交付。分析parallel两项源码对照均未改产品，结果与实际BadToken和版本hash一致。

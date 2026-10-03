@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。用户已明确放弃失败的N31/N32，以N30完成源码重新开发；本规划聊天已恢复所有tracked非docs文件至d5ca720，并保留backup/n32-wip-c88abcc、全部旧包/失败证据及历史文档。N31仅可提取翻译文案，31/32其他实现禁止复用。最新§4ar及N30-SECOND-RESTORATION.md；新诊断build=n30，正在逐段审阅并制定新卡，未重新建包、未修改手机。
+> 最后更新：2026-10-03。用户停止失败N31/N32并授权以N30完成树独立重建；已执行恢复7d6821e/anchor/n30-restored-7d6821e，全部tracked非docs与d5ca720一致，80历史交付哈希不变；c88abcc与旧证据留存。新200407诊断确认人工JSON3，18次8CPS拒绝、14次前导defer、局部对齐全片回滚已独立核查。规划收敛为N33设置/本地化/直接删独立简中root，N34字幕通用机制；N33卡已生成待执行，N34未开始。只允许复用31翻译文字，不复用31/32其他成果。最新§4ar/4as、N33-CODEX-TASK与N33-REPLAN-AND-DIAGNOSTIC-REVIEW。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,8 +17,8 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节与最新§4ar、docs/N30-SECOND-RESTORATION.md；用户最新决定覆盖§4ao–4aq的“保留N31/执行N32”。N31/N32均已停止，后续从N30产品树独立实现；旧任务卡不可恢复执行。
-2. **当前角色分工（用户最新）**：本规划对话负责读手机已有logs/dumpsys/pull installed APK、版本源码/AOSP只读对照、任务与档案；本轮双源码子agent只读审阅无产品编辑，新Codex执行N32实现/验证。用户手机不push/安装/启动/app_process/清数据，最终用户自己传合成。单执行者施工，不交DeepSeek、不把源码审阅当after实测。
+1. **先读本实时状态档案**：优先本节与最新§4ar/4as、docs/N30-SECOND-RESTORATION.md、docs/N33-REPLAN-AND-DIAGNOSTIC-REVIEW.md、docs/N33-CODEX-TASK.md。用户最新决定覆盖旧N31/N32执行安排；产品从N30恢复树重新独立实现，旧31/32任务卡失效，所有其他31/32实现/工具/测试不得复用。
+2. **当前角色分工（用户最新）**：本规划聊天负责源码/诊断/官方依据审阅、已授权可逆回退、详细方案/卡及两份状态管理；下一执行聊天按N33卡以Codex单执行者完成设置、本地化与两根验证/建包，完成即停。N34待N33结果后按最终源码另下具体卡。手机只读，不push/安装/启动/app_process/清数据；正式签名/手机安装由用户自己做。不得恢复DeepSeek接力或自派后续卡。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
 4. **当前阶段**：源码非docs仍原N31 dc304cb、恢复282d155与docs后继。当前SDK37手机已换为可开设置撤回1bc形态APK BFF42C48…，15:25:58语言onClick→showLanguages→Dialog.show token null，点击对象正确。N31潜伏两回归已确定：return receiver类型错＋configuration资源Context作Window owner。N32未产品施工；General具体页面创建尚未捕获，最终完整after不跳页/返回不重启是门槛。
@@ -437,6 +437,8 @@ N27仍搁置、VISIONOS用户已解决，最终summary/UI多语种/程序性诊�
 
 ## 6. 待办队列
 
+> 当前队列以最新§4as及N33/N34定案为准；下列历史队列保留作审计，不代表继续执行N31/N32或N27。
+
 当前优先级以§4ad为准：先N30完成N29手机反馈的确定性修正、等待/转场稳定、AI设置内多选语言菜单和最终本地化/技术诊断英文；随后只做一次短真机复验与发布来源预检。旧R2卡和N29任务列表是沿革，不据旧HEAD或旧官方版本重启已完成任务。
 
 **当前推进：C原锁环修复和正式包已交付；规划整体审阅未放行，先docs/N28C-R1-CODEX-TASK.md处理main同步等待风险与非中文短页。R1未执行，手机不必现在随机测试，第四期暂不发。**
@@ -773,3 +775,39 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 全tracked非docs树已恢复到d5ca720 / anchor/n30-d5ca720，恢复前c88abcc以backup/n32-wip-c88abcc保留。旧文档/包/失败证据保留，用户官方输入1.45.0未改。
 - 新要求：说明添加到原生自动翻译列表、纯语言名无视频可用状态且宿主风格；中文（繁体）准确命名；AI summary说明选自动翻译目标后用AI实时翻译；14语种所有设置角落独立闭环；直接删除独立简体中文root；深入分析200407诊断和manual/auto四源文件，通用修复漏/晚/短呈现。
 - 最新诊断build=n30、32/32HTTP成功，不等于字幕呈现或语义合格；需从源时间/事件/排版检查。规划者本轮不实现新功能、不签名/安装/启动手机、不远程API。后续新卡完成即停。
+
+## 4as. N30重新开发的两期定案、200407原生产探针与N33卡（2026-10-03）
+
+### 当前身份与已执行动作
+
+- 恢复提交7d6821e772b9959158dd7ac41bd7e626aef48d1c，anchor/n30-restored-7d6821e；源基线d5ca720/anchor/n30-d5ca720。全部tracked非docs逐字节相等；随后规划文档后继不改变产品树。backup/n32-wip-c88abcc保留失败暂存。80件历史MPP/MPE/APK前后hash0差异，未重新建包/签名/安装/清数据/手机启动/远程API/下载。
+- N31只允许文字翻译；从dc304cb导出纯catalog存 .verification/n33-planner/n31-text-only-catalog.json。其余31/32源码/窗口/owner epoch/hook/stub/脚本/构建候选禁止复用。N32失败暂停文档保留，不写交付通过。
+
+### 本轮诊断及原字幕的强证据
+
+- 200407输入433812B / 543C5A6CD01C34F9E08763C7988E2148D2389024FC318F3D21BDE43EF042EAD4，manifest n30/official1.45.0/presentation n29-v3，1132 history＋32 quality。旧31和32WIP的exporter实际标签为n31；没有安装APK SHA after，不拿manifest替代完整APK验真。
+- 32/32 HTTP2xx，无failure/internal retry；26逻辑block＋6额外同block请求，5repair_no_progress。tokens63268=56545+6723；RTT874/median1366/p95 1764/max1945ms。本次漏/晚不因网络失败；不调高并发/retry。
+- N30真实CaptionDocument/RebuildSource独立javac原生产探针，manual JSON3的1224词start/end与诊断全部1224 IDs完全一致，且source bytes23150、169 coarse cues。实际主源人工字幕；全1224 timing仍ESTIMATED。ASR reference实际17840B但未导出正文，与supplied auto JSON3 106667B不能混作同payload。
+- 18个layout fallback用实际REBUILD_SELECTED renderInput/range复核，18/18都触发RebuildPageLayout在几何前的8CPS硬拒绝。不能由此直接声称18条全部真机放得下；新任务须实际两行测量，soft reading watch不能单独致空。
+- 14个deferred lead记录，原owned windows合计23526ms（不是实测blank_ms，不与fallback叠加）。其中119316–121314ms的“配备6.7英寸显示屏……”提前35.9s已接纳，却119338ms仍为空，121447ms才显示merge且窗121714ms结束，直接解释晚/短闪。
+- supplied manual/auto JSON3的align生产探针：1131唯一锚词/拟1122native替换、44交界冲突；当前全片事务返回原对象，aligned0。仅说明该通用代码机制，不冒认手机17840B参照正文。safe连续片段局部提交，歧义/冲突保留估计，不全片shift/裁词。
+- supplied auto VTT原解析6963 estimated词，含内嵌时间/标签与滚动旧行；auto JSON3 1260词（1221native/39estimated）。当前manual1224没有该异常，N34需格式判别/JSON3优先与结构carry证据检查，不按重复词全局去重。
+
+### 两期安排与独立UI设计
+
+1. **N33下一张卡**：用户1–4固定AI/语言功能说明、picker纯语言名无状态/繁体名校正、14语种全部UI与默认显示/自定义保护、直接删独立简中公开root。以N30 Activity/dialog/click原处理路径，仅String/Locale解析＋自有Preference/View标准生命周期刷新。PreferenceScreen是final，保留原Screen，由child getParent更新父标题/说明；分类才可轻量子类，locale变化通过官方public Setting.key/preferences→SharedPrefCategory.preferences标准监听器弱持有自有树、main合并一次post。不改官方Fragment DEX或恢复31/32绑定/owner guard。真正点按API/model/save、保存/取消/返回、明暗大字与14控件树是交付门槛，不能靠资源齐全/离线数量替代。
+2. **N34随后**：通用soft CPS/几何呈现、禁止为merge先压空lead、候选merge不合格退当前独立事件、可信局部alignment和source/presentation trace/格式，14目标冷热/时窗/语义切口复核。不额外改vendor容量、focus2/prefetch2/total4、N30启动缓存优先、R1/CAS生命周期或N27避让。新卡按N33实际交付身份再生成，尚未开始。
+
+- UI locale显式Morphe override优先；官方 ResourceUtils.getString及getStringByLocale实际上均可直接读Activity，本轮独立官方MPP DEX已证。资源ConfigurationContext只在取字函数内部读cap_*，不对外返回Context，不给窗口/View/业务。DEFAULT跟随宿主；native菜单按其实际YouTube locale排序，不强套Morphe设置locale。
+- 默认要求显示与runtime分开：N30DeepSeekConfig.DEFAULT_PROMPT、effectivePreference及CaptionLanguageContext.preference路径不同，新的UI取字不能代入runtime defaultPrompt。runtime保持N30既有内容/identity；未自定义editor显示localeDefault，真实custom原文不翻译。切语言/rebind/profile不得误autosave/改keys。
+- 程序报告heading/stage/field/reason英文；UI壳本地化；原source/translation/custom/provider数据原样。N33不更改字幕业务，只调整构建标记/纯文案等允许项。
+- 入口仍视频页旁白之后无图标；多选列表内14项、初次empty、cancel不写；AI已装但OFF仍保留native添加且API0。N30恢复树当前仍是三公开root，删独立简中属于N33待实现，不能说回退时已完成两根。
+- N33真实最终包测试只用明确emulator序列号，最终交付仍unsigned、手机只读；独立重建fixture不复用N32 host。旧正确source/request/prompt/cache/中文golden不变，旧UI错summary/status断言可具名改；冻结4/4/4与invisible0、ACCEPTANCE历史不动。
+
+### 新文档与证据
+
+- docs/N33-CODEX-TASK.md：完整闭合任务、实现边界、真实交互测试与-n33独立三件套要求。
+- docs/N33-REPLAN-AND-DIAGNOSTIC-REVIEW.md：本轮逐问题根因、可行方案/边界、两期计划与一手规范。
+- .verification/n33-planner/：inputs/hash、80历史before/after、独立official locale dump、141 UI调用点/22类、18 fallback、14defer、生产source probe和JSON总结。本规划聊天未跑全项目Java/组合/DEX；669/669为历史N30执行记录。
+
+后续执行者先读这节与N33卡，产品基线允许docs-only后继自动开工，避免重复HEAD短hash暂停。所有新产物-n33不覆盖旧包，完成停；用户下一步将N33卡交新执行聊天。

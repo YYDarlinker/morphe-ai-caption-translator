@@ -57,3 +57,5 @@ N32交付必须独立-n32，原N31原包及历史坏包全部保留；再由用�
 ## 5. 本轮证据
 
 .verification/n31-rollback-review包含rollback-inputs/rollback-verified、navigation-review/unchanged-ui-files、later-head快照/状态before、root-removal与settings-hook-fix diff、三APK xmltree、最新版fragment/onClick/sort/debounce反读。aapt使用只读ASCII硬链接避免中文路径报错，原APK无变化。没有新产品全量测试；回退证明来自源码树相等与原产物SHA保护，不把旧680/682结果说成重新跑过。
+
+恢复实际提交：`282d155fd08e126a36c4eec8b6ef8be85eff1827`；锚点：`anchor/n31-restored-282d155`。本段为仅docs身份补记，产品/测试/原N31产物无后续修改。

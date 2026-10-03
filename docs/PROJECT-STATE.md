@@ -734,3 +734,5 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - docs/N31-ROLLBACK-AND-NAVIGATION-REVIEW.md、docs/N32-CODEX-TASK.md已生成。N32从当前原N31基线，明确允许仅设置hook/UI绑定与删除冗余根/metadata测试修改；先复现精确路由/修类型，再最终AI+Remember2根3非空组合。没有跳页证据不能用手工错listener负例或类加载结果宣称完成；不硬编码语言标题/position/general跳转，不盲cherry-pick旧整提交。
 - 保护N31UI本地化/default业务分层/用户prompt/API/profile/selected_codes、原native权限/650ms断点/cache-only启动/连接预算/转场render权限/R1CAS/golden/分页/字号位置，N27/VISIONOS不处理。独立-n32三件套，原-n31/-two-patches/-settings-crash-fixed历史不覆盖；最终真实列表点击/保存取消返回/general自身导航/语言变更、真实序列化ART/types/branches/API/资源验收，不只p.showLanguages。
 - 本轮只回退与静态对照/管理记录，没有产品全量复跑或新包构建。旧680/682不冒作本轮通过。没有签名/安装/卸载/清用户数据/向手机push/翻译API/下载/新依赖/Git推送/发布。两份状态同步，恢复commit/anchor另补实际身份；新Codex执行N32，用户自行操作最终手机安装。
+
+回退实际身份闭合：本地恢复提交 `282d155fd08e126a36c4eec8b6ef8be85eff1827` / `anchor/n31-restored-282d155`，其全部非docs跟踪树与原N31 `dc304cb`相等。后续只补docs身份，指定MPP AF084C20…未改，活动三根为准确恢复，不是新修复候选。执行N32允许此回退HEAD/doc后继，无需再回dc304cb或丢规划文档。

@@ -5,6 +5,7 @@
 ## 1. 施工身份与已知风险
 
 - 仓库仅E:\Projects\morphe-caption-v2；原产品基线dc304cbe3ae995e7e0edad2754b160c959cafce3 / anchor/n31-dc304cb。当前HEAD是新的回退提交或其docs-only后继，**不要把HEAD数值不同当阻断**：除规划docs外当前跟踪源码/测试/metadata/build与dc304cb相等即可开工，记真实HEAD。本卡及恢复状态获准保留随卡提交。
+- 实际恢复提交 `282d155fd08e126a36c4eec8b6ef8be85eff1827` / `anchor/n31-restored-282d155`；docs-only身份后继允许。该恢复点除docs外与dc304cb完全相同，不能因恢复commit名称不同再请求确认。
 - 指定原包build/local-test/patches-1.3.5-本地测试包-n31.mpp=1,165,680/SHA256 AF084C20C32636EBA051B2891BDAFC5419BD54A98DBB28974CD441BE18AF913C；原包不覆盖、不复用其文件名建新包。原N31三件套是只读对照，不作为待用户安装的修复包。
 - 阅读N31-ROLLBACK-AND-NAVIGATION-REVIEW、PROJECT-STATE最新回退章及原N31交付/原N31卡。开工比对两份状态，无差异跳过覆盖；差异读内容处理。
 - 旧HEAD150c91f在backup/n31-later-150c91f与.verification/n31-rollback-review快照；66a2584、1bc94ae、相关失败证据和包全保留。不得reset回旧修复、直接cherry-pick整提交以冒充新根因分析。

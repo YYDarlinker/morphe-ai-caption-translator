@@ -58,3 +58,5 @@ N30把 ResourceUtils 方法名当成覆盖语言保证；真实1.45方法可从�
 位置：build/local-test与build/n31-composition-final。兼容metadata仍YouTube21.16.256/minSdk28，官方1.45.0；产品1.3.5，旧发布URL/日期不改。实际测试输入SHA `75033807377774738e82fa167d1c249b8a2583cc7c650ccee6eb4f327fc8da82`。
 
 下一次仅保持系统语言，在Morphe切中文→日语→英语，看视频页AI summary、AI子屏类别/默认要求/预览/档名/诊断、多选纯语言名与固定说明（无视频可查）；用户自定义要求应原样。提供截图或诊断即可，无需14语种母语全表。本卡完成即停，不自动发布或启动下一卡。
+
+核心源码提交：`dc304cbe3ae995e7e0edad2754b160c959cafce3`；本地锚点：`anchor/n31-dc304cb`。此身份补记为 docs-only 后继，三件套与测试所依据的产品源码不变。

@@ -693,3 +693,5 @@ Java680/680，原专项68+原中文golden探针2、Morphe形态Dialog9；failure
 7组合/全部11DEX/58261类/322982方法/626704分支、公开API/新UI接缝/CRC/资源/aapt/min28/verify_bundle/N8Verify通过，MPE内嵌独立等值。Python27，冻结4/4/4与invisible_ms0、ACCEPTANCE/业务源码零diff；12972历史文件+8外部输入SHA字节不变。正式MPP使用Android根DEX；失败普通build与旧候选保留为provisional。三件套build/local-test与build/n31-composition-final，完整SHA/字节见N31-LOCAL-TEST-BUILD，逐角落清单见N31-UI-LOCALIZATION-INVENTORY。远程API/依赖/下载/签名/安装/卸载/清数据/推送/发布均0。
 
 完成即停；用户保持系统语言只切Morphe中→日→英短查，手机/母语边界未验证；不要求用户全表母语审校。
+
+N31身份补记：核心提交 `dc304cbe3ae995e7e0edad2754b160c959cafce3` / `anchor/n31-dc304cb`；docs-only 后继仅登记身份，未修改已验证产品/测试/产物。

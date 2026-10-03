@@ -53,3 +53,5 @@
 本轮没有签名、安装、卸载、清数据、推送Git或发布；供应商API／下载／新增依赖0。下一步仅用户重新合成覆盖安装后：设置→Morphe可打开，再在同一语言设置里中文→日语→英语检查AI子屏，确认不重启及文案刷新。完成代码交付后停止。
 
 证据：.verification/n31-settings-crash/summary.json、register-and-timing-negative-final.log、composition-dex-audit-timing-final.log、art-local-emulator-final.json、art-local-emulator-before.log/after.log、device-crash-before.txt、integrity-timing-final.json。源码核心commit／anchor以身份补记登记。
+
+身份补记：核心提交 `1bc94aed459300b79bd5ee93dca03d2db99d593c`；本地锚点 `anchor/n31-settings-crash-1bc94ae`。本次docs-only身份补记不改变已验证产物和产品源码。

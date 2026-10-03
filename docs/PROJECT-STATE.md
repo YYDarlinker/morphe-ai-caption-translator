@@ -715,3 +715,5 @@ N31两根后续身份：核心 `66a258466a912e43ff67fb174cb5052ee3d5d548` / `anc
 最新本地只读emulator SDK35/x86_64 ART Class.forName(true)同旧包失败、新包通过4设置类，最终APK SHA1982448D2FF7D29CC1A7882D1036C5972021D6546221F28D46A30D484B2D9651；11DEX/58261类/322981方法/626701分支审计0问题、资源CRC/N8/aapt/min28通过。修复MPP SHA5AC2509DB8C1A32C2AF0CC5A6579039AE58ED27A1D0CD23690011A30CEB8B6ED；MPE315026FA…与双补丁上一版相等。新路径build/local-test/*-n31-settings-crash-fixed及build/n31-settings-crash-fixed-composition-final。旧N31/双补丁/失败候选均留存，不覆盖。
 
 用户最新明确所有需要文件自行传手机，最终仅放本地，不再手机push/安装。此前已推前一入口候选MPP01792C50…至Download与/data/local/tmp验证，坦诚告知，非最终版；不删除/不安装/不清数据。最终实机SDK37安装点击未验证，用户自己用最新本地MPP重新合成签名覆盖安装，再开Morphe、中文→日→英短查。本轮未签名安装卸载清数据/Git推送发布、API下载新依赖0。完整SHA/证据/验证边界见N31-SETTINGS-CRASH-FIX，完成交付即停；身份commit/anchor另补记。
+
+N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` / `anchor/n31-settings-crash-1bc94ae`；最终修复MPP5AC2509D…、APK1982448D…仅本地交付，等待用户自行合成覆盖安装后打开设置验证。

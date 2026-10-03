@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。用户明确要求删除第二个冗余补丁；N31后续已将public列表收敛为AI caption translator＋Remember caption selection两根，14语言菜单（含简体中文）由AI独占，AI关闭仍可使用。682全量/12元数据/3组合及全部DEX通过；新三件套后缀n31-two-patches，原N31历史不覆盖。未签名未安装未发布，详见§4am/N31-PATCH-CONSOLIDATION。
+> 最后更新：2026-10-03。用户手机打开Morphe设置重启已定位为N31返回路径hook误用被R8复用的p0，真实SDK37安装包VerifyError确认。已修typed PreferenceScreen结果、生命周期入口及语言updatePreference之后的安全重绑；本地SDK35 ART旧包失败/最终包通过、寄存器/时序负例通过，修复MPP后缀n31-settings-crash-fixed仅本地交付。仍只有AI＋Remember两个补丁；最终实体手机重新合成安装与设置点击由用户自己操作，未冒称已过。详见§4an/N31-SETTINGS-CRASH-FIX。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -704,3 +704,14 @@ N31身份补记：核心提交 `dc304cbe3ae995e7e0edad2754b160c959cafce3` / `anc
 682/682 Java（680+2菜单归属/简体去重）、12/12元数据，原N31语言控件/中文18golden/activate继续相等；翻译调度/分页/cache/overlay源码逐字不变。最终11DEX/58261类/322981方法/626701分支与公开UI/native hooks、CRC/resources/aapt/min28/verify_bundle/N8Verify通过；MPP自身只有AI和Remember，内嵌MPE独立等值，旧root名与installed标记从DEX删除。新交付build/local-test/*-n31-two-patches及build/n31-two-patches-composition-final；全SHA/字节见N31-PATCH-CONSOLIDATION。55份历史捕获SHA/字节不变，旧N31全量交付保留。未签名/安装/清数据/推送/发布，远程API/下载/新依赖0。完成即停；实际核心commit/anchor另补记。
 
 N31两根后续身份：核心 `66a258466a912e43ff67fb174cb5052ee3d5d548` / `anchor/n31-two-patches-66a2584`；docs-only身份后继，原N31源码与交付作为历史保留，新双补丁包为本轮交付。
+
+
+## 4an. N31 设置页重启：真实VerifyError与本地修复（2026-10-03）
+
+用户手机使用双补丁MPP自行合成安装，进入Morphe即重启。SDK37／arm64的真实crash buffer和安装APK显示AbstractPreferenceFragment.lambda$new$4 [0xC]、initialize [0x3E]的v2类型不符：N31返回前onSettingsLoaded把已成为synthetic lambda／boolean／exception／PreferenceScreen的p0按Fragment传入，类验证失败。旧安装包SHA C32217BB…保留。本项目注入错误，既有离线hook计数/分支检查未验证ART类型；不把682控件全量当设备页验收。
+
+最终只改设置Kotlin接缝：initialize紧邻typed getPreferenceScreen move-result→rebind(PreferenceGroup)，生命周期入口p0仍为Fragment；lambda4098是实例方法，hook在updatePreference写新语言后、updateUIAvailability前用同一FiveRegister.registerC活receiver；View返回hook不变。新的SettingsHookRegisterAudit集成最终审计，拒绝坏旧包寄存器和入口绑定的旧语言时序候选。实际Java/UI10通过，原运行时Java/tests/resource/metadata和MPE逐字不变，沿用相同输入SHA682基线；翻译请求/paging/cache/overlay/用户selected_codes不改。
+
+最新本地只读emulator SDK35/x86_64 ART Class.forName(true)同旧包失败、新包通过4设置类，最终APK SHA1982448D2FF7D29CC1A7882D1036C5972021D6546221F28D46A30D484B2D9651；11DEX/58261类/322981方法/626701分支审计0问题、资源CRC/N8/aapt/min28通过。修复MPP SHA5AC2509DB8C1A32C2AF0CC5A6579039AE58ED27A1D0CD23690011A30CEB8B6ED；MPE315026FA…与双补丁上一版相等。新路径build/local-test/*-n31-settings-crash-fixed及build/n31-settings-crash-fixed-composition-final。旧N31/双补丁/失败候选均留存，不覆盖。
+
+用户最新明确所有需要文件自行传手机，最终仅放本地，不再手机push/安装。此前已推前一入口候选MPP01792C50…至Download与/data/local/tmp验证，坦诚告知，非最终版；不删除/不安装/不清数据。最终实机SDK37安装点击未验证，用户自己用最新本地MPP重新合成签名覆盖安装，再开Morphe、中文→日→英短查。本轮未签名安装卸载清数据/Git推送发布、API下载新依赖0。完整SHA/证据/验证边界见N31-SETTINGS-CRASH-FIX，完成交付即停；身份commit/anchor另补记。

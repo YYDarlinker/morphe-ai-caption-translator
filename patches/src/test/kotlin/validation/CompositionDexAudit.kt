@@ -297,10 +297,7 @@ fun main(args:Array<String>){
         val ui=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionUiLocale;")
         val calls=ui.methods.flatMap { it.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.mapNotNull { ins->ins.reference as? MethodReference }?.toList()?:emptyList() }
         check(calls.none { it.name=="setDefault" || it.name=="updateConfiguration" || it.definingClass=="Lapp/morphe/extension/shared/ResourceUtils;" })
-        val fragment=classes.getValue("Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;")
-        for(name in listOf("initialize","onCreateView","onPreferenceTreeClick","lambda\$new\$4")) {
-            check(fragment.methods.single { it.name==name }.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().any { (it.reference as? MethodReference)?.let { ref->ref.definingClass=="Lapp/yydarlinker/deepseekcaptions/CaptionPreferenceBindings;" && ref.name=="onSettingsLoaded" }==true }) { "N31 settings lifecycle hook missing: $name" }
-        }
+        verifySettingsHookRegisters(classes)
         val languages=classes.getValue("Lapp/yydarlinker/deepseekcaptions/CaptionLanguagesPreference;")
         check(languages.methods.none { it.implementation?.instructions?.filterIsInstance<ReferenceInstruction>()?.any { ins->(ins.reference as? MethodReference)?.name=="languageStatus" }==true })
         println("N31_UI_ABI_AND_LIFECYCLE_PASS official_language_public=true settings_hooks=4 video_status_ui_calls=0 global_mutations=0")

@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。用户要求回到原初N31并重新核验两根后的语言项错跳通用页；规划者已直接把全部非docs跟踪树恢复dc304cb/anchor/n31-dc304cb，原指定MPP AF084C20…及52历史产物SHA/字节不变，后续150c91f历史已保存。不混留旧两根或crash修复。原N31有已知ART hook类型风险，恢复不等于可安装验收；导航错误未取得完整点击复现。下一卡N32先核验实际settings点击/类型接缝，再最小修复与重新两根交付，非直接删除root或沿旧包宣布通过。最新§4ao、N31-ROLLBACK-AND-NAVIGATION-REVIEW及N32-CODEX-TASK。
+> 最后更新：2026-10-03。已按用户授权只读手机SDK37/arm64 crash与当前APK：未选独立简体根(simplifiedInstalled=false)也触发原N31 initialize/lambda返回hook错误，ART报Fragment参数类型不符；当前APK FB7B28B4…方法体与原N31相同。重启根因实机定案，导航错页仍是独立未现场复现项。已综合N31对话补充要求完善N32：先类型安全→真实设置点击/重绑对照→最终AI+Remember两根，仅本地交付。活动源码仍原N31恢复，未做新修复/安装。最新§4ap、N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW及N32-CODEX-TASK。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,12 +17,12 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节、最新§4ao、docs/N31-ROLLBACK-AND-NAVIGATION-REVIEW.md与N32-CODEX-TASK.md。用户已指定原N31作为重新施工基线，原N31产物AF084C20…不可覆盖；§4am两根和§4an修hook都是历史，不能继续把其包列当前推荐。不按旧HEAD重启或盲cherry-pick后续提交。
-2. **当前角色分工（用户最新）**：本规划对话本轮获用户明确授权直接回退，已执行文件树恢复/历史保护；研究/审阅/任务卡/状态继续本对话负责，新Codex执行对话实现N32全部测试/独立交付，不交DeepSeek。单执行者，不自动向手机传文件或安装，不让用户回测旧坏包。
+1. **先读本实时状态档案**：优先本节、最新§4ap、docs/N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW.md及更新N32-CODEX-TASK.md。§4ao原N31回退已完成，产品源dc304cb/恢复282d155/doc ad492b3或其docs后继；§4am/4an两根旧修复保留历史。当前手机只读新日志明确证实原N31类型bug，不再当仅推测；导航故障尚无当前after实机复现。
+2. **当前角色分工（用户最新）**：本规划对话已获用户明确授权读连接手机现有日志及pull安装APK，负责核查/任务/档案；新Codex对话执行完整N32。禁止向用户手机push探针/MPP、app_process测试/安装/自动启动/卸载/清数据；后续最终文件用户自行传。没有新产品修改，单执行者，不交DeepSeek。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：活动源码/测试/metadata/README/build工具已完整恢复原N31 dc304cb（当前新的回退HEAD或docs-only后继与其非docs树相同）；三public roots临时恢复，下一N32才重新两根交付。原31包未重建/未改，后续两根/crash修复历史保存。恢复包含已知原N31 p0寄存器缺陷，只用作施工基线；语言错跳general精确分支尚未实测复现。
-5. **执行顺序**：已完成原N31回退→N32用真实设置点击链区分根数清理和hook/UI绑定时序、闭合已知ART类型错误→最小通用修复→独立AI+Remember两根3组合/实际导航+ART+DEX+业务回归交付→用户自行本地MPP合成传手机短验。不继续旧修复包，不自动安装或发布。
+4. **当前阶段**：源码非docs树仍准确等于原N31 dc304cb，恢复提交282d155/anchor/n31-restored-282d155及docs后继。最新手机APK199529446/SHA FB7B28B4…、SDK37、AI/Remember=true/Simplified=false，14:58:34.080 VerifyError两方法同原N31。N32未施工，原包不宣称安全；错跳General需类型安全后在完整宿主click链核查，不能凭Class.forName签字。
+5. **执行顺序**：N32先修已实机证明的返回receiver类型/语言写入时序→再对照N30和撤回候选做真实list→delegate→Preference→Dialog/屏导航，最小隔离UI重绑与点击→最终删除冗余根只AI+Remember两根3组合→同最终包ART/UI/DEX/业务全量交付→用户自行手机安装短验。现有手机只读before不重测崩溃，不新开修订卡或模型/播放器开发。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
@@ -736,3 +736,16 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 本轮只回退与静态对照/管理记录，没有产品全量复跑或新包构建。旧680/682不冒作本轮通过。没有签名/安装/卸载/清用户数据/向手机push/翻译API/下载/新依赖/Git推送/发布。两份状态同步，恢复commit/anchor另补实际身份；新Codex执行N32，用户自行操作最终手机安装。
 
 回退实际身份闭合：本地恢复提交 `282d155fd08e126a36c4eec8b6ef8be85eff1827` / `anchor/n31-restored-282d155`，其全部非docs跟踪树与原N31 `dc304cb`相等。后续只补docs身份，指定MPP AF084C20…未改，活动三根为准确恢复，不是新修复候选。执行N32允许此回退HEAD/doc后继，无需再回dc304cb或丢规划文档。
+
+## 4ap. 当前手机原N31重启实证与补充N32要求（2026-10-03）
+
+用户进一步确认三根全打/不选加入简体中文均在Morphe重启，授权读取连接手机并要求结合N31执行对话补充安排N32。规划者仅adb devices/logcat -d/dumpsys/getprop/pm path及pull base.apk；没有logcat清空、push/安装/app_process/启动页面/卸载/清数据，没有产品修改或产品测试复跑。
+
+- 当前包app.morphe.android.youtube 21.16.256/minSdk28/target36，SDK37/arm64；更新2026-10-03 14:58:23，base.apk199529446字节/SHA FB7B28B425A3DCE8884EF9BBFEB6EF8D93FC7B782B9E2E24EDC472D9A9116C38。实际flags aiInstalled=true/memoryInstalled=true/simplifiedInstalled=false，未选简中这一条件已读包验证。
+- 14:58:34.080 FATAL EXCEPTION main，VerifyError拒绝AbstractPreferenceFragment并连带Toolbar/YouTubePreferenceFragment。lambda$new$4 [0xC] v2=synthLambda9、initialize[0x3E] v2=PreferenceScreen，却传onSettingsLoaded(PreferenceFragment)。当前APK三个相关方法dump与原N31unsigned方法dump逐字相同，**旧p0末尾方案就是本次重启根因，非简中root、网络或签名**。ART类加载验证所有方法，不等错误分支执行，所以点入口即崩溃。
+- 修法已固定为活Fragment入口/typed screen结果与实际语言写入之后的类型安全重绑；禁止每个return盲传p0、cast/吞异常骗验证。必须测试生成DEX类型/语言时序与真实设置初始化/导航，不能将680控件绿或四类Class.forName绿等同完整设置能用。
+- 当前手机装回原N31且类加载失败，不能现场执行已撤回方案的导航。此前三包settings XML/语言onclick相同排除项仍成立，点击重绑root/adapter/View身份和listener时序是待查接缝，**不虚构已抓到General错页分支**。N32需先B1类型安全才能执行A/B2导航，比照N30、撤回1bc和最小安全N31，在完整ListView点击链保存对象/key/class/root/打开窗口证据；不能直接showLanguages或固定位置拦截伪装。若不能复现独立导航故障，要保留缺口而非把实机重启根因冒作两bug根因。
+- 已重读用户N31对话附件307行，提取补充要求：12:29明确删除/合并第二root（已有AI14功能只需删冗余）、诊断原始source/prompt/provider中文原样、技术字段英文、本地化/default请求分层保留；13:44明确所有文件只放本地用户自传；加快收尾不省关键测试。本轮读手机授权不含写入/安装，新执行对话只在已有本地模拟器主动ART/UI测试。
+- docs/N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW.md已创建，既有N32卡增加当前实机input/阶段顺序/N31补充要求、完整实际点击与精简事件标记，本地输出-n32不覆盖原31/两根/旧crashfix。只AI+Remember2根3组合、234×14 UI/用户原值/R1CAS/650ms断点/cache-only/转场/分页/字号不变；不重开语义/供应商开发，零下载依赖API。
+- 原只读证据.verification/n32-device-review/installed-current.apk、device-input/phone-analysis-summary、crash-current/phone-crash-key-lines、current-root-flags、current-installed-settings-methods/original-n31-settings-methods、package-info。说明用户自己的安装APK SHA不与unsigned工程包硬比较；按实际method/hook判定版本。
+- 源码仍原N31恢复，原MPP AF084C20…/52产物保留；本輪無新MPP/修复代码/签名安装/手机push/Git推送发布。两份状态同步，管理docs可docs-only提交后继，N32新对话继续，用户不必为before重新安装或重现崩溃。

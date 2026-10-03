@@ -59,3 +59,10 @@ N32交付必须独立-n32，原N31原包及历史坏包全部保留；再由用�
 .verification/n31-rollback-review包含rollback-inputs/rollback-verified、navigation-review/unchanged-ui-files、later-head快照/状态before、root-removal与settings-hook-fix diff、三APK xmltree、最新版fragment/onClick/sort/debounce反读。aapt使用只读ASCII硬链接避免中文路径报错，原APK无变化。没有新产品全量测试；回退证明来自源码树相等与原产物SHA保护，不把旧680/682结果说成重新跑过。
 
 恢复实际提交：`282d155fd08e126a36c4eec8b6ef8be85eff1827`；锚点：`anchor/n31-restored-282d155`。本段为仅docs身份补记，产品/测试/原N31产物无后续修改。
+
+
+## 6. 后续当前手机只读核验（2026-10-03）
+
+用户进一步确认原N31三补丁/不选简体都进入Morphe自动重启并授权读手机。规划者读取新crash和实际base.apk，SDK37/arm64，FB7B28B4…/199529446字节；AI与Remember为true，simplifiedInstalled=false，14:58:34.080仍报同一lambda[0xC]/initialize[0x3E] VerifyError。方法体与原N31工程dump完全相同，所以此前“原N31已知风险”现升级为当前实机实证，排除是否选择简体。具体资料见N32-DEVICE-CRASH-AND-REQUIREMENTS-REVIEW。
+
+撤回方案的错页仍独立：当前手机无法加载设置，没有现场复现那个after方案，旧XML/onclick排除项保持；新卡明确先修类型后再真实点击。已提取用户在N31对话的删除冗余根、诊断原始数据不改、最终本地-only、加快收尾等补充要求。无手机写入/安装/主动UI操作，无新产品修改或测试复跑。

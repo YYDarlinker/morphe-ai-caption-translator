@@ -27,7 +27,7 @@ final class SecureApiKey {
     static void save(Context context, String apiKey) throws Exception {
         synchronized(ApiProfiles.LOCK) {
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            throw new IllegalArgumentException("API Key 不能为空");
+            throw new IllegalArgumentException("api_key_empty");
         }
         SecretKey key = getOrCreateKey();
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");

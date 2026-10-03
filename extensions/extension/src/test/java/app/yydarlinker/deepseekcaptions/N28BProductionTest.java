@@ -88,7 +88,9 @@ public class N28BProductionTest {
       RebuildController.stop();SourceCaptionCache.clear(h.a);RebuildCache.clear(h.a);source(c[2]);translated=c[3];
       for(String locale:new String[]{"zh-CN","en-US","ar"}) {
         RebuildController.stop();ui(locale);int before=h.calls.get();RebuildController.Session s=start(c[0],c[1]);ready(s);
-        boolean network=h.calls.get()>before;assertEquals(s.languageContext.canApplyEnglishToChinese || locale.equals("zh-CN")?1:0,h.calls.get()-before);
+        // N31 separates program-default display from business values for legacy Chinese too.
+        // Switching only UI language must hit the same cache, without clearing it or changing source.
+        boolean network=h.calls.get()>before;assertEquals(locale.equals("zh-CN")?1:0,h.calls.get()-before);
         assertEquals(c[0]==null?"UNKNOWN":c[0],s.languageContext.sourceCode);assertEquals(c[1],s.target);
         assertSame(s.languageContext,new RebuildController.Job(s,0).languageContext);
         assertEquals(c[3],s.plans[0].events.get(0).text);assertEquals(0,RebuildReview.score(s.plans[0].issues));
@@ -101,7 +103,7 @@ public class N28BProductionTest {
         }
       }
     }
-    assertEquals(12,h.calls.get());export("production-matrix");
+    assertEquals(8,h.calls.get());export("production-matrix");
   }
   @Test public void signatureReuseButSourceAndDuplicateChangeScopes()throws Exception {
     source("Une phrase.");RebuildController.Session en=start("en","fr");ready(en);int calls=h.calls.get();

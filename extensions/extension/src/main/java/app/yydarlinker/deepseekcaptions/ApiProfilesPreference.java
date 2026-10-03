@@ -13,7 +13,7 @@ import java.util.*;
 
 /** One settings row; per-profile management stays inside the existing selector dialog. */
 @SuppressWarnings("deprecation")
-public final class ApiProfilesPreference extends android.preference.Preference {
+public final class ApiProfilesPreference extends CaptionUiPreference {
     private Dialog dialog;
     private Dialog listDialog;
     private LinearLayout listBody;
@@ -47,6 +47,7 @@ public final class ApiProfilesPreference extends android.preference.Preference {
         if(summary!=null){summary.setMaxLines(1);summary.setEllipsize(android.text.TextUtils.TruncateAt.END);}
     }
     @Override protected void onClick(){showProfiles();}
+    @Override void rebindUi(){setSummary(ApiProfiles.list(getContext()).get(ApiProfiles.active(getContext())));super.rebindUi();}
 
     private void show(String title,LinearLayout body,String closeLabel){
         show(title,body,closeLabel,null);
@@ -78,7 +79,7 @@ public final class ApiProfilesPreference extends android.preference.Preference {
         TextView v=new TextView(getContext());styleAction(v);v.setText(label);v.setOnClickListener(w->click.run());
         parent.addView(v,new LinearLayout.LayoutParams(-1,-2));return v;
     }
-    private void error(String key){Toast.makeText(getContext(),text(key),Toast.LENGTH_LONG).show();}
+    private void error(String key){Toast.makeText(CaptionUiLocale.context(getContext()),text(key),Toast.LENGTH_LONG).show();}
     private boolean flush(){if(ApiProfiles.flushCurrent())return true;error("profile_invalid_edits");return false;}
     private boolean current(ProfileRow row){
         return dialog!=null && dialog==listDialog && dialog.isShowing() && rows.get(row.id)==row

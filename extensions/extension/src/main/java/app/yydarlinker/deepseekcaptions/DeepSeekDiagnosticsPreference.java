@@ -5,7 +5,7 @@ import android.view.*;
 import android.widget.*;
 /** Quiet by default; expanding or pressing a button is always explicit and never calls the provider. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekDiagnosticsPreference extends android.preference.Preference {
+public final class DeepSeekDiagnosticsPreference extends CaptionUiPreference {
     public DeepSeekDiagnosticsPreference(Context c){super(c);init();}
     public DeepSeekDiagnosticsPreference(Context c,AttributeSet a){super(c,a);init();}
     public DeepSeekDiagnosticsPreference(Context c,AttributeSet a,int d){super(c,a,d);init();}
@@ -14,25 +14,33 @@ public final class DeepSeekDiagnosticsPreference extends android.preference.Pref
     @Override protected View onCreateView(ViewGroup parent){
         Context c=getContext();LinearLayout box=new LinearLayout(c);box.setOrientation(LinearLayout.VERTICAL);CaptionSettingsStyle.row(box);
         LinearLayout header=new LinearLayout(c);header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title=new TextView(c);title.setText(CaptionStrings.settings(c,"diagnostics"));CaptionSettingsStyle.title(title);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-        Button toggle=new Button(c,null,android.R.attr.borderlessButtonStyle);CaptionSettingsStyle.button(toggle);toggle.setText(CaptionStrings.settings(c,"expand"));toggle.setTag("ai_diagnostics_toggle");header.addView(toggle);box.addView(header);
-        TextView hint=new TextView(c);hint.setText(CaptionStrings.settings(c,"diagnostics_hint"));CaptionSettingsStyle.caption(hint);box.addView(hint);
+        TextView title=new TextView(c);CaptionUiViewBindings.text(title,c,"diagnostics");CaptionSettingsStyle.title(title);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        Button toggle=new Button(c,null,android.R.attr.borderlessButtonStyle);CaptionSettingsStyle.button(toggle);CaptionUiViewBindings.text(toggle,c,"expand");toggle.setTag("ai_diagnostics_toggle");header.addView(toggle);box.addView(header);
+        TextView hint=new TextView(c);CaptionUiViewBindings.text(hint,c,"diagnostics_hint");CaptionSettingsStyle.caption(hint);box.addView(hint);
         LinearLayout expanded=new LinearLayout(c);expanded.setOrientation(LinearLayout.VERTICAL);expanded.setVisibility(View.GONE);
         ProfileActionStrip actions=new ProfileActionStrip(c);
         TextView body=new TextView(c);body.setTag("ai_diagnostics_body");CaptionSettingsStyle.caption(body);body.setTextIsSelectable(true);body.setPadding(CaptionSettingsStyle.dp(c,12),CaptionSettingsStyle.dp(c,10),CaptionSettingsStyle.dp(c,12),CaptionSettingsStyle.dp(c,10));
         ScrollView scroll=new ScrollView(c){@Override public boolean onInterceptTouchEvent(MotionEvent e){if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);return super.onInterceptTouchEvent(e);}};
         scroll.setTag("ai_diagnostics_scroll");scroll.setBackground(CaptionSettingsStyle.surface(c,false));scroll.setFillViewport(false);scroll.setVerticalScrollBarEnabled(true);scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
         Button refresh=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"refresh"),false,false,()->{});refresh.setTag("ai_diagnostics_refresh");refresh.setOnClickListener(v->{body.setText(CaptionDiagnostics.uiText(c));scroll.scrollTo(0,0);});actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));
-        Button copy=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"copy"),false,false,()->{});copy.setTag("ai_diagnostics_copy");copy.setOnClickListener(v->{ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);if(manager!=null){manager.setPrimaryClip(ClipData.newPlainText(CaptionStrings.settings(c,"diagnostics"),body.getText()));Toast.makeText(c,CaptionStrings.settings(c,"message_896c4b51d7e9"),Toast.LENGTH_SHORT).show();}});actions.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+        Button copy=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"copy"),false,false,()->{});copy.setTag("ai_diagnostics_copy");copy.setOnClickListener(v->{ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);if(manager!=null){manager.setPrimaryClip(ClipData.newPlainText(CaptionStrings.settings(c,"diagnostics"),body.getText()));Toast.makeText(CaptionUiLocale.context(c),CaptionStrings.settings(c,"message_896c4b51d7e9"),Toast.LENGTH_SHORT).show();}});actions.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         ProfileActionStrip archiveActions=new ProfileActionStrip(c);
         Button save=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"save_diagnostics"),false,false,()->{});save.setTag("ai_diagnostics_save");archiveActions.addView(save,new LinearLayout.LayoutParams(0,-2,1));
         save.setOnClickListener(v->{save.setEnabled(false);new Thread(()->{
             // The export keeps the stable raw report; only the toast text follows the interface language.
-            String report=CaptionDiagnostics.fullText(c);String result;
-            try { result=saveReport(c,report); } catch(Exception e){result=String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"save_failed"),e.getClass().getSimpleName());}
-            String message=result;new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{save.setEnabled(true);if(message==null)copyPages(c,report);else Toast.makeText(c,message,Toast.LENGTH_LONG).show();});
+            String report=CaptionDiagnostics.fullText(c);String result;boolean success;
+            try { result=saveFile(c,report);success=true; } catch(Exception e){result=e.getClass().getSimpleName();success=false;}
+            String value=result;boolean ok=success;new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{
+                if(!save.isAttachedToWindow())return;save.setEnabled(true);
+                if(ok && value==null)copyPages(c,report);
+                else Toast.makeText(CaptionUiLocale.context(c),String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,ok?"save_ok":"save_failed"),value),Toast.LENGTH_LONG).show();
+            });
         },"caption-export").start();});
         Button clear=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"clear_diagnostics"),false,true,()->{});clear.setTag("ai_diagnostics_clear");
+        CaptionUiViewBindings.text(refresh,c,"refresh");CaptionUiViewBindings.text(copy,c,"copy");
+        CaptionUiViewBindings.text(save,c,"save_diagnostics");CaptionUiViewBindings.text(clear,c,"clear_diagnostics");
+        CaptionUiViewBindings.render(toggle,()->CaptionStrings.settings(c,expanded.getVisibility()==View.VISIBLE?"collapse":"expand"));
+        CaptionUiViewBindings.description(toggle,()->CaptionStrings.settings(c,expanded.getVisibility()==View.VISIBLE?"collapse":"expand"));
         clear.setOnClickListener(v->CaptionSettingsDialogs.confirm(c,
                 CaptionStrings.settings(c,"clear_diagnostics"),
                 CaptionStrings.settings(c,"clear_diagnostics_confirm"),
@@ -49,6 +57,10 @@ public final class DeepSeekDiagnosticsPreference extends android.preference.Pref
         toggle.setOnClickListener(v->{boolean open=expanded.getVisibility()!=View.VISIBLE;if(open)body.setText(CaptionDiagnostics.uiText(c));expanded.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(CaptionStrings.settings(c,open?"collapse":"expand"));toggle.setContentDescription(open?CaptionStrings.settings(c,"collapse"):CaptionStrings.settings(c,"expand"));});return box;
     }
     static String saveReport(Context c,String report) throws java.io.IOException {
+        String name=saveFile(c,report);
+        return name==null?null:String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"save_ok"),name);
+    }
+    private static String saveFile(Context c,String report) throws java.io.IOException {
         if(android.os.Build.VERSION.SDK_INT<29)return null;
         android.content.ContentValues values=new android.content.ContentValues();
         String name="caption-diagnostics-"+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"-"+new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.ROOT).format(new java.util.Date())+".txt";
@@ -64,7 +76,7 @@ public final class DeepSeekDiagnosticsPreference extends android.preference.Pref
             values.clear();values.put(android.provider.MediaStore.MediaColumns.IS_PENDING,0);if(resolver.update(uri,values,null,null)!=1)throw new java.io.IOException("Download was not published");
         }catch(Exception e){resolver.delete(uri,null,null);throw new java.io.IOException(e);}
         // Only the file name is substituted; the whole sentence is one authored template per locale.
-        return String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"save_ok"),name);
+        return name;
     }
     /**
      * Android 9 cannot publish a file through MediaStore, so the export is handed over in clipboard
@@ -74,14 +86,14 @@ public final class DeepSeekDiagnosticsPreference extends android.preference.Pref
         int length=60000,count=(report.length()+length-1)/length;String[] labels=new String[count];
         for(int i=0;i<count;i++)labels[i]=String.format(java.util.Locale.ROOT,
                 CaptionStrings.settings(c,"copy_part_label"),i+1,count);
-        new android.app.AlertDialog.Builder(c)
+        new android.app.AlertDialog.Builder(CaptionUiLocale.context(c))
                 .setTitle(CaptionStrings.settings(c,"copy_parts_title"))
                 .setItems(labels,(d,index)->{
             ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);
             String chunk=report.substring(index*length,Math.min(report.length(),(index+1)*length));
             if(manager!=null)manager.setPrimaryClip(ClipData.newPlainText(
                     String.format(java.util.Locale.ROOT,CaptionStrings.settings(c,"copy_part_label"),index+1,count),chunk));
-            Toast.makeText(c,String.format(java.util.Locale.ROOT,
+            Toast.makeText(CaptionUiLocale.context(c),String.format(java.util.Locale.ROOT,
                     CaptionStrings.settings(c,"copy_part_done"),index+1,count),Toast.LENGTH_LONG).show();
         }).show();
     }

@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Inline model editor plus automatic OpenAI-compatible model discovery. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekModelPreference extends android.preference.Preference implements ApiProfiles.Editor {
+public final class DeepSeekModelPreference extends CaptionUiPreference implements ApiProfiles.Editor {
     static final String KEY_MODEL = "deepseek_caption_model";
 
     private static final long AUTO_SAVE_DELAY_MS = 850L;
@@ -145,7 +145,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.row(root);
 
         TextView title = new TextView(context);
-        title.setText(getTitle());
+        CaptionUiViewBindings.render(title,()->getTitle());
         CaptionSettingsStyle.title(title);
         title.setPadding(0,0,0,dp(8));
         root.addView(title, matchWrap());
@@ -156,7 +156,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.editor(editor);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         editor.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        editor.setHint(CaptionStrings.settings(getContext(), "model_hint_manual_only"));
+        CaptionUiViewBindings.hint(editor,getContext(),"model_hint_manual_only");
         String initial = DeepSeekConfig.load(context).model;
         editor.setText(initial);
         editor.setSelection(initial.length());
@@ -171,7 +171,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.button(refresh);
         refresh.setMinimumWidth(0);
         refresh.setMinHeight(dp(48));
-        refresh.setText(CaptionStrings.settings(getContext(), "refresh"));
+        CaptionUiViewBindings.text(refresh,getContext(),"refresh");
         refresh.setAllCaps(false);
         refresh.setOnClickListener(view -> fetchModels(true));
         controls.addView(refresh, new LinearLayout.LayoutParams(
@@ -301,7 +301,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
                     if (generation != fetchGeneration) return;
                     if (refresh != null) {
                         refresh.setEnabled(true);
-                        refresh.setText(CaptionStrings.settings(getContext(), "refresh"));
+                        CaptionUiViewBindings.text(refresh,getContext(),"refresh");
                     }
                     showModels(models, true);
                 });
@@ -314,8 +314,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
                 main.post(() -> {
                     if (generation != fetchGeneration) return;
                     if (refresh != null) refresh.setEnabled(true);
-                    setState(String.format(java.util.Locale.ROOT,
-                            CaptionStrings.settings(getContext(), "model_load_failed"), detail), true);
+                    setFailure("model_load_failed",detail,true);
                 });
             }
         });
@@ -387,6 +386,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         popup.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
         popup.setOnDismissListener(() -> { if (modelMenu == popup) modelMenu = null; });
         modelMenu = popup;
+        CaptionUiViewBindings.refresh(surface,getContext());
         popup.showAsDropDown(choices);
     }
 
@@ -439,11 +439,15 @@ public final class DeepSeekModelPreference extends android.preference.Preference
             if(!ApiProfiles.flushing())DynamicCaptionController.refreshConfiguration(getContext());
         } catch (Throwable error) {
             String detail = error.getMessage();
-            if (detail == null || detail.trim().isEmpty()) detail = CaptionStrings.settings(getContext(),"model_save_failed");
+            if (detail == null || detail.trim().isEmpty()) detail = "model_save_failed";
             // One template for the whole sentence: the provider's own wording is the only variable here.
-            setState(String.format(java.util.Locale.ROOT, "%1$s%2$s",
-                    detail, CaptionStrings.settings(getContext(),"keep_last_valid")), true);
-            if (reportInvalid && editor != null) editor.setError(detail);
+            final String rawDetail=detail;
+            CaptionUiViewBindings.render(state,()->{
+                String own=CaptionStrings.settings(getContext(),rawDetail);
+                return (own.isEmpty()?rawDetail:own)+CaptionStrings.settings(getContext(),"keep_last_valid");
+            });
+            state.setAlpha(1f);
+            if (reportInvalid && editor != null){String own=CaptionStrings.settings(getContext(),detail);editor.setError(own.isEmpty()?detail:own);}
         }
     }
 
@@ -453,9 +457,15 @@ public final class DeepSeekModelPreference extends android.preference.Preference
      */
     private void setState(String text, boolean important) {
         if (state == null) return;
-        state.setText(CaptionStrings.settings(getContext(), text));
+        CaptionUiViewBindings.text(state,getContext(),text);
         state.setAlpha(important ? 1f : 0.72f);
     }
+    private void setFailure(String key,String raw,boolean important){
+        if(state==null)return;
+        CaptionUiViewBindings.render(state,()->String.format(java.util.Locale.ROOT,CaptionStrings.settings(getContext(),key),raw));
+        state.setAlpha(important?1f:0.72f);
+    }
+    @Override void rebindUi(){updatePickerLabel();super.rebindUi();}
 
     @Override public boolean flushProfile(){
         if(editor==null||boundRevision!=ApiProfiles.revision()||!boundProfile.equals(ApiProfiles.active(getContext())))return true;

@@ -376,15 +376,17 @@ static final String[][] ENGLISH={
 {"use_youtube","Use YouTube"},
 {"ai_quick_toggle_on","AI caption translation · On"},
 {"ai_quick_toggle_off","AI caption translation · Off"},
-{"ai_summary","Translate video captions live with your AI service"},
+{"ai_summary","When enabled, choose a language in YouTube’s ‘Auto-translate’ list to translate captions in real time using your configured AI service."},
 {"languages_title","Auto-translate languages"},
-{"languages_summary","Choose languages to add to YouTube’s auto-translate menu"},
+{"languages_summary","Add the selected languages to YouTube’s ‘Auto-translate’ language list. You can select multiple languages."},
 {"languages_count","%1$d languages selected"},
 {"languages_save","Save"},
 {"languages_existing","Already available"},
 {"languages_new","Added"},
 {"languages_unavailable","Unavailable"},
 {"languages_empty","No languages selected; the native menu is unchanged"},
-{"languages_entry","%1$s · %2$s"}
+{"languages_entry","%1$s · %2$s"},
+{"model_empty","The model ID cannot be empty"},
+{"api_address_invalid","Enter a valid HTTP(S) OpenAI-compatible base URL without embedded credentials or a fragment."}
 };
 }

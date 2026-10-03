@@ -37,14 +37,14 @@ final class ApiProfiles {
         return result;
     }}
     static void rename(Context c,String id,String name){synchronized(LOCK){
-        String n=name==null?"":name.trim();if(n.isEmpty()||n.length()>60)throw new IllegalArgumentException(CaptionStrings.settings(c,"profile_name_error"));
+        String n=name==null?"":name.trim();if(n.isEmpty()||n.length()>60)throw new IllegalArgumentException("profile_name_invalid");
         if(!list(c).containsKey(id))throw new IllegalArgumentException("Unknown API profile");
         try{JSONObject names=new JSONObject(index(c).getString("names","{}"));names.put(id,n);index(c).edit().putString("names",names.toString()).apply();}
         catch(JSONException invalid){throw new IllegalStateException("Invalid API profiles",invalid);}
     }}
     static String create(Context c,String name,String base){synchronized(LOCK){
-        String n=name==null?"":name.trim();if(n.isEmpty()||n.length()>60)throw new IllegalArgumentException(CaptionStrings.settings(c,"profile_name_error"));
-        if(list(c).size()>=30)throw new IllegalStateException(CaptionStrings.settings(c,"profile_limit"));
+        String n=name==null?"":name.trim();if(n.isEmpty()||n.length()>60)throw new IllegalArgumentException("profile_name_invalid");
+        if(list(c).size()>=30)throw new IllegalStateException("profile_limit_reached");
         String endpoint=ProviderEndpoint.validate(base);String id=UUID.randomUUID().toString();
         // New profiles deliberately do NOT copy the active API key or model.
         values(c,id).edit().putString("base_url",endpoint).putString("model","").apply();

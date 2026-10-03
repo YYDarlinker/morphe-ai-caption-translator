@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"Usar YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"Tradução de legendas com IA · Ativada"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"Tradução de legendas com IA · Desativada"</string>
-    <string name="cap_ai_summary" formatted="false">"Traduza legendas ao vivo com seu serviço de IA"</string>
+    <string name="cap_ai_summary" formatted="false">"Depois de ativar, escolha um idioma na lista «Traduzir automaticamente» do YouTube para traduzir as legendas em tempo real com o serviço de IA configurado."</string>
     <string name="cap_languages_title" formatted="false">"Idiomas de tradução automática"</string>
-    <string name="cap_languages_summary" formatted="false">"Escolha idiomas para adicionar ao menu de tradução do YouTube"</string>
+    <string name="cap_languages_summary" formatted="false">"Adicione os idiomas selecionados à lista «Traduzir automaticamente» do YouTube. Pode selecionar vários idiomas."</string>
     <string name="cap_languages_count" formatted="false">"%1$d idiomas selecionados"</string>
     <string name="cap_languages_save" formatted="false">"Salvar"</string>
     <string name="cap_languages_existing" formatted="false">"Já disponível"</string>
@@ -232,4 +232,6 @@
     <string name="cap_languages_unavailable" formatted="false">"Indisponível"</string>
     <string name="cap_languages_empty" formatted="false">"Nenhum idioma selecionado; o menu nativo não muda"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"O ID do modelo não pode estar vazio"</string>
+    <string name="cap_api_address_invalid" formatted="false">"Introduza um URL base HTTP(S) válido e compatível com OpenAI, sem credenciais incorporadas nem fragmentos."</string>
 </resources>

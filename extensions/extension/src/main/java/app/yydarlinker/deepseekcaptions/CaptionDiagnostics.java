@@ -84,7 +84,7 @@ final class CaptionDiagnostics {
      * and timestamp is appended verbatim and is never translated.
      */
     static String uiText(Context context) {
-        return uiText(context, true);
+        return uiText(context, false);
     }
 
     /**
@@ -152,7 +152,7 @@ final class CaptionDiagnostics {
      */
     static String fullText(Context c) {
         String history=CaptionDiagnosticArchive.read(c,"history"),quality=CaptionDiagnosticArchive.read(c,"quality");
-        return uiText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; build=n30; official=1.45.0; presentation=n29-presentation-v3"+"; exported_at="+System.currentTimeMillis()
+        return uiText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; build=n31; official=1.45.0; presentation=n29-presentation-v3"+"; exported_at="+System.currentTimeMillis()
             +"; completeness=bounded_not_guaranteed; history_records="+records(history,false)+"; quality_records="+records(quality,true)
             +"; truncation_markers="+(occurrences(history,"record truncated")+occurrences(quality,"record truncated"))
             +"; debug="+DeepSeekConfig.displayTextDebugEnabled(c)+"]\n"

@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"YouTube 사용"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"AI 자막 번역 · 켜짐"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"AI 자막 번역 · 꺼짐"</string>
-    <string name="cap_ai_summary" formatted="false">"설정한 AI 서비스로 동영상 자막을 실시간 번역"</string>
+    <string name="cap_ai_summary" formatted="false">"활성화한 후 YouTube의 ‘자동 번역’ 목록에서 언어를 선택하면 설정된 AI 서비스로 자막을 실시간 번역합니다."</string>
     <string name="cap_languages_title" formatted="false">"자동 번역 언어"</string>
-    <string name="cap_languages_summary" formatted="false">"YouTube 자동 번역 메뉴에 추가할 언어 선택"</string>
+    <string name="cap_languages_summary" formatted="false">"선택한 언어를 YouTube의 ‘자동 번역’ 언어 목록에 추가합니다. 여러 언어를 동시에 선택할 수 있습니다."</string>
     <string name="cap_languages_count" formatted="false">"%1$d개 언어 선택됨"</string>
     <string name="cap_languages_save" formatted="false">"저장"</string>
     <string name="cap_languages_existing" formatted="false">"이미 있음"</string>
@@ -232,4 +232,6 @@
     <string name="cap_languages_unavailable" formatted="false">"사용 불가"</string>
     <string name="cap_languages_empty" formatted="false">"선택된 언어 없음: 기본 메뉴 유지"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"모델 ID를 입력하세요"</string>
+    <string name="cap_api_address_invalid" formatted="false">"인증 정보나 프래그먼트가 없는 유효한 HTTP(S) OpenAI 호환 기본 URL을 입력하세요."</string>
 </resources>

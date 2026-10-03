@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"YouTube を使用"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"AI 字幕翻訳 · オン"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"AI 字幕翻訳 · オフ"</string>
-    <string name="cap_ai_summary" formatted="false">"設定した AI サービスで動画字幕をリアルタイム翻訳"</string>
+    <string name="cap_ai_summary" formatted="false">"有効にすると、YouTube の「自動翻訳」リストで言語を選び、設定済みの AI サービスで字幕をリアルタイムに翻訳できます。"</string>
     <string name="cap_languages_title" formatted="false">"自動翻訳の言語"</string>
-    <string name="cap_languages_summary" formatted="false">"YouTube の自動翻訳メニューに追加する言語を選択"</string>
+    <string name="cap_languages_summary" formatted="false">"選択した言語を YouTube の「自動翻訳」の言語リストに追加します。複数の言語を選択できます。"</string>
     <string name="cap_languages_count" formatted="false">"%1$d 言語を選択中"</string>
     <string name="cap_languages_save" formatted="false">"保存"</string>
     <string name="cap_languages_existing" formatted="false">"既存"</string>
@@ -232,4 +232,6 @@
     <string name="cap_languages_unavailable" formatted="false">"利用不可"</string>
     <string name="cap_languages_empty" formatted="false">"言語未選択：標準メニューは変更されません"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"モデル ID を入力してください"</string>
+    <string name="cap_api_address_invalid" formatted="false">"有効な HTTP(S) の OpenAI 互換 API アドレスを入力してください。ユーザー名、パスワードやフラグメントは含めないでください。"</string>
 </resources>

@@ -7,7 +7,9 @@ import android.widget.Toast;
 
 /** Immediate utility actions shown as ordinary items inside the nested Morphe settings screen. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekActionPreference extends android.preference.Preference {
+public final class DeepSeekActionPreference extends CaptionUiPreference {
+    private String summaryKey="api_test_retry_hint";
+    @Override void rebindUi(){if(KEY_TEST.equals(getKey()))setSummary(CaptionStrings.settings(getContext(),summaryKey));super.rebindUi();}
     static final String KEY_TEST = "deepseek_caption_test_api";
     static final String KEY_RESET_POSITION = "deepseek_caption_reset_position";
     static final String KEY_CLEAR_CACHE = "deepseek_caption_clear_cache";
@@ -80,6 +82,7 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
         }
         final String testedProfile=ApiProfiles.active(getContext());
         setEnabled(false);
+        summaryKey="message_49562bf14c82";
         setSummary(CaptionStrings.settings(getContext(), "message_49562bf14c82"));
         new Thread(() -> {
             String result;
@@ -89,25 +92,23 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
             try {
                 String translated = ContextualBatchApiClient.test(config);
                 available = true;
-                result = String.format(java.util.Locale.ROOT,
-                        CaptionStrings.settings(getContext(),"api_test_ok"), translated);
+                result = translated;
             } catch (Throwable error) {
                 String detail = error.getMessage();
                 available = false;
-                result = String.format(java.util.Locale.ROOT,
-                        CaptionStrings.settings(getContext(),"api_test_failed"),
-                        detail == null || detail.trim().isEmpty()
+                result = detail == null || detail.trim().isEmpty()
                                 ? error.getClass().getSimpleName()
-                                : detail);
+                                : detail;
             }
             final String message = result;
             final boolean ok = available;
             postToUi(() -> {
                 setEnabled(true);
+                summaryKey="api_test_retry_hint";
                 setSummary(CaptionStrings.settings(getContext(), "api_test_retry_hint"));
                 if(!testedProfile.equals(ApiProfiles.active(getContext())))return;
                 if(ok) DynamicCaptionController.refreshConfiguration(getContext());
-                toast(message);
+                toast(String.format(java.util.Locale.ROOT,CaptionStrings.settings(getContext(),ok?"api_test_ok":"api_test_failed"),message));
             });
         }, "DeepSeekCaptionApiTest").start();
     }
@@ -119,6 +120,6 @@ public final class DeepSeekActionPreference extends android.preference.Preferenc
 
     /** The label is already fully resolved and localized by the caller; re-localizing it would mangle it. */
     private void toast(String text) {
-        Toast.makeText(getContext(), text, Toast.LENGTH_LONG).show();
+        Toast.makeText(CaptionUiLocale.context(getContext()), text, Toast.LENGTH_LONG).show();
     }
 }

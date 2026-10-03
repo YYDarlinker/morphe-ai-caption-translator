@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。N30未提交草稿保留，尚未交付；真实onPlayerType入口在guard前同步render/几何查找造成范围阻断，规划者已核对before探针并补C0/C3/§7明确许可。继续同一N30只调整入口UI分发时机/必要缓存失效，R1/CAS/显示权/compact隔离/字幕位置不变；完整V2外层及后续扫描必须覆盖。原23项19通过4失败及尚未复跑事实保留，恢复后先复验再全量/组合/DEX/建包。最新§4ah、N30-CODEX-TASK与N30-SCOPE-BLOCKER，未开始新阶段。
+> 最后更新：2026-10-03。N31统一运行时UI语言/稳定key重绑/默认展示与业务值分层、两处准确功能说明与多选纯语言名已工程交付。680全量、68专项+2中文探针、234×14及56主/14降级实际树、七组合/全部DEX通过；中文18golden以原N30中文配置逐字段相等，旧英语UI请求漂移证据保留。三件套未签名未安装，本地核心提交与anchor见§4al身份补记；手机短复验仍待用户。N30交付/规划docs保留，不发布、不开下一卡。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,19 +17,19 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节、最新§4ah、docs/N30-CODEX-TASK.md的2026-10-03 C0/C3/§7恢复定案及N30-SCOPE-BLOCKER追加§7。§4ag是施工停止历史，现分发范围已放开但不代表N30通过；产品HEAD仍b6dd6c6/N29锚点，N30改动在未提交工作区，不能reset丢弃。
-2. **当前角色分工（用户最新）**：后续Codex完整实现/验证/交付每张卡，不交DeepSeek。本规划对话负责研究/方案/任务卡/审阅及同步管理档案，本轮只读核对N30范围阻断/生产链/探针并放开必要分发范围，无产品源码修改或产品复跑。用户只做少量手机观察与给诊断，不承担14语种母语审校。单执行者串行。
+1. **先读本实时状态档案**：优先本节、最新§4ak、docs/N30-LOCALIZATION-REVIEW.md新增真实最终APK核查及N31-CODEX-TASK.md。§4ai记录N30工程交付，§4aj为初始N31规划；§4ag/4ah是N30施工/恢复历史，不按旧HEAD重启。当前源码d5ca720、docs-only HEAD fa10360，N31未开始产品改动。
+2. **当前角色分工（用户最新）**：Codex完整实现/验证/交付每张卡，不交DeepSeek。本规划对话负责研究/任务卡/审阅/状态，本轮核对N30源码/最终DEX语言API/本地化测试并补强既有N31草稿，无产品修改或产品测试复跑。用户只作少量语言切换/截图或诊断，不承担14语种母语审校，单执行者串行。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：N29源码3eefe00/anchor/n29-3eefe00，docs-only HEAD b6dd6c6；N30已施工，草稿未提交、无锚点/三件套。因卡内冻结入口render→refresh同步扫描停止，现规划者已定案可修改其分发时机；继续N30现工作区，不另开N30r。编译/23项专项19过4失败/探针before复现仅历史结果，不是最终通过。
-5. **执行顺序**：继续当前N30草稿→补完整V2/inner异步几何、快速转场/失效/main回归并复验4失败专项→继续全部N30（文案/启动稳定/通用硬断点/转场/AI页14多选/本地化与英文技术诊断）→全量/main/K12/400轮/最终组合DEX/独立交付→用户一次短复验。不reset、不签名安装/发布、不拆N30r或自动新期。
+4. **当前阶段**：N30源码d5ca720/anchor/n30-d5ca720、身份fa10360，工程669/669、68专项、400轮、7组合/11DEX及232×14已交付；用户切日语后默认要求/预览/字号/诊断仍大量中文，运行时本地化未验收。N31任务已全面细化，源码/三件套尚未施工或生成，不回退N30。
+5. **执行顺序**：N31一张卡修有效UI语言与全设置/对话/预览/滑条/诊断绑定、默认展示分层、两个功能说明、隐藏所有多选视频状态→14真实覆盖主矩阵/变异反例/最终工程交付→用户中文→日语→英语短复验→发布准备。保持N30全部翻译/菜单逻辑/播放器/缓存性能结果，不自动再开阶段或发布。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
 
 ## 1. 项目与路径
 
-- 产品：Morphe字幕补丁（.mpp，v1.3.5本地测试基线约1.1MB），YouTube自动翻译→用户自配OpenAI兼容API→播放器字幕。实际宿主21.16.256/minSdk28；历史发布声明仍21.07.247，N29须修为真实验证的21.16.256。历史工程包用官方1.44.0；后续基线1.45.0，用户已组合实机但接缝不完整，N29修复见§4ab。不可把官方1.45号当本项目产品版本。
+- 产品：Morphe字幕补丁（本地测试1.3.5），YouTube原生自动翻译选择→用户自配OpenAI兼容API→播放器字幕。当前开发包/Constants/生成metadata已验证YouTube21.16.256/minSdk28＋官方1.45.0；原已发布历史资产记录仍按原版本保留，不能覆盖。N30业务已工程交付；N31只修UI运行语言/说明/状态展示，官方版本号不等同本项目产品号。
 - 工作仓库：`E:\Projects\morphe-caption-v2`（从 GitHub main=v1.3.5 全新克隆）。
 - 只读档案：`E:\Projects\morphe-ai-caption-translator-next`（旧研究区，39 提交/10 分支；ADR-006、P4d 失败报告在内；**禁止延续其任务序列，仅点名时查阅**）。
 - 材料（均在仓库根目录）：`caption-diagnostics-1.3.5-20260927-084217.txt`（旧真机）、`caption-diagnostics-1.3.5-20260929-155802.txt`（0929 诊断）、英文源 SRT、`字幕参考.zip`；真机诊断输出目录 `D:\HONOR Share\Honor Share\`。
@@ -655,3 +655,41 @@ N30 按 `docs/N30-CODEX-TASK.md` 开工，真实 HEAD `b6dd6c6`，源码基线 `
 - 独立交付：MPP 1149147字节/SHA 7FEB7313460239B9F8C7315F11C4B8D599FCFED3640A24EADCA8B38317056880；MPE 2786164字节/SHA 6AB8823E239634E414117CA6A1C997775DFAD1CF8F2AE5D105DE43A3508DE9BC；unsignedAPK 198113758字节/SHA AD0DBDA174002BA1FF6D363814A9D5A62AA3FEA15A71EECC5FE06A2C1CB2BF0E。路径 `build/local-test/*-n30.mpp/mpe`、`build/n30-composition-final/YouTube-21.16.256-本地测试包-n30-unsigned.apk`。
 - 12646份既有历史/输入SHA/字节未变，原始诊断/截图与四外部字幕只读复核未变；中间失败/前三阶段候选及前两套named候选均保留为非交付。无远程API/下载/依赖/签名/安装/清用户数据/卸载/推送/发布。
 - 运行时与截图是平台/受控host工程证据，不冒作全部YouTube手机/14母语验收；N29真实bounded history40/37/3 vs since-reset audit41/38、67745tokens域分开，N30没有device-after RTT/token/帧率。仅请一次短复验：中文开关/summary/多选、稳定播放及真实1:52–2:07、详情↔悬浮窗/全屏、日语/另一非中文切口并完整诊断。N30完成后停止，不另开N30r或下一卡，不自动发布。
+
+## 4aj. N30工程交付后运行时本地化未闭环与N31定案（2026-10-03）
+
+N30核心d5ca720/anchor/n30-d5ca720、身份docs fa10360及三件套已完成；工程669/669、68专项、400轮、Python27、7组合/11DEX、232×14静态/受控资源检查通过。用户安装后切日语仍观察到翻译要求、字幕预览、字号滑条说明和字幕诊断大量中文。本轮只读审阅源码/报告和用户反馈，未修改产品代码、未重建包。
+
+- 结论：232×14键齐全、resources.arsc解析、Robolectric布局和fallback扫描不能证明真实Morphe PreferenceScreen运行时语言。当前风险在XML inflate后的Preference/Category标题与summary可能已固定、Morphe ResourceUtils语言覆盖未贯穿动态控件、动态Preference/预览/滑条/诊断分别取getTitle/getSummary或中文fallback，或用户看到的是旧Context/缓存文本。
+- N30源码仍有大量ResourcePatch动态生成XML标题/summary、PreferenceCategory及Java动态控件；CaptionStrings.settings虽能通过ResourceUtils取key，但没有证据证明所有生成Preference、动态刷新、预览、滑条和诊断入口都由同一运行时绑定器统一覆盖。用户真机反馈优先于静态证据，三项旧本地化问题不能关闭。
+- 自动翻译语言入口summary必须明确“把语言添加到YouTube自动翻译语言列表”；AI入口summary必须明确“选择自动翻译语言中的语言后，使用已配置AI服务实时翻译字幕”。N31需14语种资源与运行时验证。
+- N31只做本地化/文案闭环，冻结N30菜单去重排序、硬断点请求前拆块、cache-only bootstrap、Socket错误预算、转场分发/失效、draw权限、R1/CAS、中文golden、n29 presentation、字号/颜色/位置、N27和VISIONOS。必要Preference运行时绑定可触及Preference装配/动态控件，但不得改业务语义。
+- N31必须建立inventory覆盖视频页AI入口、AI子屏/分类、API/模型/测试、翻译要求/默认prompt、预览/sample/样式预览全屏、五档字号/透明度/位置、缓存/调试/诊断/复制保存/Toast、语言多选Dialog和所有fallback；程序性诊断stage/field/reason/error code英文，用户壳随语言，source/translation/prompt/provider原始证据不改。
+- 已生成docs/N30-LOCALIZATION-REVIEW.md、docs/N31-CODEX-TASK.md。N31是下一张任务卡，Codex完整执行、验证、建包、交付；未开始源码施工，没有N31产物/锚点。完成后用户只需中文/日语/英语短复验，不要求十四语种母语全表。
+- 本轮无产品修改/测试复跑/远程API/下载/新依赖/签名安装/清数据/推送发布；两份PROJECT-STATE同步。N30工程交付状态不因本地化反馈撤销，但不能把N30静态本地化PASS当作运行时闭环。
+
+## 4ak. N31补强：实际语言API断层、固定说明、每语种去状态（2026-10-03）
+
+用户转交N30完成报告，并真机指出：语言添加说明不清晰且每语种带当前视频“不可用”等状态；AI summary没有说必须在原生自动翻译列表选语言；日语默认要求/预览/字号/诊断等仍中文。当前E盘HEAD fa10360、产品d5ca720，无源码差异，仅已有N31规划文件/状态；已先读这些草稿并保存before于.verification/n31-planning，再补强，没有盲目覆盖。
+
+- 明确**N30本地化未闭环**，资源232×14、ARSC、合成Context/Robolectric的PASS不推翻用户手机证据；669等是执行者报告，本轮不宣称亲自复跑。其翻译/650ms硬断点/启动稳定/转场/CAS等工程成果保留。
+- 确定说明丢失：CaptionLanguagesPreference.refresh用languages_empty/count盖掉已有languages_summary；N31固定说明在无选择/已选/保存/重绑时都必须出现。中文定案“将所选语言添加到 YouTube 的‘自动翻译’语言列表，可同时选择多种语言。”，AI说明“启用后，在 YouTube 的‘自动翻译’列表中选语言，使用已配置的 AI 服务实时翻译字幕。”；14语种完整传达。
+- 确定状态来源：showLanguages把UI语言名与NativeCaptionBridge.languageStatus按languages_entry拼接；**用户最新要求覆盖旧显示状态方案**。N31所有候选仅语言名+标准勾选框，隐藏已存在/新增/不可用全部状态，不以灰字/图标/summary继续呈现。无视频/不同视频/AI开关仍同14候选、可选与存储不变；内部去重/克隆/能力保持，不改变LanguageMenuOrder真实YouTube插入排序locale。原状态资源可留历史但不再可见。
+- 本轮已反读**最终N30 unsigned APK** classes2：ResourceUtils.getString是getActivityOrContext→Context.getString，flag可取Activity；getStringByLocale同样未使用传入locale；Utils.setContext才读取BaseSettings.MORPHE_LANGUAGE/AppLanguage.getLocale建语言化Context。当前CaptionStrings注释“必尊重override”没有保障；N30测试把Context直接改目标语言，没测Morphe选ja而Activity仍中文，且多数图是手拼TextView。最终DEX证据n30-final-resourceutils.txt/n30-final-utils-context.txt，不冒作手机内部设置快照。
+- N31以真实Morphe显式语言优先、DEFAULT跟随宿主Context确定UI快照，在本补丁ConfigurationContext读取资源；不改系统Locale/官方全局Utils或ResourceUtils flag。按稳定key覆盖实际生成PreferenceScreen/Category、动态编辑器/模型/API/Preview/Slider/诊断/Dialog/Toast/无障碍等，必要UI-only hook和非持久展示标识已准，不因此重新范围停工；不从中文title猜身份、不将整段用户数据送替换器。
+- Snapshot既有program_default/stored_custom分层：只内建默认在编辑器显示当前locale，不被TextWatcher当用户提交；自定义/草稿/profile原值保持。必要仅分开默认展示与业务偏好，中文兼容基线/非中文effectivePreference稳定，跨UI请求hash/JSON/cache scope不漂；18golden不改，界面语言不决定翻译目标。
+- 诊断壳/title/hint/buttons随语言；报告body/导出技术heading/stage/field/reason英文；用户prompt/源译文/provider/raw错误及实际显示文字证据原样，不以“有汉字”误判日语，逐key对作者资源与实际View属性验。
+- N31主矩阵需保持系统/Activity中文，真实官方接口形态存在且ResourceUtils可错取中文，Morphe覆盖14目标；另做缺官方类fallback，不能混为主覆盖。实际默认编辑器/预览Canvas/五档/展开诊断/多选及API模型Dialog必须创建；切zh→ja→en→fr→ar/回收重开没有旧文，故意旧解析/缺绑定/缺资源/残视频状态被同一检查拒绝。缺Morphe覆盖复现或只有232循环/TextView图不验收。
+- 已补写docs/N31-CODEX-TASK.md（完整说明/去状态/有效locale/全inventory/默认与数据/主矩阵/边界）和N30-LOCALIZATION-REVIEW追加真实证据，N31尚无产品实现/产物。保护N30菜单/调度/缓存/Renderer/CAS/18golden；原3根7组合兼容入口不借本卡再合并，不恢复N27或VISIONOS。
+- 本轮只读源码/最终DEX/资源/测试与管理写入，两份实时状态同步，未产品修改/产品复跑/网络翻译/下载/依赖/签名安装/清数据/提交推送发布。下一卡交Codex完整做N31，用户只需保持系统语言并Morphe中日英短复验全部所列UI，不承担14母语审校。
+
+
+## 4al. N31 工程闭环交付（2026-10-03）
+
+实际HEAD fa10360、产品d5ca720，仅docs差异；初始两份状态SHA一致。统一官方MORPHE_LANGUAGE快照，DEFAULT随宿主Context；本补丁配置Context、稳定key、4类别展示标识和设置加载/重绑接缝，仅自有UI。两处summary按定案14语种，多选14纯名称/标准勾选无视频状态；原native locale/sort/clone/去重保持。默认展示随UI，业务中文DEFAULT固定、非中文effective既有、自定义raw；语言刷新无存储/revision/request变化，显式同模板paste保持custom。技术正文英文、壳本地化、旧raw不改，所有源/译文/provider/user证据原样。
+
+Java680/680，原专项68+原中文golden探针2、Morphe形态Dialog9；failure/error/skipped0，main/K12/R1/400轮保持。234×14，中文原Activity/Application/system与14显式覆盖×4尺寸字体共56真实23节点树，另14缺官方类完整fallback；zh/ja/en/fr/ar真实控件截图，所有动态状态/错误/5档/对话/Android9复制有14证据。原英语UIgolden曾把英默认带入中文请求：before不改，D分层后仅请求/hash/cache身份修正；准确N30提交以原方法/样本/断言中文配置回放，18组和activate与N31逐字段相等。
+
+7组合/全部11DEX/58261类/322982方法/626704分支、公开API/新UI接缝/CRC/资源/aapt/min28/verify_bundle/N8Verify通过，MPE内嵌独立等值。Python27，冻结4/4/4与invisible_ms0、ACCEPTANCE/业务源码零diff；12972历史文件+8外部输入SHA字节不变。正式MPP使用Android根DEX；失败普通build与旧候选保留为provisional。三件套build/local-test与build/n31-composition-final，完整SHA/字节见N31-LOCAL-TEST-BUILD，逐角落清单见N31-UI-LOCALIZATION-INVENTORY。远程API/依赖/下载/签名/安装/卸载/清数据/推送/发布均0。
+
+完成即停；用户保持系统语言只切Morphe中→日→英短查，手机/母语边界未验证；不要求用户全表母语审校。

@@ -16,20 +16,31 @@ final class CaptionSettingsDialogs {
 
     /** Host-styled confirmation, with the platform dialog only when the host class is absent. */
     static Dialog confirm(Context c,String title,String message,String confirmLabel,Runnable onConfirm){
+        Context display=CaptionUiLocale.context(c);
         try{
             Object result=Class.forName("app.morphe.extension.shared.ui.CustomDialog")
                     .getMethod("create",Context.class,CharSequence.class,CharSequence.class,
                             EditText.class,CharSequence.class,Runnable.class,Runnable.class,
                             CharSequence.class,Runnable.class,boolean.class,boolean.class)
-                    .invoke(null,c,title,message,null,confirmLabel,onConfirm,(Runnable)()->{},
+                    .invoke(null,display,title,message,null,confirmLabel,onConfirm,null,
                             null,null,false,true);
-            Dialog dialog=(Dialog)((Pair<?,?>)result).first;
-            dialog.show();return dialog;
+            Pair<?,?> pair=(Pair<?,?>)result;Dialog dialog=(Dialog)pair.first;
+            // Official 1.45's system-string helper can also ignore its locale argument. Supply both
+            // actions explicitly in the verified last-child button area, retaining Morphe chrome.
+            LinearLayout main=(LinearLayout)pair.second;
+            main.removeViewAt(main.getChildCount()-1);
+            ProfileActionStrip actions=new ProfileActionStrip(display);
+            android.widget.Button cancel=actions.add(CaptionStrings.settings(c,"cancel"),dialog::dismiss);
+            CaptionUiViewBindings.text(cancel,c,"cancel");
+            actions.addPrimary(confirmLabel,()->{onConfirm.run();dialog.dismiss();});
+            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.topMargin=CaptionSettingsStyle.dp(c,16);
+            main.addView(actions,params);
+            dialog.show();CaptionUiLocale.direction(dialog.getWindow().getDecorView(),c);return dialog;
         }catch(ReflectiveOperationException | ClassCastException | LinkageError unavailable){
-            AlertDialog dialog=new AlertDialog.Builder(c).setTitle(title).setMessage(message)
+            AlertDialog dialog=new AlertDialog.Builder(display).setTitle(title).setMessage(message)
                     .setNegativeButton(CaptionStrings.settings(c,"cancel"),null)
                     .setPositiveButton(confirmLabel,(d,which)->onConfirm.run()).create();
-            dialog.show();return dialog;
+            dialog.show();CaptionUiLocale.direction(dialog.getWindow().getDecorView(),c);return dialog;
         }
     }
 
@@ -37,6 +48,8 @@ final class CaptionSettingsDialogs {
         return show(c,title,content,closeLabel,null);
     }
     static Dialog show(Context c,String title,View content,String closeLabel,View footer){
+        Context display=CaptionUiLocale.context(c);
+        CaptionUiViewBindings.refresh(content,c);
         // A bounded scroll area also keeps actions reachable in landscape and with large fonts.
         ScrollView scroll = new ScrollView(c) {
             @Override protected void onMeasure(int width, int height) {
@@ -55,7 +68,7 @@ final class CaptionSettingsDialogs {
                     .getMethod("create", Context.class, CharSequence.class, CharSequence.class,
                             EditText.class, CharSequence.class, Runnable.class, Runnable.class,
                             CharSequence.class, Runnable.class, boolean.class, boolean.class)
-                    .invoke(null, c, title, null, null, closeLabel, (Runnable)()->{}, null,
+                    .invoke(null, display, title, null, null, closeLabel, (Runnable)()->{}, null,
                             null, null, false, false);
             Pair<?,?> pair = (Pair<?,?>)result;
             LinearLayout main = (LinearLayout)pair.second;
@@ -73,7 +86,7 @@ final class CaptionSettingsDialogs {
         }
         if (dialog == null) {
             scroll.setPadding(CaptionSettingsStyle.dp(c,20),0,CaptionSettingsStyle.dp(c,20),0);
-            AlertDialog.Builder builder=new AlertDialog.Builder(c).setTitle(title);
+            AlertDialog.Builder builder=new AlertDialog.Builder(display).setTitle(title);
             if(footer==null)builder.setView(scroll).setPositiveButton(closeLabel,null);
             else{
                 LinearLayout column=new LinearLayout(c);column.setOrientation(LinearLayout.VERTICAL);
@@ -84,6 +97,7 @@ final class CaptionSettingsDialogs {
             dialog=builder.create();
         }
         dialog.show();
+        CaptionUiLocale.direction(dialog.getWindow().getDecorView(),c);
         return dialog;
     }
 }

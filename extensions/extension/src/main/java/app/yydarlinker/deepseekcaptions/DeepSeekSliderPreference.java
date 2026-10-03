@@ -18,7 +18,7 @@ import java.util.List;
 
 /** Inline slider that persists on finger release; no additional dialog or Save button is used. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekSliderPreference extends android.preference.Preference {
+public final class DeepSeekSliderPreference extends CaptionUiPreference {
     static final String KEY_TEXT_SIZE = "deepseek_caption_text_size";
     static final String KEY_OPACITY = "deepseek_caption_background_opacity";
     private static final String[] SIZE_TIER_KEYS = {
@@ -92,7 +92,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         ));
 
         TextView title = new TextView(context);
-        title.setText(getTitle());
+        CaptionUiViewBindings.render(title,()->getTitle());
         CaptionSettingsStyle.title(title);
         title.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
         heading.addView(title, new LinearLayout.LayoutParams(
@@ -111,7 +111,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         CaptionSettingsStyle.slider(slider);
         slider.setTag(sizeSlider ? "ai_size_tier_slider" : "ai_opacity_slider");
         slider.setMinimumHeight(dp(48));
-        slider.setContentDescription(getTitle());
+        CaptionUiViewBindings.description(slider,getContext(),KEY_TEXT_SIZE.equals(getKey())?"size":"opacity");
         int minimum = minimum();
         int maximum = maximum();
         int current = currentValue();
@@ -135,7 +135,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         CharSequence summaryText = KEY_TEXT_SIZE.equals(getKey()) ? tierDescription(current) : getSummary();
         TextView summary = new TextView(context);
         if (summaryText != null && summaryText.length() > 0) {
-            summary.setText(summaryText);
+            CaptionUiViewBindings.render(summary,()->KEY_TEXT_SIZE.equals(getKey())?tierDescription(slider.getProgress()+minimum):getSummary());
             CaptionSettingsStyle.caption(summary);
             root.addView(summary, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -204,9 +204,15 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
             natural[tier]=name.getMeasuredWidth();
             labels.add(name);
         }
+        final String[] measuredIdentity={CaptionUiLocale.identity(getContext())};
         LinearLayout names = new LinearLayout(getContext()) {
             @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
                 int count=getChildCount();
+                // A locale rebind may change widths on this same row; measure the current authored names.
+                String identity=CaptionUiLocale.identity(getContext());
+                if(!identity.equals(measuredIdentity[0])){
+                    int[] widths=tierLabelWidths();System.arraycopy(widths,0,natural,0,count);measuredIdentity[0]=identity;
+                }
                 // The label row is a full-width sibling of the slider with no horizontal padding of its own,
                 // so the slider's padded frame and this row's frame start at the same x and every
                 // coordinate below can be derived from the slider's own numbers.
@@ -264,7 +270,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
      */
     private TextView tierLabel(String key) {
         TextView name = new TextView(getContext());
-        name.setText(CaptionStrings.settings(getContext(), key));
+        CaptionUiViewBindings.text(name,getContext(),key);
         CaptionSettingsStyle.caption(name);
         name.setGravity(Gravity.CENTER);
         name.setSingleLine(false);
@@ -274,6 +280,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         name.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
         name.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        CaptionUiLocale.direction(name,getContext());
         name.setMaxWidth(dp(MAX_TIER_LABEL_PX));
         return name;
     }
@@ -331,8 +338,9 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         int selected = CaptionFontSize.clampTier(tier);
         String current = CaptionStrings.settings(getContext(), SIZE_TIER_KEYS[selected]);
         String description = getTitle() + ": " + current;
-        slider.setContentDescription(description);
-        names.setContentDescription(description);
+        java.util.function.Supplier<CharSequence> accessible=()->getTitle()+": "+CaptionStrings.settings(getContext(),SIZE_TIER_KEYS[CaptionFontSize.clampTier(slider.getProgress())]);
+        CaptionUiViewBindings.description(slider,accessible);
+        CaptionUiViewBindings.description(names,accessible);
         for (int i = 0; i < names.getChildCount(); i++) {
             TextView name = (TextView) names.getChildAt(i);
             name.setTextColor(i == selected ? CaptionSettingsStyle.primary(getContext())

@@ -36,7 +36,7 @@ public class N30LocalizationRuntimeTest {
    d.dismiss();}a.finish();}
  @Test public void all232AuthoredKeysResolveInTheirActualLocaleNotAnEnglishOrChineseFallback()throws Exception {
   JSONObject expected=new JSONObject(new String(getClass().getResourceAsStream("/n30/localization-expected.json").readAllBytes(),"UTF-8"));Activity a=Robolectric.buildActivity(Activity.class).setup().get();
-  for(String tag:TAGS){String folder=tag.equals("zh-CN")?"zh-rCN":tag.equals("zh-TW")?"zh-rTW":tag;JSONObject values=expected.getJSONObject(folder);assertEquals(232,values.length());
+  for(String tag:TAGS){String folder=tag.equals("zh-CN")?"zh-rCN":tag.equals("zh-TW")?"zh-rTW":tag;JSONObject values=expected.getJSONObject(folder);assertEquals(expected.getJSONObject("en").length(),values.length());
    Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.forLanguageTag(tag)));Context c=a.createConfigurationContext(config);
    java.util.Iterator<String> keys=values.keys();while(keys.hasNext()){String key=keys.next();assertEquals(tag+":"+key,values.getString(key),CaptionStrings.settings(c,key));}
   }a.finish();

@@ -54,6 +54,7 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     if(renderer!=null && (renderer.superclass==null || renderer.methods.any { it.name=="draw" && it.parameterTypes.toList()==listOf("Landroid/graphics/Canvas;") }))
         throw PatchException("AI captions: native draw override unavailable or already exists")
     val fragment=if(ai) mutableClassDefBy("Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;") else null
+    if(ai)installCaptionSettingsBindings()
     val copyPath=fragment?.methods?.filter { it.name=="onPreferenceLongClick" && it.returnType=="Z" &&
         it.parameterTypes.map { t->t.toString() }==listOf("Landroid/widget/AdapterView;","Landroid/view/View;","I","J") }
         ?.unique("official breadcrumb long-press handler")

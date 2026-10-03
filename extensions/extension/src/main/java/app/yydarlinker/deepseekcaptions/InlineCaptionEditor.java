@@ -55,9 +55,10 @@ public final class InlineCaptionEditor extends EditText {
         if(actions!=null){actions.finish();actions=null;}
         actions=startActionMode(new ActionMode.Callback2(){
             public boolean onCreateActionMode(ActionMode mode,Menu menu){
-                menu.add(0,android.R.id.paste,0,android.R.string.paste).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-                menu.add(0,android.R.id.selectAll,1,android.R.string.selectAll);
-                if(!sensitive)menu.add(0,android.R.id.copy,2,android.R.string.copy);
+                Context ui=CaptionUiLocale.context(getContext());
+                menu.add(0,android.R.id.paste,0,ui.getString(android.R.string.paste)).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+                menu.add(0,android.R.id.selectAll,1,ui.getString(android.R.string.selectAll));
+                if(!sensitive)menu.add(0,android.R.id.copy,2,ui.getString(android.R.string.copy));
                 return true;
             }
             public boolean onPrepareActionMode(ActionMode mode,Menu menu){return false;}

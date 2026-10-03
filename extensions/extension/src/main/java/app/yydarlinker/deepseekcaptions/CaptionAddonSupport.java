@@ -10,5 +10,6 @@ public final class CaptionAddonSupport {
     static Context context(){return context;}
     static Activity activity(){return activity.get();}
     public static boolean aiInstalled(){return false;} // Bound to selected roots at patch time.
+    public static boolean simplifiedInstalled(){return false;}
     public static boolean memoryInstalled(){return false;}
 }

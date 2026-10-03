@@ -29,9 +29,7 @@ assert datetime.fromisoformat(manifest["created_at"]).tzinfo is None
 assert manifest["download_url"]==f"https://github.com/{repo}/releases/download/v{v}/patches-{v}.mpp"
 expected_names={"AI caption translator"}
 if tuple(map(int,v.split("-")[0].split("."))) >= (1,2,0):
-    expected_names.add("Remember caption selection")
-    if tuple(map(int,v.split("-")[0].split("."))) < (1,3,5):
-        expected_names.add("Add Simplified Chinese to auto-translate")
+    expected_names.update({"Add Simplified Chinese to auto-translate","Remember caption selection"})
 assert listing["version"]==v and {p["name"] for p in listing["patches"]}==expected_names
 assert len(listing["patches"])==len(expected_names)
 changelog=get(base+"/CHANGELOG.md?check="+str(time.time_ns())).decode("utf-8")

@@ -17,10 +17,6 @@ class ReleaseContractTest(unittest.TestCase):
             env=dict(os.environ,GITHUB_REPOSITORY="YYDarlinker/morphe-ai-caption-translator")
             return subprocess.run([sys.executable,str(SCRIPT),version],cwd=dst,env=env,capture_output=True).returncode
     def test_current_contract(self): self.assertEqual(0,self.validate())
-    def test_reject_removed_standalone_language_patch(self):
-        def restore(dst):
-            p=dst/"patches-list.json";data=json.loads(p.read_text(encoding="utf-8"));extra=dict(data["patches"][0]);extra["name"]="Add Simplified Chinese to auto-translate";data["patches"].append(extra);p.write_text(json.dumps(data),encoding="utf-8")
-        self.assertNotEqual(0,self.validate(mutate_files=restore))
     def test_reject_duplicate_patch_names(self):
         def duplicate(dst):
             p=dst/"patches-list.json";data=json.loads(p.read_text(encoding="utf-8"));data["patches"].append(data["patches"][0]);p.write_text(json.dumps(data),encoding="utf-8")

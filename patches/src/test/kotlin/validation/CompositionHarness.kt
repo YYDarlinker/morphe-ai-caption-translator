@@ -65,7 +65,7 @@ fun main(args:Array<String>){
             println("REAL_PATCHER_DEX_SERIALIZED ${output.resolve("serialized-dex.zip").absolutePath}")
         }
         val flags=bytecode.classDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
-        val expected=mapOf("aiInstalled" to ai,"memoryInstalled" to names.contains("Remember caption selection"))
+        val expected=mapOf("aiInstalled" to ai,"simplifiedInstalled" to names.contains("Add Simplified Chinese to auto-translate"),"memoryInstalled" to names.contains("Remember caption selection"))
         for((name,on) in expected){
             val method=flags.methods.single { it.name==name }
             val literal=method.implementation!!.instructions.filterIsInstance<com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction>().single().wideLiteral
@@ -91,8 +91,8 @@ fun main(args:Array<String>){
             }
             throw IllegalStateException("Patch failed; real partial state preserved",failure)
         }
-        check(((hooks["augmentTranslations"]?:0)>0)==ai){"N30 AI root must include the generic language-menu seam"}
-        check(((hooks["augmentMetadata"]?:0)>0)==ai){"N30 AI root must include generic translation metadata"}
+        check(((hooks["augmentTranslations"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include the generic language-menu seam"}
+        check(((hooks["augmentMetadata"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include generic translation metadata"}
         check(((hooks["resolveRemembered"]?:0)>0)==expected.getValue("memoryInstalled"))
         check(((hooks["suppressNativeDraw"]?:0)>0)==ai)
         check((hooks["initialize"]?:0)==1){"Duplicate shared initialization"}

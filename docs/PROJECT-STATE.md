@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。用户手机打开Morphe设置重启已定位为N31返回路径hook误用被R8复用的p0，真实SDK37安装包VerifyError确认。已修typed PreferenceScreen结果、生命周期入口及语言updatePreference之后的安全重绑；本地SDK35 ART旧包失败/最终包通过、寄存器/时序负例通过，修复MPP后缀n31-settings-crash-fixed仅本地交付。仍只有AI＋Remember两个补丁；最终实体手机重新合成安装与设置点击由用户自己操作，未冒称已过。详见§4an/N31-SETTINGS-CRASH-FIX。
+> 最后更新：2026-10-03。用户要求回到原初N31并重新核验两根后的语言项错跳通用页；规划者已直接把全部非docs跟踪树恢复dc304cb/anchor/n31-dc304cb，原指定MPP AF084C20…及52历史产物SHA/字节不变，后续150c91f历史已保存。不混留旧两根或crash修复。原N31有已知ART hook类型风险，恢复不等于可安装验收；导航错误未取得完整点击复现。下一卡N32先核验实际settings点击/类型接缝，再最小修复与重新两根交付，非直接删除root或沿旧包宣布通过。最新§4ao、N31-ROLLBACK-AND-NAVIGATION-REVIEW及N32-CODEX-TASK。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,12 +17,12 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节、最新§4ak、docs/N30-LOCALIZATION-REVIEW.md新增真实最终APK核查及N31-CODEX-TASK.md。§4ai记录N30工程交付，§4aj为初始N31规划；§4ag/4ah是N30施工/恢复历史，不按旧HEAD重启。当前源码d5ca720、docs-only HEAD fa10360，N31未开始产品改动。
-2. **当前角色分工（用户最新）**：Codex完整实现/验证/交付每张卡，不交DeepSeek。本规划对话负责研究/任务卡/审阅/状态，本轮核对N30源码/最终DEX语言API/本地化测试并补强既有N31草稿，无产品修改或产品测试复跑。用户只作少量语言切换/截图或诊断，不承担14语种母语审校，单执行者串行。
+1. **先读本实时状态档案**：优先本节、最新§4ao、docs/N31-ROLLBACK-AND-NAVIGATION-REVIEW.md与N32-CODEX-TASK.md。用户已指定原N31作为重新施工基线，原N31产物AF084C20…不可覆盖；§4am两根和§4an修hook都是历史，不能继续把其包列当前推荐。不按旧HEAD重启或盲cherry-pick后续提交。
+2. **当前角色分工（用户最新）**：本规划对话本轮获用户明确授权直接回退，已执行文件树恢复/历史保护；研究/审阅/任务卡/状态继续本对话负责，新Codex执行对话实现N32全部测试/独立交付，不交DeepSeek。单执行者，不自动向手机传文件或安装，不让用户回测旧坏包。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：N30源码d5ca720/anchor/n30-d5ca720、身份fa10360，工程669/669、68专项、400轮、7组合/11DEX及232×14已交付；用户切日语后默认要求/预览/字号/诊断仍大量中文，运行时本地化未验收。N31任务已全面细化，源码/三件套尚未施工或生成，不回退N30。
-5. **执行顺序**：N31一张卡修有效UI语言与全设置/对话/预览/滑条/诊断绑定、默认展示分层、两个功能说明、隐藏所有多选视频状态→14真实覆盖主矩阵/变异反例/最终工程交付→用户中文→日语→英语短复验→发布准备。保持N30全部翻译/菜单逻辑/播放器/缓存性能结果，不自动再开阶段或发布。
+4. **当前阶段**：活动源码/测试/metadata/README/build工具已完整恢复原N31 dc304cb（当前新的回退HEAD或docs-only后继与其非docs树相同）；三public roots临时恢复，下一N32才重新两根交付。原31包未重建/未改，后续两根/crash修复历史保存。恢复包含已知原N31 p0寄存器缺陷，只用作施工基线；语言错跳general精确分支尚未实测复现。
+5. **执行顺序**：已完成原N31回退→N32用真实设置点击链区分根数清理和hook/UI绑定时序、闭合已知ART类型错误→最小通用修复→独立AI+Remember两根3组合/实际导航+ART+DEX+业务回归交付→用户自行本地MPP合成传手机短验。不继续旧修复包，不自动安装或发布。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
@@ -699,6 +699,8 @@ N31身份补记：核心提交 `dc304cbe3ae995e7e0edad2754b160c959cafce3` / `anc
 
 ## 4am. 用户指令：删除冗余独立语言补丁（2026-10-03）
 
+本节为已撤回的后续历史：用户最新指定原N31回退，当前施工状态与新卡见§4ao；不覆盖旧证据，也不再推荐此历史包为当前修复候选。
+
 本轮用户明确覆写旧三根冻结：自动翻译14语言功能已在AI caption translator中，直接删除Add Simplified Chinese to auto-translate。已删public root、CaptionFeatures.simplified、simplifiedInstalled及独立强制zh-Hans加入；简体中文和其余13语言全部沿AI设置保存集合提供，AI开关关闭仍有效，默认空集合/用户selected_codes不变。保留Remember独立原生记忆；2根3个非空组合通过。README、生成patches-list及本地发行校验一致，旧公开URL/日期/patches-bundle不变，不发布。
 
 682/682 Java（680+2菜单归属/简体去重）、12/12元数据，原N31语言控件/中文18golden/activate继续相等；翻译调度/分页/cache/overlay源码逐字不变。最终11DEX/58261类/322981方法/626701分支与公开UI/native hooks、CRC/resources/aapt/min28/verify_bundle/N8Verify通过；MPP自身只有AI和Remember，内嵌MPE独立等值，旧root名与installed标记从DEX删除。新交付build/local-test/*-n31-two-patches及build/n31-two-patches-composition-final；全SHA/字节见N31-PATCH-CONSOLIDATION。55份历史捕获SHA/字节不变，旧N31全量交付保留。未签名/安装/清数据/推送/发布，远程API/下载/新依赖0。完成即停；实际核心commit/anchor另补记。
@@ -707,6 +709,8 @@ N31两根后续身份：核心 `66a258466a912e43ff67fb174cb5052ee3d5d548` / `anc
 
 
 ## 4an. N31 设置页重启：真实VerifyError与本地修复（2026-10-03）
+
+本节为已撤回的后续历史：用户最新指定原N31回退，当前施工状态与新卡见§4ao；不覆盖旧证据，也不再推荐此历史包为当前修复候选。
 
 用户手机使用双补丁MPP自行合成安装，进入Morphe即重启。SDK37／arm64的真实crash buffer和安装APK显示AbstractPreferenceFragment.lambda$new$4 [0xC]、initialize [0x3E]的v2类型不符：N31返回前onSettingsLoaded把已成为synthetic lambda／boolean／exception／PreferenceScreen的p0按Fragment传入，类验证失败。旧安装包SHA C32217BB…保留。本项目注入错误，既有离线hook计数/分支检查未验证ART类型；不把682控件全量当设备页验收。
 
@@ -717,3 +721,16 @@ N31两根后续身份：核心 `66a258466a912e43ff67fb174cb5052ee3d5d548` / `anc
 用户最新明确所有需要文件自行传手机，最终仅放本地，不再手机push/安装。此前已推前一入口候选MPP01792C50…至Download与/data/local/tmp验证，坦诚告知，非最终版；不删除/不安装/不清数据。最终实机SDK37安装点击未验证，用户自己用最新本地MPP重新合成签名覆盖安装，再开Morphe、中文→日→英短查。本轮未签名安装卸载清数据/Git推送发布、API下载新依赖0。完整SHA/证据/验证边界见N31-SETTINGS-CRASH-FIX，完成交付即停；身份commit/anchor另补记。
 
 N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` / `anchor/n31-settings-crash-1bc94ae`；最终修复MPP5AC2509D…、APK1982448D…仅本地交付，等待用户自行合成覆盖安装后打开设置验证。
+
+## 4ao. 用户授权原N31回退与两根导航复核、新N32卡（2026-10-03）
+
+用户观察“合并为两个补丁后，点AI里的自动翻译语言进入通用设置”，明确要求规划者先直接回到build/local-test/patches-1.3.5-本地测试包-n31.mpp原初版，再核验原因并给新执行对话卡。本轮已执行回退，不仅提建议。
+
+- 原初N31源码dc304cbe3ae995e7e0edad2754b160c959cafce3/anchor/n31-dc304cb，1a3c555是docs后继；MPP1165680字节/SHA AF084C20C32636EBA051B2891BDAFC5419BD54A98DBB28974CD441BE18AF913C，原MPE2803268/SHA05F60BEDC300BB2AAAE1ED3788EF1FA2F26F4C2066117A1DD275EAC27331BCEF，原APK198125124/SHA0174A5D8AF707501CF6A42135307B178121A3B4362BE6B16656F79D86EE72075均未改。
+- 回退前HEAD150c91f67f4612a94674aef0ee5c8da48a51ed26、工作区仅外部1.45MPP未跟踪。新提交恢复28个非docs路径：生产/测试/metadata/README/发行校验/构建工具全与dc304cb一致，原三根也准确恢复，不混留1bc安全hook或两根标志。未git reset/rebase/amend，旧HEAD保留backup/n31-later-150c91f及ZIP、完整diff和状态before在.verification/n31-rollback-review；52历史产物字节/SHA全一致。
+- 两根删除66a2584与设置crash修复1bc94ae是独立变更。三正式APK的morphe_prefs.xml真实aapt全树输出SHA同6F71503B97272032F2F274DEDE268A8C891046A4AA3B2AAD4A7F66F2732BC569；语言项仍CaptionLanguagesPreference/deepseek_caption_languages/order1，没有general路由。语言控件/binder/locale/资源patch源码在三点相同；最新onClick仍只showLanguages，66a没改settings binding hook。不能凭“减少root”先后关系断言直接原因。
+- 原N31已有真实p0返回寄存器复用缺陷：initialize返回v2是PreferenceScreen、lambda分支是synthetic/boolean/exception，却按Fragment传入，SDK37旧crash/SDK35 ART before有明确VerifyError。它先于根数清理；用户指定准确恢复后该风险一并回到基线。**当前恢复不宣称旧N31安全、不让用户再装旧包测试**。新卡必须闭合类型安全，不保留此缺陷发布。
+- 最新历史修复ART after只是Class.forName四类验证，不是菜单点击签字。现有N31RuntimeUiTest直接showLanguages绕过视频→AI→真实ListView→官方listener→Preference链；此为确定的验收缺口。新错跳general尚无完整点击记录/当前实机包身份/本轮复现；可能settings hook重绑/adapter对象与行标签失配/时序问题，**不写已经复现根因**，新卡先对照并记录adapter/key/class/root/点击对象再最小修。
+- docs/N31-ROLLBACK-AND-NAVIGATION-REVIEW.md、docs/N32-CODEX-TASK.md已生成。N32从当前原N31基线，明确允许仅设置hook/UI绑定与删除冗余根/metadata测试修改；先复现精确路由/修类型，再最终AI+Remember2根3非空组合。没有跳页证据不能用手工错listener负例或类加载结果宣称完成；不硬编码语言标题/position/general跳转，不盲cherry-pick旧整提交。
+- 保护N31UI本地化/default业务分层/用户prompt/API/profile/selected_codes、原native权限/650ms断点/cache-only启动/连接预算/转场render权限/R1CAS/golden/分页/字号位置，N27/VISIONOS不处理。独立-n32三件套，原-n31/-two-patches/-settings-crash-fixed历史不覆盖；最终真实列表点击/保存取消返回/general自身导航/语言变更、真实序列化ART/types/branches/API/资源验收，不只p.showLanguages。
+- 本轮只回退与静态对照/管理记录，没有产品全量复跑或新包构建。旧680/682不冒作本轮通过。没有签名/安装/卸载/清用户数据/向手机push/翻译API/下载/新依赖/Git推送/发布。两份状态同步，恢复commit/anchor另补实际身份；新Codex执行N32，用户自行操作最终手机安装。

@@ -83,13 +83,3 @@ tasks.register<JavaExec>("auditComposition") {
     maxHeapSize="4G"
     providers.gradleProperty("composition.apk").orNull?.let { args(it) }
 }
-
-tasks.register<JavaExec>("verifySettingsHookRegisters") {
-    dependsOn(tasks.named("testClasses"))
-    classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
-    mainClass.set("validation.SettingsHookRegisterAuditKt")
-    maxHeapSize="2G"
-    providers.gradleProperty("settings.before").orNull?.let { args(it) }
-    providers.gradleProperty("settings.after").orNull?.let { args(it) }
-    providers.gradleProperty("settings.prewrite").orNull?.let { args(it) }
-}

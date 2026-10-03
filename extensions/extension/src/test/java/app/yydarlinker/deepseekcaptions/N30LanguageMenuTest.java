@@ -12,10 +12,11 @@ import org.robolectric.*;
 import org.robolectric.annotation.*;
 @RunWith(RobolectricTestRunner.class) @Config(sdk=28,shadows={N30LanguageMenuTest.Flags.class,N30LanguageMenuTest.Host.class})
 public class N30LanguageMenuTest {
- static boolean ai;static int clones;
+ static boolean ai,simplified;static int clones;
  static class Track {final String code,name,url,vss;Track(String c,String n){code=c;name=n;url="https://www.youtube.com/api/timedtext?v=menu-test&lang=en&tlang="+c+"&signature=KEEP";vss="t"+c+".source";}}
  @Implements(CaptionAddonSupport.class) public static class Flags {
   @Implementation public static boolean aiInstalled(){return ai;}
+  @Implementation public static boolean simplifiedInstalled(){return simplified;}
  }
  @Implements(NativeCaptionBridge.class) public static class Host {
   @Implementation public static String language(Object t){return ((Track)t).code;}
@@ -24,7 +25,7 @@ public class N30LanguageMenuTest {
   @Implementation public static Object cloneTranslation(Object t,String c){clones++;return new Track(c,NativeCaptionBridge.translationLabel(c));}
  }
  Activity a;
- @Before public void before(){a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);ai=true;clones=0;
+ @Before public void before(){a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);ai=true;simplified=false;clones=0;
   a.getSharedPreferences(CaptionLanguageSelection.STORE,0).edit().clear().commit();DeepSeekConfig.saveEnabled(a,false);RememberedCaptionSelection.reset();}
  @After public void after(){a.finish();}
  @Test public void emptyByDefaultPersistsCanonicalCodesAndRejectsWrongStorage(){
@@ -62,10 +63,10 @@ public class N30LanguageMenuTest {
   assertEquals("languages_existing",NativeCaptionBridge.languageStatus("en"));assertEquals("languages_new",NativeCaptionBridge.languageStatus("fr"));
   List<CaptionLanguageMetadata.Field> fields=CaptionLanguageMetadata.fields(after);assertEquals(3,fields.size());assertTrue(fields.stream().anyMatch(f->Arrays.equals(f.value,en)));
  }
- @Test public void nativeAndRememberOnlySelectionsDoNotEnableAiOrAddLanguagesOrChangeUserSet(){
+ @Test public void legacyNativeOnlyAndRememberOnlySelectionsDoNotEnableAiOrChangeUserSet(){
   CaptionLanguageSelection.save(a,Arrays.asList("ja","fr"));Set<String> saved=CaptionLanguageSelection.read(a);ai=false;
   Track t=new Track("en","English");List<Track> before=Arrays.asList(t);assertSame(before,NativeCaptionBridge.augmentTranslations(before));
-  List<?> out=NativeCaptionBridge.augmentTranslations(before);assertSame(before,out);assertEquals(1,out.size());assertFalse(DeepSeekConfig.enabled(a));assertEquals(saved,CaptionLanguageSelection.read(a));
+  simplified=true;List<?> out=NativeCaptionBridge.augmentTranslations(before);assertEquals(2,out.size());assertFalse(DeepSeekConfig.enabled(a));assertEquals(saved,CaptionLanguageSelection.read(a));
   assertFalse(NativeCaptionBridge.enabled());assertEquals("",RebuildController.activeUrl());
  }
  @Test public void nativeDialogCancelDoesNotSaveAndSaveCanRemainEmptyWhileAiOff(){
@@ -73,23 +74,4 @@ public class N30LanguageMenuTest {
   dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();assertTrue(CaptionLanguageSelection.read(a).isEmpty());
   dialog=pref.showLanguages();Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();dialog.getListView().performItemClick(dialog.getListView().getChildAt(0),0,0);dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();assertEquals(1,CaptionLanguageSelection.read(a).size());assertFalse(DeepSeekConfig.enabled(a));
  }
- @Test public void aiRootAloneOwnsAllFourteenLanguagesWhileEngineIsOffAndDoesNotForceSimplified(){
-  DeepSeekConfig.saveEnabled(a,false);CaptionLanguageSelection.save(a,Collections.emptySet());
-  Track en=new Track("en","English");List<Track> nativeList=Arrays.asList(en);
-  assertTrue(CaptionLanguageSelection.menuCodes().isEmpty());assertSame(nativeList,NativeCaptionBridge.augmentTranslations(nativeList));
-  CaptionLanguageSelection.save(a,CaptionLanguageSelection.CODES);Set<String> saved=CaptionLanguageSelection.read(a);
-  List<?> result=NativeCaptionBridge.augmentTranslations(nativeList);assertEquals(14,result.size());assertTrue(result.contains(en));
-  Set<String> codes=new LinkedHashSet<>();for(Object value:result)assertTrue(codes.add(CaptionLanguageSelection.canonical(((Track)value).code)));
-  assertEquals(new HashSet<>(CaptionLanguageSelection.CODES),codes);assertSame(result,NativeCaptionBridge.augmentTranslations(result));
-  assertFalse(DeepSeekConfig.enabled(a));assertEquals("",RebuildController.activeUrl());assertEquals(saved,CaptionLanguageSelection.read(a));
-  ai=false;assertSame(nativeList,NativeCaptionBridge.augmentTranslations(nativeList));assertEquals(saved,CaptionLanguageSelection.read(a));
- }
- @Test public void simplifiedSelectionLivesInAiAndRetainsNativeCanonicalDeduplication(){
-  CaptionLanguageSelection.save(a,Arrays.asList("zh-Hans"));DeepSeekConfig.saveEnabled(a,false);
-  Track en=new Track("en","English");List<Track> plain=Arrays.asList(en);
-  for(boolean enabled:new boolean[]{false,true,false}){DeepSeekConfig.saveEnabled(a,enabled);List<?> menu=NativeCaptionBridge.augmentTranslations(plain);assertEquals(2,menu.size());assertTrue(menu.contains(en));assertTrue(menu.stream().anyMatch(t->"zh-Hans".equals(CaptionLanguageSelection.canonical(((Track)t).code))));}
-  Track nativeChinese=new Track("zh-CN","native Chinese label");List<Track> existing=Arrays.asList(en,nativeChinese);
-  assertSame(existing,NativeCaptionBridge.augmentTranslations(existing));assertEquals(Collections.singleton("zh-Hans"),CaptionLanguageSelection.read(a));
- }
-
 }

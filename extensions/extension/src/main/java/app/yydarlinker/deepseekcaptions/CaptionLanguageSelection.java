@@ -26,6 +26,8 @@ final class CaptionLanguageSelection {
     static Set<String> menuCodes() {
         TreeSet<String> codes=new TreeSet<>();
         if(CaptionAddonSupport.aiInstalled())codes.addAll(read(CaptionAddonSupport.context()));
+        // Backward-compatible standalone root; AI no longer needs that root for this menu seam.
+        if(CaptionAddonSupport.simplifiedInstalled())codes.add("zh-Hans");
         return Collections.unmodifiableSet(new LinkedHashSet<>(codes));
     }
 }

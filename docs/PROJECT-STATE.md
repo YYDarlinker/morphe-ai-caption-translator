@@ -702,3 +702,5 @@ N31身份补记：核心提交 `dc304cbe3ae995e7e0edad2754b160c959cafce3` / `anc
 本轮用户明确覆写旧三根冻结：自动翻译14语言功能已在AI caption translator中，直接删除Add Simplified Chinese to auto-translate。已删public root、CaptionFeatures.simplified、simplifiedInstalled及独立强制zh-Hans加入；简体中文和其余13语言全部沿AI设置保存集合提供，AI开关关闭仍有效，默认空集合/用户selected_codes不变。保留Remember独立原生记忆；2根3个非空组合通过。README、生成patches-list及本地发行校验一致，旧公开URL/日期/patches-bundle不变，不发布。
 
 682/682 Java（680+2菜单归属/简体去重）、12/12元数据，原N31语言控件/中文18golden/activate继续相等；翻译调度/分页/cache/overlay源码逐字不变。最终11DEX/58261类/322981方法/626701分支与公开UI/native hooks、CRC/resources/aapt/min28/verify_bundle/N8Verify通过；MPP自身只有AI和Remember，内嵌MPE独立等值，旧root名与installed标记从DEX删除。新交付build/local-test/*-n31-two-patches及build/n31-two-patches-composition-final；全SHA/字节见N31-PATCH-CONSOLIDATION。55份历史捕获SHA/字节不变，旧N31全量交付保留。未签名/安装/清数据/推送/发布，远程API/下载/新依赖0。完成即停；实际核心commit/anchor另补记。
+
+N31两根后续身份：核心 `66a258466a912e43ff67fb174cb5052ee3d5d548` / `anchor/n31-two-patches-66a2584`；docs-only身份后继，原N31源码与交付作为历史保留，新双补丁包为本轮交付。

@@ -19,7 +19,7 @@ N34目标是**所有目标语言下，已接纳且实际能够在原owned时间�
 
 ## 1. 开工身份、输入与历史保护
 
-实际仓库 E:/Projects/morphe-caption-v2。先读docs/PROJECT-STATE最新§4au、docs/N34-DISPLAY-RISK-REVIEW.md，再读本卡。不能在C盘旧worktree施工。
+实际仓库 E:/Projects/morphe-caption-v2。先读docs/PROJECT-STATE最新§4au/4av、docs/N33-REPLAN-AND-DIAGNOSTIC-REVIEW.md（前轮根因与边界）、docs/N34-DISPLAY-RISK-REVIEW.md（本轮新增实证），再读本卡。不能在C盘旧worktree施工。
 
 - N33源码b52b65b7a206f1a07464dae62dc30cabc164bf10 / anchor/n33-b52b65b；当前开卡前HEAD4a76cd4，仅docs-only。之后本规划聊天新增N34卡/状态等docs-only后继是合法开工HEAD，记录真实身份，**不要因短哈希不等4a76cd4暂停**。
 - 开工需是锚点后继且tracked非docs相对N33无差异；若只有docs增补直接施工，产品并行改动先保留并阅读、不覆盖。两份PROJECT-STATE先比字节/SHA，无差异跳过，有差异阅读最新段落再同步。
@@ -27,6 +27,7 @@ N34目标是**所有目标语言下，已接纳且实际能够在原owned时间�
 - N33交付三件套：MPP F60F7B50295566D0FC887A3392E78B017685E9B37F4C3C9EC36BE45CBE1C866E、MPE 5D501610F230FC28ADDDF9D3F363586933C61DF434FE8DE75E11403620F26970、APK 08AA970CC8A63643083108DE8732B92247C0A08212C2FF87C47EF95AB172B4CC。开工独立核hash，所有历史包/候选/失败证据保留，禁止root clean/build递归删除。
 - 新诊断 D:/HONOR Share/Honor Share/caption-diagnostics-1.3.5-20261004-093813.txt，780916B / 24494E5EE4F379CC9C4716C91918B12179951676BC26938E7DEC4F4D60150380。
 - 人工JSON3 D:/下载/.deno/bin/manual_en/The Truth About the Bezelless Concept Phone [ngPkbaZliaU].en.json3，23150B / 505C5A99A6C08A0546A67DD4D8E2070CE17A7FBBD391772B5DAAB3256148C399。
+- 人工VTT D:/下载/.deno/bin/manual_en/The Truth About the Bezelless Concept Phone [ngPkbaZliaU].en.vtt，12061B / 24C447B2DD1885A7D63033D62C554B50F8C3AE4FA9DC84E23A408B24B33C993D。已核对169 cues与manual JSON3全文/开始/结束相等（规范化空白后），无内嵌word timestamp/样式tag；旧独立生产解析的1224词时间/precision也相等。.verification/n34-planner/manual-vtt-json3-parity.json记录证据。
 - 前轮200407诊断/auto JSON3/VTT四源/纯输入探针按docs/N33-REPLAN-AND-DIAGNOSTIC-REVIEW读取；这些材料是回归数据，不允许video id、词句、固定时间点/源token范围进入生产判断。
 - .verification/n34-planner/input-identities.json、093813-diagnostic-review.json、diagnostic-quality-records.json、probe-before-02与原probe源码均为规划者独立before证据；probe-before初次编译失败保留。before3测试通过的意思是缺陷已复现，不是修复通过。
 
@@ -146,6 +147,10 @@ trace必须English、owner/session/generation/event/request可关联且bounded/d
 ## 9. 验证：先负例before，再after及全目标/场景
 
 ### 9.1 已知样本，真实production链
+
+- **双格式不回退门槛**：对本轮同轨manual VTT/JSON3，在无reference或相同已验证reference条件下，比较169段的起止/规范化文字、完整source words的text/id/cue/start/end/precision、Planner blocks/hard breaks，以及相同cfg/source_code/target下的request payload和RebuildCache翻译身份，全部一致。覆盖14target context；格式传输的SourceCaptionCache URL key可不同，不强行合并signed URL缓存。169/1224仅fixture期望，不是生产判断常量。没有word timestamp的普通人工VTT不能为了提高native计数把插值升级成NATIVE。
+- **格式负例**：manual两个相同句子/短词分别有独立cue窗，均保留；无内嵌timestamp的manual不能套auto滚动carry规则。把纯人工对照与有timestamp/rolling结构的auto VTT逐增量检查分开，不因整体词数接近就认定解析正确。
+- **时间间隙口径**：source_gap只表示源轨中此时没有有效owned词/cue，不证明音频中无人说话。manual常见82ms cue间隙既可能是制作者排轴间距也可能有真实停顿，不通过统一补齐/延长字幕或删除短cue消除它。原>=650ms/speaker硬源断点仍保留，未经音频证据不称为已实测静默。
 
 - 保存原093813/200407/source文件只读身份；新输出统一 .verification/n34，任何环境输出N25_PREVIEW_OUTPUT/CAPTION_UI_PREVIEW_OUTPUT/N30_EVIDENCE_DIR等转到新n34，不能覆写旧fixture。
 - 重放新50 quality响应，以(session,block,attempt)关联原事件；两会话分开记50HTTP2xx/49accepted/1rejected。日语quote错配仍reject，其成功重试仍accept；本卡不提升nonChinese exactQuoteRebind权限来抹掉这次正确拒绝。不能只拿最后绿响应替换负例。

@@ -108,3 +108,12 @@ N33手机设置短验通过后，本轮直接下**一张N34完整卡**：先纯�
 - Netflix简中指南给9CPS/两行等正式交付参考；它不提供“直播翻译超速就删除正文”的实现依据。本文选择速率soft watch是项目已授权的实时显示取舍，不冒称Netflix强制如此：https://partnerhelp.netflixstudios.com/hc/en-us/articles/215986007-Chinese-Simplified-Timed-Text-Style-Guide
 
 不声称本轮运行完整676全量/400轮/正式DEX，数值仍是N33历史执行者验证。规划者本轮没有签名/安装/启动手机/清数据/远程翻译API/下载、新依赖；产品修复由后续N34执行聊天完成。
+
+## 6. 用户再次提供人工VTT后的补充核验（2026-10-04）
+
+- 文件SHA24C447B2DD1885A7D63033D62C554B50F8C3AE4FA9DC84E23A408B24B33C993D，与前轮同路径人工VTT一致。12,061bytes/169cue；对manual JSON3规范化空白后每cue文本/start/end全部相等、差异0；无inline timestamp、无payload tag。前轮独立生产解析1224词的time/text/precision完全相等，输入未变且N33对应解析源码未改。
+- 它证实同人工主轨的格式一致性，也提供防止普通人工VTT被滚动去重的强回归资料；没有逐词时间，不能当新增ASR参照或证明音频同步准确。当前8CPS/owned窗等根因无需更改。
+- N34已结合N33-REPLAN-AND-DIAGNOSTIC-REVIEW：旧18fallback/14defer、1131anchor/1122native/44冲突及autoVTT6963污染，与本轮7fallback/defer0/ja安全拒绝准确分列。已在N34开工读取顺序明确要求读前轮分析，未漏继承其结果。
+- 补充N34验收：ordinary manual VTT/JSON3全cue/word/precision/Planner/request/RebuildCache身份对照；同句不同窗的真实重复保留；manual与rolling auto规则分开；格式本身不触发重复翻译/时间升级。SourceCaptionCache依signed URL传输身份可不同，不混淆两个缓存层。
+- 164个cue间有源轨gap，初始常见82ms；这不直接证明音频静默。source_gap是源数据时间口径，不能据此改听感判断或统一填gap延长字幕。原既有hard source breaks保持，音频同步仍由用户after观察。
+- 没有新增阶段、依赖/网络/产品实现或放宽已有保护；更新仍同一N34任务卡。证据 .verification/n34-planner/manual-vtt-json3-parity.json。

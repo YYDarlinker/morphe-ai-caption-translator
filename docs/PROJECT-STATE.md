@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-04。N33源码b52b65b/anchor/n33-b52b65b、docs后继4a76cd4已完整交付，用户六项手机短验均通过，只有既有漏字幕。新093813诊断确认人工轨、中文7次8CPS误空白，日语无同类fallback且quote拒绝后及时重试；规划者原生产Android NATIVE before3/3复现7句两行可放却被清空与共用页时窗clamp。N34已细化为中文软门槛/merge/late、全语种严格时间/实际测量与trace、保守源局部alignment和VTT纯适配，一张完整卡待执行。源/语义安全、调度/R1-CAS、字号、N33设置保留。最新§4au、N34-DISPLAY-RISK-REVIEW及N34-CODEX-TASK。
+> 最后更新：2026-10-04。N33源码b52b65b已工程及用户六项手机短验通过；N34独立显示/保守源修复卡待执行，产品未改。新093813中文7次8CPS空白/共用页时窗clamp已证、日语正确quote拒绝已重试；本轮追加manual VTT核对，169cue与JSON3文字/起止及原生产1224词完全对应，缺逐词标签。N34继承前轮N33分析18fallback/14defer/对齐回滚/autoVTT问题，并补齐双格式无副作用、真实重复与source_gap非音频静默验收。最新§4au/4av、N34-DISPLAY-RISK-REVIEW及N34-CODEX-TASK。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,7 +17,7 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节与最新§4at/4au、docs/N33-LOCAL-TEST-BUILD.md、docs/N34-DISPLAY-RISK-REVIEW.md、docs/N34-CODEX-TASK.md。当前产品N33而非旧N30/N31/N32。N33用户六项短验通过，N34下一张卡待执行；旧31/32卡失效，不复用旧实现，N27避让不恢复。
+1. **先读本实时状态档案**：优先本节与最新§4at/4au/4av、docs/N33-LOCAL-TEST-BUILD.md、docs/N34-DISPLAY-RISK-REVIEW.md、docs/N34-CODEX-TASK.md。当前产品N33而非旧N30/N31/N32。N33用户六项短验通过，N34下一张卡待执行；旧31/32卡失效，不复用旧实现，N27避让不恢复。
 2. **当前角色分工（用户最新）**：本规划聊天负责源码/诊断/官方规范审阅、只读原生产probe、具体方案/卡和两份状态管理；下一Codex单执行者按N34卡实现、验证、独立建包、本地提交后停。单执行者，不派DeepSeek，不自派修订/后续卡。手机只读、不push/安装/启动/app_process/清数据，正式签名与手机安装由用户做。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
@@ -868,3 +868,11 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 新版正式输出-n34，产品1.3.5/官方1.45/原host21.16.256/min28、两root不变。手机只读，不签名安装/启动/清数据/下载/远程API/推送发布；模拟器有界测试明确序列号，正式APK保持unsigned。N34源码尚未实现。
 
 用户下一步只需将N34卡交执行对话。交付后短验中文上述区间/旧119–122秒lead、日语一个切口和一次pause/seek/fullscreen返回，发完整diagnostic；不要求14种母语全表。
+
+## 4av. 人工VTT补充与N34继承/验收加强（2026-10-04）
+
+- 用户再次提供manual_en VTT并询问分析是否结合N33前轮成果、N34是否需优化。已独立核SHA，12061B / 24C447B2DD1885A7D63033D62C554B50F8C3AE4FA9DC84E23A408B24B33C993D，与前轮文件相同；169cue规范化文字/start/end与manual JSON3逐项相等，无inline timestamp/样式tag。旧原生产1224词text/time/precision对照相等，解析源码未变；证据manual-vtt-json3-parity.json。
+- 新VTT对同人工轨格式对照与普通VTT无误去重有帮助，不含word timing，不能补出runtime17840B ASR参考正文或推翻7个8CPS显示误拒绝。N34已引用/继承N33-REPLAN的18fallback/14defer、align44冲突全片回滚、autoVTT6963污染；在开工必读中进一步明确。
+- 同一卡加强：manual VTT/JSON3全cue/word/precision/Planner/request/RebuildCache身份相等（相同cfg/target/ref条件）；SourceCaptionCache signed URL层可不同，不能强合并。manual无timestamp不能升级NATIVE，真实同句不同cue窗保留，不套rolling auto carry去重。
+- 源轨164个gap（初段常见82ms）不等于实测音频静默；source_gap原因只描述源数据无owned时间，不据此统一补齐/持有字幕、删除短cue或改hard650ms/speaker合同。
+- docs/N34-CODEX-TASK.md与N34-DISPLAY-RISK-REVIEW已补充，仍同一N34，无新修订/后续阶段，产品还是N33，两个状态副本同步；未实现/建包/手机操作/远程API。

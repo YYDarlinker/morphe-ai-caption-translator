@@ -83,7 +83,7 @@ CaptionOverlay.position/render/showEvent：
 - showEvent主线程实际应用、coalesced player frame及normal render都读取**同Session最新displayPosition**，包含现有pausedDisplayPosition。可以给RenderGuard新增default轻量time accessor，或加现有showEvent的LongSupplier；supplier不获Controller/Session锁、不调用媒体/网络/View扫描、不持强Activity、不改CLOCK，应用前先isValid。
 - supplied position只是对无生产supplier的fixture/旧调用fallback；主线程late command不能覆写较新的观测值回过去。不同owner/generation、seek后的旧time update/queued callback不能影响新track。
 - position任务如需携owner/generation，可最小添加guard重载并改两个既有调用点time/tick；不修改seek检测、任务取消、prefetch调度/Lock/CAS/stop5秒barrier。
-- pause仍冻结在真实暂停/显式seek时刻，不能用wall clock强制翻页或关字幕；pause下小rewind/原media stale report的现有合同保留。
+- pause仍冻结在真实暂停/显式seek时刻，不能用wall clock强制翻页或关字幕；倍速时跟随source媒体时间而非私自放慢字幕/视频，已有1200ms多页阈值是媒体窗，不得伪称2倍速手机实际观看仍每页>=1200ms；pause下小rewind/原media stale report的现有合同保留。
 - hide/clear/owner撤销优先，miniplayer/PIP隔离保持；恢复详情页/全屏后从**当前绝对位置**选页，不重新播放过去page，不残留未来page。
 
 before生产探针已证：indexAt99→0、end2500→last，实际Overlay七家族在end仍可见/before start也可见。after必须翻转成“不显示”，而不删掉before负例数据。
@@ -161,7 +161,7 @@ en/zh-Hans/zh-Hant/es/fr/de/pt/ru/ja/ko/ar/hi/id/vi，目标取实际session met
 - 原窗80/283/600/830/1000/1199/1200/2399/2400/3601/7000/9000ms：短窗完整可两行必须单页；多页>=1200、连续覆盖原窗、全文串接、语义/字形切口；物理容量不够准确blank，不任意缩字或借时间。
 - 宽窄/标准与超大字体、详情/横屏；高速CPS/CPL、中文含Latin型号、日语标点、韩语组合、德语长词、法语重音、vi combining、Arabic混合LTR数字/括号/连接字、Indic conjunct/ZWJ、emoji/旗帜、NBSP/CRLF。完整Unicode/合字不能被切坏。
 - start-1/start/end-1/end，page分界、实际页间隙；response提前/正在窗中/晚到仍剩余/完全过期；main队列被延迟但同owner有效；coalesced player frame应用时位点更新，不能timestamp回退。
-- pause在页分界附近＋等待时、resume、paused explicit seek/小rewind、连续forward/backwardseek、换target/视频、旧结果/cache任务/旧frame晚到，均owner/generation/time不串。
+- pause在页分界附近＋等待时、resume、paused explicit seek/小rewind、连续forward/backwardseek、换target/视频、旧结果/cache任务/旧frame晚到，均owner/generation/time不串。另覆盖0.5/1/1.5/2倍速、buffering停住、后台→前台的已有合法回调；视频media时刻决定字幕页，不按wall timer推进暂停/卡缓冲页面。
 - 详情↔全屏↔评论收窄↔miniplayer/PIP/hidden↔恢复、一次旋转和拖动字幕。保留compact抑制设计、暂停不翻页、拖动不写避让偏移、不调用play/pause、外/内官方播放器callback仍无同步View扫描。
 - RTL→Latin/中文→等待来回切换，不残留方向/paintlocale，UI locale变化不改变target/canonical要求；N33日语设置、多选save/cancel/返回、API/model/save用本地mock各一次smoke。
 - 真实hard geometry/非法Unicode仍明确blank；没有对source/translation做全局删除/特殊列表。新诊断字段不会增加后台布局修复请求。
@@ -174,7 +174,7 @@ en/zh-Hans/zh-Hant/es/fr/de/pt/ru/ja/ko/ar/hi/id/vi，目标取实际session met
 
 - N33历史Java676/676＋Python27/27/发行11/11。最终全量重新跑真实分母，失败/error/skipped0；原400轮并发/主线程退休/同key提交/5秒barrier及R1、Unicode、N30转场回归保留。
 - 18正确中文业务golden（source/quote/text/prompt/hash）保留；已授权显示错误预期如legacyDoesRejectCps/shouldDeferLead/late waiting/页clamp改为新合同并逐条留变更依据。只有表现旧错误的assert可以改，不能扩大超容量/丢token的允许范围。
-- 当前7条/native14行、before窗泄漏14行、旧18/14条每项记录after可见/合法blank/原因；别把重叠窗相加成总时长。所谓实际可见时长从真实应用时间/position记录，不能只算event duration或SELECTED差值。
+- 当前7条/native14行、before窗泄漏14行、旧18/14条每项记录after可见/合法blank/原因；别把重叠窗相加成总时长。所谓实际可见时长从真实应用时间/position记录，区分媒体窗和wall观看时长（暂停/倍速/缓冲），不能只算event duration或SELECTED差值。
 - 新旧同caption geometry下统计planning calls/layout次数与frame/callback耗时；不设未经基准的巨大容忍线，不借并行重负载把慢测忽略。保证StaticLayout不进入Session锁或同步player callback，不每80ms重排未变的整个事件，无新增API/线程/无界队列。模型恶意长文本/大量弱切口做有界压力观察；若需优化，只做结果等价的本事件复用/measure memo或早期硬容量判断，不增加任意字符截断/重写架构。
 - 冻结scoreboard4通过/4既有失败/4未验证、三invisible_ms0、ACCEPTANCE/frozen原字节不改。新093813live结果另存，不能拿旧冻结0覆盖本次7空白。
 - AI-only/Remember-only/AI+Remember三root组合实际Patcher/serializedDEX通过。官方1.45下N33完整组合92项只是历史分母，本卡按实际selection报，不假称所有版本固定84/92。回调/fingerprint资源注入保持N33，无第三简中root、无N27/31/32设置hook。

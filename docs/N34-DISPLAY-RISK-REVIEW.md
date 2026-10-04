@@ -89,7 +89,7 @@ RebuildPageLayout.indexAt在position<start返回0、position>=end返回最后页
 
 ### R8 暂停、seek、切target/视频、原生遮罩、RTL/Unicode：审阅并覆盖回归，不猜测改架构
 
-已读CLOCK同播放器新鲜度/暂停冻结、generation/Publication/CAS和frame合并、native masking/compact隔离。用户六项播放冒烟无异常，现有回归涵盖400轮锁/生命周期、R1 pager、Unicode/RTL/N30转场。没有新证据支持修改调度、retry/deadline、字体档位、drag保存、native许可或设置绑定。N34仅在上述R1–6纯呈现/输入接缝工作，并对这些场景做回归。
+已读CLOCK同播放器新鲜度/暂停冻结、generation/Publication/CAS和frame合并、native masking/compact隔离。用户六项播放冒烟无异常，现有回归涵盖400轮锁/生命周期、R1 pager、Unicode/RTL/N30转场。没有新证据支持修改调度、retry/deadline、字体档位、drag保存、native许可或设置绑定。N34仅在上述R1–6纯呈现/输入接缝工作，并对这些场景做回归。补充0.5/1/1.5/2倍速、buffering和后台→前台：依现有媒体clock推进，不能因wall timer强行翻页。1200ms是媒体页窗，倍速后的物理观看时长另计，不伪称每页实际仍1.2秒。
 
 语言层：12非中文维持独立profile软目标/ICU边界/RTL。中文也须校验emojis、组合字、混入Latin/numbers的完整grapheme；不能以代码点切口破坏cluster。超长不可拆word在两行都放不下时才用原有emergency grapheme，不能因时间短就切正常单词。母语语义不能由ICU保证，本卡不声称自动母语自然度全通过。
 

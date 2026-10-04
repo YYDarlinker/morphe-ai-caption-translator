@@ -857,7 +857,7 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 跨所有14target：RebuildPageLayout.indexAt首尾clamp、queued show旧position/缺owned窗check；beforeprobeSDK28 Native已复现七家族14行实际early/expired仍visible。Owner valid不代表时间有效；改严格[start,end)与同session最新displayPosition，不改CLOCK/暂停/seek检测。
 - compact/StaticLayout与TextView差异是潜在false blank，最多一次恢复许可最大内宽重测，不缩字/越界；日志REBUILD_PRESENTED目前在真实TextView检查前写需后移，区分selection与实际UI applied，不当录屏。无新ja该故障实证，不误标根因。
 - 纯source局部计时与结构VTT适配对所有target共享，段内/边界/硬gap/Native保护；不能全片shift或按target字数编时间，无法安全对齐则逐字段保持原source。time/precision改后新cache身份自然失配，旧cache不清也不强读。
-- 不改变quote/numeric/semantic safeguards、true geometry/time capacity blank、source gap/non-speech、pending/failure、PIP/compact隔离；无证据不重写调度/源fetch/ref预算/并发/字体/用户drag/N33窗口UI。对pause/seek/旋转/target/video切换、RTL/Unicode、native遮罩做回归，不能承诺任何条件下永不空白。
+- 不改变quote/numeric/semantic safeguards、true geometry/time capacity blank、source gap/non-speech、pending/failure、PIP/compact隔离；无证据不重写调度/源fetch/ref预算/并发/字体/用户drag/N33窗口UI。对pause/seek/旋转/target/video切换、RTL/Unicode、native遮罩及0.5/1/1.5/2倍速、缓冲/前后台做回归；1200ms为media页窗，倍速wall观看时长另计，不能承诺任何条件下永不空白。
 
 ### N34下一卡与独立证据
 

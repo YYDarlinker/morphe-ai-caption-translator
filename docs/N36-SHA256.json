@@ -2,9 +2,9 @@
   "version": 1,
   "delivered_date": "2026-10-05",
   "repository": "E:/Projects/morphe-caption-v2",
-  "source_commit": "PENDING",
-  "delivery_commit": "PENDING",
-  "source_anchor": "PENDING",
+  "source_commit": "6319fd69900b1f08b231b14161713021d0fb616d",
+  "delivery_commit": "6319fd69900b1f08b231b14161713021d0fb616d",
+  "source_anchor": "anchor/n36-6319fd6",
   "artifacts": [
     {
       "kind": "mpp",
@@ -42,5 +42,7 @@
   },
   "protected_packages_unchanged": true,
   "composition_evidence": "E:/Projects/morphe-caption-v2/.verification/n36/composition-final-01",
-  "final_checks": "E:/Projects/morphe-caption-v2/.verification/n36/final-checks.json"
+  "final_checks": "E:/Projects/morphe-caption-v2/.verification/n36/final-checks.json",
+  "baseline_n35_completion_head": "013cc93b266b339ad05dea11b1bd29177cbcbffe",
+  "open_issue": "RebuildIntegrationTest.n24BlockedOldFocusStillLeavesTheSecondSlotForTheNewLanding fails only when run in the same JVM as other test classes (expected 2 calls, observed 4); it passes when its class runs alone. No assertion was relaxed to hide it."
 }

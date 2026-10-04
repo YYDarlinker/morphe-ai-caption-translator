@@ -13,11 +13,11 @@ final class RebuildPageLayout {
   static final class Page {
     final String text;
     final long start, end;
+    final String timingBasis;
 
-    Page(String text, long start, long end) {
-      this.text = text;
-      this.start = start;
-      this.end = end;
+    Page(String text, long start, long end) { this(text,start,end,"ESTIMATED_PAGE_TIMING"); }
+    Page(String text,long start,long end,String timingBasis) {
+      this.text=text;this.start=start;this.end=end;this.timingBasis=timingBasis;
     }
   }
 
@@ -62,6 +62,9 @@ final class RebuildPageLayout {
     if(budget==null || spec==null || text==null || text.isEmpty() || end<=start) return Collections.emptyList();
     CaptionOverlay.LayoutBudget measured=budget.withSpec(spec);
     if(spec.legacy) {
+      // A complete event that fits the real two-line budget is one immutable page.
+      if(CaptionLanguagePager.wellFormed(text,spec) && spec.fits(text,measured.preferredPx,measured.width,2))
+        return Collections.singletonList(new Page(text,start,end,"SOURCE_EVENT"));
       // Preserve correct N26 cuts, not its rate/style rejection. No cache-policy change.
       java.util.Map<String,Integer> geometry=new java.util.HashMap<>();
       java.util.function.ToIntFunction<String> lines=value -> geometry.computeIfAbsent(value,key -> {
@@ -73,7 +76,7 @@ final class RebuildPageLayout {
       if(validPreferred(text,start,end,preferred,measured,spec)) return preferred;
       if(CaptionLanguagePager.wellFormed(text,spec)
           && spec.fits(text,measured.preferredPx,measured.width,2))
-        return Collections.singletonList(new Page(text,start,end));
+        return Collections.singletonList(new Page(text,start,end,"SOURCE_EVENT"));
     }
     return CaptionLanguagePager.plan(text,start,end,measured,spec);
   }

@@ -432,6 +432,8 @@ final class RebuildController {
       epoch = ++publicationEpoch;
     }
     clear(epoch);
+    // Do not let a stopped session donate a media snapshot to the next same-video session.
+    CLOCK.reset(SystemClock.elapsedRealtime());
     if (s != null) s.cancel();
     CaptionMusicSuppressor.kick();
   }
@@ -597,17 +599,26 @@ final class RebuildController {
 
   static void time(long ms) {
     long now = SystemClock.elapsedRealtime();
-    boolean seek = CLOCK.update(ms, now);
     Session s = active;
-    if (!current(s)) return;
+    if (!current(s)) { CLOCK.updateHook(ms,now); return; }
+    OfficialPlayerClockAdapter.Sample nativeSample=OfficialPlayerClockAdapter.read(s.owner);
+    RebuildClock.Update nativeUpdate=nativeSample.available
+        ? CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,now,nativeSample.state,nativeSample.speed)
+        : new RebuildClock.Update(false,0,"unavailable");
     PlaybackState state = playbackState();
-    long presentation = CLOCK.presentation(now);
+    long projectedBeforeHook=CLOCK.current(now);
+    RebuildClock.Update hookUpdate=CLOCK.updateHook(ms,now);
+    boolean seek=nativeUpdate.seek||(!nativeSample.available&&hookUpdate.seek);
+    long presentation = nativeSample.available ? CLOCK.current(now)
+        : CLOCK.position(now,state==null?-1:state.getPosition(),state==null?0:state.getLastPositionUpdateTime(),
+            state==null?0:state.getPlaybackSpeed(),state==null?0:state.getState());
+    if(!nativeSample.available&&state==null&&!hookUpdate.seek)presentation=Math.max(projectedBeforeHook,presentation);
     List<Notice> notices = new ArrayList<>();
     List<HttpURLConnection> disconnect = new ArrayList<>();
     int generation;
     synchronized (s) {
       if (!current(s)) return;
-      if(seek){endFallback(s,s.position,"seek",notices); notice(notices,"REBUILD_SEEK","session="+s.id+";from="+s.position+";to="+ms); }
+      if(seek){endFallback(s,s.position,"seek",notices); notice(notices,"REBUILD_SEEK","session="+s.id+";from="+s.position+";to="+presentation+";clock_source="+CLOCK.source()+";"+CLOCK.diagnostic(now)); }
       s.position = presentation;
       // Explicit hooks take precedence over paused media jitter, including a small rewind.
       s.pausedDisplayPosition = state != null && state.getState() == PlaybackState.STATE_PAUSED
@@ -620,7 +631,7 @@ final class RebuildController {
         s.displayedEvent=""; s.withheldEvent="";
         if (s.jobs != null)
           for (Job j : s.jobs)
-            if (j != null && !j.sent && s.blocks != null && !covers(s.blocks.get(j.index), ms)) {
+            if (j != null && !j.sent && s.blocks != null && !covers(s.blocks.get(j.index), presentation)) {
               j.cancelled = true;
               if (j.connection != null) disconnect.add(j.connection);
             }
@@ -656,12 +667,12 @@ final class RebuildController {
 
   private static long position(Session s) {
     long now = SystemClock.elapsedRealtime();
+    OfficialPlayerClockAdapter.Sample nativeSample=OfficialPlayerClockAdapter.read(video);
+    if(nativeSample.available)CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,now,nativeSample.state,nativeSample.speed);
     PlaybackState state = playbackState();
     long reported = state == null ? -1 : state.getPosition();
-    long regular = CLOCK.position(now, reported,
-        state == null ? 0 : state.getLastPositionUpdateTime(),
-        state == null ? 0 : state.getPlaybackSpeed(),
-        state == null ? 0 : state.getState());
+    long regular = state==null ? CLOCK.current(now)
+        : CLOCK.position(now,reported,state.getLastPositionUpdateTime(),state.getPlaybackSpeed(),state.getState());
     if (s != null) {
       synchronized (s) {
         if (state == null || state.getState() != PlaybackState.STATE_PAUSED) {
@@ -688,9 +699,13 @@ final class RebuildController {
 
   private static long displayPosition(Session s) {
     long frozen = s.pausedDisplayPosition;
-    return frozen >= 0 ? frozen : s.position;
+    if(frozen>=0)return frozen;
+    long now=SystemClock.elapsedRealtime();
+    long live=CLOCK.current(now);
+    if(!CLOCK.fresh(now))return s.position;
+    long delta=live-s.position;
+    return delta>=8?live:s.position;
   }
-
   private static boolean paused() {
     try {
       Activity a = activity.get();
@@ -780,18 +795,26 @@ final class RebuildController {
       RebuildSource source = RebuildSource.read(raw.body, raw.document);
       CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=rebuild;ms="+(SystemClock.elapsedRealtime()-phase));
       phase=SystemClock.elapsedRealtime();
-      if (!s.sourceOnly) {
-        int precise = 0;
-        for (RebuildSource.Word w : source.words)
-          if (w.precision != RebuildSource.Precision.ESTIMATED) precise++;
-        if (precise * 10 < source.words.size() * 8)
-          try {
-            RawCaptionSource.Source ref = RawCaptionSource.reference(s.context, s.url, control);
-            if (ref != null) source = source.align(RebuildSource.read(ref.body, ref.document),
-                detail->CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_ALIGNMENT","session="+s.id+";"+detail));
-          } catch (Exception ignored) {
-            RawCaptionSource.checkActive(control);
+      if (!s.sourceOnly && (source.hasPartialTiming() || source.nativeWordCount() < source.words.size())) {
+        try {
+          RawCaptionSource.Source ref = RawCaptionSource.reference(s.context, s.url, source, control);
+          if (ref != null) {
+            RebuildSource referenceEvidence = ref.timingEvidence != null
+                ? ref.timingEvidence : RebuildSource.read(ref.body, ref.document);
+            RebuildSource beforeReference = source;
+            source = source.align(referenceEvidence,
+                detail->CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_ALIGNMENT",
+                    "session="+s.id+";profile="+ref.timingProfile+";quality="+ref.timingQuality
+                        +";"+detail));
+            CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_REFERENCE_APPLIED",
+                "session="+s.id+";profile="+ref.timingProfile+";quality="+ref.timingQuality
+                    +";before="+beforeReference.precisionEvidence()+";after="+source.precisionEvidence());
           }
+        } catch (Exception ignored) {
+          RawCaptionSource.checkActive(control);
+          CaptionDiagnostics.mark(s.context,"ASR_REFERENCE_FETCH_FAILED",
+              "session="+s.id+";reason="+CaptionDiagnostics.errorDetail(ignored));
+        }
       }
       CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=reference;ms="+(SystemClock.elapsedRealtime()-phase));
       phase=SystemClock.elapsedRealtime();
@@ -1061,7 +1084,7 @@ final class RebuildController {
     List<Job> start = new ArrayList<>();
     List<Notice> notices = new ArrayList<>();
     long now = SystemClock.elapsedRealtime();
-    boolean playbackAhead = !paused() && CLOCK.fresh(now);
+    boolean playbackAhead = !paused() && (CLOCK.fresh(now) || s.everReady);
     restoreCandidates(s, now, playbackAhead);
     synchronized (s) {
       if (!current(s) || s.blocks == null || s.blocks.isEmpty() || now < s.providerRetry) return;
@@ -1386,6 +1409,13 @@ final class RebuildController {
   }
 
   private static CaptionDocument.Cue originalCue(Session s, long time) {
+    // Before SOURCE_IO completes the raw parsed cue is the only trustworthy window.  Once the
+    // immutable source is accepted, derive the same window from source words so ready/pending/gap
+    // rendering cannot split across two timelines.
+    if (s.source != null) {
+      RebuildSource.TimedWindow window=s.source.windowAt(time);
+      if(window!=null)return new CaptionDocument.Cue(window.start,window.end,s.source.text(window.from,window.to));
+    }
     if (s.raw == null) return null;
     CaptionDocument.Cue latest = null;
     for (CaptionDocument.Cue c : s.raw.document.cues())

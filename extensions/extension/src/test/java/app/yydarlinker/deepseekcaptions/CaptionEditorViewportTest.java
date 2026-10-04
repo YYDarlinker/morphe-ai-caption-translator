@@ -19,7 +19,7 @@ public class CaptionEditorViewportTest {
     private void idle(){Shadows.shadowOf(Looper.getMainLooper()).idle();}
     private int mode(View root){return ((WindowManager.LayoutParams)root.getLayoutParams()).softInputMode & WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;}
 
-    @Test public void nestedDialogUsesItsOwnWindowAndRestoresAdjustmentAfterLastEditorDetaches(){
+    @Test public void nestedDialogUsesItsOwnWindowAndRestoresAdjustmentAfterRootDetaches(){
         a.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         Dialog dialog=new Dialog(a);dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         LinearLayout content=new LinearLayout(a);content.setOrientation(1);
@@ -29,7 +29,7 @@ public class CaptionEditorViewportTest {
         assertEquals(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,mode(root));
         assertEquals(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN,a.getWindow().getAttributes().softInputMode & WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST);
         content.removeView(one);assertEquals(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,mode(root));
-        content.removeView(two);assertEquals(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING,mode(root));dialog.dismiss();
+        content.removeView(two);assertEquals(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,mode(root));dialog.dismiss();assertEquals(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING,mode(root));
     }
     @Test public void focusAndCaretChangesAskParentToRevealOnlyCurrentLine(){
         class TrackingScroll extends ScrollView {

@@ -15,6 +15,7 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
         int users;
         int originalAdjustment;
         boolean changed;
+        View.OnAttachStateChangeListener watcher;
     }
     private final EditText editor;
     private View root;
@@ -39,10 +40,22 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
                 lease.changed=lease.originalAdjustment!=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
                         && adjust(root,WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
             }
+            final View leasedRoot=root;final WindowLease leasedLease=lease;
+            lease.watcher=new View.OnAttachStateChangeListener(){
+                @Override public void onViewAttachedToWindow(View v) {}
+                @Override public void onViewDetachedFromWindow(View v){cleanupWindow(leasedRoot,leasedLease);}
+            };
+            root.addOnAttachStateChangeListener(lease.watcher);
         }
         lease.users++;
         root.getViewTreeObserver().addOnGlobalLayoutListener(this);
         root.getViewTreeObserver().addOnPreDrawListener(this);
+    }
+    private static void cleanupWindow(View root,WindowLease lease){
+        if(root==null||lease==null||windows.get(root)!=lease)return;
+        if(lease.changed)adjust(root,lease.originalAdjustment);
+        if(lease.watcher!=null)root.removeOnAttachStateChangeListener(lease.watcher);
+        windows.remove(root);
     }
     private static boolean adjust(View root,int adjustment){
         if(!(root.getLayoutParams() instanceof WindowManager.LayoutParams))return false;
@@ -58,10 +71,9 @@ final class CaptionEditorViewport implements ViewTreeObserver.OnGlobalLayoutList
         if(root==null)return;
         if(root.getViewTreeObserver().isAlive()){root.getViewTreeObserver().removeOnGlobalLayoutListener(this);root.getViewTreeObserver().removeOnPreDrawListener(this);}
         WindowLease lease=windows.get(root);
-        if(lease!=null && --lease.users==0){
-            if(lease.changed)adjust(root,lease.originalAdjustment);
-            windows.remove(root);
-        }
+        // Row recycling is not window destruction.  Keep the root lease until the actual root
+        // detaches, preventing soft-input mode flips as rows leave/re-enter the preview edge.
+        if(lease!=null)lease.users=Math.max(0,lease.users-1);
         root=null;
     }
     void focus(boolean focused){if(focused)reveal();else restorePadding();}

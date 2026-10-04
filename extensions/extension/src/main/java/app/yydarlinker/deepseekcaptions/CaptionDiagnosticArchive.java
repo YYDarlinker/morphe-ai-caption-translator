@@ -50,6 +50,6 @@ final class CaptionDiagnosticArchive {
     }).get(30,TimeUnit.SECONDS);}catch(Exception e){return "[archive read failed: "+e.getClass().getSimpleName()+"]";}
   }
   static void clear(Context c){
-    try{IO.submit(()->{for(String channel:new String[]{"history","quality"})for(File f:files(new File(c.getFilesDir(),"caption-diagnostics-r25/"+channel)))f.delete();dropped.set(0);}).get(30,TimeUnit.SECONDS);}catch(Exception ignored){}
+    try{IO.submit(()->{for(String channel:new String[]{"history","quality","timing"})for(File f:files(new File(c.getFilesDir(),"caption-diagnostics-r25/"+channel)))f.delete();dropped.set(0);}).get(30,TimeUnit.SECONDS);}catch(Exception ignored){}
   }
 }

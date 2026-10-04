@@ -14,6 +14,26 @@ final class RebuildSource {
     ALIGNED
   }
 
+  enum AnchorKind { WORD_ONSET, SEGMENT_ONSET, CUE_ONSET, CUE_END_BOUND }
+
+  static final class TimeAnchor {
+    final int boundary;
+    final long timeMs;
+    final AnchorKind kind;
+    final String origin;
+    final int cue;
+    TimeAnchor(int boundary,long timeMs,AnchorKind kind,String origin,int cue) {
+      this.boundary=boundary;this.timeMs=timeMs;this.kind=kind;this.origin=origin;this.cue=cue;
+    }
+  }
+
+  static final class TimedWindow {
+    final int from,to;
+    final long start,end;
+    TimedWindow(int from,int to,long start,long end){this.from=from;this.to=to;this.start=start;this.end=end;}
+    boolean contains(long time){return start<=time&&time<end;}
+  }
+
   static final class Word {
     final String text, key;
     final long start, end;
@@ -55,22 +75,28 @@ final class RebuildSource {
   }
 
   final List<Word> words;
+  final List<TimeAnchor> anchors;
   final boolean coarseCueReconstructed;
   final int coarseCueCount;
   final String formatEvidence;
 
   RebuildSource(List<Word> values) {
-    this(values, false, 0);
+    this(values, Collections.emptyList(), false, 0, "");
   }
 
   private RebuildSource(List<Word> values, boolean reconstructed, int count) {
-    this(values,reconstructed,count,"");
+    this(values, Collections.emptyList(), reconstructed, count, "");
   }
-  private RebuildSource(List<Word> values,boolean reconstructed,int count,String evidence) {
+  private RebuildSource(List<Word> values,List<TimeAnchor> anchors,boolean reconstructed,int count,String evidence) {
     formatEvidence=evidence;
     words = Collections.unmodifiableList(new ArrayList<>(values));
+    this.anchors=Collections.unmodifiableList(new ArrayList<>(anchors));
     coarseCueReconstructed = reconstructed;
     coarseCueCount = count;
+  }
+
+  private RebuildSource(List<Word> values,boolean reconstructed,int count,String evidence) {
+    this(values,Collections.emptyList(),reconstructed,count,evidence);
   }
 
   static final Pattern TOKEN =
@@ -132,6 +158,53 @@ final class RebuildSource {
 
   String text(int a, int b) {
     return join(words, a, b);
+  }
+
+  int nativeWordCount() {
+    int count=0;for(Word word:words)if(word.precision==Precision.NATIVE)count++;return count;
+  }
+  int segmentAnchorCount() {
+    int count=0;for(TimeAnchor anchor:anchors)if(anchor.kind==AnchorKind.SEGMENT_ONSET)count++;return count;
+  }
+  int cueAnchorCount() {
+    int count=0;for(TimeAnchor anchor:anchors)if(anchor.kind==AnchorKind.CUE_ONSET||anchor.kind==AnchorKind.CUE_END_BOUND)count++;return count;
+  }
+  boolean hasPartialTiming() { return segmentAnchorCount()>0||cueAnchorCount()>0; }
+  int matchedWordCount(RebuildSource reference) {
+    return reference==null?0:uniqueWordMatches(words,reference.words).size();
+  }
+  int timingQualityAgainst(RebuildSource primary) {
+    int matched=primary==null?6:primary.matchedWordCount(this);
+    if(matched<6)return 0;
+    if(nativeWordCount()>0)return 3;
+    if(segmentAnchorCount()>0)return 2;
+    if(cueAnchorCount()>0)return 1;
+    return 0;
+  }
+  String timingCapabilities() {
+    return "word_direct="+nativeWordCount()+";segment_anchors="+segmentAnchorCount()
+        +";cue_anchors="+cueAnchorCount()+";words="+words.size()+";format="
+        +(formatEvidence.isEmpty()?"unknown":formatEvidence);
+  }
+
+  List<TimedWindow> windows() {
+    if(words.isEmpty())return Collections.emptyList();
+    List<TimedWindow> result=new ArrayList<>();int from=0;long start=words.get(0).start,end=words.get(0).end;
+    int cue=words.get(0).cue;
+    for(int i=1;i<words.size();i++){
+      Word prior=words.get(i-1),now=words.get(i);
+      boolean split=now.cue!=cue || now.start-prior.end>=650 || now.text.startsWith(">>");
+      if(split){if(end>start)result.add(new TimedWindow(from,i-1,start,end));from=i;start=now.start;cue=now.cue;}
+      end=Math.max(end,now.end);
+    }
+    if(end>start)result.add(new TimedWindow(from,words.size()-1,start,end));
+    return Collections.unmodifiableList(result);
+  }
+  TimedWindow windowAt(long time) {
+    TimedWindow latest=null;for(TimedWindow window:windows()){
+      if(window.contains(time))return window;
+      if(window.start<=time)latest=window;
+    }return null;
   }
 
   static boolean terminal(String s) {
@@ -256,6 +329,7 @@ final class RebuildSource {
       } else ordered.add(span);
     }
     List<Word> out = new ArrayList<>();
+    List<TimeAnchor> observed = new ArrayList<>();
     boolean repaired = false;
     int coarse = 0;
     for (int i = 0; i < ordered.size(); i++) {
@@ -268,6 +342,11 @@ final class RebuildSource {
         repaired |= estimated;
       }
       int first=out.size();Set<Integer> speakerWords=new HashSet<>();if(span.speakerBreak)speakerWords.add(0);
+      List<String> spanTokens=tokens(span.text);
+      AnchorKind onsetKind=span.nativeOffset && spanTokens.size()==1
+          ? AnchorKind.WORD_ONSET : span.nativeOffset ? AnchorKind.SEGMENT_ONSET : AnchorKind.CUE_ONSET;
+      if(!spanTokens.isEmpty()) observed.add(new TimeAnchor(first,span.start,onsetKind,
+          webVtt?"vtt":raw.startsWith("{")?"json3":"cue",span.cue));
       if(span.speakerOffsets.isEmpty())add(out,span.text,span.start,end,span.cue,span.nativeOffset);
       else {
         List<String> speech=new ArrayList<>();int from=0;
@@ -279,6 +358,8 @@ final class RebuildSource {
         if(end-span.start<speech.size())throw new IllegalArgumentException("vtt_voice_time_capacity");
         addTokens(out,speech,span.text,span.start,end,span.cue,span.nativeOffset);
       }
+      if(!spanTokens.isEmpty()) observed.add(new TimeAnchor(out.size(),end,AnchorKind.CUE_END_BOUND,
+          webVtt?"vtt":raw.startsWith("{")?"json3":"cue",span.cue));
       for(int index:speakerWords)if(first+index>=first && first+index<out.size()){Word word=out.get(first+index);
         out.set(first+index,new Word(">>"+word.text,word.start,word.end,word.cue,word.precision));}
     }
@@ -286,7 +367,7 @@ final class RebuildSource {
     for (int i = 1; i < out.size(); i++)
       if (out.get(i).start < out.get(i - 1).end)
         throw new IllegalArgumentException("source_time_order");
-    return new RebuildSource(out, repaired, coarse,formatEvidence);
+    return new RebuildSource(out, observed, repaired, coarse,formatEvidence);
   }
 
   /**
@@ -387,6 +468,12 @@ final class RebuildSource {
   RebuildSource align(RebuildSource reference) { return align(reference,null); }
 
   RebuildSource align(RebuildSource reference,java.util.function.Consumer<String> report) {
+    RebuildSource direct=alignNativeOnly(reference,report);
+    if(direct!=this)return direct;
+    return direct.alignPartial(reference,report);
+  }
+
+  private RebuildSource alignNativeOnly(RebuildSource reference,java.util.function.Consumer<String> report) {
     if(reference==null){alignmentReport(report,"reason=missing_reference;adopted_segments=0");return this;}
     Map<String,Integer> left=ngrams(words),right=ngrams(reference.words);
     Map<Integer,Integer> matches=new TreeMap<>();Set<Integer> anchors=new HashSet<>();int last=-1;
@@ -442,15 +529,133 @@ final class RebuildSource {
       if(adopted+skipped<=16){if(evidence.length()>0)evidence.append(',');evidence.append(from).append('-').append(to)
           .append('@').append(jFrom).append(':').append(reason);}
     }
+    int hardBreakRestored=0;
+    boolean changed=true;int guardPass=0;
+    while(changed&&guardPass++<3){
+      changed=false;
+      for(int i=1;i<proposed.size();i++){
+        boolean beforeGap=words.get(i).start-words.get(i-1).end>=650;
+        boolean afterGap=proposed.get(i).start-proposed.get(i-1).end>=650;
+        if(beforeGap!=afterGap){
+          if(proposed.get(i)!=words.get(i)){proposed.set(i,words.get(i));changed=true;}
+          if(proposed.get(i-1)!=words.get(i-1)){proposed.set(i-1,words.get(i-1));changed=true;}
+          hardBreakRestored++;
+        }
+      }
+    }
+    int effective=0;for(int i=0;i<proposed.size();i++)if(proposed.get(i)!=words.get(i))effective++;
     alignmentReport(report,"matched_words="+matches.size()+";native_candidates="+eligible.size()
         +";adopted_segments="+adopted+";skipped_segments="+skipped+";aligned_words="+aligned
-        +";segments_bounded="+evidence+";segments_omitted="+Math.max(0,adopted+skipped-16));
-    return adopted==0 ? this : new RebuildSource(proposed,coarseCueReconstructed,coarseCueCount,formatEvidence);
+        +";hard_break_restored="+hardBreakRestored+";segments_bounded="+evidence+";segments_omitted="+Math.max(0,adopted+skipped-16));
+    return effective==0 ? this : new RebuildSource(proposed,this.anchors,coarseCueReconstructed,coarseCueCount,formatEvidence);
+  }
+
+  /**
+   * Consume segment/cue boundaries even when the reference has no word-level offsets.  This is a
+   * local, bounded affine remap: source shape between two observed boundaries is preserved, native
+   * words and hard gaps are immutable constraints, and a tail without a right boundary is never
+   * extrapolated.
+   */
+  private RebuildSource alignPartial(RebuildSource reference,java.util.function.Consumer<String> report) {
+    if(reference==null||reference.anchors.isEmpty())return this;
+    Map<Integer,Integer> refToPrimary=uniqueWordMatches(this.words,reference.words);
+    if(refToPrimary.size()<6){alignmentReport(report,"partial_reason=insufficient_unique_context;matched_words="+refToPrimary.size()+";anchors_adopted=0;actual_retimed=0");return this;}
+    List<BoundaryPair> pairs=new ArrayList<>();int mapped=0;
+    for(TimeAnchor anchor:reference.anchors){
+      int primary=mapBoundary(anchor.boundary,refToPrimary,reference.words.size(),words.size());
+      if(primary<0||primary>words.size())continue;
+      if(anchor.kind==AnchorKind.CUE_END_BOUND&&anchor.boundary==0)continue;
+      pairs.add(new BoundaryPair(primary,anchor.timeMs,anchor.kind));mapped++;
+    }
+    pairs.sort(Comparator.comparingInt(p->p.boundary));
+    List<BoundaryPair> unique=new ArrayList<>();
+    for(BoundaryPair pair:pairs){
+      if(!unique.isEmpty()&&unique.get(unique.size()-1).boundary==pair.boundary){
+        BoundaryPair prior=unique.get(unique.size()-1);
+        if(anchorRank(pair.kind)>anchorRank(prior.kind))unique.set(unique.size()-1,pair);
+      } else unique.add(pair);
+    }
+    if(unique.size()<2){alignmentReport(report,"partial_reason=unmapped_boundaries;matched_words="+refToPrimary.size()+";anchors_seen="+reference.anchors.size()+";anchors_mapped="+mapped+";anchors_adopted=0;actual_retimed=0");return this;}
+    List<Word> proposed=new ArrayList<>(words);int adopted=0,retimed=0,skipped=0,adoptedAnchors=0;
+    StringBuilder components=new StringBuilder();
+    for(int n=0;n+1<unique.size();n++){
+      BoundaryPair left=unique.get(n),right=unique.get(n+1);
+      if(right.boundary<=left.boundary||right.time<=left.time)continue;
+      if(right.boundary-left.boundary<1)continue;
+      long oldLeft=boundaryTime(words,left.boundary),oldRight=boundaryTime(words,right.boundary);
+      if(oldRight<=oldLeft)continue;
+      String reason="";
+      for(int i=left.boundary;i<right.boundary;i++){
+        if(i>=words.size()){reason="boundary_out_of_range";break;}
+        if(RebuildPlanner.hardBreakBefore(this,i)){reason="hard_source_gap";break;}
+      }
+      List<Word> candidate=new ArrayList<>(proposed);
+      int local=0;
+      if(reason.isEmpty())for(int i=left.boundary;i<right.boundary;i++){
+        Word old=words.get(i);
+        if(old.precision!=Precision.ESTIMATED)continue;
+        long a=mapTime(old.start,oldLeft,oldRight,left.time,right.time);
+        long b=mapTime(old.end,oldLeft,oldRight,left.time,right.time);
+        if(b<=a){reason="non_monotone";break;}
+        candidate.set(i,new Word(old.text,a,b,old.cue,Precision.ESTIMATED));local++;
+      }
+      if(reason.isEmpty()){
+        if(left.boundary>0&&candidate.get(left.boundary-1).end>candidate.get(left.boundary).start)reason="left_constraint";
+        if(reason.isEmpty()&&right.boundary<words.size()&&candidate.get(right.boundary-1).end>candidate.get(right.boundary).start)reason="right_constraint";
+      }
+      if(reason.isEmpty()&&local>0){
+        for(int i=left.boundary;i<right.boundary;i++)if(candidate.get(i).precision==Precision.ESTIMATED){
+          if(candidate.get(i).start!=words.get(i).start||candidate.get(i).end!=words.get(i).end)retimed++;
+        }
+        proposed=candidate;adopted++;adoptedAnchors+=2;
+        if(components.length()>0)components.append(',');components.append(left.boundary).append('-').append(right.boundary).append("@")
+            .append(left.time).append('-').append(right.time).append(":adopted");
+      } else if(!reason.isEmpty()){
+        skipped++;if(components.length()<900){if(components.length()>0)components.append(',');components.append(left.boundary).append('-').append(right.boundary).append(':').append(reason);}
+      }
+    }
+    String detail="partial_matched_words="+refToPrimary.size()+";anchors_seen="+reference.anchors.size()
+        +";anchors_mapped="+mapped+";anchors_adopted="+adoptedAnchors+";partial_components="+adopted
+        +";partial_skipped="+skipped+";actual_retimed="+retimed+";partial_components_detail="+components;
+    alignmentReport(report,detail);
+    return retimed==0?this:new RebuildSource(proposed,this.anchors,coarseCueReconstructed,coarseCueCount,formatEvidence);
+  }
+
+  private static final class BoundaryPair {
+    final int boundary;final long time;final AnchorKind kind;
+    BoundaryPair(int b,long t,AnchorKind k){boundary=b;time=t;kind=k;}
+  }
+  private static int anchorRank(AnchorKind kind){return kind==AnchorKind.WORD_ONSET?4:kind==AnchorKind.SEGMENT_ONSET?3:kind==AnchorKind.CUE_ONSET?2:1;}
+  private static int mapBoundary(int boundary,Map<Integer,Integer> matches,int refSize,int primarySize){
+    if(boundary<=0)return 0;
+    if(boundary>=refSize)return primarySize;
+    Integer exact=matches.get(boundary);if(exact!=null)return exact;
+    Integer prior=matches.get(boundary-1);return prior==null?-1:prior+1;
+  }
+  private static long boundaryTime(List<Word> values,int boundary){
+    if(values.isEmpty())return 0;
+    if(boundary<=0)return values.get(0).start;
+    if(boundary>=values.size())return values.get(values.size()-1).end;
+    return values.get(boundary).start;
+  }
+  private static long mapTime(long value,long oldA,long oldB,long newA,long newB){
+    long numerator=(value-oldA)*(newB-newA);
+    return newA+Math.round((double)numerator/(double)(oldB-oldA));
+  }
+  private static Map<Integer,Integer> uniqueWordMatches(List<Word> primary,List<Word> reference){
+    Map<String,Integer> left=ngrams(primary),right=ngrams(reference);
+    Map<Integer,Integer> out=new TreeMap<>();int last=-1;
+    for(int i=0;i+2<primary.size();i++){
+      String gram=gram(primary,i);Integer a=left.get(gram),j=right.get(gram);
+      if(a==null||a!=i||j==null||j<0||j<=last)continue;
+      for(int n=0;n<3;n++)out.put(j+n,i+n);last=j+2;i+=2;
+    }return out;
   }
   String precisionEvidence() {
     int nativeWords=0,estimatedWords=0,alignedWords=0;
     for(Word word:words) switch(word.precision){case NATIVE:nativeWords++;break;case ALIGNED:alignedWords++;break;default:estimatedWords++;}
     return "native="+nativeWords+";estimated="+estimatedWords+";aligned="+alignedWords
+        +";segment_anchors="+segmentAnchorCount()+";cue_anchors="+cueAnchorCount()
         +(formatEvidence.isEmpty()?"":";"+formatEvidence);
   }
   private static void alignmentReport(java.util.function.Consumer<String> report,String detail) {

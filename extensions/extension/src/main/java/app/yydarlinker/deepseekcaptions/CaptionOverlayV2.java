@@ -116,6 +116,7 @@ final class CaptionOverlay {
   private static WeakReference<View> playerFrameClock = new WeakReference<>(null);
   private static boolean playerRenderPending, applyingPlayerRender;
   static long deferredRenderCount, deferredRenderNanos;
+  private static long renderStartedUptime;
 
   private static void invalidatePlayerRender() {
     playerRenderEpoch++;
@@ -483,6 +484,7 @@ final class CaptionOverlay {
   }
 
   private static void render() {
+    renderStartedUptime=SystemClock.uptimeMillis();
     Activity a = activityRef.get();
     if(currentGuard!=null && !currentGuard.isValid()) {
       hideView();displayResult(a,"suppressed","owner_invalid",false,0,0,"");return;
@@ -650,8 +652,9 @@ final class CaptionOverlay {
                   + ";page_range=" + pendingPages.get(shownPage).start + "-"
                   + pendingPages.get(shownPage).end
                   + (pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS
-                      ? ";duration_exception=owned_window_lt_1200" : "")
-                  : ";pagination_unresolved=true");
+                       ? ";duration_exception=owned_window_lt_1200" : "")
+                   + ";page_basis=" + pendingPages.get(shownPage).timingBasis
+                   : ";pagination_unresolved=true");
     detail+=";available_width_px="+inner+";measured_width_px="+Math.max(0,compact);
     if(shown.isEmpty()) {
       text.setText("");hideView();lastBlankIdentity=pendingIdentity;
@@ -746,7 +749,8 @@ final class CaptionOverlay {
     String result=(detail.isEmpty()?"id="+pendingIdentity+";mode="+mode:detail)
         +";ui_applied=true;visible="+visible+";reason="+reason+";render_position="+pendingPosition
         +";window="+pendingStart+"-"+pendingEnd+";applied_wall_ms="+System.currentTimeMillis()
-        +";applied_uptime_ms="+SystemClock.uptimeMillis()+";presentation_revision=n34-owned-display-v1"
+        +";applied_uptime_ms="+SystemClock.uptimeMillis()+";dispatch_uptime_ms="+renderStartedUptime
+         +";layout_cost_ms="+Math.max(0,SystemClock.uptimeMillis()-renderStartedUptime)+";presentation_revision=n35-owned-display-v1"
         +";text="+CaptionQualityTrace.redact(shown,DeepSeekConfig.load(a).apiKey,400);
     if(DeepSeekConfig.displayTextDebugEnabled(a))CaptionDiagnostics.mark(a,"REBUILD_PRESENTED",result);
     CaptionDiagnostics.mark(a,"REBUILD_DISPLAY_RESULT",result);

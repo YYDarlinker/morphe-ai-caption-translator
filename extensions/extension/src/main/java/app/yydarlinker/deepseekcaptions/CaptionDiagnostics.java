@@ -151,13 +151,14 @@ final class CaptionDiagnostics {
      * earlier exports used, and the manifest and archive channels are appended unchanged.
      */
     static String fullText(Context c) {
-        String history=CaptionDiagnosticArchive.read(c,"history"),quality=CaptionDiagnosticArchive.read(c,"quality");
-        return uiText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; build=n34; official=1.45.0; presentation=n29-presentation-v3; presentation_revision=n34-owned-display-v1"+"; exported_at="+System.currentTimeMillis()
-            +"; completeness=bounded_not_guaranteed; history_records="+records(history,false)+"; quality_records="+records(quality,true)
-            +"; truncation_markers="+(occurrences(history,"record truncated")+occurrences(quality,"record truncated"))
+        String history=CaptionDiagnosticArchive.read(c,"history"),quality=CaptionDiagnosticArchive.read(c,"quality"),timing=CaptionDiagnosticArchive.read(c,"timing");
+        return uiText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; build=n35; official=1.45.0; presentation=n29-presentation-v3; presentation_revision=n35-owned-display-v1"+"; exported_at="+System.currentTimeMillis()
+            +"; completeness=bounded_not_guaranteed; history_records="+records(history,false)+"; quality_records="+records(quality,true)+"; timing_records="+records(timing,true)
+            +"; truncation_markers="+(occurrences(history,"record truncated")+occurrences(quality,"record truncated")+occurrences(timing,"record truncated"))
             +"; debug="+DeepSeekConfig.displayTextDebugEnabled(c)+"]\n"
             + "\n[Extended history: chronological; last 24h; up to 8 MiB per channel]\n"
-            + history + "\n[Extended quality evidence; captured only while debug enabled]\n"+quality;
+            + history + "\n[Extended quality evidence; captured only while debug enabled]\n"+quality
+            + "\n[Extended timing evidence; bounded raw reference parts]\n"+timing;
     }
 
     private static int records(String text,boolean json){int n=0;for(String line:text.split("\n"))if(json?line.startsWith("{"):line.matches("^[0-9]+ \\|.*"))n++;return n;}
@@ -173,7 +174,10 @@ final class CaptionDiagnostics {
                 || stage.equals("FIRST_AI_READY") || stage.equals("SOURCE_TIMING_BASE")
                 || stage.equals("ASR_LOCAL_TIMING_APPLIED") || stage.equals("ASR_LOCAL_TIMING_REJECTED")
                 || stage.equals("ASR_NATIVE_WORD_TIMING_SELECTED") || stage.equals("ASR_NATIVE_WORD_TIMING_ALIGNED")
-                || stage.equals("ASR_WORD_TIMING_UNAVAILABLE") || stage.equals("ENGINE_MODE_SAVED")
+                || stage.equals("ASR_WORD_TIMING_UNAVAILABLE") || stage.equals("ASR_REFERENCE_CANDIDATE")
+                || stage.equals("ASR_REFERENCE_SELECTED") || stage.equals("ASR_REFERENCE_UNAVAILABLE")
+                || stage.equals("SOURCE_TIMING_CAPABILITIES") || stage.equals("REBUILD_SOURCE_REFERENCE_APPLIED")
+                || stage.equals("ENGINE_MODE_SAVED")
                 || stage.equals("NATIVE_APPLIED_CAPTURE_FAILED") || stage.equals("NATIVE_APPLIED_OWNER_REJECTED")
                 || stage.equals("OVERLAY_READABILITY_DEGRADED") || stage.equals("ENGINE_SNAPSHOT_ACTIVATED") || stage.equals("BACKGROUND_ACTIVATION_IGNORED");
     }

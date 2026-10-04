@@ -32,6 +32,7 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
      * tests that prove a localized sample stays inside the video frame; nothing in production reads it.
      */
     static RectF LAST_CAPTION_BOX;
+    static long sampleLayoutCalls;
 
     /**
      * Where the caption lands once the full-screen reference frame has been scaled into the preview. The
@@ -74,8 +75,8 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
         root.addView(hint,hintParams);
         return root;
     }
-    static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.sizeTier=CaptionFontSize.clampTier(value);else p.opacity=value;p.invalidate();}}
-    @Override protected void refreshDynamicText(){Preview preview=ownPreview.get();if(preview!=null){preview.setContentDescription(CaptionStrings.settings(getContext(),"preview"));CaptionTextResolver.direction(preview,false);preview.invalidate();}}
+    static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.sizeTier=CaptionFontSize.clampTier(value);else p.opacity=value;p.invalidateCache();p.invalidate();}}
+    @Override protected void refreshDynamicText(){Preview preview=ownPreview.get();if(preview!=null){preview.setContentDescription(CaptionStrings.settings(getContext(),"preview"));CaptionTextResolver.direction(preview,false);preview.invalidateCache();preview.invalidate();}}
     /** The sample line resolved through the settings catalog for whatever interface language is active. */
     static String sample(Context c){return CaptionStrings.settings(c,SAMPLE_KEY);}
     // Use all available row width; video and captions share one 16:9 coordinate system.
@@ -122,8 +123,16 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
     }
     static final class Preview extends View {
         int sizeTier;int opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private TextView cachedLabel;private String cachedLabelKey="";private int cachedWidth=-1;
         Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);sizeTier=s.captionSizeTier;opacity=s.backgroundOpacity;setContentDescription(CaptionStrings.settings(c,"preview"));}
-        @Override protected void onMeasure(int widthSpec,int heightSpec){int width=MeasureSpec.getSize(widthSpec);int height=Math.round(stageHeight(width));setMeasuredDimension(width,resolveSize(height,heightSpec));}
+        void invalidateCache(){cachedLabel=null;cachedLabelKey="";cachedWidth=-1;}
+        @Override protected void onMeasure(int widthSpec,int heightSpec){int width=MeasureSpec.getSize(widthSpec);if(width!=cachedWidth)invalidateCache();cachedWidth=width;int height=Math.round(stageHeight(width));setMeasuredDimension(width,resolveSize(height,heightSpec));}
+        private TextView label(Context c,String sample,float contentW){
+            String locale=CaptionTextResolver.locale(c).toLanguageTag();android.util.DisplayMetrics d=c.getResources().getDisplayMetrics();
+            String key=sample+"|"+locale+"|"+sizeTier+"|"+opacity+"|"+contentW+"|"+d.density+"|"+d.scaledDensity+"|"+c.getResources().getConfiguration().fontScale;
+            if(cachedLabel==null||!key.equals(cachedLabelKey)){cachedLabel=sampleLabel(c,sample,sizeTier,opacity,LANDSCAPE_REFERENCE_WIDTH_PX,contentW);cachedLabelKey=key;sampleLayoutCalls++;}
+            return cachedLabel;
+        }
         @Override protected void onDraw(Canvas c){
             android.util.DisplayMetrics d=getResources().getDisplayMetrics();float radius=12*d.density;paint.setColor(CaptionSettingsStyle.tint(CaptionSettingsStyle.primary(getContext()),7));c.drawRoundRect(0,0,getWidth(),getHeight(),radius,radius,paint);
             float w=frameWidth(getWidth());
@@ -136,8 +145,7 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
             // 2736x1264 full-screen reference scaled once, so the glyphs stay at the full-screen ratio.
             String sample=LOCALIZE_SAMPLE?sample(getContext()):CaptionStrings.get(getContext(),SAMPLE_KEY);
             // Simulate the full-size content frame first; shrink the entire view exactly once.
-            TextView label=sampleLabel(getContext(),sample,sizeTier,opacity,
-                    LANDSCAPE_REFERENCE_WIDTH_PX,contentW);
+            TextView label=label(getContext(),sample,contentW);
             float pos=DeepSeekConfig.captionPositionY(getContext(),true);
             float boxX=(contentW-label.getMeasuredWidth())/2f;
             float boxY=Math.max(0,Math.min(contentH-label.getMeasuredHeight(),contentH*pos-label.getMeasuredHeight()/2f));

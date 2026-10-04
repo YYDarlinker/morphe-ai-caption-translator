@@ -3,6 +3,7 @@ package app.yydarlinker.deepseekcaptions;
 import android.content.Context;
 import android.net.Uri;
 import android.os.SystemClock;
+import android.util.Base64;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -10,6 +11,11 @@ import java.util.*;
 /** Source transport only. RebuildSource owns all text/timing decisions. */
 final class RawCaptionSource {
   private static final int MAX_SOURCE_BYTES = 16 * 1024 * 1024;
+  private static final int MAX_REFERENCE_ATTEMPTS = 3;
+  private static final int REFERENCE_DEADLINE_MS = 1500;
+  private static final int MAX_REFERENCE_CAPTURE_BYTES = 256 * 1024;
+  private static final int MAX_REFERENCE_CAPTURE_PARTS = 3;
+  private static final java.util.concurrent.atomic.AtomicInteger REFERENCE_CAPTURES = new java.util.concurrent.atomic.AtomicInteger();
 
   private static long startupClock() {
     return SystemClock.elapsedRealtime();
@@ -28,12 +34,21 @@ final class RawCaptionSource {
     final byte[] body;
     final String contentType, sourceUrl;
     final CaptionDocument.Parsed document;
+    final String timingProfile;
+    final int timingQuality;
+    final RebuildSource timingEvidence;
 
     Source(LoadedTrack t) {
+      this(t,"",0,null);
+    }
+    Source(LoadedTrack t,String profile,int quality,RebuildSource evidence) {
       body = t.body;
       contentType = t.contentType;
       sourceUrl = t.url;
       document = t.document;
+      timingProfile=profile;
+      timingQuality=quality;
+      timingEvidence=evidence;
     }
   }
 
@@ -80,15 +95,49 @@ final class RawCaptionSource {
 
   static Source reference(Context c, String url, DeepSeekApiClient.RequestControl control)
       throws Exception {
+    return reference(c,url,null,control);
+  }
+
+  static Source reference(Context c,String url,RebuildSource primary,DeepSeekApiClient.RequestControl control)
+      throws Exception {
     String video = PageCaptionController.videoIdFromUrl(url), language = query(url, "lang");
+    long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(REFERENCE_DEADLINE_MS);
+    Source best=null;int bestQuality=0,attempts=0;String bestDetail="";
     // Only signed native descriptors for this video/language; no synthesized unsigned track URLs.
-    for (String candidate : NativeAsrTrackReference.candidates(video, language)) {
+    outer: for (String candidate : NativeAsrTrackReference.candidates(video, language)) {
       if (!WordTimingReference.sameLanguage(language, query(candidate, "lang"))) continue;
       if (CaptionEngine.sourceCaptionUrl(url).equals(candidate)) continue;
-      return new Source(
-          loadTrack(c, SourceFormatPolicy.json3(candidate), "ASR_REFERENCE", false, 1500, control));
+      for(SourceFormatPolicy.Profile profile:SourceFormatPolicy.referenceProfiles(candidate)){
+        if(attempts++>=MAX_REFERENCE_ATTEMPTS)break outer;
+        checkActive(control);int left=remaining(deadline);
+        try {
+          LoadedTrack track=loadTrack(c,profile.url,"ASR_REFERENCE",false,left,control);
+          RebuildSource evidence=RebuildSource.read(track.body,track.document);
+          int quality=primary==null?evidence.timingQualityAgainst(null):evidence.timingQualityAgainst(primary);
+          int matched=primary==null?0:primary.matchedWordCount(evidence);
+          String detail="profile="+profile.name+";quality="+quality+";matched_words="+matched+";"+evidence.timingCapabilities();
+          CaptionDiagnostics.mark(c,"ASR_REFERENCE_CANDIDATE",detail);
+          if(quality>bestQuality){
+            bestQuality=quality;best=new Source(track,profile.name,quality,evidence);bestDetail=detail;
+          }
+          // A direct word source is the strongest possible evidence; no later coarse candidate can
+          // improve it, and the bounded budget must not turn into a serial 1.5s wait.
+          if(quality>=3)break outer;
+        } catch(Exception failure) {
+          CaptionDiagnostics.mark(c,"ASR_REFERENCE_CANDIDATE_FAILED",
+              "profile="+profile.name+";reason="+CaptionDiagnostics.errorDetail(failure));
+          if(System.nanoTime()>=deadline)break outer;
+        }
+      }
     }
-    return null;
+    if(best==null||bestQuality<=0){
+      CaptionDiagnostics.mark(c,"ASR_REFERENCE_UNAVAILABLE",
+          "attempts="+Math.min(attempts,MAX_REFERENCE_ATTEMPTS)+";reason=no_usable_timing");
+      return null;
+    }
+    CaptionDiagnostics.mark(c,"ASR_REFERENCE_SELECTED",
+        "attempts="+Math.min(attempts,MAX_REFERENCE_ATTEMPTS)+";quality="+bestQuality+";"+bestDetail);
+    return best;
   }
 
   static boolean publishSharedTimeline(String id, List<CaptionDocument.Cue> cues) {
@@ -186,9 +235,32 @@ final class RawCaptionSource {
       CaptionDiagnostics.mark(context,"SOURCE_INPUT_EVIDENCE","kind="+kind+";format="+format
           +";track_kind="+(query(track.url,"kind").equals("asr")?"asr":"manual")
           +";source_code="+code+";bytes="+track.body.length+";sha256="+hex);
+      try {
+        RebuildSource evidence=RebuildSource.read(track.body,track.document);
+        CaptionDiagnostics.mark(context,"SOURCE_TIMING_CAPABILITIES",
+            "kind="+kind+";"+evidence.timingCapabilities()+";quality="
+                +(kind.equals("ASR_REFERENCE")?evidence.timingQualityAgainst(null):0));
+      } catch(Throwable ignored) {}
+      captureTimingBody(context,track,kind,hex.toString(),format);
     } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
   }
 
+  private static void captureTimingBody(Context context,LoadedTrack track,String kind,String sha,String format){
+    if(!DeepSeekConfig.displayTextDebugEnabled(context)||!"ASR_REFERENCE".equals(kind))return;
+    int slot=REFERENCE_CAPTURES.getAndIncrement();if(slot>=MAX_REFERENCE_CAPTURE_PARTS)return;
+    int captured=Math.min(track.body.length,MAX_REFERENCE_CAPTURE_BYTES),chunk=30000;
+    int count=(captured+chunk-1)/chunk;
+    for(int part=0;part<count;part++){
+      int from=part*chunk,to=Math.min(captured,from+chunk);
+      String payload=Base64.encodeToString(java.util.Arrays.copyOfRange(track.body,from,to),Base64.NO_WRAP);
+      CaptionDiagnosticArchive.append(context,"timing","{\"channel\":\"timing\",\"kind\":\""
+          +kind+"\",\"format\":\""+format+"\",\"sha256\":\""+sha
+          +"\",\"totalBytes\":"+track.body.length+",\"capturedBytes\":"+captured
+          +",\"partIndex\":"+part+",\"partCount\":"+count+",\"offset\":"+from
+          +",\"captureTruncated\":"+(captured<track.body.length)+",\"bodyBase64\":\""
+          +payload+"\"}");
+    }
+  }
   static void checkActive(DeepSeekApiClient.RequestControl control) throws InterruptedException {
     if (Thread.currentThread().isInterrupted() || (control != null && control.isCancelled()))
       throw new InterruptedException("source_cancelled");

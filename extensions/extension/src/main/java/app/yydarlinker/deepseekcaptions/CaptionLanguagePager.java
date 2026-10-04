@@ -11,8 +11,8 @@ final class CaptionLanguagePager {
       CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
     if(text==null || text.isEmpty() || end<=start || !wellFormed(text,spec))
       return Collections.emptyList();
-    if (end-start <= 7000 && spec.fits(text,budget.preferredPx,budget.width,2))
-      return Collections.singletonList(new RebuildPageLayout.Page(text,start,end));
+    if (spec.fits(text,budget.preferredPx,budget.width,2))
+      return Collections.singletonList(new RebuildPageLayout.Page(text,start,end,"SOURCE_EVENT"));
     if (end-start < 2*MIN_PAGE_MS && !spec.fits(text,budget.preferredPx,budget.width,2)) return Collections.emptyList();
     Seams seams=seams(text,budget,spec);
     List<RebuildPageLayout.Page> pages=choose(text,start,end,seams.cuts,seams.kinds,budget,spec);

@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-04。N34已在N33源码基线上完成全语种owned-window/中文soft门槛/primary候选合并/保守源计时与VTT适配，独立三件套、本地全量和SDK35交付DEX宿主验证完成；最终身份与证据见最新§4aw及docs/N34-LOCAL-TEST-BUILD.md。N33手机六项设置短验仍为已通过历史；N34真实手机/音频同步短复验待用户，完成即停，不自派下一卡。
+> 最后更新：2026-10-04。用户已取消“小修”限制，要求全链查字幕时间并解决参照真正使用；N35尚未产品施工。稳定N34源26edf55/交付bfe5a0a及backup/pre-n35固定，恢复工具已InspectOnly。完整审查已有7/7原生产before：同语种desc覆盖、partial锚降级、800平台、不同样本时基误比、预seek样本复用、row window重排/preview重复layout；另反读actualN34确认官方原player getVideoTime已绑定但当前字幕未用。新N35同一卡：按能力选ref/保留word-segment-cue锚/真实采用与payload可回放→event完整两行及估计page标识→原player当前时间优先/正确估算+frame/seek生命周期→preview。旧f40f17840B正文缺失，native候选0不证明无时间，不能猜variant。最新§4ay覆盖4ax小修，N35完整卡/审阅/回退资料已准备，建议Codex，用户仍可选DeepSeek单执行者。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,11 +17,11 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节与最新§4aw、docs/N34-LOCAL-TEST-BUILD.md；§4at/4au/4av、docs/N33-LOCAL-TEST-BUILD.md、docs/N34-DISPLAY-RISK-REVIEW.md、docs/N34-CODEX-TASK.md保留作为基线与授权历史。当前产品N34，N33为设置/两root稳定基线而非旧N30/N31/N32。N34闭合交付后停止，只待用户短复验；旧31/32卡失效，不复用旧实现，N27避让不恢复。
+1. **先读本实时状态档案**：优先本节与最新§4aw/4ay、docs/N34-LOCAL-TEST-BUILD.md、docs/N35-SYNC-AND-PREVIEW-REVIEW.md、docs/N35-EXECUTION-TASK.md、docs/N35-ROLLBACK-READY.md。当前产品N34，N35待执行；旧N30/N31/N32任务失效，N27避让不恢复。不能因下面历史卡序或Codex-only旧限制忽略用户本轮DeepSeek试行授权。
 2. **当前角色分工（本轮完成）**：规划聊天的管理/分析段落保留；Codex 单执行者已按 N34 完整卡实现、验证、独立建包并准备本地提交身份。完成后停止，不派 DeepSeek，不自派 N34r/N35。用户仅需短复验；正式签名与手机安装由用户做，执行者物理手机只读。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：N34 从 N33 稳定源码基线闭合交付，最新完成身份/实际分母/三件套见§4aw及N34交付报告；N33用户六项设置短验为既有通过历史。N34原生全量、真实交付DEX SDK35宿主与源/格式重放完成；真实手机和音频同步不由本地自动证据自签。
+4. **当前阶段**：稳定N34源26edf555c8956e12a4b0448b72aef34597141409、交付bfe5a0a及新docs-only后继。用户漏显改善、同步/preview开放；N35完整重写尚未源码施工，§4ax小修范围已撤销。副本文案/role当前以§4ay为准，原N34包/失败证据与用户数据不动。
 5. **执行状态**：N34 A→B→C→D 在同一授权卡内完成。后续聊天不得自动重跑旧 N31/N32/N27 或另起修订卡；先读最新§4aw与N34交付报告，等待用户短复验反馈。源调度/Publication/CAS/Cache提交、prompt/业务语义与N33设置仍保护。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
@@ -437,7 +437,7 @@ N27仍搁置、VISIONOS用户已解决，最终summary/UI多语种/程序性诊�
 
 ## 6. 待办队列
 
-> 当前队列以最新§4au/N34定案为准，N33已工程＋用户六项短验通过；下列历史队列保留作审计，不代表继续执行N31/N32或N27。
+> 当前队列以最新§4ay/N35完整时间链定案为准，N33已短验、N34已工程交付；下列历史队列保留作审计，不代表继续执行N31/N32或N27。
 
 当前优先级以§4ad为准：先N30完成N29手机反馈的确定性修正、等待/转场稳定、AI设置内多选语言菜单和最终本地化/技术诊断英文；随后只做一次短真机复验与发布来源预检。旧R2卡和N29任务列表是沿革，不据旧HEAD或旧官方版本重启已完成任务。
 
@@ -894,3 +894,73 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 最新最终源码全量 evidence `full-final-06`：704/704（failure/error/skipped0），input SHA `904c8368030aaf86b148c349830ca289125c3048c83c5e03527b93d815c21c38`、210 main/test/resource 文件；额外 actual-response-replay-04 6/6、82 loopback requests/81 accepted/1 source_quote_mismatch correct reject/remote0，performance-final-03 1/1。
 - candidate-03/正式三件套同字节，SDK35 final-03宿主 copied DEX/resources provenance、owned-final-04/actions-final-02 PASS，final-03三件套 branch audit0错误，39官方方法相等。历史281140条hash changed0。
 - 已停止N34工程任务，仅待用户上述短复验与完整诊断；实际音频早/晚、物理手机效果不自签通过。
+
+## 4ax. N34手机同步/预览反馈、N35小修与回退保障（2026-10-04）
+
+### 用户要求与身份
+
+- 用户已安装N34，漏字幕缓解但字幕声音不同步、设置preview触上缘卡住/跳到预期位置。随后用标注明确：首次显示relative页start median约275ms/部分近1s就是本轮同步问题，务必详细查机制并放执行卡。不能仅说全estimated搁置。要求简单快，允许DeepSeek先试、不佳Codex，同一卡单执行者，稳定成果须可方便回退。
+- 稳定源码26edf555c8956e12a4b0448b72aef34597141409 / anchor/n34-26edf55，交付后继bfe5a0a83beba8c645ca1d88d06d962c1db8f1dd；tracked非docs相等，工作区仅official未跟踪。原三包SHA/bytes已规划者独立核验与§4aw一致。
+- 已建立 backup/pre-n35-n34-bfe5a0a，固定交付后继；docs/N35-N34-BASELINE.json记录源/交付/备份及原包身份，N35新候选不得盖-n34。docs/N35-RESTORE-N34.ps1已InspectOnly测试，恢复模式没有运行，当前还是N34。
+
+### 新诊断与同步机制
+
+- 151644txt710679B，manifestn34/official1.45/presentation_revision n34-owned-display-v1，2165history/27quality/27HTTP2xx/27结构接纳/0network failure，26blocks，额外1是block8原片段语义repair。当前无旧hard geometry/CPS/overflow拒绝，不据此说全部帧无漏。
+- 排除merge后的119首id/page应用relative页起点median275/p90 821/max990ms；普通event已accepted-before-apply margin median30438ms，delay>=800的多个提前23–39秒ready，不能改provider并发/重译处理。relative媒体窗不是音频波形测量，geometry reflow等影响局部统计，N35 after须现有同源当前time对照和用户听感。
+- 主source manual23150B；runtime ref json3/asr17840B、SHAf40f646a…matched1131但native_candidates0/adopted0/aligned0，全1224estimated。不是N34又因44冲突回滚，而无独立native候选；旧supplied106667B的191 aligned实验不冒认手机实况。此轮不新取ref、不做cue提前/假NATIVE。
+- RebuildClock目前valid guard1500ms，却只推min(800,age)。直接原函数probe年龄880/1040/1200/1440ms，真实freshplaying应20880/21040/21200/21440而旧20800，额外lag80/240/400/640已证。callback已读同player state却走CLOCK.presentation不给媒体信息，tick才position；统一同数据且去已可信分支800cap是最小修复。原fresh/epoch/±1800/finite speed/playing/paused/seek规则不改，无fresh证据不外推。
+- 旧诊断缺hook_age/media_age/state/speed，不能说两代码点解释手机全部延后；N35只在原caption apply trace附有界clock numeric证据，不每80ms多一条persist log。素材时间/估计子句/权重分页余差仍保留，先改善软件额外迟到，不承诺无音频证据全词同步。
+
+### 预览滚动机制与小修
+
+- 最后inline prompt row位于preview前。CaptionEditorViewport当前root lease与可见editor用户数绑定，最后row因scroll detach会恢复softInput模式，回滑attach又切resize。原SDK28 NATIVE no-focus/no-edit probe窗口48→16→48→16，发生无需IME。该窗口重排高度吻合上缘fling跳位，但不是手机FrameMetrics根因自签。
+- lease改为root/window寿命；row detach移除自身listener/pendingreveal/padding，不改windowmode，复附复用；window实际dismiss/detach时clean弱lease、可安全则恢复，token gone不强update。保留firstTap/IME/caret/隐私和activity/dialog独立，不全局禁focus或抢OnScrollListener。
+- Preview.onDraw每次new TextView/FontMetrics/多轮StaticLayout/measure/layout，重复内容8draw测试cold232ms、warm8.5–14.2ms，每draw9resource reads；只是本机Native观测。N35实例缓存label/layout及size-dependent scene，只有sample/locale/style/density/size等真变重建，保持2736缩放/五档/opacity/preview文案和真几何。
+
+### 执行和恢复合同
+
+- docs/N35-EXECUTION-TASK.md精确限定6生产文件（clock、Controller.time与trace、Overlay trace、viewport、preview、diagnostic build）＋tests/tools/docs；不改source/align/Protocol/Review/provider/cache/CAS/锁/调度/N33设置/native许可/字体。旧clock800cap、lease最后row立即restore预期可具名修，其他assert保留。
+- final全量N34704基线一次＋Python27/27/发行11/11＋三组合/最终DEX一次；不重做全14UI/82响应/281140临时文件hash大矩阵。N34原三包/官方/N33final/冻结hash保护，旧文件不删不覆写root clean。实际SDK35 scroll和有界freshclock字幕场景，新路径-n35；物理手机仍只读。
+- DeepSeek/Codex都按同一方案，核心未过先WIP本地commit＋backup/n35-trial-tag、保留-n35候选即停。可直接交Codex继续，也可用户显式运行N35-RESTORE-N34工具：拒未保存work，先保存trialtag，恢复全部tracked非docs至N34并新revert commit，保留docs与所有包/证据，state两侧同步。无reset/amend/清数据/手机操作，代码回退不自动安装旧包。
+- docs/N35-SYNC-AND-PREVIEW-REVIEW.md完整机制与证据边界；docs/N35-ROLLBACK-READY.md操作说明；.verification/n35-planner input/151644summary/119page delays/ready margins/probe-before-01失败＋before-02原生产3/3。最初probePath导入冲突已改外部probe，tracked产品及原测试无改；本轮没有新包或full704复跑。
+
+后续交付用户同慢片段30–60秒＋pause/seek/fullscreen一次，无IME快慢滑preview上缘各三次，导出诊断。N35开始前只管理文档，source依然N34；不得自派N35r/N36或继续旧N31/N32。
+
+## 4ay. 用户取消小修限制、N35完整时间链定案（2026-10-04）
+
+### 最高优先级与草稿处理
+
+- 用户连续明确：275ms/近1s首显延后就是同步问题；要求检视为何未真正使用计时参照并解决；取消小修限制，系统审查source/ref/parser/match/event/page/clock/frame每层根因，再明确任务交执行对话。覆盖§4ax“仅6文件小修”。预览卡顿和随时恢复N34要求保留。
+- 原小修卡/审阅/当时state草稿保存 .verification/n35-planner/superseded-small-scope；从未产品施工/建包，未交付执行。现在同路径N35-EXECUTION-TASK/N35-SYNC-AND-PREVIEW-REVIEW是新版完整链，不另开N35r。N34稳定源/三包、backup/pre-n35-n34-bfe5a0a、baseline JSON/恢复脚本保留。
+
+### 参照链已证根因与必要口径纠正
+
+- runtimef40f17840B参照只记录matched1131/eligibleNative0/adopted0；原body缺，当前adb无设备，不能知道其rawoffset是否无/分段多词/被误降級/只NATIVE未匹配。先前“native0故数据本身无逐词时间”口径过强，新稿已纠正，不猜gemini后自签旧case。
+- 原NativeAsrTrackReference同language只存一个URL、Raw.reference首个可parse成功就return，质量与HTTP下载混同。before两samevideo/lang不同variant只保留后coarse、rich丢失已复现。
+- 原Parser单span需nativeOffset且tokens.size1才NATIVE；3显式offset/6多词在100/900/1700的真实segment边界全部变EST，匹配6仍eligible0，当前无法采用时间边界已复现。正确方案保留word/segment/cue观测等级，不把内部估計升级词NATIVE。
+- 新reference选择 bounded多desc、capability与matched evidence优先、总1500ms/max3 attempts cache先看质量、unsigned fmt/xosf/variant固定有限profile（sparams+lsparams保护，未被签才允许），native主人工内容不换ASR，访问失败正常降级不declare_ready。没有words时clean cue/segment anchors可真正约束内部estimated，本卡要求B实际用，不只多日志。
+- 两级采用：沿用N34directNative安全局部段；unique边界锚monotone映射primary token index，相邻可信锚间按source旧时间shape分段仿射，Native不可变constraint，原650/speaker保护，组件/邻域整体验证不剪词/跨空窗/全片shift。内部仍EST，origin/time_basis和实际改时/与ref本来一致分开计。
+- 新debug timing evidence multipart bounded每payload256KiB/每session3body，原SHA/parts完整/缺块标截断、不存URL/cookies/key；full save导出可重放真实实际ref，不每frame写。原f40body若未取不能冒用另106667B/公开空response。
+
+### 源误差、event/page与clock/frame系统修复
+
+- manual与supplied auto经同uniquegram得到1131match/1122native，词起点manual-ref median230/p90 1007、正负-1709..1704；83个event起点median49/p90 588/-1709..1257。某10348 vs9760迟588、15617 vs14360迟1257；也有manual早408。资料不同且非声学真值，不和UI275median相加，不固定提前。
+- 采用ref后ready event/pending/gap必须同最终source轴，raw cue仅source未ready时用；timed windows从word.cue组派生不误用raw index、主线程有界查找，避免双轴闪现。Event仍source首末归属；完整两行整event优先，特别中文不为一行偏好人为分页。>2行正常N34semantic/Unicode/1200ms容量，多page时无可信source-targetspan只标estimated_page_timing，不能字数/标点zip假声学对应。不修改翻译prompt/schema/quote/数/语义安全。
+- CLOCK现已before证800–1500ms平台；raw不同采样时刻相比致2x误拒；seek21000后旧22000@11000样本返回22200。MEDIA fallback需同time-origin投影到hookAt比容差，fresh playing无800截断，seek epoch清preseek样本。
+- 额外原MPP＋**actualN34APK**独立DEX读取确认public VideoInformation.getVideoTime/getVideoId/getPlaybackSpeed和VideoState.getCurrent已存在，getTime通过PlaybackController.patch_getVideoTime包装原Lakez/Laove方法，另有MDX fallback。可复用而不加hook：owner/id稳定、epoch/state验证后currentplayer直接位点优先，MediaSession估算次之，hook/frozen保底。公式不能仅靠dummy callback忽略media。
+- Native与rawHook独立观测/路由，避免每80ms强读数后稍旧hook制造backseek；真跳按同旧seek处理块和去重，不只换s.position忘generation/取消。explicit paused/small rewind仍优先。
+- main测量阻塞时s.position不更新，重读volatile不等最新frame。测量后main有界重读原player当前位点，失效用合法数字snapshot当前elapsedProjection，不新读MediaControllerIPC/网络/View扫描。frame仅时间/guard验证，不递归time/kick/seek。
+
+### 公共核查和before边界
+
+- 只读公开watch200取得a.en、variant=gemini；三profile＋同匿名cookie会话caption均200/空（expiry未过）。不是手机descriptor/f40body，不证明variant缺时间。未保存signedURL/cookie值，没用用户账号。yt-dlp原extractor对xosf的处理只格式方案参考，不是本例定因。
+- 完整time7/7原productionbefore已完成（外部probe）：desc覆盖、partial锚丢失、clock800cap/时间原点误比/preseek复用、no-focus row窗口模式、preview反复layout。N34source main/test/resource输入SHA904c8368…不变，未复跑全704或产品after。
+- official-145-clock-api.txt/public-player-api/method-bodies及n34-actual-player-time-bindings.txt、full-timing-root-cause-register、manual-vs-supplied-asr差、public参考访问边界均在 .verification/n35-planner。根因研究与具体算法由本规划者完成，执行者只照卡实现与验，不猜源参数/偷改全局偏移。
+
+### 执行/回退安排
+
+- N35完整卡授权Reference registry/format/capability/Evidence Reader/partial source mapping、必要sourceCache质量meta、Controller.load/time/guard/时钟与frame/page basis、boundeddiagnostic timing capture及preview/viewport。旧6文件限制失效，但原语义/quote/numeric、N34 strictowned/capacity、R1-CAS/locks/durable/请求限额、N33设置/两root/用户key/custom/字体和N27撤回保护不变。
+- 建议Codex承担这张完整链，因为已不是小修；用户如仍DeepSeek先试按同合同单执行，不跳能力/真实采用/时基测试。核心不合格WIP保存及trialtag再停，同卡可交Codex接手或用户用已准备工具恢复全部tracked非docs N34源，新revert保留历史。
+- actualcapability/锚/source/event/page/clock/frame逐层证据＋十四target代表/原704基线/400并发/SDK35实际getter与settingfling/三组合/finalDEX/原N34包hash保护，一次闭合-n35交付，真实phone音频和旧f40body缺失边界不能测试绿替代。
+
+当前产品仍N34，没有实现N35/新包/手机写入或远程翻译API。本轮网络仅用户要求的公开视频caption/primary文本只读核验；新依赖/工具/音视频未下载，Git未push/release。

@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-03。用户停止失败N31/N32并授权以N30完成树独立重建；已执行恢复7d6821e/anchor/n30-restored-7d6821e，全部tracked非docs与d5ca720一致，80历史交付哈希不变；c88abcc与旧证据留存。新200407诊断确认人工JSON3，18次8CPS拒绝、14次前导defer、局部对齐全片回滚已独立核查。规划收敛为N33设置/本地化/直接删独立简中root，N34字幕通用机制；N33卡已生成待执行，N34未开始。只允许复用31翻译文字，不复用31/32其他成果。最新§4ar/4as、N33-CODEX-TASK与N33-REPLAN-AND-DIAGNOSTIC-REVIEW。
+> 最后更新：2026-10-04。N33源码b52b65b/anchor/n33-b52b65b、docs后继4a76cd4已完整交付，用户六项手机短验均通过，只有既有漏字幕。新093813诊断确认人工轨、中文7次8CPS误空白，日语无同类fallback且quote拒绝后及时重试；规划者原生产Android NATIVE before3/3复现7句两行可放却被清空与共用页时窗clamp。N34已细化为中文软门槛/merge/late、全语种严格时间/实际测量与trace、保守源局部alignment和VTT纯适配，一张完整卡待执行。源/语义安全、调度/R1-CAS、字号、N33设置保留。最新§4au、N34-DISPLAY-RISK-REVIEW及N34-CODEX-TASK。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,19 +17,19 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节与最新§4ar/4as、docs/N30-SECOND-RESTORATION.md、docs/N33-REPLAN-AND-DIAGNOSTIC-REVIEW.md、docs/N33-CODEX-TASK.md。用户最新决定覆盖旧N31/N32执行安排；产品从N30恢复树重新独立实现，旧31/32任务卡失效，所有其他31/32实现/工具/测试不得复用。
-2. **当前角色分工（用户最新）**：本规划聊天负责源码/诊断/官方依据审阅、已授权可逆回退、详细方案/卡及两份状态管理；下一执行聊天按N33卡以Codex单执行者完成设置、本地化与两根验证/建包，完成即停。N34待N33结果后按最终源码另下具体卡。手机只读，不push/安装/启动/app_process/清数据；正式签名/手机安装由用户自己做。不得恢复DeepSeek接力或自派后续卡。
+1. **先读本实时状态档案**：优先本节与最新§4at/4au、docs/N33-LOCAL-TEST-BUILD.md、docs/N34-DISPLAY-RISK-REVIEW.md、docs/N34-CODEX-TASK.md。当前产品N33而非旧N30/N31/N32。N33用户六项短验通过，N34下一张卡待执行；旧31/32卡失效，不复用旧实现，N27避让不恢复。
+2. **当前角色分工（用户最新）**：本规划聊天负责源码/诊断/官方规范审阅、只读原生产probe、具体方案/卡和两份状态管理；下一Codex单执行者按N34卡实现、验证、独立建包、本地提交后停。单执行者，不派DeepSeek，不自派修订/后续卡。手机只读、不push/安装/启动/app_process/清数据，正式签名与手机安装由用户做。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：源码非docs仍原N31 dc304cb、恢复282d155与docs后继。当前SDK37手机已换为可开设置撤回1bc形态APK BFF42C48…，15:25:58语言onClick→showLanguages→Dialog.show token null，点击对象正确。N31潜伏两回归已确定：return receiver类型错＋configuration资源Context作Window owner。N32未产品施工；General具体页面创建尚未捕获，最终完整after不跳页/返回不重启是门槛。
-5. **执行顺序**：同一N32先ART typed安全→窗口资源/Activity owner分层统一修所有Dialog→真实完整list点击/可见窗口/保存取消返回/General自身导航与语言更新对照→删冗余root仅AI+Remember两根3组合→最终包全量ART/WMS/DEX/资源/业务回归与本地交付。保留N31多语言/default分层与N30核心，不全仓退30、不为等待General独立before忽略已确定BadToken，不额外推手机或开新阶段。
+4. **当前阶段**：N33完整工程＋用户手机六项设置/交互/播放冒烟验收通过，未宣称所有语种翻译语义通过；开工产品锚点b52b65b，4a76cd4及规划docs-only后继是正常HEAD。093813中文7fallback全触8CPS、未发生defer/late；日语1quote错配已重试且播放前就绪。源计时对齐仍estimated；共用Overlay页时窗clamp已独立复现。N34未施工。
+5. **执行顺序**：同一N34先中文soft rate/排版repair解耦与primary/candidate及晚到规则→全语种严格owned窗/最新主线程绘制时间/实际TextView兜底与可信trace→源局部安全alignment/结构VTT→50响应及旧样本重放、14目标场景/676基线与R1/400轮/真实SDK35代表caption/三组合最终DEX→独立-n34交付停。不修改Controller调度/Publication/CAS/Cache提交，不重做已验收N33设置，不提升quote重绑/并发来掩盖漏显。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
 
 ## 1. 项目与路径
 
-- 产品：Morphe字幕补丁（本地测试1.3.5），YouTube原生自动翻译选择→用户自配OpenAI兼容API→播放器字幕。当前开发包/Constants/生成metadata已验证YouTube21.16.256/minSdk28＋官方1.45.0；原已发布历史资产记录仍按原版本保留，不能覆盖。N30业务已工程交付；N31只修UI运行语言/说明/状态展示，官方版本号不等同本项目产品号。
+- 产品：Morphe字幕补丁（本地测试1.3.5），YouTube原生自动翻译选择→用户自配OpenAI兼容API→播放器字幕。当前已交付N33两公开root、十四语种设置闭环及N30业务，YouTube21.16.256/minSdk28＋官方1.45.0。下一卡N34通用呈现/源修复；旧已发布资产保持，官方版本号不等于产品号，N31/N32已撤回。
 - 工作仓库：`E:\Projects\morphe-caption-v2`（从 GitHub main=v1.3.5 全新克隆）。
 - 只读档案：`E:\Projects\morphe-ai-caption-translator-next`（旧研究区，39 提交/10 分支；ADR-006、P4d 失败报告在内；**禁止延续其任务序列，仅点名时查阅**）。
 - 材料（均在仓库根目录）：`caption-diagnostics-1.3.5-20260927-084217.txt`（旧真机）、`caption-diagnostics-1.3.5-20260929-155802.txt`（0929 诊断）、英文源 SRT、`字幕参考.zip`；真机诊断输出目录 `D:\HONOR Share\Honor Share\`。
@@ -437,7 +437,7 @@ N27仍搁置、VISIONOS用户已解决，最终summary/UI多语种/程序性诊�
 
 ## 6. 待办队列
 
-> 当前队列以最新§4as及N33/N34定案为准；下列历史队列保留作审计，不代表继续执行N31/N32或N27。
+> 当前队列以最新§4au/N34定案为准，N33已工程＋用户六项短验通过；下列历史队列保留作审计，不代表继续执行N31/N32或N27。
 
 当前优先级以§4ad为准：先N30完成N29手机反馈的确定性修正、等待/转场稳定、AI设置内多选语言菜单和最终本地化/技术诊断英文；随后只做一次短真机复验与发布来源预检。旧R2卡和N29任务列表是沿革，不据旧HEAD或旧官方版本重启已完成任务。
 
@@ -835,3 +835,36 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 实现提交 `b52b65b7a206f1a07464dae62dc30cabc164bf10`，锚点 `anchor/n33-b52b65b`；随后仅本 docs-only 身份补记，不 amend，不改变非 docs 源树或已验证三件套。
 - 最终实际覆盖：官方 13 显式选项104 cases；DEFAULT＋宿主繁中解析 zh-Hant-TW，另8 cases；补丁实际去重十四语种112 cases，extra DEFAULT简中8 cases不作新语种。
 - 两份 PROJECT-STATE 字节/SHA同步；工作区仅保留原官方输入未跟踪，未推送/发布/手机写入。N33完成停止，N34未开始。
+
+## 4au. N33用户六项短验通过、093813漏显根因和N34定案（2026-10-04）
+
+### N33当前产品与用户验收
+
+- 用户原话“六项测试均完成，除漏字幕外未发现任何问题”。登记设置入口/返回、多选与纯语言名/说明、API-model-save动作、日语本地化/默认保护、亮暗与原数据、原生菜单/播放冒烟短验通过；不宣称14语种母语语义和所有显示情境全绿。
+- 当前源码b52b65b7a206f1a07464dae62dc30cabc164bf10 / anchor/n33-b52b65b，HEAD4a76cd4及新规划docs-only后继；非docs与锚点零差异。MPP/MPE/APK独立hash与交付相等；唯一未跟踪官方输入1.45.0不动。旧N30恢复只是历史，不能按旧§0的N31/N32顺序回退施工。
+
+### 新诊断实证
+
+- caption-diagnostics-1.3.5-20261004-093813.txt，780916B / 24494E5EE4F379CC9C4716C91918B12179951676BC26938E7DEC4F4D60150380；manifestn33/official1.45.0，2812history/50quality。50HTTP2xx/0network failures、49structure accepted/1rejected；qwen3.8-flash，81834tokens（70808+11026）。与前轮deepseek不同，不能跨provider按RTT直接判版本回退。
+- zh-Hans会话1：26请求/20逻辑块，7layout fallback均8CPS硬拒绝；没有deferred/lateUnreadable。7句包括25.193–26.023“情况一直在改善。”、71.571–73.766、79.905两重叠候选、168.169–170.077、251.431–253.045、253.127–255.011。实际1121px标准几何前就被清空；原生产Android NATIVE测试7句全部两行可放，简/繁机制14行全fit但shown空，SDK/OEM不冒作手机after。
+- 额外6同block请求中5纯layout（2/4/5/11/12），1fragmentary（8），4repair_no_progress；应将纯显示指标/容量改advisory不触发付费语义repair，原语义/结构repair保留。
+- ja会话31：24请求/23逻辑块，0layout/hard display reject；唯一request39/block5 source_quote_mismatch把and放进272–287错误引用，安全拒绝正确。request41重试1791077646052接纳，第一次该block选择1791077662718，提前约16.7秒；三事件正常selected。所有ja none选择均落source无词gap；不能把speech外小空档算漏译。
+- 两session source_ready同manual JSON3的1224词/169cue，全estimated、aligned0。捕获zh934/ja1065词time逐项与独立manual原解析相等，主源人工。reference17840B实际正文仍缺；不能冒用supplied auto106667B。旧align1131anchor/1122native/44冲突整片回退及autoVTT6963metadata污染仍是有效通用before。
+
+### 全语种风险研判与修复边界
+
+- 中文专属（所有source→简/繁）：8CPS/minimumcells拒绝、lead-defer、未验证merge、late withholding；本次只证7rate，defer本次0但旧200407实证14，所以N34仍修通用机制，不按video特化。
+- 跨所有14target：RebuildPageLayout.indexAt首尾clamp、queued show旧position/缺owned窗check；beforeprobeSDK28 Native已复现七家族14行实际early/expired仍visible。Owner valid不代表时间有效；改严格[start,end)与同session最新displayPosition，不改CLOCK/暂停/seek检测。
+- compact/StaticLayout与TextView差异是潜在false blank，最多一次恢复许可最大内宽重测，不缩字/越界；日志REBUILD_PRESENTED目前在真实TextView检查前写需后移，区分selection与实际UI applied，不当录屏。无新ja该故障实证，不误标根因。
+- 纯source局部计时与结构VTT适配对所有target共享，段内/边界/硬gap/Native保护；不能全片shift或按target字数编时间，无法安全对齐则逐字段保持原source。time/precision改后新cache身份自然失配，旧cache不清也不强读。
+- 不改变quote/numeric/semantic safeguards、true geometry/time capacity blank、source gap/non-speech、pending/failure、PIP/compact隔离；无证据不重写调度/源fetch/ref预算/并发/字体/用户drag/N33窗口UI。对pause/seek/旋转/target/video切换、RTL/Unicode、native遮罩做回归，不能承诺任何条件下永不空白。
+
+### N34下一卡与独立证据
+
+- docs/N34-CODEX-TASK.md：A中文软门槛/候选merge/late/技术prefix→B全语种严格窗/最新渲染时间/真实测量trace→C源局部align/VTT纯适配→D新50及旧32响应/14目标场景/全量及三组合/最终DEX/n34独立交付。同一封闭卡，不另自派N34r/N35或DeepSeek，完成即停。
+- docs/N34-DISPLAY-RISK-REVIEW.md：已发生/探针/潜在/设计正确各风险及低风险方案、不可消除条件、source引用与验证边界。输入/汇总/50quality和before测试源/输出在 .verification/n34-planner。
+- 规划者本轮before3/3仅复现当前缺陷（native7CPS句及page边界/实际Overlay）；初次probe编译失败因SDK28无Files.writeString保留，改外部probeFiles.write后通过，tracked产品及原测试字节未改。N33全量676/676等是执行者历史结果，不冒称规划者复跑。
+- 旧正确中文golden事件文本/source/prompt不改，错误CPS/defer/clamp/late显示assert具名修订；新live呈现另存，冻结4/4/4及invisible0和ACCEPTANCE历史不动。
+- 新版正式输出-n34，产品1.3.5/官方1.45/原host21.16.256/min28、两root不变。手机只读，不签名安装/启动/清数据/下载/远程API/推送发布；模拟器有界测试明确序列号，正式APK保持unsigned。N34源码尚未实现。
+
+用户下一步只需将N34卡交执行对话。交付后短验中文上述区间/旧119–122秒lead、日语一个切口和一次pause/seek/fullscreen返回，发完整diagnostic；不要求14种母语全表。

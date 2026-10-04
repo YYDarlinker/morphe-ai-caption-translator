@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-04。用户已取消“小修”限制，要求全链查字幕时间并解决参照真正使用；N35尚未产品施工。稳定N34源26edf55/交付bfe5a0a及backup/pre-n35固定，恢复工具已InspectOnly。完整审查已有7/7原生产before：同语种desc覆盖、partial锚降级、800平台、不同样本时基误比、预seek样本复用、row window重排/preview重复layout；另反读actualN34确认官方原player getVideoTime已绑定但当前字幕未用。新N35同一卡：按能力选ref/保留word-segment-cue锚/真实采用与payload可回放→event完整两行及估计page标识→原player当前时间优先/正确估算+frame/seek生命周期→preview。旧f40f17840B正文缺失，native候选0不证明无时间，不能猜variant。最新§4ay覆盖4ax小修，N35完整卡/审阅/回退资料已准备，建议Codex，用户仍可选DeepSeek单执行者。
+> 最后更新：2026-10-04（Asia/Shanghai）。N35已交付并完成用户after，当前产品1967dac/完成HEAD013cc93；本轮规划者审阅诊断215344与14.27秒滚动录像，确认五条通用机制before5/5：无IME强拉、preview重绑失缓存、旧owner隔离继承、恢复probe占槽、真实player通知被caption clear作废。另查主线程日志反复Keystore解密/动画重排；压力请求队列并非主要延迟，network与取消需分辨。N36详细卡/审阅/回退资料已准备，尚未产品施工；backup/pre-n36-n35-013cc93固定。N35/N34/官方三包SHA未变，恢复脚本仅InspectOnly。N35真实f40参照body本轮已取得并SHA验证，partial实际retime752词，保留时间成果。最新§4ba覆盖旧N35待执行口径；单执行者Codex推荐、DeepSeek允许，真实IME/滚动/转场先于一次最终全量，同输入不重复建包。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,8 +17,8 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节与最新§4aw/4ay、docs/N34-LOCAL-TEST-BUILD.md、docs/N35-SYNC-AND-PREVIEW-REVIEW.md、docs/N35-EXECUTION-TASK.md、docs/N35-ROLLBACK-READY.md。当前产品N34，N35待执行；旧N30/N31/N32任务失效，N27避让不恢复。不能因下面历史卡序或Codex-only旧限制忽略用户本轮DeepSeek试行授权。
-2. **当前角色分工（本轮完成）**：规划聊天的管理/分析段落保留；Codex 单执行者已按 N34 完整卡实现、验证、独立建包并准备本地提交身份。完成后停止，不派 DeepSeek，不自派 N34r/N35。用户仅需短复验；正式签名与手机安装由用户做，执行者物理手机只读。
+1. **先读本实时状态档案**：优先本节和最新§4ba、docs/N36-N35-REVIEW-AND-REPLAN.md、docs/N36-EXECUTION-TASK.md、docs/N36-ROLLBACK-READY.md及N35交付记录。当前产品N35，N36仅规划完成；任务卡/状态的docs-only后继合法，不按HEAD旧短哈希误停。N27控件避让不恢复，VISIONOS已解决；用户允许本卡DeepSeek或Codex单执行者。
+2. **当前角色分工**：本聊天是规划者/审阅者，已准备N36执行卡并核验回退。下一执行聊天按卡完整实现/本地验证/独立建包/提交后停止；用户反馈/真机短验后再回本聊天。不能自行开N36r/N37，不并行多个执行聊天，不因复杂任务擅自把范围转给另一模型。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
 4. **当前阶段**：稳定N34源26edf555c8956e12a4b0448b72aef34597141409、交付bfe5a0a及新docs-only后继。用户漏显改善、同步/preview开放；N35完整重写尚未源码施工，§4ax小修范围已撤销。副本文案/role当前以§4ay为准，原N34包/失败证据与用户数据不动。
@@ -974,3 +974,35 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 独立离线 source build、patch-list、Patcher composition 通过；组合 92 PASS lines/COMPOSITION_PASS，final APK 11 root DEX/58,281 classes；MPP/MPE/APK n35 bytes/SHA 见 docs/N35-LOCAL-TEST-BUILD.md 与 .verification/n35/final-checks.json。N34 三包、official input、baseline SHA/bytes 未变。
 - reference 口径保持诚实：机制 fixture 已证明 partial offsets 会被保留并实际局部采用；旧 runtime f40f646a... 的 17,840B body 仍未取得，未连接真实手机，不能宣称实际音频波形或用户短验同步。新诊断会记录 downloaded/parsed/matched/capable/chosen/applied 和 bounded body capture。
 - preview root lease 与缓存改动已通过 69 项 focused regression；未进行物理手机写入/安装/启动/push/清数据/发布。交付产物为独立 -n35 路径，N34 可按 N35-RESTORE-N34.ps1 回退。用户自行完成 after 短验后停止，不自派 N35r/N36。
+
+
+## 4ba. N35真实反馈审阅及N36规划（2026-10-04，最新管理状态）
+
+### 当前身份和授权
+
+- N35产品提交 1967dacff904173ef685602e831cc21291fffb94；完成HEAD与anchor/n35-013cc93=013cc93b266b339ad05dea11b1bd29177cbcbffe；本轮只有docs规划与忽略目录before探针，无N36产品改动/包。
+- backup/pre-n36-n35-013cc93=013cc93b266b339ad05dea11b1bd29177cbcbffe。N35三包、N34三包和官方1.45输入实际SHA/bytes核对不变。N36-N35-BASELINE.json记录242个保护路径及诊断/录像输入身份。
+- 已准备N36-RESTORE-N35.ps1、N36-ROLLBACK-READY.md，-InspectOnly成功，product差异0；**没有实际回退**。N35已知UI缺陷保留，若用户选择稳定设置可明确退N34，旧N35-RESTORE-N34.ps1也保留。不得自行reset/amend、删失败包或写手机。
+- 用户补充第五项详情↔小窗抖动，并要求五项均解释原设计目的/必要性/替代方案。已纳入同一N36卡，不拆出漫长额外阶段。DeepSeek或Codex单执行者允许，推荐Codex；不自动开发、不自派新卡。
+
+### 本轮证据
+
+- input215344：2209813B，manifest n35/1.45、extended history7640；录像14.270625s/1264×2736。实际逐帧查看，只含preview滚动，不含IME和小窗。ADB无设备，没有物理写入/远程API/工具下载。
+- .verification/n36-planner/probe-run-01当前坏机制4/4复现；probe-run-02另1/1证明同owner真实MAXIMIZED回调因caption clear改变render epoch被误丢弃。这是before，不是after/708全量。
+- 635 display记录65 suppressed、18 owner_invalid、73 pending、156 outside-window、85 source_gap，不能把正常compact/合法源gap都算漏字幕；旧log缺player type/owner，不能定位用户那次长期无字幕的唯一手机状态。代码可稳定复现的authority误关联、owner残留、probe占槽应修。
+- 106 attempts，89 2xx/17 error。translation slot median24/p90 53/max132ms；source queue median14/p90 38/max105ms。network median4491/p90 7335/max16000ms，含6个active拒绝记录的deadline附近错误和紧邻退役的错误；NetworkDeadline timer只disconnect未记触发cause，故timeout=0不能证明未到期；不一律算供应商或取消。保留并发/attempt/deadline，精确区分取消结算，cached READY恢复不应重新发请求。
+- preview相同key普通getView会refreshDynamicText→invalidateCache；viewport无IME也reveal、逐帧padding/双scroll；四字段失效没有手机InputConnection堆栈，不假装唯一OEM原因已复现。下卡真实SDK35 IME composition/commit、四字段持续输入是硬闸，不能setText/仅键盘可见代替。
+- 转场多渲染触发＋每步geometry重排；displayResult/mark→DeepSeekConfig.load→SecureApiKey.load每次Keystore/Cipher解密，并在ApiProfiles.LOCK中。debug显示日志单次至少3次key解密；REBUILD_BLOCK_REUSED3377条。下一卡必须热路径0密码学/文件IO，保留正确脱敏和有界日志，不用关闭诊断省时间。
+- deferred-render增量成本44样本median57.431/p90 71.281/max119.908ms，不等同系统fps；旧全局renderStarted导致77秒/6秒假layout记录，修正测量口径。
+- 新raw timing已完整恢复SHA一致f40f...17840B（95events/94timed、0offset）及87c68...33047B。f40 partial anchors188/178/108、54components、actual_retimed752，内部仍ESTIMATED属正确，不再声称本轮参照没实际采用。保留N35时间和N34漏字幕成果。
+
+### 验证流程与执行顺序
+
+- N35的24个result测试调用累计1985.405s≈33m，四小时主要是实现/回归；成功full02与full03的212文件/input_sha完全相同，后者5m15s属确认可省重复；失败后复跑不能全算浪费。MPP21:10是候选，不能等同正式完成。
+- N36顺序：A输入/preview → B authority/recovery → C转场/日志 → D取消/压力复验 → E一次全量和最终三包。先真实交互小专项再冻结，708基线和安全组合/DEX不省；同输入复用，docs-only不重跑/重建，不扫281140历史文件，不重复额外400轮。
+- official1.45、YouTube21.16.256/minSdk28、1.3.5/14locale/两roots、source/clock/page/reference、prompt/schema/cache identity、CAS/锁/5s barrier、安全空白/数字引用、key/profile/默认自定义、本地化与Shorts全保护。N27不恢复。frozen4/4/4与ACCEPTANCE/history不动。
+- 下卡：docs/N36-EXECUTION-TASK.md；细审：docs/N36-N35-REVIEW-AND-REPLAN.md；回退：docs/N36-ROLLBACK-READY.md、N36-N35-BASELINE.json、N36-RESTORE-N35.ps1。用户after约3-5min：四字段输入/IME/滚动、已有字幕详情↔小窗3次/开关、换视频/语言返回及完整diag。
+
+### 停止点
+
+规划完成并本地持久化，不实施N36，不签名/安装/推送/发布。等用户交执行聊天或提供新指示。

@@ -100,7 +100,7 @@ D. 达12帧未稳定后只依赖 decor 的 layout change 重试；播放器子�
 - 每个editor都安装root监听，共享同一ListView却各自保留originalBottom/appliedBottom。焦点转移、行回收和IME动画可能互相恢复/覆盖留白。
 - IME底部一会儿来自root visible frame，一会儿来自Context WindowManager.getCurrentWindowMetrics；nested PreferenceScreen可能是Dialog，Context指标和实际root窗口不是同一坐标系统。键盘期间尺寸变化被每帧转成setPadding/requestLayout和立即scroll。
 - 无IME自动reveal已经探针证明；重复布局／焦点恢复／serve input connection重建是有明确代码路径的风险。
-- **这次输入失效没有手机IME/logcat堆栈，录像也不含输入。不能声称已在Android17手机逐字符复现或判定唯一OEM原因**。下一卡必须补真正IME composition/commit before/after，识别输入连接无效、focused row detach/rebind、窗口focus丢失、文字被程序性重设的具体分支，不能再用setText或键盘可见截图冒称输入通过。
+- **这次输入失效没有手机IME/logcat堆栈，录像也不含输入。不能声称已在Android17手机逐字符复现或判定唯一OEM原因**。下一卡必须补真正IME composition/commit before/after，识别输入连接无效、编辑Dialog的ALT_FOCUSABLE_IM/NOT_FOCUSABLE与model popup残留、focused row detach/rebind、窗口focus丢失、文字被程序性重设的具体分支，不能再用setText或键盘可见截图冒称输入通过。
 
 ### 替代方案
 

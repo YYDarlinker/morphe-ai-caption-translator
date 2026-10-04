@@ -40,18 +40,18 @@
 
 ### A1 先补真正的输入before，不能冒称已锁定OEM唯一原因
 
-四个生产字段：DeepSeekModelPreference、API key、base URL、prompt，均经InlineCaptionEditor/CaptionEditorViewport。在实际官方1.45主题及nested PreferenceScreen窗口下建立可见host；用当前N35记录实际window/root token、focused view identity、active InputConnection、attach/detach、getView重绑、composing/text watcher与滚动请求计数。
+四个生产字段：DeepSeekModelPreference、API key、base URL、prompt，均经InlineCaptionEditor/CaptionEditorViewport。在实际官方1.45主题及nested PreferenceScreen窗口下建立可见host；用当前N35记录实际window/root token及window flags（NOT_FOCUSABLE、ALT_FOCUSABLE_IM）、model PopupWindow/drawer的焦点归属、focused view identity、active InputConnection、attach/detach、getView重绑、composing/text watcher与滚动请求计数。
 
 必须走真正IME service的setComposingText/finishComposingText/commitText/deleteSurroundingText，或实际模拟器键盘输入；**不是setText、EditorInfo flag检查、仅调用onCreateInputConnection，也不是绕开served editor拿一个人工连接就判输入可用**。如果现成host需要最小TestIme服务，可只给测试包新增，不进入MPE/正式APK；不下载第三方IME。
 
-追踪以确认具体失效分支：连接没建立、已建立但focus/row重绑失效、composition被重置、程序性setText覆盖、其他窗口取得focus、主线程热路径长阻塞。手机Android17分支未离线复现时如实记录；后续after仍要证明实际四字段可持续输入。
+追踪以确认具体失效分支：连接没建立、已建立但focus/row重绑失效、composition被重置、程序性setText覆盖、其他窗口取得focus或编辑窗口被ALT_FOCUSABLE_IM阻断、主线程热路径长阻塞。手机Android17分支未离线复现时如实记录；后续after仍要证明实际四字段可持续输入。
 
 ### A2 生产修改方案（保留inline和自动保存）
 
 1. 每个实际root/window只保留一个editor viewport协调器，使用weak owner和可撤销editor registration。当前focused editor才有处理权。行回收注销该字段及queued任务；root真实detach释放窗口资源。不能让旧editor恢复另一个editor的padding。
 2. 主路径优先平台原生IME resize/insets与TextView光标逻辑。**删除每帧onPreDraw的padding/reveal/scroll轮询**；global layout也不因为editor.hasFocus就强拉。没有IME、不在用户输入动作、用户正在drag/fling时，本功能的scroll请求应为0。
 3. inline长按选择文本和多行prompt内部滚动仍正常；外层手势从输入框开始的纵向drag应交给父ListView。不能禁用focus/IME、将输入框设不可编辑或用新弹窗替换来过测试。
-4. IME显示只走一套主申请流程；避免同一手势反复restartInput和两套show。Window focus与editor已attach/owner有效才申请；IME已服务同一editor时不restart。普通getView/recycle不能触发自动show/抢焦点。
+4. 编辑所在实际窗口必须具备输入资格；核查lazy PreferenceScreen/Dialog构建及旧model popup是否留下FLAG_ALT_FOCUSABLE_IM/NOT_FOCUSABLE或夺走focus。只有已证明属于自有编辑窗口的错误flag才修正；不全局clear宿主flag，也不改本应非编辑overlay的属性。IME显示只走一套主申请流程；避免同一手势反复restartInput和两套show。Window focus与editor已attach/owner有效才申请；IME已服务同一editor时不restart。普通getView/recycle不能触发自动show/抢焦点。
 5. 普通重绑保持同一字段、同profile的EditText和InputConnection；不无条件setText，不丢composition/selection，不换成其他字段回收View。需要不同唯一viewId时用稳定的per-field ID，禁止几项都是android.R.id.edit导致错误焦点恢复；先用before证据判断此处是否参与失效。真正profile切换才flush并换内容；保持N33默认展示/自定义要求保护。
 6. 无法原生resize的实际窗口才用fallback。坐标全来自同一root/window：root屏幕位置、root WindowInsets、list实际viewport。不能混用Activity WindowMetrics与Dialog root visible frame。
 7. fallback在IME打开/结束或明确用户输入/光标动作时计算真实剩余遮挡；可按animation回调做只读状态/必要translation，**不要每帧setPadding或requestLayout**。底部scroll range只提交缺额一次，IME隐藏恢复一次。已经resize不得再叠加完整IME高度。

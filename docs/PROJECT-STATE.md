@@ -991,7 +991,7 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - .verification/n36-planner/probe-run-01当前坏机制4/4复现；probe-run-02另1/1证明同owner真实MAXIMIZED回调因caption clear改变render epoch被误丢弃。这是before，不是after/708全量。
 - 635 display记录65 suppressed、18 owner_invalid、73 pending、156 outside-window、85 source_gap，不能把正常compact/合法源gap都算漏字幕；旧log缺player type/owner，不能定位用户那次长期无字幕的唯一手机状态。代码可稳定复现的authority误关联、owner残留、probe占槽应修。
 - 106 attempts，89 2xx/17 error。translation slot median24/p90 53/max132ms；source queue median14/p90 38/max105ms。network median4491/p90 7335/max16000ms，含6个active拒绝记录的deadline附近错误和紧邻退役的错误；NetworkDeadline timer只disconnect未记触发cause，故timeout=0不能证明未到期；不一律算供应商或取消。保留并发/attempt/deadline，精确区分取消结算，cached READY恢复不应重新发请求。
-- preview相同key普通getView会refreshDynamicText→invalidateCache；viewport无IME也reveal、逐帧padding/双scroll；四字段失效没有手机InputConnection堆栈，不假装唯一OEM原因已复现。下卡真实SDK35 IME composition/commit、四字段持续输入是硬闸，不能setText/仅键盘可见代替。
+- preview相同key普通getView会refreshDynamicText→invalidateCache；viewport无IME也reveal、逐帧padding/双scroll；四字段失效没有手机InputConnection堆栈，不假装唯一OEM原因已复现。下卡必须记录实际window flags/旧model popup归属，核查ALT_FOCUSABLE_IM等阻断；真实SDK35 IME composition/commit、四字段持续输入是硬闸，不能setText/仅键盘可见代替。
 - 转场多渲染触发＋每步geometry重排；displayResult/mark→DeepSeekConfig.load→SecureApiKey.load每次Keystore/Cipher解密，并在ApiProfiles.LOCK中。debug显示日志单次至少3次key解密；REBUILD_BLOCK_REUSED3377条。下一卡必须热路径0密码学/文件IO，保留正确脱敏和有界日志，不用关闭诊断省时间。
 - deferred-render增量成本44样本median57.431/p90 71.281/max119.908ms，不等同系统fps；旧全局renderStarted导致77秒/6秒假layout记录，修正测量口径。
 - 新raw timing已完整恢复SHA一致f40f...17840B（95events/94timed、0offset）及87c68...33047B。f40 partial anchors188/178/108、54components、actual_retimed752，内部仍ESTIMATED属正确，不再声称本轮参照没实际采用。保留N35时间和N34漏字幕成果。

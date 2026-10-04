@@ -23,7 +23,7 @@ public class N28ALanguageContextTest {
     assertTrue(java.lang.reflect.Modifier.isFinal(f.getModifiers()));return (CaptionLanguageContext)f.get(s);
   }
   String log(){return CaptionDiagnostics.fullText(h.a);}
-  int records(String stage){return h.a.getSharedPreferences("deepseek_caption_diagnostics",0).getString("history","").split(" \\| "+stage+" \\| ",-1).length-1;}
+  int records(String stage){return CaptionDiagnostics.history(h.a).split(" \\| "+stage+" \\| ",-1).length-1;}
   @Test public void actualActivateSelectsSourceAndConfirmedTargetUnderThreeUiLocales() throws Exception {
     org.json.JSONArray evidence=new org.json.JSONArray();
     String[][] cases={{"en","zh-Hans","zh-Hans"},{"en","zh-Hant","zh-Hant"},{"fr","ar","ar"},{"zh","en","en"},{null,"fr","fr"}};

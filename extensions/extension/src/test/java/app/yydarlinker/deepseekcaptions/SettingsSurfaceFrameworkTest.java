@@ -9,7 +9,7 @@ public class SettingsSurfaceFrameworkTest {
     ApiKeyPreference pref=new ApiKeyPreference(a);pref.setKey("deepseek_caption_api_key");pref.setTitle("API Key");
     FrameLayout host=new FrameLayout(a);a.setContentView(host);View row=pref.getView(null,new ListView(a));host.addView(row);
     host.measure(View.MeasureSpec.makeMeasureSpec(600,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(1000,View.MeasureSpec.EXACTLY));host.layout(0,0,600,1000);
-    InlineCaptionEditor edit=row.findViewById(android.R.id.edit);assertNotNull(edit);assertTrue(edit.isEnabled());assertTrue(edit.isFocusable());assertEquals("",edit.getText().toString());
+    EditText edit=CaptionEditorIds.editorIn(row);assertNotNull(edit);assertTrue(edit.isEnabled());assertTrue(edit.isFocusable());assertEquals("",edit.getText().toString());
     edit.requestFocus();long now=android.os.SystemClock.uptimeMillis();edit.dispatchTouchEvent(MotionEvent.obtain(now,now,0,20,20,0));edit.dispatchTouchEvent(MotionEvent.obtain(now,now+30,1,20,20,0));
     Shadows.shadowOf(Looper.getMainLooper()).idle();assertTrue(edit.hasFocus());
     assertTrue(edit.performLongClick());Field field=InlineCaptionEditor.class.getDeclaredField("actions");field.setAccessible(true);ActionMode mode=(ActionMode)field.get(edit);assertNotNull(mode);

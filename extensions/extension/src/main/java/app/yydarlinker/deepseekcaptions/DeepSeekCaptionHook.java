@@ -24,6 +24,7 @@ public final class DeepSeekCaptionHook {
         try {
             if (activity != null) appContext = activity.getApplicationContext();
             TokenCostAudit.install(appContext);
+            CaptionPlayerTransitionGuard.installAuthorityListener();
             CaptionPlayerTransitionGuard.setActivity(activity);
             DynamicCaptionController.setMainActivity(activity);
             CaptionLifecycleRestore.install(activity);
@@ -35,6 +36,7 @@ public final class DeepSeekCaptionHook {
 
     public static void onVideoId(String videoId) {
         try {
+            CaptionPlayerAuthority.setVideo(videoId);
             TokenCostAudit.onVideoId(context(), videoId);
             DynamicCaptionController.onVideoId(videoId);
             CaptionButtonController.onVideoId(videoId);
@@ -46,15 +48,21 @@ public final class DeepSeekCaptionHook {
     private static final Object PLAYER_NOTIFICATION_LOCK=new Object();
     private static Enum<?> queuedPlayerType;
     private static boolean queuedPlayerOuter, playerNotificationPosted;
-    private static long queuedPlayerEpoch;
+    private static long queuedPlayerOwnerEpoch;
+    /**
+     * Off-main player notifications are coalesced to the newest type and merged on the main thread.
+     * The guard is the player <em>owner</em> epoch, not a caption render identity: a caption clear, an
+     * AI toggle or a style change must not be able to discard a valid player callback, while a real
+     * Activity/video change still rejects the stale notification.
+     */
     static boolean deferPlayerNotification(Enum<?> type,boolean outer) {
         if(android.os.Looper.myLooper()==android.os.Looper.getMainLooper())return false;
         synchronized(PLAYER_NOTIFICATION_LOCK) {
-            queuedPlayerType=type;queuedPlayerOuter=outer;queuedPlayerEpoch=CaptionOverlay.playerDispatchIdentity();
+            queuedPlayerType=type;queuedPlayerOuter=outer;queuedPlayerOwnerEpoch=CaptionPlayerAuthority.ownerEpoch();
             if(!playerNotificationPosted){playerNotificationPosted=true;PLAYER_MAIN.post(()->{
                 Enum<?> next;boolean full;long epoch;
-                synchronized(PLAYER_NOTIFICATION_LOCK){next=queuedPlayerType;full=queuedPlayerOuter;epoch=queuedPlayerEpoch;queuedPlayerType=null;playerNotificationPosted=false;}
-                if(epoch!=CaptionOverlay.playerDispatchIdentity())return;
+                synchronized(PLAYER_NOTIFICATION_LOCK){next=queuedPlayerType;full=queuedPlayerOuter;epoch=queuedPlayerOwnerEpoch;queuedPlayerType=null;playerNotificationPosted=false;}
+                if(epoch!=CaptionPlayerAuthority.ownerEpoch())return;
                 if(full)DeepSeekCaptionHookV2.onPlayerType(next);else onPlayerType(next);
             });}
         }

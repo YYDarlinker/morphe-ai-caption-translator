@@ -115,7 +115,7 @@ public class DeepSeekTextPreference extends CaptionSettingPreference implements 
         root.addView(title, matchWrap());
 
         editor = new InlineCaptionEditor(context);
-        editor.setId(android.R.id.edit);
+        editor.setId(CaptionEditorIds.forKey(getKey()));
         editor.setFocusableInTouchMode(true);
         CaptionSettingsStyle.editor(editor);
         configureEditor(editor);

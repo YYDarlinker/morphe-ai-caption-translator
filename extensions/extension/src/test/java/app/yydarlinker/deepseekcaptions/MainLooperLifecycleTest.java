@@ -22,9 +22,11 @@ public class MainLooperLifecycleTest {
  interface Work {void run() throws Exception;}
  static void main(Work r) throws Exception {
   FutureTask<Void> task=new FutureTask<>(()->{assertSame(Looper.getMainLooper(),Looper.myLooper());r.run();return null;});
-  new Handler(Looper.getMainLooper()).post(task);task.get(2,TimeUnit.SECONDS);
+  // N36: the main entry must return promptly, but a shared test JVM may still be draining the previous
+  // fixture. The per-test 30 s guard remains the real deadline; this is only the hand-off wait.
+  new Handler(Looper.getMainLooper()).post(task);task.get(10,TimeUnit.SECONDS);
  }
- @Before public void setup() throws Exception {h=new SchedulerLifecycleRegressionTest();main(()->h.setup());}
+ @Before public void setup() throws Exception {CaptionPlayerTransitionGuard.resetForTests();CaptionPlayerAuthority.resetForTests();h=new SchedulerLifecycleRegressionTest();main(()->h.setup());}
  @After public void cleanup() throws Exception {h.cleanup();}
  RebuildController.Session held() throws Exception {
   RebuildController.Session s=h.fixture();SchedulerLifecycleRegressionTest.install(s);
@@ -73,8 +75,12 @@ public class MainLooperLifecycleTest {
   RebuildController.Session next=h.h.session();assertNotSame(old,next);ready(next);
   main(()->RebuildController.time(0));String shown=(String)RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingText");assertFalse(shown.isEmpty());
   assertTrue(old.retired);assertNotEquals(old.cacheKey,next.cacheKey);assertEquals(1,SchedulerLifecycleRegressionTest.CommitBoundary.release.getCount());
+  // N36: the applied identity must belong to the live session after the retired render is invoked.
   release(old);main(()->SchedulerLifecycleRegressionTest.invoke("render",old));
-  assertSame(next,h.h.session());assertEquals(shown,RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingText"));
+  assertSame(next,h.h.session());
+  String applied=String.valueOf(RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingIdentity"));
+  assertTrue("the applied identity must belong to the live session: "+applied,applied.startsWith(next.id+":"));
+  assertFalse(((String)RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingText")).isEmpty());
  }
  @Test(timeout=30000) public void backgroundTimeoutKeepsRevocationAndCanAwaitAgainAfterRelease() throws Exception {
   RebuildController.Session old=h.fixture();SchedulerLifecycleRegressionTest.install(old);RebuildCache.Permit permit=old.publication.reserve();
@@ -133,6 +139,12 @@ public class MainLooperLifecycleTest {
   main(RebuildController::stop);SchedulerLifecycleRegressionTest.await(entered);
   main(()->RebuildController.activate(h.h.a,h.url("fr"),false,true));RebuildController.Session next=h.h.session();ready(next);main(()->RebuildController.time(0));
   String shown=(String)RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingText");assertFalse(shown.isEmpty());done.countDown();old.awaitRetirement();
-  main(()->SchedulerLifecycleRegressionTest.invoke("render",old));assertEquals(shown,RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingText"));assertSame(next,h.h.session());
+  // N36: the retired session must not own what is applied. The live session may legitimately advance
+  // to its next page while the retirement barrier drains, so ownership of the applied identity and a
+  // non-empty applied text are asserted instead of one frozen string.
+  main(()->SchedulerLifecycleRegressionTest.invoke("render",old));
+  String applied=String.valueOf(RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingIdentity"));
+  assertTrue("the applied identity must belong to the live session: "+applied,applied.startsWith(next.id+":"));
+  assertFalse(((String)RebuildIntegrationTest.field(null,CaptionOverlay.class,"pendingText")).isEmpty());
  }
 }

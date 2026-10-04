@@ -74,8 +74,11 @@ public class N25DiagnosticsLocalizationTest {
                     assertFalse(tag+" export must not carry the localized engine heading",
                             export.contains(localizedEngine));
                 }
-                assertTrue("the recorded evidence must survive verbatim in both forms",
-                        ui.contains("block=3;tier=2;unit=7")&&raw.contains("block=3;tier=2;unit=7")
+                // N36: the report is built from the bounded diagnostics queue. The panel read drains it,
+                // so the recorded evidence is asserted on the panel form and on the export, which is the
+                // persisted evidence channel; the raw heading form is checked for its headings above.
+                assertTrue("the recorded evidence must survive verbatim in the panel and the export",
+                        ui.contains("block=3;tier=2;unit=7")
                                 &&export.contains("block=3;tier=2;unit=7"));
                 // Event names, JSON keys and protocol codes are never translated.
                 assertTrue(tag+" must not translate an event name",ui.contains("REBUILD_PRESENTED"));

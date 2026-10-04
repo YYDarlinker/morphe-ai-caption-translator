@@ -31,6 +31,8 @@ final class CaptionSurface {
   };
   static long refreshSearchCount, renderedSearchCount, geometrySearchNanos;
   static void invalidateGeometry(){geometryInvalid=true;renderedSurfaces.clear();}
+  /** True while a real surface layout invalidated the cached player rectangle and it was not re-proven. */
+  static boolean geometryInvalidated(){return geometryInvalid;}
 
   static void activity(Activity a) {
     View old=observedRoot.get();if(old!=null)old.removeOnLayoutChangeListener(GEOMETRY_LAYOUT);

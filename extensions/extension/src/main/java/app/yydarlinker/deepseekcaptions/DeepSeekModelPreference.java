@@ -151,6 +151,7 @@ public final class DeepSeekModelPreference extends CaptionSettingPreference impl
         root.addView(title, matchWrap());
 
         editor = new InlineCaptionEditor(context);
+        editor.setId(CaptionEditorIds.forKey(KEY_MODEL));
         editor.setSingleLine(true);
         editor.setFocusableInTouchMode(true);
         CaptionSettingsStyle.editor(editor);

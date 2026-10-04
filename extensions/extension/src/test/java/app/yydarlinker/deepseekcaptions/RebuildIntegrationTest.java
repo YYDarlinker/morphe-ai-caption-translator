@@ -61,6 +61,10 @@ public class RebuildIntegrationTest {
   @Before
   public void setup() throws Exception {
     RebuildController.stop();
+    // N36: the player authority and its transition coordinator are process-wide; a fixture Activity
+    // must start from a clean authority instead of inheriting the previous test owner state.
+    CaptionPlayerTransitionGuard.resetForTests();
+    CaptionPlayerAuthority.resetForTests();
     RebuildApi.reset();
     a = Robolectric.buildActivity(Activity.class).setup().visible().get();
     SourceCaptionCache.clear(a);

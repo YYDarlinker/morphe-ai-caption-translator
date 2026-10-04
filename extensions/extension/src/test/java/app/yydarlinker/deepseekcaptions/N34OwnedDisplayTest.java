@@ -142,7 +142,12 @@ public class N34OwnedDisplayTest {
   }
   @Test public void illegalUnicodeAndPhysicalCapacityNeverBecomeVisible()throws Exception {
     CaptionOverlay.showEvent("\ud800",()->true,()->"","unicode-invalid",100,2000,100,spec("zh-Hans"));
-    assertEquals(View.GONE,h.anchor().getVisibility());assertTrue(h.presentationHistory().contains("hard_geometry_unresolved"));
+    // N36: a never-presented overlay has no anchor at all or a hidden one; the authority-level fact is
+    // that nothing is visible.
+    // N36: the blank decision and its reason are asserted on the production display memory; the
+    // archive-channel form is covered by the diagnostics lane.
+    assertFalse(CaptionOverlay.anchorVisible());
+    assertTrue(String.valueOf(RebuildLayoutTest.field("lastDisplayResult")).contains("hard_geometry_unresolved"));
     String dense=String.join(" ",Collections.nCopies(60,"unchanged"));long before=System.nanoTime();
     List<RebuildPageLayout.Page> pages=RebuildPageLayout.plan(dense,0,283,new CaptionOverlay.LayoutBudget(200,40),spec("en"));assertTrue(pages.isEmpty());
     save("bounded-long-input",new JSONObject().put("characters",dense.length()).put("duration_ms",283).put("planning_us",(System.nanoTime()-before)/1000).put("blank",true));

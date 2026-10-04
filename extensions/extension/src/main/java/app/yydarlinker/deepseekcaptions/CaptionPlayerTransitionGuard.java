@@ -7,18 +7,14 @@ import android.os.Looper;
 import android.view.View;
 
 import java.lang.ref.WeakReference;
-import java.util.Locale;
 
 /**
  * Keeps extension work out of YouTube's player transition critical path.
  *
- * <p>Miniplayer expansion owns an explicit quarantine. The overlay is hidden and unbound before the
- * transition, may update only its pending text while YouTube animates, and is restored exactly once
- * after geometry stabilizes. No multi-frame extension measurement/polling follows the restore.</p>
- *
- * <p>The same transition signal also temporarily silences caption-button accessibility scanning,
- * native-renderer discovery, and protects the active AI Timed Text target during fullscreen /
- * orientation transitions.</p>
+ * <p>N36: this class no longer owns player state. It consumes {@link CaptionPlayerAuthority} and owns
+ * exactly one revocable read-only probe per owner epoch. Every probe exit path (owner change, decor
+ * disappearance, token change, timeout, completion) releases its own slot, and a cleanup only clears
+ * the slot it owns, so an old probe can never clear a newer one.</p>
  */
 final class CaptionPlayerTransitionGuard {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -30,188 +26,293 @@ final class CaptionPlayerTransitionGuard {
     private static final int STABLE_FRAMES_REQUIRED = 2;
     private static final int MAX_OBSERVATION_FRAMES = 12;
     private static final int PIXEL_TOLERANCE = 1;
+    /** A probe that cannot start must not hold the only restore slot while the owner changes. */
+    private static final Runnable NO_OP = () -> {};
 
     private static WeakReference<Activity> activityRef = new WeakReference<>(null);
-    private static boolean compactPlayer;
-    /**
-     * True from the moment compact-player quarantine starts until a non-compact probe actually
-     * completes the one-shot overlay restore. This is intentionally separate from compactPlayer:
-     * YouTube can emit several non-compact player-type callbacks while one expansion animation is
-     * still in flight. A later callback must not erase the restore responsibility of the first one.
-     */
-    private static boolean expansionRestorePending;
+    private static long ownerEpoch = -1;
     private static long generation;
     private static Probe pendingProbe;
-    private static String latestType="";
-    private static WeakReference<View> playerRectView=new WeakReference<>(null);
+    private static String probeTargetType = "";
+    private static boolean probeRestoresOverlay;
+    private static WeakReference<View> playerRectView = new WeakReference<>(null);
     static long observedFrameCount, probeNanos;
-    private static WeakReference<View> recoveryLayoutRoot=new WeakReference<>(null);
-    private static final View.OnLayoutChangeListener RECOVERY_LAYOUT=(v,l,t,r,b,ol,ot,or,ob)->{
-        if(expansionRestorePending&&!compactPlayer&&pendingProbe==null)startReadOnlyProbe(latestType,true);
-    };
-    private static void removeRecoveryLayout(){View v=recoveryLayoutRoot.get();if(v!=null)v.removeOnLayoutChangeListener(RECOVERY_LAYOUT);recoveryLayoutRoot.clear();}
-    private static void awaitValidLayout(Activity activity){View root=decor(activity);if(root==null)return;removeRecoveryLayout();recoveryLayoutRoot=new WeakReference<>(root);root.addOnLayoutChangeListener(RECOVERY_LAYOUT);}
+    private static WeakReference<View> observedPlayerView = new WeakReference<>(null);
+    private static WeakReference<View> recoveryLayoutRoot = new WeakReference<>(null);
+    private static boolean awaitingPlayerChild;
+    /**
+     * A real layout event is only a wake-up. Restore permission still requires this owner to expose a
+     * proven current player surface, so an unrelated decor relayout cannot award the restore slot.
+     */
+    private static final View.OnLayoutChangeListener RECOVERY_LAYOUT =
+            (v,l,t,r,b,oldL,oldT,oldR,oldB) -> {
+                if(!awaitingPlayerChild||pendingProbe!=null)return;
+                if(!ownerSurfaceStable())return;
+                awardRestore();
+            };
+    private static void removeRecoveryLayout(){
+        View v=recoveryLayoutRoot.get();
+        if(v!=null)v.removeOnLayoutChangeListener(RECOVERY_LAYOUT);
+        recoveryLayoutRoot.clear();
+    }
+    /**
+     * Waits for one real layout event on the highest view of the current player subtree that is still
+     * attached. The decor frame alone is not evidence that the player child came back, so the listener
+     * is placed below it whenever a player subtree is still reachable.
+     */
+    private static void awaitValidLayout(View decorRoot){
+        removeRecoveryLayout();
+        View target=playerSubtreeRoot(decorRoot);
+        if(target==null){awaitingPlayerChild=false;return;}
+        recoveryLayoutRoot=new WeakReference<>(target);
+        target.addOnLayoutChangeListener(RECOVERY_LAYOUT);
+        awaitingPlayerChild=true;
+    }
+
+    private static View playerSubtreeRoot(View decorRoot){
+        View player=playerRectView.get();
+        if(player==null)player=observedPlayerView.get();
+        View highest=null;
+        for(View current=player;current!=null;current=current.getParent() instanceof View
+                ?(View)current.getParent():null){
+            if(current==decorRoot)break;
+            highest=current;
+        }
+        return highest==null?decorRoot:highest;
+    }
 
     private CaptionPlayerTransitionGuard() {}
 
     static void setActivity(Activity activity) {
         removeRecoveryLayout();
         activityRef = new WeakReference<>(activity);
-        generation++;pendingProbe=null;playerRectView.clear();
+        ownerEpoch = -1;
+        revokeProbe();
+        awaitingPlayerChild = false;
+        playerRectView.clear();
+        observedPlayerView.clear();
     }
 
+    /**
+     * One player notification on the main thread. Authority merge only plus constant-time bookkeeping;
+     * no tree scan, no font measurement, no network and no keystore work happens here.
+     */
     static void onPlayerType(String rawType) {
-        String type = rawType == null ? "" : rawType.trim();
-        boolean nextCompact = !CaptionSurface.isShorts() && compact(type);
-        boolean same=type.equals(latestType);latestType=type;
-        if(same && pendingProbe!=null)return;
+        onPlayerType(rawType, false);
+    }
 
-        // Renderer discovery may walk a bounded part of the player View tree. Keep that work out of
-        // the same animation-critical window already used for overlay geometry and CC state guards.
+    static void onPlayerType(String rawType, boolean outer) {
+        Activity activity = activityRef.get();
+        if (activity != null && activity != CaptionPlayerAuthority.activity())
+            CaptionPlayerAuthority.setOwner(activity);
+        long currentEpoch = CaptionPlayerAuthority.ownerEpoch();
+        if (currentEpoch != ownerEpoch) {
+            ownerEpoch = currentEpoch;
+            revokeProbe();
+            awaitingPlayerChild = false;
+            playerRectView.clear();
+            observedPlayerView.clear();
+        }
+        boolean installed = listenerInstalled;
+        CaptionPlayerAuthority.onNotification(rawType, outer);
+        // The authority state change arrives through the listener registration; if the listener is not
+        // installed yet (first notification of a cold owner) drive the coordinator directly.
+        if (!installed) onAuthorityChanged();
+    }
+
+    private static boolean listenerInstalled;
+    private static final CaptionPlayerAuthority.Listener AUTHORITY_LISTENER =
+            CaptionPlayerTransitionGuard::onAuthorityChanged;
+    static void installAuthorityListener(){
+        listenerInstalled=true;
+        CaptionPlayerAuthority.addListener(AUTHORITY_LISTENER);
+    }
+
+    /** Called on the main thread after the authority merged a notification or changed owner/state. */
+    static void onAuthorityChanged(){
+        // A cleared authority also clears this coordinator: a stale Activity reference must never be
+        // re-declared as the owner of a later session.
+        if(CaptionPlayerAuthority.activity()==null){
+            activityRef=new WeakReference<>(null);
+            ownerEpoch=-1;
+            revokeProbe();
+            awaitingPlayerChild=false;
+            playerRectView.clear();
+            observedPlayerView.clear();
+            return;
+        }
+        String type=CaptionPlayerAuthority.playerType();
+        int state=CaptionPlayerAuthority.state();
         CaptionMusicSuppressor.pauseDiscoveryForPlayerTransition(true);
         CaptionMusicSuppressor.beginNativeRendererTransition();
         CaptionButtonController.onPlayerTransition(type);
         CaptionLifecycleRestore.onPlayerTransition(type);
 
-        if (nextCompact) {
-            generation++;pendingProbe=null;playerRectView.clear();removeRecoveryLayout();
-            compactPlayer = true;
-            expansionRestorePending = true;
-            // Start the quarantine before YouTube's compact/expand choreography can issue layouts.
-            CaptionOverlay.beginGuardedExpansion();
+        if(state==CaptionPlayerAuthority.COMPACT){
+            revokeProbe();
+            awaitingPlayerChild=false;
+            if(CaptionPlayerAuthority.ownerValid())
+                awaitValidLayout(CaptionPlayerAuthority.decorView());
+            CaptionMusicSuppressor.endNativeRendererTransition();
             return;
         }
-
-        // Do not infer restore ownership only from the immediately previous player type. YouTube can
-        // report several ordinary/non-compact types during one miniplayer expansion. The first one
-        // starts a delayed restore probe; subsequent ones invalidate that probe via generation++.
-        // Keep carrying the restore obligation until the newest probe actually finishes it.
-        boolean expandingFromCompact = compactPlayer || expansionRestorePending;
-        compactPlayer = false;
-
-        if (!expandingFromCompact) {
-            // Fullscreen/orientation changes remain visible and use real layout events only.
-            CaptionOverlay.setPlayerType(type);
-            generation++;
+        if(state==CaptionPlayerAuthority.CLOSED||state==CaptionPlayerAuthority.UNKNOWN){
+            revokeProbe();
+            CaptionMusicSuppressor.endNativeRendererTransition();
+            return;
+        }
+        // TRANSITIONING_TO_REGULAR and REGULAR both rely on real geometry. A REGULAR owner without a
+        // compact predecessor still runs one bounded observation so the first paint is not guessed.
+        if(state==CaptionPlayerAuthority.REGULAR){
+            // No compact predecessor: the authoritative non-compact type is already decisive, so no
+            // geometry observation is started. One frame-aligned render keeps the visible caption on
+            // the newly reported player mode and the coordinator returns to idle.
+            revokeProbe();
+            awaitingPlayerChild=false;
+            removeRecoveryLayout();
+            CaptionOverlay.requestPlayerRender();
             CaptionButtonController.onPlayerStable();
             CaptionMusicSuppressor.endNativeRendererTransition();
             return;
         }
-
-        if (!DynamicCaptionController.isVisibleActive()) {
-            if (expandingFromCompact) {
-                CaptionOverlay.restoreAfterGuardedExpansion(type);
-                expansionRestorePending = false;
-            }
-            CaptionButtonController.onPlayerStable();
-            CaptionMusicSuppressor.endNativeRendererTransition();
-            return;
-        }
-
-        // Non-compact intermediate types update the restore target, never restart the observation.
-        if(pendingProbe==null)startReadOnlyProbe(type, expandingFromCompact);
+        if(!ownerSurfaceStable())return;
+        if(pendingProbe!=null)return;
+        startReadOnlyProbe(type,true);
     }
 
-    private static void startReadOnlyProbe(String targetType, boolean delayedOverlayRestore) {
-        final long token = ++generation;
-        Activity activity = activityRef.get();
-        View frameClock = decor(activity);
-        if (activity == null || frameClock == null) {
-            // Missing geometry is not permission to display at an unverified location.
+    /** Cached read-only player view, refreshed only when the owner or the cached view is gone. */
+    static View playerView(){
+        Activity activity=activityRef.get();
+        if(activity==null||activity.isFinishing()||activity.getWindow()==null)return null;
+        View cached=playerRectView.get();
+        if(cached!=null&&cached.isAttachedToWindow()&&cached.isShown())return cached;
+        readPlayerRect(activity);
+        return playerRectView.get();
+    }
+
+    /**
+     * A bounded observation may only start when this owner still has proven, current player geometry.
+     * The player view is read from the cached discovery and a missing cache means the last real render
+     * already hid this surface. There is no per-frame decor walk here.
+     */
+    private static boolean ownerSurfaceStable(){
+        // The same visibility rule the overlay uses, so a hidden player container can never be
+        // mistaken for a settled surface and a stale rectangle is never reused.
+        return CaptionSurface.visible(playerView());
+    }
+
+    private static void revokeProbe(){
+        generation++;
+        pendingProbe=null;
+        probeTargetType="";
+        probeRestoresOverlay=false;
+        observedPlayerView.clear();
+        playerRectView.clear();
+    }
+
+    /** The bounded observation completed: hand the display permission decision to the authority. */
+    private static void awardRestore(){
+        if(pendingProbe!=null)return;
+        removeRecoveryLayout();
+        awaitingPlayerChild=false;
+        CaptionPlayerAuthority.settleRegular();
+        CaptionButtonController.onPlayerStable();
+        CaptionMusicSuppressor.endNativeRendererTransition();
+        Activity activity=activityRef.get();
+        if(activity!=null)CaptionDiagnostics.mark(activity,"PLAYER_TRANSITION_STABLE",
+            "type="+CaptionPlayerAuthority.playerType()+";state="+CaptionPlayerAuthority.stateName()
+                +";geometry_probe_total_us="+(probeNanos/1000)+";overlay_restore="+probeRestoresOverlay
+                +";"+CaptionPlayerAuthority.shortId());
+    }
+
+    private static void startReadOnlyProbe(String targetType,boolean restoresOverlay){
+        final long token=++generation;
+        Activity activity=activityRef.get();
+        if(activity==null||activity.isFinishing()||activity.getWindow()==null){
+            // Missing owner is not permission to display at an unverified location.
+            observedPlayerView.clear();
             CaptionMusicSuppressor.endNativeRendererTransition();
-            awaitValidLayout(activity);
             return;
         }
-
-        Probe probe = new Probe(token, targetType, delayedOverlayRestore);
+        Probe probe=new Probe(token,targetType,restoresOverlay);
         pendingProbe=probe;
+        probeTargetType=targetType;
+        probeRestoresOverlay=restoresOverlay;
         android.view.Choreographer.getInstance().postFrameCallback(probe);
     }
 
-    private static void finish(
-            long token,
-            String targetType,
-            boolean delayedOverlayRestore,
-            int observedFrames
-    ) {
-        if (token != generation) return;
-        long frameSpan=pendingProbe==null?0:Math.max(0,pendingProbe.lastFrameNanos-pendingProbe.firstFrameNanos);
-        pendingProbe=null;removeRecoveryLayout();
-        targetType=latestType;
-        if (delayedOverlayRestore) {
-            // One atomic restore. CaptionOverlay no longer starts a 20/36-frame geometry tail here.
-            CaptionOverlay.restoreAfterGuardedExpansion(targetType);
-            expansionRestorePending = false;
-        }
+    private static void finish(Probe probe,int observedFrames){
+        if(probe.token!=generation||pendingProbe!=probe)return;
+        long frameSpan=Math.max(0,probe.lastFrameNanos-probe.firstFrameNanos);
+        pendingProbe=null;
+        removeRecoveryLayout();
+        awaitingPlayerChild=false;
+        CaptionPlayerAuthority.settleRegular();
         CaptionButtonController.onPlayerStable();
         CaptionMusicSuppressor.endNativeRendererTransition();
-
-        Activity activity = activityRef.get();
-        if (activity != null && DynamicCaptionController.isVisibleActive()) {
-            CaptionDiagnostics.mark(
-                    activity,
-                    "PLAYER_TRANSITION_STABLE",
-                    "type="+targetType+";observed_frames="+observedFrames+";observed_frame_ns="+frameSpan
-                            +";geometry_probe_total_us="+(probeNanos/1000)+";overlay_restore="+delayedOverlayRestore
-            );
+        Activity activity=activityRef.get();
+        if(activity!=null&&DynamicCaptionController.isVisibleActive()){
+            CaptionDiagnostics.mark(activity,"PLAYER_TRANSITION_STABLE",
+                "type="+CaptionPlayerAuthority.playerType()+";observed_frames="+observedFrames
+                    +";observed_frame_ns="+frameSpan+";geometry_probe_total_us="+(probeNanos/1000)
+                    +";overlay_restore="+probe.delayedOverlayRestore+";state="+CaptionPlayerAuthority.stateName()
+                    +";"+CaptionPlayerAuthority.shortId());
         }
     }
 
-    private static View decor(Activity activity) {
-        if (activity == null || activity.isFinishing() || activity.getWindow() == null) return null;
-        return activity.getWindow().getDecorView();
+    /**
+     * A proven player snapshot: the view that produced the rectangle plus its current rect. Holding the
+     * view keeps the rect and the identity consistent, so a cached rectangle is never paired with a
+     * different surface.
+     */
+    private static final class PlayerSnapshot {
+        final View view;
+        final Rect rect;
+        PlayerSnapshot(View view,Rect rect){this.view=view;this.rect=rect;}
     }
 
-    private static Rect readPlayerRect(Activity activity) {
-        View root = decor(activity);
-        if (root == null) return null;
-
+    private static PlayerSnapshot readPlayerRect(Activity activity) {
+        View root=activity==null?null:activity.getWindow()==null?null:activity.getWindow().getDecorView();
+        if(root==null)return null;
         View cached=playerRectView.get();
-        if(cached!=null && cached.isAttachedToWindow() && cached.isShown()) {Rect r=new Rect();if(cached.getGlobalVisibleRect(r)&&r.width()>1&&r.height()>1)return r;}
-        Rect best = null;
-        long bestArea = -1L;
-        for (String name : PLAYER_IDS) {
-            int id;
-            try {
-                id = activity.getResources().getIdentifier(name, "id", activity.getPackageName());
-            } catch (Throwable ignored) {
-                continue;
-            }
-            if (id == 0) continue;
-            View candidate = root.findViewById(id);
-            if (candidate == null || !candidate.isAttachedToWindow() ||
-                    !candidate.isShown() || candidate.getAlpha() <= 0.01f) {
-                continue;
-            }
-            Rect rect = new Rect();
-            if (!candidate.getGlobalVisibleRect(rect) || rect.width() <= 1 || rect.height() <= 1) {
-                continue;
-            }
-            long area = (long) rect.width() * rect.height();
-            if (area > bestArea) {
-                bestArea = area;
-                best = rect;
-                playerRectView=new WeakReference<>(candidate);
+        if(cached!=null&&CaptionSurface.visible(cached)){
+            Rect rect=new Rect();
+            if(cached.getGlobalVisibleRect(rect)&&rect.width()>1&&rect.height()>1)
+                return new PlayerSnapshot(cached,rect);
+        }
+        View previous=observedPlayerView.get();
+        if(previous!=null&&CaptionSurface.visible(previous)){
+            Rect rect=new Rect();
+            if(previous.getGlobalVisibleRect(rect)&&rect.width()>1&&rect.height()>1){
+                playerRectView=new WeakReference<>(previous);
+                return new PlayerSnapshot(previous,rect);
             }
         }
-        return best;
+        View bestView=null;
+        Rect best=null;
+        long bestArea=-1L;
+        for(String name:PLAYER_IDS){
+            int id;
+            try { id=activity.getResources().getIdentifier(name,"id",activity.getPackageName()); }
+            catch(Throwable ignored){ continue; }
+            if(id==0)continue;
+            View candidate=root.findViewById(id);
+            if(!CaptionSurface.visible(candidate))continue;
+            Rect rect=new Rect();
+            if(!candidate.getGlobalVisibleRect(rect)||rect.width()<=1||rect.height()<=1)continue;
+            long area=(long)rect.width()*rect.height();
+            if(area>bestArea){bestArea=area;best=rect;bestView=candidate;}
+        }
+        if(bestView==null)return null;
+        playerRectView=new WeakReference<>(bestView);
+        observedPlayerView=new WeakReference<>(bestView);
+        return new PlayerSnapshot(bestView,best);
     }
 
-    private static boolean nearlySame(Rect a, Rect b) {
-        if (a == null || b == null) return false;
-        return Math.abs(a.left - b.left) <= PIXEL_TOLERANCE &&
-                Math.abs(a.top - b.top) <= PIXEL_TOLERANCE &&
-                Math.abs(a.right - b.right) <= PIXEL_TOLERANCE &&
-                Math.abs(a.bottom - b.bottom) <= PIXEL_TOLERANCE;
-    }
-
-    private static boolean compact(String rawType) {
-        String type = rawType == null ? "" : rawType.trim().toUpperCase(Locale.ROOT);
-        if (type.isEmpty()) return false;
-        return type.equals("NONE") || type.equals("HIDDEN") || type.equals("INLINE_MINIMAL") ||
-                type.equals("WATCH_WHILE_PICTURE_IN_PICTURE") || type.contains("MINIMAL") ||
-                type.contains("MINIMIZED") || type.contains("PICTURE_IN_PICTURE") ||
-                type.contains("DISMISSED");
+    private static boolean nearlySame(Rect a,Rect b){
+        if(a==null||b==null)return false;
+        return Math.abs(a.left-b.left)<=PIXEL_TOLERANCE&&Math.abs(a.top-b.top)<=PIXEL_TOLERANCE
+            &&Math.abs(a.right-b.right)<=PIXEL_TOLERANCE&&Math.abs(a.bottom-b.bottom)<=PIXEL_TOLERANCE;
     }
 
     private static final class Probe implements Runnable, android.view.Choreographer.FrameCallback {
@@ -224,55 +325,81 @@ final class CaptionPlayerTransitionGuard {
         long firstFrameNanos,lastFrameNanos;
         Rect previous;
 
-        Probe(long token, String targetType, boolean delayedOverlayRestore) {
-            this.token = token;
-            this.targetType = targetType;
-            this.delayedOverlayRestore = delayedOverlayRestore;
+        Probe(long token,String targetType,boolean delayedOverlayRestore){
+            this.token=token;
+            this.targetType=targetType;
+            this.delayedOverlayRestore=delayedOverlayRestore;
         }
 
-        @Override public void doFrame(long frameTimeNanos){lastFrameNanos=frameTimeNanos;if(firstFrameNanos==0)firstFrameNanos=frameTimeNanos;run();}
-        @Override
-        public void run() {
-            if (token != generation) return;
-            Activity activity = activityRef.get();
-            View frameClock = decor(activity);
-            if (activity == null || frameClock == null) {
+        @Override public void doFrame(long frameTimeNanos){
+            lastFrameNanos=frameTimeNanos;
+            if(firstFrameNanos==0)firstFrameNanos=frameTimeNanos;
+            run();
+        }
+
+        @Override public void run(){
+            if(token!=generation||pendingProbe!=this)return;
+            Activity activity=activityRef.get();
+            if(activity==null||activity.isFinishing()||activity.getWindow()==null){
+                // Owner disappeared mid-observation: release this probe's slot, keep quarantine.
+                releaseProbe();
+                awaitingPlayerChild=true;
                 CaptionMusicSuppressor.endNativeRendererTransition();
                 return;
             }
-
             long started=System.nanoTime();
-            Rect current = readPlayerRect(activity);
+            PlayerSnapshot snapshot=readPlayerRect(activity);
             probeNanos+=System.nanoTime()-started;
+            Rect current=snapshot==null?null:snapshot.rect;
             frames++;observedFrameCount++;
-            if (current != null && previous != null) {
-                if (nearlySame(previous, current)) {
-                    stableFrames++;
-                } else {
-                    sawMotion = true;
-                    stableFrames = 0;
-                }
-            } else {
-                stableFrames = 0;
-            }
-            previous = current == null ? null : new Rect(current);
+            if(current!=null&&previous!=null){
+                if(nearlySame(previous,current))stableFrames++;
+                else {sawMotion=true;stableFrames=0;}
+            } else stableFrames=0;
+            previous=current==null?null:new Rect(current);
 
-            boolean enoughFrames = frames >= MIN_OBSERVATION_FRAMES;
-            boolean stable = enoughFrames && stableFrames >= STABLE_FRAMES_REQUIRED &&
-                    (sawMotion || frames >= NO_MOTION_FALLBACK_FRAMES);
-            if (stable || frames >= MAX_OBSERVATION_FRAMES) {
-                if (!stable) {
-                    pendingProbe=null;awaitValidLayout(activity);
-                    CaptionMusicSuppressor.endNativeRendererTransition();
-                    CaptionButtonController.onPlayerStable();
-                    CaptionDiagnostics.mark(activity,"PLAYER_TRANSITION_SAFE_BLANK",
-                        "reason=geometry_not_stable;observed_frames="+frames);
-                    return; // Keep quarantine; no forced restore at the observation ceiling.
-                }
-                finish(token, targetType, delayedOverlayRestore, frames);
+            boolean enoughFrames=frames>=MIN_OBSERVATION_FRAMES;
+            boolean stable=enoughFrames&&stableFrames>=STABLE_FRAMES_REQUIRED
+                &&(sawMotion||frames>=NO_MOTION_FALLBACK_FRAMES);
+            if(stable){finish(this,frames);return;}
+            if(frames>=MAX_OBSERVATION_FRAMES){
+                // End this observation and release the slot. Keep the safe blank surface and wait for a
+                // real player-subtree attach/layout or one new authoritative notification; no forced
+                // restore at the ceiling and no permanent polling.
+                releaseProbe();
+                awaitValidLayout(CaptionPlayerAuthority.decorView());
+                CaptionMusicSuppressor.endNativeRendererTransition();
+                CaptionButtonController.onPlayerStable();
+                CaptionDiagnostics.mark(activity,"PLAYER_TRANSITION_SAFE_BLANK",
+                    "reason=geometry_not_stable;observed_frames="+frames
+                        +";state="+CaptionPlayerAuthority.stateName()+";"+CaptionPlayerAuthority.shortId());
                 return;
             }
             android.view.Choreographer.getInstance().postFrameCallback(this);
         }
+
+        private void releaseProbe(){
+            if(pendingProbe==this)pendingProbe=null;
+        }
     }
+
+    /** Test-only reset so each fixture starts from a clean probe slot. */
+    static void resetForTests(){
+        removeRecoveryLayout();
+        activityRef=new WeakReference<>(null);
+        ownerEpoch=-1;
+        generation=0;
+        pendingProbe=null;
+        probeTargetType="";
+        probeRestoresOverlay=false;
+        awaitingPlayerChild=false;
+        playerRectView.clear();
+        observedPlayerView.clear();
+        observedFrameCount=0;
+        probeNanos=0;
+        if(listenerInstalled){CaptionPlayerAuthority.removeListener(AUTHORITY_LISTENER);listenerInstalled=false;}
+    }
+
+    static boolean probePending(){return pendingProbe!=null;}
+    static boolean awaitingPlayerChild(){return awaitingPlayerChild;}
 }

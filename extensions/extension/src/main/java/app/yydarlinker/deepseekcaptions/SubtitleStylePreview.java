@@ -37,7 +37,7 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
     /**
      * Where the caption lands once the full-screen reference frame has been scaled into the preview. The
      * caption is laid out and centred in reference coordinates and the whole frame is then scaled exactly
-     * once, so a box narrower than the reference can still start outside the scaled frame — this both
+     * once, so a box narrower than the reference can still start outside the scaled frame 鈥?this both
      * computes the real on-screen rectangle and reports whether the fit is exact. Read-only evidence for
      * the fixtures; nothing in production reads it.
      */
@@ -76,7 +76,22 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
         return root;
     }
     static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.sizeTier=CaptionFontSize.clampTier(value);else p.opacity=value;p.invalidateCache();p.invalidate();}}
-    @Override protected void refreshDynamicText(){Preview preview=ownPreview.get();if(preview!=null){preview.setContentDescription(CaptionStrings.settings(getContext(),"preview"));CaptionTextResolver.direction(preview,false);preview.invalidateCache();preview.invalidate();}}
+    /**
+     * Ordinary row rebinding, scrolling, clipping at the preview edge and entering/leaving the
+     * window are not measurement changes, so this must not throw away a warm label. A real interface
+     * language change is picked up by the measurement key itself; the slider values are re-read here
+     * only when they actually differ from what this instance already holds.
+     */
+    @Override protected void refreshDynamicText(){
+        Preview preview=ownPreview.get();
+        if(preview==null)return;
+        preview.setContentDescription(CaptionStrings.settings(getContext(),"preview"));
+        CaptionTextResolver.direction(preview,false);
+        DeepSeekConfig.Snapshot style=DeepSeekConfig.displayStyle(getContext());
+        boolean changed=preview.sizeTier!=style.captionSizeTier||preview.opacity!=style.backgroundOpacity;
+        preview.sizeTier=style.captionSizeTier;preview.opacity=style.backgroundOpacity;
+        if(changed){preview.invalidateCache();preview.invalidate();}
+    }
     /** The sample line resolved through the settings catalog for whatever interface language is active. */
     static String sample(Context c){return CaptionStrings.settings(c,SAMPLE_KEY);}
     // Use all available row width; video and captions share one 16:9 coordinate system.
@@ -124,21 +139,50 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
     static final class Preview extends View {
         int sizeTier;int opacity;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
         private TextView cachedLabel;private String cachedLabelKey="";private int cachedWidth=-1;
+        /** Scene geometry is rebuilt only for a real size change; a warm draw allocates nothing. */
+        private int sceneWidth=-1,sceneHeight=-1;
+        private Path sceneClip,sceneHill;
+        private LinearGradient sceneSky;
+        /** Background style is re-applied only for a real colour or corner change. */
+        private int appliedBackground=Integer.MIN_VALUE;
+        private float appliedRadius=-1f;
         Preview(Context c){super(c);DeepSeekConfig.Snapshot s=DeepSeekConfig.displayStyle(c);sizeTier=s.captionSizeTier;opacity=s.backgroundOpacity;setContentDescription(CaptionStrings.settings(c,"preview"));}
         void invalidateCache(){cachedLabel=null;cachedLabelKey="";cachedWidth=-1;}
         @Override protected void onMeasure(int widthSpec,int heightSpec){int width=MeasureSpec.getSize(widthSpec);if(width!=cachedWidth)invalidateCache();cachedWidth=width;int height=Math.round(stageHeight(width));setMeasuredDimension(width,resolveSize(height,heightSpec));}
+        /**
+         * The measurement key. Everything the label rasterization depends on is in it, so a cache hit
+         * is only possible for the same sample, locale, size tier, opacity, reference width, display
+         * metrics and interface font scale. Ordinary rebinding, scrolling or clipping never changes it.
+         */
+        private String measurementKey(Context c,String sample,float contentW){
+            android.util.DisplayMetrics d=c.getResources().getDisplayMetrics();
+            return sample+"|"+CaptionTextResolver.locale(c).toLanguageTag()+"|"+sizeTier+"|"+opacity
+                    +"|"+contentW+"|"+d.density+"|"+d.scaledDensity+"|"+c.getResources().getConfiguration().fontScale;
+        }
         private TextView label(Context c,String sample,float contentW){
-            String locale=CaptionTextResolver.locale(c).toLanguageTag();android.util.DisplayMetrics d=c.getResources().getDisplayMetrics();
-            String key=sample+"|"+locale+"|"+sizeTier+"|"+opacity+"|"+contentW+"|"+d.density+"|"+d.scaledDensity+"|"+c.getResources().getConfiguration().fontScale;
+            String key=measurementKey(c,sample,contentW);
             if(cachedLabel==null||!key.equals(cachedLabelKey)){cachedLabel=sampleLabel(c,sample,sizeTier,opacity,LANDSCAPE_REFERENCE_WIDTH_PX,contentW);cachedLabelKey=key;sampleLayoutCalls++;}
             return cachedLabel;
         }
+        private void prepareScene(float w,float h,float radius){
+            int iw=Math.round(w),ih=Math.round(h);
+            if(iw==sceneWidth&&ih==sceneHeight&&sceneClip!=null)return;
+            sceneWidth=iw;sceneHeight=ih;appliedBackground=Integer.MIN_VALUE;appliedRadius=-1f;
+            Path clip=new Path();clip.addRoundRect(new RectF(0,0,w,h),radius,radius,Path.Direction.CW);sceneClip=clip;
+            sceneSky=new LinearGradient(0,0,w,h,new int[]{0xff354650,0xff9faeae},null,Shader.TileMode.CLAMP);
+            Path hill=new Path();hill.moveTo(0,h);hill.lineTo(w*.3f,h*.38f);hill.lineTo(w*.6f,h*.70f);hill.lineTo(w*.82f,h*.48f);hill.lineTo(w,h*.64f);hill.lineTo(w,h);hill.close();sceneHill=hill;
+        }
         @Override protected void onDraw(Canvas c){
-            android.util.DisplayMetrics d=getResources().getDisplayMetrics();float radius=12*d.density;paint.setColor(CaptionSettingsStyle.tint(CaptionSettingsStyle.primary(getContext()),7));c.drawRoundRect(0,0,getWidth(),getHeight(),radius,radius,paint);
+            android.util.DisplayMetrics d=getResources().getDisplayMetrics();float radius=12*d.density;
+            int background=CaptionSettingsStyle.tint(CaptionSettingsStyle.primary(getContext()),7);
+            if(background!=appliedBackground||radius!=appliedRadius){paint.setColor(background);appliedBackground=background;appliedRadius=radius;}
+            if(paint.getShader()!=null)paint.setShader(null);
+            c.drawRoundRect(0,0,getWidth(),getHeight(),radius,radius,paint);
             float w=frameWidth(getWidth());
             float h=w*9f/16f;
-            c.save();c.translate((getWidth()-w)/2f,(getHeight()-h)/2f);Path clip=new Path();clip.addRoundRect(new RectF(0,0,w,h),radius,radius,Path.Direction.CW);c.clipPath(clip);
-            paint.setAlpha(255);paint.setShader(new LinearGradient(0,0,w,h,new int[]{0xff354650,0xff9faeae},null,Shader.TileMode.CLAMP));c.drawRect(0,0,w,h,paint);paint.setShader(null);paint.setColor(0xff536866);Path hill=new Path();hill.moveTo(0,h);hill.lineTo(w*.3f,h*.38f);hill.lineTo(w*.6f,h*.70f);hill.lineTo(w*.82f,h*.48f);hill.lineTo(w,h*.64f);hill.lineTo(w,h);hill.close();c.drawPath(hill,paint);
+            prepareScene(w,h,radius);
+            c.save();c.translate((getWidth()-w)/2f,(getHeight()-h)/2f);c.clipPath(sceneClip);
+            paint.setAlpha(255);paint.setShader(sceneSky);c.drawRect(0,0,w,h,paint);paint.setShader(null);paint.setColor(0xff536866);c.drawPath(sceneHill,paint);
             float contentW=LANDSCAPE_REFERENCE_WIDTH_PX;
             float scale=w/contentW,contentH=h/scale;
             // The sample is the localized line the user would read in full screen; the frame is the exact

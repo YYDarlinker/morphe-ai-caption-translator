@@ -51,6 +51,7 @@ public class RebuildLayoutTest {
     a.getResources().getDisplayMetrics().widthPixels = 1264;
     a.getResources().getDisplayMetrics().heightPixels = 2736;
     DeepSeekConfig.saveCaptionSizeTier(a, 2);
+    CaptionOverlay.resetPresentationDedupForTests();
     CaptionOverlay.clear();
     CaptionOverlay.setActivity(a);
   }
@@ -77,7 +78,7 @@ public class RebuildLayoutTest {
   }
 
   String presentationHistory() {
-    return a.getSharedPreferences("deepseek_caption_diagnostics",0).getString("history","");
+    return CaptionDiagnostics.history(a);
   }
 
   @Test
@@ -321,7 +322,7 @@ public class RebuildLayoutTest {
       CaptionOverlay.refreshSurface();
     }
     String history =
-        a.getSharedPreferences("deepseek_caption_diagnostics", 0).getString("history", "");
+        CaptionDiagnostics.history(a);
     assertEquals(1, history.split("REBUILD_LAYOUT_FALLBACK", -1).length - 1);
     assertTrue(history.contains("width="));
     assertTrue(history.contains("lines="));
@@ -336,7 +337,7 @@ public class RebuildLayoutTest {
     String caption = String.join("", java.util.Collections.nCopies(120, "字"));
     CaptionOverlay.showEvent(caption, () -> true, () -> "source retained", "r2:2:10");
     String history =
-        a.getSharedPreferences("deepseek_caption_diagnostics", 0).getString("history", "");
+        CaptionDiagnostics.history(a);
     assertTrue(history.contains("REBUILD_PRESENTED"));
     assertTrue(history.contains("mode=original_fallback"));
     assertTrue(history.contains("source retained"));
@@ -536,7 +537,7 @@ public class RebuildLayoutTest {
   @Test public void presentedPixelMetricsMatchActualTextPaintAndGeometry() throws Exception {
     CaptionDiagnostics.clear(a);DeepSeekConfig.saveDisplayTextDebugEnabled(a,true);
     bounds=new Rect(0,0,1264,711);CaptionOverlay.showCaption("字幕",()->true);
-    String history=a.getSharedPreferences("deepseek_caption_diagnostics",0).getString("history","");
+    String history=CaptionDiagnostics.history(a);
     assertTrue(history.contains(";width="+CaptionOverlay.budget().width+";"));
     assertTrue(history.contains(";target_glyph_height_px="+SubtitleStyleMetrics.targetGlyphHeightPx(2,1264,false)));
     assertTrue(history.contains(";glyph_height_px="+SubtitleStyleMetrics.measuredGlyphHeightPx(text().getPaint())));
@@ -568,8 +569,7 @@ public class RebuildLayoutTest {
     CaptionOverlay.showEvent(caption, () -> true, () -> "", "n3-unresolved", 0, 5000, 0);
     assertNotEquals(caption, text().getText().toString());
     assertEquals(caption, field("pendingText"));
-    String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
-        .getString("history", "");
+    String history = CaptionDiagnostics.history(a);
     assertTrue(history.contains("REBUILD_LAYOUT_FALLBACK"));
     assertTrue(history.contains("pagination_unresolved=true"));
   }
@@ -579,8 +579,7 @@ public class RebuildLayoutTest {
     String caption = "这一条译文虽然很短，但时间窗口更短。";
     CaptionOverlay.showEvent(caption, () -> true, () -> "Original", "n15-cps", 0, 1200, 0);
     assertEquals(caption, text().getText().toString());
-    String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
-        .getString("history", "");
+    String history = CaptionDiagnostics.history(a);
     assertFalse(history.contains("REBUILD_LAYOUT_FALLBACK"));
     assertEquals(View.VISIBLE,anchor().getVisibility());
   }
@@ -594,8 +593,7 @@ public class RebuildLayoutTest {
     assertEquals(1, pages.size());
     assertEquals(500, pages.get(0).start);
     assertEquals(1386, pages.get(0).end);
-    String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
-        .getString("history", "");
+    String history = CaptionDiagnostics.history(a);
     assertTrue(history.contains("duration_exception=owned_window_lt_1200"));
   }
   @SuppressWarnings("unchecked")
@@ -613,8 +611,7 @@ public class RebuildLayoutTest {
       assertEquals(pages.get(i).text, text().getText().toString());
       int actualLines = text().getLayout().getLineCount();
       assertTrue(actualLines <= 2);
-      String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
-          .getString("history", "");
+      String history = CaptionDiagnostics.history(a);
       assertTrue("page " + (i + 1) + " should log its displayed line count",
           history.contains("id=n17a-lines;mode=caption_page;")
               && history.contains(";lines=" + actualLines + ";page=" + (i + 1) + "/" + pages.size()

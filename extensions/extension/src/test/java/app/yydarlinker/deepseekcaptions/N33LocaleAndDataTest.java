@@ -31,7 +31,7 @@ public class N33LocaleAndDataTest {
     }
     @After public void done(){Setting.preferences.preferences=null;BaseSettings.MORPHE_LANGUAGE.save(AppLanguage.DEFAULT);ResourceUtils.activity=null;activity.finish();}
     private void choose(AppLanguage language){BaseSettings.MORPHE_LANGUAGE.save(language);Shadows.shadowOf(Looper.getMainLooper()).idle();}
-    private EditText editor(DeepSeekTextPreference p){return p.getView(null,new LinearLayout(activity)).findViewById(android.R.id.edit);}
+    private EditText editor(DeepSeekTextPreference p){return CaptionEditorIds.editorIn(p.getView(null,new LinearLayout(activity)));}
     @Test public void allFourteenOverridesWinOverChineseActivityAndGeneratedFallbackMatchesXml(){
         DeepSeekDiagnosticsPreference diagnostics=new DeepSeekDiagnosticsPreference(activity);
         View diagnosticView=diagnostics.getView(null,new LinearLayout(activity));

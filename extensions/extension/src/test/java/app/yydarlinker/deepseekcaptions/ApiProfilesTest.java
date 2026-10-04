@@ -35,17 +35,17 @@ public class ApiProfilesTest {
  }
  @Test public void pendingUrlEditsFlushToOldProfileAndDetachedEventsCannotWriteNewProfile(){
   DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);
-  LinearLayout parent=new LinearLayout(a);android.view.View old=p.getView(null,parent);EditText edit=old.findViewById(android.R.id.edit);
+  LinearLayout parent=new LinearLayout(a);android.view.View old=p.getView(null,parent);EditText edit=CaptionEditorIds.editorIn(old);
   edit.setText("https://old-edited.example/v1");String b=ApiProfiles.create(a,"B","https://new.example/v1");assertTrue(ApiProfiles.select(a,b));
   assertEquals("https://old-edited.example/v1",ApiProfiles.values(a,"default").getString("base_url",""));
   edit.setText("https://stale.example/v1");org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));
   assertEquals("https://new.example/v1",DeepSeekConfig.load(a).baseUrl);
-  android.view.View fresh=p.getView(old,parent);EditText newEdit=fresh.findViewById(android.R.id.edit);assertEquals("https://new.example/v1",newEdit.getText().toString());
+  android.view.View fresh=p.getView(old,parent);EditText newEdit=CaptionEditorIds.editorIn(fresh);assertEquals("https://new.example/v1",newEdit.getText().toString());
   edit.setText("https://still-stale.example/v1");org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));
   assertEquals("https://new.example/v1",DeepSeekConfig.load(a).baseUrl);
  }
  @Test public void invalidPendingEditBlocksSwitchWithoutLosingOriginalConfig(){
-  DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);EditText edit=p.getView(null,new LinearLayout(a)).findViewById(android.R.id.edit);edit.setText("not a URL");
+  DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);EditText edit=CaptionEditorIds.editorIn(p.getView(null,new LinearLayout(a)));edit.setText("not a URL");
   String b=ApiProfiles.create(a,"B","https://b.example/v1");assertFalse(ApiProfiles.select(a,b));assertEquals("default",ApiProfiles.active(a));assertNotNull(edit.getError());
  }
  @Test public void delayedModelEditsCannotCrossProfiles(){
@@ -70,11 +70,11 @@ public class ApiProfilesTest {
  @Test public void offscreenPromptRoundTripMustRebindAndRemainEditable(){
   DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
   LinearLayout parent=new LinearLayout(a);android.view.View old=p.getView(null,parent);
-  String initial=((EditText)old.findViewById(android.R.id.edit)).getText().toString();assertFalse(initial.isEmpty());
+  String initial=CaptionEditorIds.editorIn(old).getText().toString();assertFalse(initial.isEmpty());
   String b=ApiProfiles.create(a,"B","https://b.example/v1");assertTrue(ApiProfiles.select(a,b));
   // Row remains offscreen while B is active, so ListView never asks it to create a B view.
   assertTrue(ApiProfiles.select(a,"default"));
-  android.view.View rebound=p.getView(old,parent);EditText input=rebound.findViewById(android.R.id.edit);
+  android.view.View rebound=p.getView(old,parent);EditText input=CaptionEditorIds.editorIn(rebound);
   assertEquals(initial,input.getText().toString());input.setText("editable after round trip");assertTrue(p.flushProfile());
   assertEquals("editable after round trip",DeepSeekConfig.load(a).prompt);
  }

@@ -25,20 +25,40 @@ final class RebuildApi {
   static final class TransportFailure extends IOException {
     final String reason, phase;
     final long elapsedMs, remainingMs;
+    /** True when the connection was closed by our own stop/retire rather than by the network. */
+    final boolean cancelled;
     TransportFailure(Exception cause, String phase, long start, long deadline) {
+      this(cause, phase, start, deadline, null, false);
+    }
+    TransportFailure(Exception cause, String phase, long start, long deadline,
+        NetworkDeadline guard, boolean intentional) {
       super(cause.getClass().getSimpleName(), cause);
       this.phase=phase;
-      reason = transportReason(cause, phase);
+      cancelled=intentional;
+      reason = intentional ? "cancelled" : transportReason(cause, phase, guard);
       elapsedMs=TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start);
-      remainingMs=Math.max(0,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));
+      long remaining=guard!=null?guard.remainingMs():Math.max(0,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));
+      remainingMs=remaining;
     }
   }
+
+  /**
+   * Classifies a transport failure from the facts we actually have. The deadline's own timer flag is
+   * consulted first, so a timer-fired disconnect is reported as an expiry instead of a socket error;
+   * remaining time is never used to guess which side failed first.
+   */
   static String transportReason(Exception error, String phase) {
+    return transportReason(error, phase, null);
+  }
+
+  static String transportReason(Exception error, String phase, NetworkDeadline guard) {
     if(error instanceof TransportFailure)return ((TransportFailure)error).reason;
+    if(error instanceof InterruptedIOException)
+      return "connect".equals(phase)?"connection_establishment_timeout":"read_interrupted";
+    if(guard!=null&&guard.timerFired())return "deadline_expired";
     if(error instanceof ConnectException || error instanceof UnknownHostException
         || error instanceof NoRouteToHostException)return "connection_establishment_failed";
     if(error instanceof SocketException)return "connection_socket_exception";
-    if(error instanceof InterruptedIOException)return "connect".equals(phase)?"connection_establishment_timeout":"read_interrupted";
     return "connect".equals(phase)?"connection_establishment_failed":"read_interrupted";
   }
 
@@ -242,7 +262,9 @@ final class RebuildApi {
     String phase="connect";
     HttpURLConnection c =
         (HttpURLConnection) new URL(ProviderEndpoint.chat(cfg.baseUrl)).openConnection();
-    try (NetworkDeadline guard = new NetworkDeadline(c, deadline)) {
+    // Declared outside the resource clause so the catch block can read the deadline's own timer fact.
+    NetworkDeadline guard = new NetworkDeadline(c, deadline);
+    try (NetworkDeadline armed = guard) {
       if (control != null) control.onConnection(c);
       RawCaptionSource.checkActive(control);
       c.setRequestMethod("POST");
@@ -285,8 +307,13 @@ final class RebuildApi {
       }
       return new Response(code, new String(out.toByteArray(), StandardCharsets.UTF_8), retry);
     } catch (IOException failure) {
-      // Do not reinterpret transport failures as semantic or structural repair errors.
-      throw new TransportFailure(failure,phase,started,deadline);
+      // Do not reinterpret transport failures as semantic or structural repair errors. A connection
+      // this controller itself stopped or retired is an intentional cancellation, not a wire fault;
+      // a real deadline expiry is reported from the deadline's own timer fact.
+      boolean intentional=false;
+      try { RawCaptionSource.checkActive(control); }
+      catch(Exception cancelled){ intentional=true; }
+      throw new TransportFailure(failure,phase,started,deadline,guard,intentional);
     } finally {
       c.disconnect();
       if (control != null) control.onConnection(null);

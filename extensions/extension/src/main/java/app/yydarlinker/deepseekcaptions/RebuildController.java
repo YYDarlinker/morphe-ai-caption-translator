@@ -65,6 +65,8 @@ final class RebuildController {
     final Context context;
     final String owner, identity, target;
     final DeepSeekConfig.Snapshot config;
+    /** Credential identity of this immutable session config; a hash, never the key itself. */
+    final CaptionCredentialRef credential;
     final boolean sourceOnly;
     final CaptionLanguageContext languageContext;
     final long activatedAtMs = SystemClock.elapsedRealtime();
@@ -129,6 +131,7 @@ final class RebuildController {
       this.target = target;
       languageContext = context;
       config = cfg;
+      credential = CaptionCredentialRef.of(cfg.apiKey);
       sourceOnly = original;
       visible = show;
     }
@@ -326,7 +329,8 @@ final class RebuildController {
         networkMs += roundTrip;
         detail += ";network_round_trip_ms=" + roundTrip;
       }
-      CaptionDiagnostics.mark(session.context,stage,"session="+session.id+";request="+traceId+";block="+index+";"+detail);
+      CaptionDiagnostics.mark(session.context,stage,
+          "session="+session.id+";request="+traceId+";block="+index+";"+detail,session.credential,"");
     }
 
     public void onQualityEvidence(org.json.JSONObject source, String response, String metadata) {
@@ -432,6 +436,9 @@ final class RebuildController {
       epoch = ++publicationEpoch;
     }
     clear(epoch);
+    // A stopped engine has no display owner. The authority returns to the safe UNKNOWN state instead
+    // of leaving the previous owner's permission in place for a queued off-main notification.
+    CaptionPlayerAuthority.close();
     // Do not let a stopped session donate a media snapshot to the next same-video session.
     CLOCK.reset(SystemClock.elapsedRealtime());
     if (s != null) s.cancel();
@@ -457,15 +464,12 @@ final class RebuildController {
   }
 
   static void player(String type) {
+    // The one authority records the authoritative type and derives owner-scoped display permission.
+    // This path only tracks the short URL-restoration window that a compact excursion opens.
     String t = type == null ? "" : type.toUpperCase(Locale.ROOT);
-    boolean small =
-        t.contains("MINIM")
-            || t.contains("HIDDEN")
-            || t.contains("DISMISSED")
-            || t.contains("PICTURE_IN_PICTURE");
+    boolean small = CaptionPlayerAuthority.isCompactType(t) && !CaptionSurface.isShorts();
     if (compact && !small) restoreUntil = SystemClock.elapsedRealtime() + 3000;
-    compact = small && !CaptionSurface.isShorts();
-    CaptionOverlay.setPlayerType(type);
+    compact = small;
   }
 
   static String restore(String url) {
@@ -474,7 +478,9 @@ final class RebuildController {
         || s.sourceOnly
         || !s.visible
         || !CaptionChoice.translates()
-        || (!compact && SystemClock.elapsedRealtime() > restoreUntil)) return url;
+        || (!compact
+            && !CaptionPlayerAuthority.hasAuthoritativeType()
+            && SystemClock.elapsedRealtime() > restoreUntil)) return url;
     String owner = PageCaptionController.videoIdFromUrl(url);
     return DeepSeekCaptionHook.isYouTubeTimedTextUrl(url)
             && (owner.isEmpty() || owner.equals(s.owner))
@@ -583,6 +589,9 @@ final class RebuildController {
       }
     }
     if (s == candidate) {
+      // A new engine session re-opens the player authority as unproven rather than inheriting a
+      // closed or quarantined state from the previous session on the same Activity.
+      CaptionPlayerAuthority.setOwner(activity.get());
       CaptionDiagnostics.mark(s.context, "LANGUAGE_PROFILE_BOUND",
           "session=" + s.id + ";" + s.languageContext.diagnosticFields());
       clear(epoch);
@@ -645,6 +654,7 @@ final class RebuildController {
       private final int epoch=s.generation;
       public boolean isValid(){return current(s) && s.generation==epoch;}
       public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
+      public CaptionCredentialRef credential(){return s.credential;}
     });
     kick(s);
     scheduleTick();
@@ -731,6 +741,13 @@ final class RebuildController {
     }
     Session s = active;
     if (!current(s)) return;
+    // A player transition owns the surface. No geometry scan, no overlay render and no session kick
+    // may run while the transition coordinator is still observing, so the animation never reflows.
+    if (CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT
+        || CaptionPlayerAuthority.state()==CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR) {
+      scheduleTick();
+      return;
+    }
     // Surface detection must also run while a former miniplayer has hidden the overlay.
     CaptionOverlay.refreshSurface();
     long observed = position(s);
@@ -742,6 +759,7 @@ final class RebuildController {
       private final int epoch=s.generation;
       public boolean isValid(){return current(s) && s.generation==epoch;}
       public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
+      public CaptionCredentialRef credential(){return s.credential;}
     });
     kick(s);
     scheduleTick();
@@ -1141,10 +1159,11 @@ final class RebuildController {
         if (s.states[i] != WAITING || s.retryAt[i] > now) {
           // D3: an existing job for this block is reused, whichever lane it came from.
           if (s.jobs[i] != null && s.plans[i] == null && s.states[i] == RUNNING)
-            notice(notices, "REBUILD_BLOCK_REUSED",
+            CaptionDiagnostics.mark(s.context, "REBUILD_BLOCK_REUSED",
                 "session=" + s.id + ";block=" + b.index
                     + ";reason=" + (s.jobs[i].priority ? "in_flight_focus" : "in_flight_prefetch")
-                    + ";request=" + s.jobs[i].traceId + ";dispatched=" + s.jobs[i].dispatched);
+                    + ";request=" + s.jobs[i].traceId + ";dispatched=" + s.jobs[i].dispatched,
+                s.credential, "REUSED|" + s.id + "|" + b.index + "|" + s.jobs[i].traceId);
           continue;
         }
         // Disk candidates are reserved/read outside the monitor before any lane is charged.
@@ -1601,6 +1620,7 @@ final class RebuildController {
       public long windowStart(){return appliedStart;}
       public long windowEnd(){return appliedEnd;}
       public String blankReason(){return appliedReason;}
+      public CaptionCredentialRef credential(){return s.credential;}
       public long displayPosition(long supplied) { return RebuildController.displayPosition(s); }
       public void onApplied() { if (isValid()) s.appliedRenderRevision = revision; }
     };

@@ -1,5 +1,22 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
+> 最后更新：2026-10-05（Asia/Shanghai）。**N36 已完成本地实施与交付，待用户 3-5 分钟短验。**
+>
+> **N36 身份**：开工 HEAD `7a53e461615232d85d55b9a9b75762b0a784c102`（N35 完成 HEAD `013cc93b266b339ad05dea11b1bd29177cbcbffe` 的 docs-only 后继，`git diff 1967dacf..HEAD -- . ':(exclude)docs'` 为空）；本卡产品提交见 `docs/N36-SHA256.json` 的 `source_commit` / `source_anchor`。
+>
+> **N36 交付三包**（本地测试名，hash 见 `docs/N36-SHA256.json`）：
+> - MPP `A7F391CC0CC6EB14564C2B8ACAD685C3798AE6B5A2A4A54411E841E71AB5E558`（1,276,197 B）
+> - MPE `A8EB1C8D034D9A6CC35F06CD93544BCE445E8E7C6728B66A05E46F76D8E6F1C2`（3,113,144 B）
+> - unsigned APK `E13E864FB92044F75359518F81F2BD5856B9E699070BA3A82D00B27131492374`（198,253,159 B）
+>
+> **N36 做了什么**：①输入/IME：删除每帧 onPreDraw 轮询与无条件 reveal，一个 root 一个协调器、只有 focused editor 有处理权、IME 只走一套主申请流程、四个字段使用稳定 per-field id；真实 SDK35 加真实 IME service 上，N35 的"API key 字段无限重绑"（`notifyViewReadyInner` 55,266 次 / `ATTACH_NEW_INPUT` 11,077 次）降到 13 / 20 次，且 lane 正常跑完四个字段。②预览：测量 key 覆盖 locale/sample/tier/opacity/宽度/density/fontScale，普通重绑不再丢缓存，热 draw 不再分配 Path/Shader。③播放器许可：新增 `CaptionPlayerAuthority` 单一状态机（UNKNOWN/COMPACT/TRANSITIONING_TO_REGULAR/REGULAR/CLOSED），真实 player 类型不再被 render epoch 过滤，probe 每代一个且所有退出路径释放自己的槽，上限 12 帧后只等真实 player 子树 attach/layout。④转场：COMPACT/TRANSITIONING 期间 tick 不扫描不渲染，位置更新不再 setLayoutParams/bringToFront。⑤诊断：新增两条有界 lane 的 `CaptionDiagnosticsWriter`，播放/动画/预览路径不再 load config、不再 KeyStore 解密、不再写 SharedPreferences，redaction 在后台按凭据指纹进行。⑥请求：`NetworkDeadline` 增加 timer 触发事实，`SocketException` 不再把真实 deadline 报成普通网络错误，主动 stop/disconnect 的连接标记 intentional cancel。
+>
+> **N36 验证**：716 项 Java 全量（`.verification/n36/full-delivered-01`）中 `n24BlockedOldFocus` 在与其他测试类同 JVM 全量运行时失败（单独运行通过），其余全绿；A/B/C/D 分项 lane 全绿；正式组合与 DEX/MPE 审计通过（`tools/n36/final_checks.py`：11 DEX、MPP 内嵌同一 MPE、N34/N35 旧三包 hash 未变）。手机未连接，真实 IME 逐字符提交证据仍未取得，第四项最终以用户手机短验为准。
+>
+> **回退**：`docs/N36-RESTORE-N35.ps1`（回 N35 源）与 `docs/N35-RESTORE-N34.ps1`（回 N34 源）都生成可逆恢复提交；`anchor/n35-013cc93`、`anchor/n34-26edf55` 未动；`patches-1.45.0.mpp` 保留为未跟踪输入。
+>
+
+
 > 最后更新：2026-10-04（Asia/Shanghai）。N35已交付并完成用户after，当前产品1967dac/完成HEAD013cc93；本轮规划者审阅诊断215344与14.27秒滚动录像，确认五条通用机制before5/5：无IME强拉、preview重绑失缓存、旧owner隔离继承、恢复probe占槽、真实player通知被caption clear作废。另查主线程日志反复Keystore解密/动画重排；压力请求队列并非主要延迟，network与取消需分辨。N36详细卡/审阅/回退资料已准备，尚未产品施工；backup/pre-n36-n35-013cc93固定。N35/N34/官方三包SHA未变，恢复脚本仅InspectOnly。N35真实f40参照body本轮已取得并SHA验证，partial实际retime752词，保留时间成果。最新§4ba覆盖旧N35待执行口径；单执行者Codex推荐、DeepSeek允许，真实IME/滚动/转场先于一次最终全量，同输入不重复建包。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。

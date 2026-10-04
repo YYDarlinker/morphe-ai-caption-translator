@@ -24,6 +24,8 @@ final class CaptionOverlay {
     default long windowStart(){return -1;}
     default long windowEnd(){return -1;}
     default String blankReason(){return "";}
+    /** Credential identity known when this guard was bound; never resolved on the render path. */
+    default CaptionCredentialRef credential(){return CaptionCredentialRef.NONE;}
   }
 
   private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -99,18 +101,23 @@ final class CaptionOverlay {
     return plannedPages;
   }
   private static boolean previousShorts, previousFullScreen;
-  private static boolean pendingStatus, pendingWaiting, suppressed, guardedExpansion;
+  private static boolean pendingStatus, pendingWaiting;
+  /** Display permission and compact quarantine live in the one player authority, not in this class. */
+  private static boolean suppressed(){return !CaptionPlayerAuthority.displayPermitted()
+      && CaptionPlayerAuthority.state()!=CaptionPlayerAuthority.UNKNOWN;}
+  private static boolean guardedExpansion(){return CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT
+      || CaptionPlayerAuthority.state()==CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR;}
   private static RenderGuard currentGuard;
   private static Supplier<String> fallback;
   private static Rect previous = new Rect();
   private static int normalVideoWidth;
   private static int previousScreenWidth;
   private static boolean referenceShorts, referenceLandscape;
-  private static String playerType = "";
   private static long lastScan, lastLayout;
   private static boolean dirty = true;
   // One frame-aligned UI request. Never postpone model authority, clear or compact quarantine.
   private static volatile long playerRenderEpoch;
+  /** Render invalidation only. The real player type is owned by CaptionPlayerAuthority. */
   static long playerDispatchIdentity(){return playerRenderEpoch;}
   private static Runnable playerRenderTask;
   private static WeakReference<View> playerFrameClock = new WeakReference<>(null);
@@ -125,9 +132,12 @@ final class CaptionOverlay {
     if(playerRenderTask!=null)MAIN.removeCallbacks(playerRenderTask);
     playerRenderTask=null;playerFrameClock.clear();playerRenderPending=false;
   }
-  private static void requestPlayerRender() {
-    if(playerRenderTask!=null || suppressed || guardedExpansion
+  static void requestPlayerRender() {
+    if(suppressed() || guardedExpansion()
         || pendingText.isEmpty()&&pendingIdentity.isEmpty())return;
+    // An authoritative player transition supersedes a queued render: the obsolete callback is dropped
+    // and exactly one new frame-aligned render is requested for the new mode.
+    if(playerRenderTask!=null)invalidatePlayerRender();
     Activity owner=activityRef.get();
     if(owner==null || owner.isFinishing() || owner.isDestroyed() || owner.getWindow()==null)return;
     View clock=owner.getWindow().getDecorView();
@@ -137,12 +147,12 @@ final class CaptionOverlay {
       // A stale callback has no attach/render/hide side effects, including on a newer Session.
       if(epoch!=playerRenderEpoch || activityRef.get()!=owner || owner.isFinishing() || owner.isDestroyed())return;
       playerRenderTask=null;playerFrameClock.clear();playerRenderPending=false;
-      if(suppressed || guardedExpansion || currentGuard!=null&&!currentGuard.isValid()
+      if(suppressed() || guardedExpansion() || currentGuard!=null&&!currentGuard.isValid()
           || pendingText.isEmpty()&&pendingIdentity.isEmpty())return;
       long started=System.nanoTime();applyingPlayerRender=true;
       try{render();deferredRenderCount++;}finally{applyingPlayerRender=false;deferredRenderNanos+=System.nanoTime()-started;}
       CaptionDiagnostics.mark(owner,"PLAYER_TRANSITION_RENDER_DISPATCH",
-          "type="+playerType+";deferred_render_count="+deferredRenderCount+";render_total_us="+(deferredRenderNanos/1000)
+          "type="+CaptionPlayerAuthority.playerType()+";state="+CaptionPlayerAuthority.stateName()+";deferred_render_count="+deferredRenderCount+";render_total_us="+(deferredRenderNanos/1000)
           +";geometry_search_count="+CaptionSurface.refreshSearchCount+";native_scan_count="+CaptionMusicSuppressor.scanCount
           +";tree_summary_count="+CaptionMusicSuppressor.treeSummaryCount);
     };
@@ -155,7 +165,7 @@ final class CaptionOverlay {
   private static final android.view.ViewTreeObserver.OnPreDrawListener WATCH =
       () -> {
         long now = SystemClock.uptimeMillis();
-        if (now - lastLayout >= 100 && !guardedExpansion && !suppressed
+        if (now - lastLayout >= 100 && !guardedExpansion() && !suppressed()
             && (!pendingText.isEmpty() || !pendingIdentity.isEmpty())) {
           lastLayout = now;
           render();
@@ -164,13 +174,13 @@ final class CaptionOverlay {
       };
 
   static void setActivity(Activity a) {
+    CaptionPlayerAuthority.setOwner(a);
     main(
         () -> {
           if (activityRef.get() != a) {
             invalidatePlayerRender();
             detach();
             normalVideoWidth = 0;
-            playerType = "";
           }
           activityRef = new WeakReference<>(a);
           CaptionSurface.activity(a);
@@ -361,51 +371,84 @@ final class CaptionOverlay {
         });
   }
 
+  /**
+   * Geometry refresh only, and never during a player transition: the transition coordinator is the
+   * single place that decides when a new surface may be discovered. Shorts keep their existing
+   * isolation, which is a surface fact rather than a player-transition fact.
+   */
   static void refreshSurface() {
     main(
         () -> {
+          CaptionPlayerAuthority.reconcileCurrentPlayerType();
+          if(CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT)
+            return;
+          boolean surfaceDirty=CaptionPlayerAuthority.consumeSurfaceDirty();
+          if (CaptionSurface.isShorts()) {
+            // Shorts keeps its existing isolation and is never the compact miniplayer state.
+            CaptionPlayerAuthority.noteShortsSurface();
+            long now = SystemClock.uptimeMillis();
+            if (!surfaceDirty && now >= lastScan && now - lastScan < 500L) return;
+            CaptionSurface.refresh();
+            lastScan = SystemClock.uptimeMillis();
+            CaptionSurface.invalidateGeometry();
+            dirty = true;
+            render();
+            return;
+          }
+          if(CaptionPlayerAuthority.state()==CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR)return;
           long now = SystemClock.uptimeMillis();
-          if (now >= lastScan && now - lastScan < 500L) return;
+          // The 500 ms throttle bounds repeated expensive searches. A genuinely new authoritative
+          // player notification is a real surface change, so it also stamps the window: the search it
+          // is allowed to perform replaces the throttled one instead of adding to it.
+          if (!surfaceDirty && now >= lastScan && now - lastScan < 500L) return;
           CaptionSurface.refresh();
           lastScan = SystemClock.uptimeMillis();
-          if (CaptionSurface.isShorts()) {
-            suppressed = false;
-            guardedExpansion = false;
-          }
+          CaptionSurface.invalidateGeometry();
           dirty = true;
           render();
         });
   }
 
+  /**
+   * Routes a raw player type into the one authority. This method no longer decides anything about
+   * display permission, and a caption clear / style change cannot invalidate the notification.
+   */
   static void setPlayerType(String type) {
-    main(() -> {
-      String next=type==null?"":type.toUpperCase(java.util.Locale.ROOT);
-      boolean changed=!next.equals(playerType);
-      if(changed){playerType=next;normalVideoWidth=0;CaptionSurface.invalidateGeometry();dirty=true;}
-      suppressed=!CaptionSurface.isShorts() && (next.contains("MINIM") || next.contains("HIDDEN")
-          || next.contains("DISMISSED") || next.contains("PICTURE_IN_PICTURE"));
-      if(suppressed){invalidatePlayerRender();hideView();displayResult(activityRef.get(),"suppressed","player_suppressed",false,0,0,"");return;}
-      if(changed)requestPlayerRender();
-    });
+    CaptionPlayerAuthority.onNotification(type, false);
+    main(
+        () -> {
+          if (CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT
+              || CaptionPlayerAuthority.state()==CaptionPlayerAuthority.CLOSED) {
+            invalidatePlayerRender();
+            hideView();
+            displayResult(activityRef.get(),"suppressed","player_suppressed",false,0,0,"");
+            return;
+          }
+          normalVideoWidth=0;
+          CaptionSurface.invalidateGeometry();
+          dirty=true;
+          requestPlayerRender();
+        });
   }
 
   static void beginGuardedExpansion() {
     main(
         () -> {
           invalidatePlayerRender();
-          guardedExpansion = true;
           hideView();
         });
   }
 
+  /**
+   * The transition coordinator already moved the authority to REGULAR. This only re-enables drawing;
+   * it never re-derives a player type and never starts a geometry tail of its own.
+   */
   static void restoreAfterGuardedExpansion(String type) {
+    CaptionPlayerAuthority.settleRegular();
     main(
         () -> {
-          guardedExpansion = false;
-          suppressed = false;
           CaptionSurface.invalidateGeometry();
           dirty = true;
-          setPlayerType(type);
           requestPlayerRender();
         });
   }
@@ -415,10 +458,30 @@ final class CaptionOverlay {
     else MAIN.post(r);
   }
 
+  /**
+   * Verification reset of the presentation dedup memory. Production reaches the same effect through
+   * the next genuine caption identity; this exists so a cleared session can be observed again.
+   */
+  static void resetPresentationDedupForTests() {
+    lastDisplayResult = "";
+    lastNotice = "";
+    lastMergeNotice = "";
+    lastPresentationNotice = "";
+    lastBlankIdentity = null;
+    lastScan = -500;
+    lastLayout = 0;
+    reconcilingDisplayTime = false;
+  }
   private static void hideView() {
     lastBlankIdentity = null;
     FrameLayout a = anchorRef.get();
-    if (a != null) a.setVisibility(View.GONE);
+    if(a!=null)a.setVisibility(View.GONE);
+  }
+
+  /** Read-only bounded evidence: is the current overlay anchor visible right now? */
+  static boolean anchorVisible(){
+    FrameLayout a=anchorRef.get();
+    return a!=null&&a.getVisibility()==View.VISIBLE;
   }
 
   private static void detach() {
@@ -426,6 +489,9 @@ final class CaptionOverlay {
     if (h != null && h.getViewTreeObserver().isAlive())
       h.getViewTreeObserver().removeOnPreDrawListener(WATCH);
     if (a != null && a.getParent() instanceof ViewGroup) ((ViewGroup) a.getParent()).removeView(a);
+    // A detached overlay must never keep a visible state: a later owner renders only after it has
+    // proven a permitted player surface, so nothing inherits the previous anchor visibility.
+    if (a != null) a.setVisibility(View.GONE);
     hostRef = new WeakReference<>(null);
     anchorRef = new WeakReference<>(null);
     textRef = new WeakReference<>(null);
@@ -449,6 +515,9 @@ final class CaptionOverlay {
     if (!(content instanceof FrameLayout)) return false;
     h = (FrameLayout) content;
     FrameLayout anchor = new FrameLayout(a);
+    // A freshly attached overlay starts hidden. Only a render that passed the authority, guard and
+    // geometry checks may make it visible, so a transition can never expose an unverified overlay.
+    anchor.setVisibility(View.GONE);
     anchor.setTag("yydarlinker.deepseek.caption.anchor");
     anchor.setClipChildren(false);
     anchor.setClipToPadding(false);
@@ -502,11 +571,11 @@ final class CaptionOverlay {
         || a.isFinishing()
         || a.isDestroyed()
         || pendingText.isEmpty() && pendingIdentity.isEmpty()
-        || suppressed
-        || guardedExpansion
+        || suppressed()
+        || guardedExpansion()
         || currentGuard != null && !currentGuard.isValid()) {
       hideView();
-      if(a!=null && (suppressed || guardedExpansion))displayResult(a,"suppressed","player_suppressed",false,0,0,"");
+      if(a!=null && (suppressed() || guardedExpansion()))displayResult(a,"suppressed","player_suppressed",false,0,0,"");
       return;
     }
     if (!attach(a)) return;
@@ -548,6 +617,17 @@ final class CaptionOverlay {
     previousFullScreen = fullScreen;
     dirty = false;
     previous.set(b);
+    // N36: a new surface may only be committed outside a player transition. The authority is the one
+    // place that decides when the geometry is settled, so a transition never reflows this caption.
+    // "Proven" means an explicit player authority decision, not merely that nothing has been reported
+    // yet: a long-lived session that never receives a player callback keeps the legacy non-compact
+    // behaviour, while a real COMPACT / TRANSITIONING window never commits a new surface.
+    boolean authorityTransitioning=CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT
+        ||CaptionPlayerAuthority.state()==CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR;
+    if(authorityTransitioning&&!CaptionSurface.isShorts()){
+      hideView();
+      return;
+    }
     previousScreenWidth = screenWidth;
     DeepSeekConfig.Snapshot cfg = DeepSeekConfig.displayStyle(a);
     boolean landscapeHost = host.getWidth() > host.getHeight();
@@ -697,17 +777,20 @@ final class CaptionOverlay {
         CaptionSurface.isShorts()
             ? DeepSeekConfig.shortsPosition(a)
             : DeepSeekConfig.captionPositionY(a, landscape);
+    int leftMargin = b.left + (b.width() - width) / 2;
+    int topMargin = Math.max(b.top, Math.min(b.bottom - height, b.top + Math.round(b.height() * y) - height / 2));
     FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) anchor.getLayoutParams();
-    params.width = width;
-    params.height = height;
-    params.gravity = Gravity.TOP | Gravity.START;
-    params.leftMargin = b.left + (b.width() - width) / 2;
-    params.topMargin =
-        Math.max(
-            b.top, Math.min(b.bottom - height, b.top + Math.round(b.height() * y) - height / 2));
-    anchor.setLayoutParams(params);
-    anchor.setVisibility(View.VISIBLE);
-    anchor.bringToFront();
+    // Position-only changes and identical parameters must not re-enter the parent layout.
+    if(params.width != width || params.height != height || params.gravity != (Gravity.TOP | Gravity.START)
+        || params.leftMargin != leftMargin || params.topMargin != topMargin) {
+      params.width = width;
+      params.height = height;
+      params.gravity = Gravity.TOP | Gravity.START;
+      params.leftMargin = leftMargin;
+      params.topMargin = topMargin;
+      anchor.setLayoutParams(params);
+    }
+    if(anchor.getVisibility() != View.VISIBLE) anchor.setVisibility(View.VISIBLE);
     if((mode.equals("original_fallback") || mode.equals("overflow_status")) && !detail.equals(lastNotice))
       CaptionDiagnostics.mark(a,"REBUILD_LAYOUT_FALLBACK",detail);
     lastNotice=detail;
@@ -750,10 +833,15 @@ final class CaptionOverlay {
         +";ui_applied=true;visible="+visible+";reason="+reason+";render_position="+pendingPosition
         +";window="+pendingStart+"-"+pendingEnd+";applied_wall_ms="+System.currentTimeMillis()
         +";applied_uptime_ms="+SystemClock.uptimeMillis()+";dispatch_uptime_ms="+renderStartedUptime
-         +";layout_cost_ms="+Math.max(0,SystemClock.uptimeMillis()-renderStartedUptime)+";presentation_revision=n35-owned-display-v1"
-        +";text="+CaptionQualityTrace.redact(shown,DeepSeekConfig.load(a).apiKey,400);
-    if(DeepSeekConfig.displayTextDebugEnabled(a))CaptionDiagnostics.mark(a,"REBUILD_PRESENTED",result);
-    CaptionDiagnostics.mark(a,"REBUILD_DISPLAY_RESULT",result);
+         +";layout_cost_ms="+Math.max(0,SystemClock.uptimeMillis()-renderStartedUptime)+";presentation_revision=n36-player-authority-v1"
+        +";text="+shown;
+    CaptionCredentialRef credential=currentGuard==null?CaptionCredentialRef.NONE:currentGuard.credential();
+    // Records for the same event, page and applied geometry are one stable observation: they merge in
+    // the bounded queue and are exported once with their total count, keeping the first display and any
+    // real state change exact.
+    String recordKey="DISPLAY|"+pendingIdentity+"|"+shownPage+"|"+mode+"|"+reason+"|"+visible+"|"+width+"|"+size;
+    if(DeepSeekConfig.displayTextDebugEnabled(a))CaptionDiagnostics.mark(a,"REBUILD_PRESENTED",result,credential,recordKey);
+    CaptionDiagnostics.mark(a,"REBUILD_DISPLAY_RESULT",result,credential,recordKey);
   }
 
   private static void presentationDiagnostics(Activity a,String shown,float size,int width,

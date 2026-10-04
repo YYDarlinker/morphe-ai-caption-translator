@@ -51,14 +51,18 @@ public class RebuildR212EvidenceTest {
     assertEquals(1,count);
   }
 
-  @Test public void releaseLayoutIssueBlocksAndRepairAttemptIsBoundedByBlockEnd() {
+  @Test public void releaseLayoutIsAdvisoryAndSemanticRepairRemainsBoundedByBlockEnd() {
     RebuildProtocol.Event event=new RebuildProtocol.Event(0,3,0,5000,"long caption");
     RebuildProtocol.Plan plan=new RebuildProtocol.Plan(Collections.singletonList(event),"{}",
         Collections.singletonList(new RebuildReview.Issue(0,3,"layout_overflow","old measured budget",true)));
-    assertTrue(RebuildReview.blocked(plan,event));
-    assertTrue(RebuildReview.shouldRepair(plan,1,0,4500,5000));
+    assertFalse(RebuildReview.blocked(plan,event));
+    assertFalse(RebuildReview.shouldRepair(plan,1,0,4500,5000));
     assertFalse(RebuildReview.shouldRepair(plan,2,0,4500,5000));
     assertFalse(RebuildReview.shouldRepair(plan,1,0,5000,5000));
+    RebuildProtocol.Plan semantic=new RebuildProtocol.Plan(Collections.singletonList(event),"{}",Collections.singletonList(
+        new RebuildReview.Issue(0,3,"possible_polarity_change","semantic risk",true)));
+    assertTrue(RebuildReview.blocked(semantic,event));assertTrue(RebuildReview.shouldRepair(semantic,1,0,4500,5000));
+    assertFalse(RebuildReview.shouldRepair(semantic,1,0,5000,5000));
   }
 
   @Test public void releaseRepairPromptFollowsSourceIssueOrderAndStopsAtLimit() {

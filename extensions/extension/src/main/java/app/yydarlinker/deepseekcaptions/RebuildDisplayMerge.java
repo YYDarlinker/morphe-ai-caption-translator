@@ -47,7 +47,7 @@ final class RebuildDisplayMerge {
     return event != null && event.end > event.start && event.end - event.start < SHORT_PAGE_MS;
   }
 
-  /** A small, non-terminal lead is safe to defer until its owned continuation is ready. */
+  /** A small non-terminal lead may offer a join, but is always independently visible. */
   static boolean isLead(RebuildProtocol.Event event) {
     if (event == null || event.text == null) return false;
     String text = normalize(event.text);
@@ -72,14 +72,15 @@ final class RebuildDisplayMerge {
 
   static boolean adjacent(RebuildSource source, RebuildProtocol.Event left,
       RebuildProtocol.Event right) {
-    if (source == null || left == null || right == null || left.to + 1 != right.from) return false;
+    if (source == null || left == null || right == null || left.to + 1 != right.from
+        || RebuildPlanner.hardBreakBefore(source,right.from)) return false;
     if (left.start >= left.end || right.start >= right.end || left.end > right.start) return false;
     return right.start - left.end <= MAX_ADJACENCY_GAP_MS;
   }
 
   static boolean shouldDeferLead(RebuildSource source, RebuildProtocol.Event lead,
       RebuildProtocol.Event continuation, long position) {
-    return merge(source, lead, continuation) != null && position < continuation.start;
+    return false; // Display preference is never authority to hide an accepted lead.
   }
 
   private static String normalize(String value) {

@@ -19,6 +19,11 @@ final class CaptionOverlay {
   interface RenderGuard {
     boolean isValid();
     default void onApplied() {}
+    default long displayPosition(long supplied) { return supplied; }
+    default String identity(){return "";}
+    default long windowStart(){return -1;}
+    default long windowEnd(){return -1;}
+    default String blankReason(){return "";}
   }
 
   private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -49,11 +54,10 @@ final class CaptionOverlay {
       return value.isEmpty() || renderSpec.fits(value,preferredPx,width,2);
     }
     boolean canPresent(RebuildProtocol.Event event) {
-      return !RebuildPageLayout.plan(event.text,event.start,event.end,this::fitsPreferred).isEmpty();
+      return canPresent(event,renderSpec);
     }
     boolean canPresent(RebuildProtocol.Event event,CaptionRenderSpec spec) {
-      return spec.legacy ? withSpec(spec).canPresent(event)
-          : !RebuildPageLayout.plan(event.text,event.start,event.end,this,spec).isEmpty();
+      return !RebuildPageLayout.plan(event.text,event.start,event.end,this,spec).isEmpty();
     }
     int preferredColumns() { return Math.max(1,(int)(width/Math.max(1,preferredPx))); }
     int approximateColumns() { return Math.max(1,(int)(width/Math.max(1,minimumPx))); }
@@ -74,6 +78,26 @@ final class CaptionOverlay {
   private static long pendingStart = -1, pendingEnd = -1, pendingPosition = -1;
   private static List<RebuildPageLayout.Page> pendingPages = Collections.emptyList();
   private static int shownPage = -1;
+  private static RebuildDisplayMerge.Merged pendingCandidate;
+  private static String plannedIdentity="", plannedText="", lastDisplayResult="", lastMergeNotice="";
+  private static long plannedStart,plannedEnd;
+  private static int plannedWidth;
+  private static float plannedSize;
+  private static CaptionRenderSpec plannedSpec;
+  private static List<RebuildPageLayout.Page> plannedPages=Collections.emptyList();
+  static long planningCalls;
+  private static boolean reconcilingDisplayTime;
+
+  private static List<RebuildPageLayout.Page> currentPlan(LayoutBudget budget,CaptionRenderSpec spec) {
+    if(!plannedIdentity.equals(pendingIdentity) || !plannedText.equals(pendingText)
+        || plannedStart!=pendingStart || plannedEnd!=pendingEnd || plannedWidth!=budget.width
+        || plannedSize!=budget.preferredPx || !spec.sameMeasurement(plannedSpec)) {
+      plannedIdentity=pendingIdentity;plannedText=pendingText;plannedStart=pendingStart;plannedEnd=pendingEnd;
+      plannedWidth=budget.width;plannedSize=budget.preferredPx;plannedSpec=spec;planningCalls++;
+      plannedPages=RebuildPageLayout.plan(pendingText,pendingStart,pendingEnd,budget,spec);
+    }
+    return plannedPages;
+  }
   private static boolean previousShorts, previousFullScreen;
   private static boolean pendingStatus, pendingWaiting, suppressed, guardedExpansion;
   private static RenderGuard currentGuard;
@@ -188,18 +212,30 @@ final class CaptionOverlay {
     show(s,false,g,f,id,start,end,position,false,spec);
   }
 
+  static void showEvent(String s,RenderGuard g,Supplier<String> f,String id,
+      long start,long end,long position,CaptionRenderSpec spec,RebuildDisplayMerge.Merged candidate) {
+    show(s,false,g,f,id,start,end,position,false,spec,candidate);
+  }
+
   static void showWaitingEvent(String s, RenderGuard g, String id,
       long start, long end, long position) {
     show(s, false, g, null, id, start, end, position, true);
   }
 
-  static void position(long position) {
+  static void position(long position) { position(position,null); }
+
+  static void position(long position,RenderGuard owner) {
+    if(owner!=null && !owner.isValid())return;
     main(() -> {
-      pendingPosition = position;
-      int next = RebuildPageLayout.indexAt(pendingPages, position);
-      if (next >= 0 && next != shownPage) {
-        dirty = true;
-        render();
+      if(owner!=null && !owner.isValid())return;
+      long latest=currentGuard!=null && currentGuard.isValid() ? currentGuard.displayPosition(position)
+          : owner==null ? position : owner.displayPosition(position);
+      long before=pendingPosition;pendingPosition=latest;
+      int next=RebuildPageLayout.indexAt(pendingPages,latest);
+      boolean timed=pendingStart>=0 && pendingEnd>pendingStart;
+      if(next!=shownPage || timed && (latest<pendingStart || latest>=pendingEnd
+          || before<pendingStart || before>=pendingEnd)) {
+        dirty=true;render();
       }
     });
   }
@@ -224,6 +260,10 @@ final class CaptionOverlay {
 
   private static void show(String s,boolean status,RenderGuard g,Supplier<String> f,String id,
       long start,long end,long position,boolean waiting,CaptionRenderSpec spec) {
+    show(s,status,g,f,id,start,end,position,waiting,spec,null);
+  }
+  private static void show(String s,boolean status,RenderGuard g,Supplier<String> f,String id,
+      long start,long end,long position,boolean waiting,CaptionRenderSpec spec,RebuildDisplayMerge.Merged candidate) {
     if (g != null && !g.isValid()) return;
     long command = g == null ? COMMAND.incrementAndGet() : COMMAND.get();
     main(
@@ -233,11 +273,12 @@ final class CaptionOverlay {
             COMMAND.incrementAndGet();
           } else if (command != COMMAND.get()) return;
           pendingRenderSpec = spec;
+          pendingCandidate=candidate;
           pendingText = s == null ? "" : s;
           pendingIdentity = id;
           pendingStart = start;
           pendingEnd = end;
-          pendingPosition = position;
+          pendingPosition = g==null ? position : g.displayPosition(position);
           pendingPages = Collections.emptyList();
           shownPage = -1;
           pendingStatus = status;
@@ -265,12 +306,20 @@ final class CaptionOverlay {
           } else if (command != COMMAND.get()) return;
           invalidatePlayerRender();
           pendingText = "";
+          pendingCandidate=null;plannedIdentity="";plannedPages=Collections.emptyList();
+          pendingStart=-1;pendingEnd=-1;
           pendingIdentity = "";
           pendingPages = Collections.emptyList();
           shownPage = -1;
           fallback = null;
           currentGuard = g;
           hideView();
+          if(g!=null){
+            pendingIdentity=g.identity();pendingStart=g.windowStart();pendingEnd=g.windowEnd();
+            pendingPosition=g.displayPosition(pendingPosition);
+            displayResult(activityRef.get(),"empty",g.blankReason(),false,0,0,"");
+            pendingIdentity="";pendingStart=-1;pendingEnd=-1; // A diagnostic identity is not a pending render.
+          }
           if (g != null) g.onApplied();
         });
   }
@@ -287,6 +336,8 @@ final class CaptionOverlay {
         () -> {
           if (command != COMMAND.get() || guard != null && !guard.isValid()) return;
           pendingText = "";
+          pendingCandidate=null;plannedIdentity="";plannedPages=Collections.emptyList();
+          pendingStart=-1;pendingEnd=-1;
           pendingIdentity = "";
           pendingPages = Collections.emptyList();
           shownPage = -1;
@@ -332,7 +383,7 @@ final class CaptionOverlay {
       if(changed){playerType=next;normalVideoWidth=0;CaptionSurface.invalidateGeometry();dirty=true;}
       suppressed=!CaptionSurface.isShorts() && (next.contains("MINIM") || next.contains("HIDDEN")
           || next.contains("DISMISSED") || next.contains("PICTURE_IN_PICTURE"));
-      if(suppressed){invalidatePlayerRender();hideView();return;}
+      if(suppressed){invalidatePlayerRender();hideView();displayResult(activityRef.get(),"suppressed","player_suppressed",false,0,0,"");return;}
       if(changed)requestPlayerRender();
     });
   }
@@ -385,6 +436,7 @@ final class CaptionOverlay {
     lastBlankIdentity = null;
     layoutBudget = null;
     pendingPages = Collections.emptyList();
+    plannedIdentity="";plannedPages=Collections.emptyList();
     shownPage = -1;
   }
 
@@ -431,9 +483,19 @@ final class CaptionOverlay {
   }
 
   private static void render() {
-    // WATCH, time and restore requests merge until the player frame runs.
-    if(playerRenderPending && !applyingPlayerRender){requestPlayerRender();return;}
     Activity a = activityRef.get();
+    if(currentGuard!=null && !currentGuard.isValid()) {
+      hideView();displayResult(a,"suppressed","owner_invalid",false,0,0,"");return;
+    }
+    if(currentGuard!=null)pendingPosition=currentGuard.displayPosition(pendingPosition);
+    if(pendingStart>=0 && pendingEnd>pendingStart
+        && (pendingPosition<pendingStart || pendingPosition>=pendingEnd)) {
+      TextView stale=textRef.get();if(stale!=null)stale.setText("");
+      shownPage=-1;hideView();dirty=true;
+      displayResult(a,"empty","outside_owned_window",false,0,0,"");return;
+    }
+    // A time expiry is authoritative even while a geometry frame is queued.
+    if(playerRenderPending && !applyingPlayerRender){requestPlayerRender();return;}
     if (a == null
         || a.isFinishing()
         || a.isDestroyed()
@@ -442,6 +504,7 @@ final class CaptionOverlay {
         || guardedExpansion
         || currentGuard != null && !currentGuard.isValid()) {
       hideView();
+      if(a!=null && (suppressed || guardedExpansion))displayResult(a,"suppressed","player_suppressed",false,0,0,"");
       return;
     }
     if (!attach(a)) return;
@@ -502,40 +565,59 @@ final class CaptionOverlay {
             0,screenWidth,fullScreen,b.width(),normalVideoWidth));
     int width = Math.max(1, Math.round(b.width() * (CaptionSurface.isShorts() ? .78f : .92f)));
     int inner = Math.max(1, width - text.getPaddingLeft() - text.getPaddingRight());
-    layoutBudget =
-        new LayoutBudget(inner,minimum,preferred,pendingRenderSpec);
+    CaptionRenderSpec measuredSpec=pendingRenderSpec.withPaint(text);
+    layoutBudget = new LayoutBudget(inner,minimum,preferred,measuredSpec);
     float size = preferred;
     String shown = pendingText;
     String mode = pendingStatus ? "status" : "caption";
     boolean ownedCaption = !pendingStatus && !pendingWaiting && !pendingText.isEmpty()
         && pendingStart >= 0 && pendingEnd > pendingStart;
-    pendingPages = ownedCaption
-        ? RebuildPageLayout.plan(pendingText,pendingStart,pendingEnd,layoutBudget,pendingRenderSpec)
-        : Collections.emptyList();
-    shownPage = RebuildPageLayout.indexAt(pendingPages, pendingPosition);
-    if (shownPage >= 0) {
-      shown = pendingPages.get(shownPage).text;
-      if (pendingPages.size() > 1) mode = "caption_page";
-    } else if (!ownedCaption) {
-      while (size > minimum && linesPx(shown, size, inner,pendingRenderSpec) > 2)
-        size = Math.max(minimum, size - .5f);
+    pendingPages=ownedCaption ? currentPlan(layoutBudget,measuredSpec) : Collections.emptyList();
+    boolean candidate=false;
+    if(ownedCaption && pendingCandidate!=null) {
+      RebuildDisplayMerge.Merged join=pendingCandidate;
+      candidate=pendingPosition>=join.right.start && join.end-pendingPosition>=RebuildPageLayout.MIN_PAGE_MS
+          && CaptionLanguagePager.wellFormed(join.text,measuredSpec)
+          && measuredSpec.fits(join.text,preferred,inner,2);
+      if(candidate)pendingPages=Collections.singletonList(new RebuildPageLayout.Page(join.text,join.start,join.end));
+      else mergeRejected(a,"candidate_time_or_geometry");
     }
-    // A failed time/CPS/seam gate must not show the invalid translation as a single page.
-    if (shownPage < 0 && (ownedCaption || linesPx(shown, size, inner,pendingRenderSpec) > 2)) {
-      mode = "original_fallback";
-      shown = fallback == null ? "" : fallback.get();
-      if (shown == null || shown.isEmpty() || linesPx(shown, size, inner,pendingRenderSpec) > 2) {
-        mode = "overflow_status";
-        shown = "";
+    shownPage=RebuildPageLayout.indexAt(pendingPages,pendingPosition);
+    if(shownPage>=0) {
+      shown=pendingPages.get(shownPage).text;
+      if(pendingPages.size()>1)mode="caption_page";
+      if(candidate)mode="caption_merge";
+    } else if(!ownedCaption) {
+      while(size>minimum && linesPx(shown,size,inner,measuredSpec)>2)size=Math.max(minimum,size-.5f);
+    }
+    String reason=shown.isEmpty() && currentGuard!=null ? currentGuard.blankReason() : "";
+    if(ownedCaption && shownPage<0) {
+      shown="";mode="overflow_status";
+      reason=pendingPages.isEmpty() ? CaptionLanguagePager.failureReason(pendingText,layoutBudget,measuredSpec)
+          : "outside_owned_window";
+    } else if(!ownedCaption && linesPx(shown,size,inner,measuredSpec)>2) {
+      shown=fallback==null ? "" : fallback.get();mode="original_fallback";
+      if(shown==null || linesPx(shown,size,inner,measuredSpec)>2){shown="";mode="overflow_status";}
+    }
+    text.setTextSize(TypedValue.COMPLEX_UNIT_PX,size);
+    text.setSingleLine(false);text.setMaxLines(2);text.setEllipsize(null);
+    text.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
+    text.setTextColor(pendingStatus ? 0xE6FFFFFF : Color.WHITE);
+    int compact=0;
+    if(!shown.isEmpty()) {
+      compact=measureComplete(text,shown,size,inner,measuredSpec,ownedCaption);
+      if(compact<0 && candidate) {
+        // The optional join can never consume the current primary event on an OEM shaping failure.
+        mergeRejected(a,"candidate_textview_geometry");candidate=false;
+        pendingPages=currentPlan(layoutBudget,measuredSpec);
+        shownPage=RebuildPageLayout.indexAt(pendingPages,pendingPosition);
+        shown=shownPage<0 ? "" : pendingPages.get(shownPage).text;
+        mode=pendingPages.size()>1 ? "caption_page" : "caption";
+        compact=shown.isEmpty() ? -1 : measureComplete(text,shown,size,inner,measuredSpec,true);
       }
+      if(compact<0){shown="";mode="overflow_status";reason="hard_textview_geometry";}
     }
-    text.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
-    String notice = pendingIdentity + "|" + pendingText + "|" + mode + "|" + inner + "|" + size
-        + "|" + shownPage + "|" + screenWidth + "|" + b.width() + "|" + fullScreen
-        + "|" + metrics.density + "|" + a.getResources().getConfiguration().fontScale;
-    if (!notice.equals(lastNotice)) {
-      lastNotice = notice;
-      String detail =
+    String detail =
           "id="
               + pendingIdentity
               + ";mode="
@@ -563,60 +645,50 @@ final class CaptionOverlay {
               + ";density=" + metrics.density
               + ";fontScale=" + a.getResources().getConfiguration().fontScale
               + ";lines="
-              + linesPx(shown, size, inner,pendingRenderSpec)
+              + (shown.isEmpty()?0:text.getLineCount())
               + (shownPage >= 0 ? ";page=" + (shownPage + 1) + "/" + pendingPages.size()
                   + ";page_range=" + pendingPages.get(shownPage).start + "-"
                   + pendingPages.get(shownPage).end
-                  + (pendingRenderSpec.legacy && pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS
+                  + (pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS
                       ? ";duration_exception=owned_window_lt_1200" : "")
                   : ";pagination_unresolved=true");
-      if (pendingRenderSpec.legacy && shownPage >= 0 && pendingEnd - pendingStart < RebuildPageLayout.MIN_PAGE_MS)
-        CaptionDiagnostics.mark(a, "REBUILD_LAYOUT_TIME_EXCEPTION", detail);
-      if (mode.equals("original_fallback") || mode.equals("overflow_status"))
-        CaptionDiagnostics.mark(a, "REBUILD_LAYOUT_FALLBACK", detail);
-      if (DeepSeekConfig.displayTextDebugEnabled(a))
-        CaptionDiagnostics.mark(
-            a,
-            "REBUILD_PRESENTED",
-            detail
-                + ";text="
-                + CaptionQualityTrace.redact(shown, DeepSeekConfig.load(a).apiKey, 400));
+    detail+=";available_width_px="+inner+";measured_width_px="+Math.max(0,compact);
+    if(shown.isEmpty()) {
+      text.setText("");hideView();lastBlankIdentity=pendingIdentity;
+      if(ownedCaption && !reason.isEmpty())presentationDiagnostics(a,pendingText,preferred,inner,pendingEnd-pendingStart,reason);
+      if(mode.equals("overflow_status") && !detail.equals(lastNotice))CaptionDiagnostics.mark(a,"REBUILD_LAYOUT_FALLBACK",detail+";reason="+reason);
+      lastNotice=detail;displayResult(a,mode,reason,false,inner,size,detail);return;
     }
-    text.setText(shown);
-    if (shown.isEmpty()) {
-      if(ownedCaption && !pendingRenderSpec.legacy)
-        presentationDiagnostics(a,pendingText,preferred,inner,pendingEnd-pendingStart,
-            CaptionLanguagePager.failureReason(pendingText,
-                new CaptionOverlay.LayoutBudget(inner,preferred,preferred,pendingRenderSpec),pendingRenderSpec));
-      hideView();
-      lastBlankIdentity = pendingIdentity;
-      return;
-    }
-    lastBlankIdentity = null;
-    text.setSingleLine(false);
-    text.setMaxLines(2);
-    text.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
-    text.setTextColor(pendingStatus ? 0xE6FFFFFF : Color.WHITE);
-    int compact = compactWidthPx(shown,size,inner,pendingRenderSpec) + text.getPaddingLeft() + text.getPaddingRight();
-    text.setMaxWidth(compact);
-    text.getLayoutParams().width = compact;
-    GradientDrawable bg = new GradientDrawable();
-    bg.setColor((SubtitleStyleMetrics.alpha(cfg.backgroundOpacity) << 24));
-    bg.setCornerRadius(dp(a, 4));
-    text.setBackground(bg);
-    text.measure(
-        View.MeasureSpec.makeMeasureSpec(compact, View.MeasureSpec.EXACTLY),
-        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-    if(ownedCaption && !pendingRenderSpec.legacy) {
-      long span=shownPage>=0 ? pendingPages.get(shownPage).end-pendingPages.get(shownPage).start
-          : pendingEnd-pendingStart;
-      if(!pendingRenderSpec.fits(shown,text.getLayout(),compact-text.getPaddingLeft()-text.getPaddingRight(),2)) {
-        presentationDiagnostics(a,shown,size,inner,span,"hard_textview_geometry");
-        text.setText(""); hideView(); lastBlankIdentity=pendingIdentity; return;
+    lastBlankIdentity=null;
+    GradientDrawable bg=new GradientDrawable();bg.setColor(SubtitleStyleMetrics.alpha(cfg.backgroundOpacity)<<24);
+    bg.setCornerRadius(dp(a,4));text.setBackground(bg);
+    // Time and owner are sampled again at UI application, after potentially expensive layout.
+    if(currentGuard!=null) {
+      if(!currentGuard.isValid()){text.setText("");hideView();displayResult(a,"empty","owner_invalid",false,inner,size,detail);return;}
+      long latest=currentGuard.displayPosition(pendingPosition);
+      if(pendingStart>=0 && pendingEnd>pendingStart && (latest<pendingStart || latest>=pendingEnd)) {
+        pendingPosition=latest;text.setText("");shownPage=-1;hideView();dirty=true;
+        displayResult(a,"empty","outside_owned_window",false,inner,size,"");return;
       }
-      presentationDiagnostics(a,shown,size,compact-text.getPaddingLeft()-text.getPaddingRight(),span,"");
+      int page=RebuildPageLayout.indexAt(pendingPages,latest);
+      boolean correction=ownedCaption && (page!=shownPage || candidate && pendingCandidate.end-latest<RebuildPageLayout.MIN_PAGE_MS);
+      pendingPosition=latest;
+      if(correction) {
+        dirty=true;
+        if(!reconcilingDisplayTime){reconcilingDisplayTime=true;try{render();}finally{reconcilingDisplayTime=false;}}
+        else {text.setText("");hideView();requestPlayerRender();}
+        return;
+      }
     }
     int height = text.getMeasuredHeight();
+    if(ownedCaption && height>b.height()) {
+      text.setText("");hideView();presentationDiagnostics(a,shown,size,inner,pendingEnd-pendingStart,"hard_textview_geometry");
+      displayResult(a,"empty","hard_textview_geometry",false,inner,size,detail);return;
+    }
+    if(candidate && pendingCandidate!=null)detail+=";candidate_from="+pendingCandidate.from+";candidate_to="+pendingCandidate.to
+        +";candidate_onset="+pendingCandidate.right.start;
+    if(ownedCaption)presentationDiagnostics(a,shown,size,compact-text.getPaddingLeft()-text.getPaddingRight(),
+        pendingPages.get(shownPage).end-pendingPages.get(shownPage).start,"");
     boolean landscape = b.width() > b.height();
     float y =
         CaptionSurface.isShorts()
@@ -633,6 +705,51 @@ final class CaptionOverlay {
     anchor.setLayoutParams(params);
     anchor.setVisibility(View.VISIBLE);
     anchor.bringToFront();
+    if((mode.equals("original_fallback") || mode.equals("overflow_status")) && !detail.equals(lastNotice))
+      CaptionDiagnostics.mark(a,"REBUILD_LAYOUT_FALLBACK",detail);
+    lastNotice=detail;
+    displayResult(a,mode,pendingWaiting ? "pending_translation" : "",true,inner,size,detail);
+  }
+
+  /** Complete TextView measure, with at most one retry at the already approved maximum width. */
+  private static int measureComplete(TextView text,String shown,float size,int inner,CaptionRenderSpec spec,boolean strict) {
+    int padding=text.getPaddingLeft()+text.getPaddingRight();
+    int compact=compactWidthPx(shown,size,inner,spec)+padding;
+    return measureCompleteAtWidth(text,shown,inner,spec,strict,compact);
+  }
+  static long textMeasureCalls;
+  static int measureCompleteAtWidth(TextView text,String shown,int inner,CaptionRenderSpec spec,boolean strict,int compact) {
+    int padding=text.getPaddingLeft()+text.getPaddingRight();
+    text.setText(shown);
+    for(int pass=0;pass<2;pass++) {
+      text.setMaxWidth(compact);text.getLayoutParams().width=compact;
+      textMeasureCalls++;
+      text.measure(View.MeasureSpec.makeMeasureSpec(compact,View.MeasureSpec.EXACTLY),
+          View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+      if(!strict || spec.fits(shown,text.getLayout(),compact-padding,2))return compact;
+      if(compact==inner+padding)break;
+      compact=inner+padding;
+    }
+    return -1;
+  }
+  private static void mergeRejected(Activity a,String why) {
+    String key=pendingIdentity+"|"+why;
+    if(key.equals(lastMergeNotice))return;lastMergeNotice=key;
+    CaptionDiagnostics.mark(a,"REBUILD_DISPLAY_OBSERVATION","id="+pendingIdentity
+        +";reason=merge_rejected_keep_primary;detail="+why+";render_position="+pendingPosition);
+  }
+  private static void displayResult(Activity a,String mode,String reason,boolean visible,int width,float size,String detail) {
+    if(a==null)return;
+    TextView view=textRef.get();String shown=visible && view!=null ? view.getText().toString() : "";
+    String key=pendingIdentity+"|"+mode+"|"+reason+"|"+visible+"|"+shown+"|"+shownPage+"|"+width+"|"+size;
+    if(key.equals(lastDisplayResult))return;lastDisplayResult=key;
+    String result=(detail.isEmpty()?"id="+pendingIdentity+";mode="+mode:detail)
+        +";ui_applied=true;visible="+visible+";reason="+reason+";render_position="+pendingPosition
+        +";window="+pendingStart+"-"+pendingEnd+";applied_wall_ms="+System.currentTimeMillis()
+        +";applied_uptime_ms="+SystemClock.uptimeMillis()+";presentation_revision=n34-owned-display-v1"
+        +";text="+CaptionQualityTrace.redact(shown,DeepSeekConfig.load(a).apiKey,400);
+    if(DeepSeekConfig.displayTextDebugEnabled(a))CaptionDiagnostics.mark(a,"REBUILD_PRESENTED",result);
+    CaptionDiagnostics.mark(a,"REBUILD_DISPLAY_RESULT",result);
   }
 
   private static void presentationDiagnostics(Activity a,String shown,float size,int width,

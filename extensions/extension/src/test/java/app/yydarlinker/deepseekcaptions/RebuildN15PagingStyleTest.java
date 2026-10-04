@@ -45,11 +45,11 @@ public class RebuildN15PagingStyleTest {
     }
   }
 
-  @Test public void cpsFailsClosedEvenForAOneLineTranslation() {
-    assertTrue(RebuildPageLayout.plan("预算会继续不断增加。",1000,2000,
-        capacity(100),capacity(100)).isEmpty());
-    assertTrue(RebuildPageLayout.plan("每段都需要真实时间，不能借用下一段。",0,2000,
-        capacity(100),capacity(100)).isEmpty());
+  @Test public void softCpsCannotBlankAnEntireFittingOwnedPage() {
+    assertEquals(1,RebuildPageLayout.plan("预算会继续不断增加。",1000,2000,
+        capacity(100),capacity(100)).size());
+    assertEquals(1,RebuildPageLayout.plan("每段都需要真实时间，不能借用下一段。",0,2000,
+        capacity(100),capacity(100)).size());
   }
 
   @Test public void onlyAnEntireShortWindowMayKeepItsOriginalSub1200Duration() {
@@ -58,8 +58,8 @@ public class RebuildN15PagingStyleTest {
     assertEquals(1,shortWindow.size());
     assertEquals(500,shortWindow.get(0).start);
     assertEquals(1386,shortWindow.get(0).end);
-    assertTrue(RebuildPageLayout.plan("字字字字字字字字",500,1386,
-        capacity(20),capacity(20)).isEmpty());
+    assertEquals(1,RebuildPageLayout.plan("字字字字字字字字",500,1386,
+        capacity(20),capacity(20)).size());
   }
 
   @Test public void derivedWindowCapAllowsMoreThanThreeButNotBeyondAvailableSlots() {

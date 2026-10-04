@@ -113,7 +113,7 @@ public class RebuildLayoutTest {
     assertTrue(history.contains("REBUILD_LAYOUT_FALLBACK"));
     assertTrue(history.contains("REBUILD_PRESENTED"));
     assertTrue(history.contains("id=n20-overflow;mode=overflow_status;"));
-    assertTrue(history.contains(";pagination_unresolved=true;text="));
+    assertTrue(history.contains(";pagination_unresolved=true;") && history.contains(";ui_applied=true;visible=false;"));
     assertPresentationFields(history);
     exportDiagnostics("overlay-overflow-diagnostics.txt",history);
     DeepSeekConfig.saveDisplayTextDebugEnabled(a, false);
@@ -224,7 +224,7 @@ public class RebuildLayoutTest {
     DeepSeekConfig.saveDisplayTextDebugEnabled(a,false);
   }
 
-  @Test public void blankPreDrawStillAllowsExplicitFallbackShowWithSameIdentity()throws Exception {
+  @Test public void blankPreDrawRetainsOwnedHardCapacityRefusalEvenWithSourceFallback()throws Exception {
     bounds=new Rect(0,0,240,400);
     String overflow=String.join("",java.util.Collections.nCopies(120,"字"));
     CaptionOverlay.showEvent(overflow,()->true,null,"n21b-fallback",0,5000,0);
@@ -234,8 +234,8 @@ public class RebuildLayoutTest {
     assertSame(beforeFallback,CaptionOverlay.budget());
     CaptionOverlay.showEvent(overflow,()->true,()->"Original","n21b-fallback",0,5000,0);
     assertNotSame(beforeFallback,CaptionOverlay.budget());
-    assertEquals("Original",text().getText().toString());
-    assertEquals(View.VISIBLE,anchor().getVisibility());
+    assertEquals("",text().getText().toString());
+    assertEquals(View.GONE,anchor().getVisibility());
   }
 
   @Test public void waitingPlaceholderIsVisibleEvenWhenCueTimeCannotFitTranslation()throws Exception {
@@ -574,15 +574,15 @@ public class RebuildLayoutTest {
     assertTrue(history.contains("pagination_unresolved=true"));
   }
 
-  @Test public void cpsFailureUsesOriginalEvenWhenTranslationFitsTwoLines() throws Exception {
+  @Test public void softCpsDoesNotHideCompleteTranslationThatFitsTwoLines() throws Exception {
     CaptionDiagnostics.clear(a);
     String caption = "这一条译文虽然很短，但时间窗口更短。";
     CaptionOverlay.showEvent(caption, () -> true, () -> "Original", "n15-cps", 0, 1200, 0);
-    assertEquals("Original", text().getText().toString());
+    assertEquals(caption, text().getText().toString());
     String history = a.getSharedPreferences("deepseek_caption_diagnostics", 0)
         .getString("history", "");
-    assertTrue(history.contains("REBUILD_LAYOUT_FALLBACK"));
-    assertTrue(history.contains("pagination_unresolved=true"));
+    assertFalse(history.contains("REBUILD_LAYOUT_FALLBACK"));
+    assertEquals(View.VISIBLE,anchor().getVisibility());
   }
 
   @Test public void ownedShortWindowIsLoggedWithoutExtendingItsTime() throws Exception {

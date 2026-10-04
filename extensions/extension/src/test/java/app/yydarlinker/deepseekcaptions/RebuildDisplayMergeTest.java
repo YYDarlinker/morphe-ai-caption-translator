@@ -16,7 +16,7 @@ public class RebuildDisplayMergeTest {
   }
 
   @Test
-  public void a11LeadWaitsForOwnedContinuationThenUsesUnionWindow() {
+  public void a11LeadRemainsIndependentAndMayOfferOnlyAnOptionalUnionCandidate() {
     RebuildSource source = source();
     RebuildProtocol.Event lead =
         new RebuildProtocol.Event(622, 628, 194800, 196620, "我要问的问题是");
@@ -24,7 +24,7 @@ public class RebuildDisplayMergeTest {
         new RebuildProtocol.Event(629, 637, 196620, 198806, "预算是否全面？有没有遗漏？");
 
     assertTrue(RebuildDisplayMerge.isLead(lead));
-    assertTrue(RebuildDisplayMerge.shouldDeferLead(source, lead, question, 196619));
+    assertFalse(RebuildDisplayMerge.shouldDeferLead(source, lead, question, 196619));
     RebuildDisplayMerge.Merged merged = RebuildDisplayMerge.merge(source, lead, question);
     assertNotNull(merged);
     assertEquals(622, merged.from);

@@ -28,7 +28,13 @@ final class RebuildPageLayout {
             && value.codePointCount(0, value.length()) <= 18);
   }
 
-  static List<Page> plan(String text, long start, long end,
+  static List<Page> plan(String text,long start,long end,Predicate<String> fitsTwo,Predicate<String> fitsOne) {
+    List<Page> preferred=preferredLegacyPlan(text,start,end,fitsTwo,fitsOne);
+    if(!preferred.isEmpty())return preferred;
+    return text!=null && !text.isEmpty() && end>start && fitsTwo!=null && fitsTwo.test(text)
+        ? Collections.singletonList(new Page(text,start,end)) : Collections.emptyList();
+  }
+  private static List<Page> preferredLegacyPlan(String text, long start, long end,
       Predicate<String> fitsTwo, Predicate<String> fitsOne) {
     if (text == null || text.isEmpty() || fitsTwo == null || fitsOne == null || end <= start)
       return Collections.emptyList();
@@ -50,14 +56,43 @@ final class RebuildPageLayout {
         expandedSeams(text, offset), true);
   }
 
-  /** Target-aware production entry. Chinese retains the exact N26 algorithm above. */
+  /** Target-aware entry: preserve valid legacy cuts; otherwise use soft-rate Unicode capacity. */
   static List<Page> plan(String text,long start,long end,CaptionOverlay.LayoutBudget budget,
       CaptionRenderSpec spec) {
-    if(budget==null || spec==null) return Collections.emptyList();
+    if(budget==null || spec==null || text==null || text.isEmpty() || end<=start) return Collections.emptyList();
     CaptionOverlay.LayoutBudget measured=budget.withSpec(spec);
-    if(spec.legacy) return plan(text,start,end,measured::fitsPreferred,
-        value -> spec.layout(value,measured.preferredPx,measured.width).getLineCount()<=1);
+    if(spec.legacy) {
+      // Preserve correct N26 cuts, not its rate/style rejection. No cache-policy change.
+      java.util.Map<String,Integer> geometry=new java.util.HashMap<>();
+      java.util.function.ToIntFunction<String> lines=value -> geometry.computeIfAbsent(value,key -> {
+        android.text.StaticLayout layout=spec.layout(key,measured.preferredPx,measured.width);
+        return spec.fits(key,layout,measured.width,2) ? layout.getLineCount() : 3;
+      });
+      List<Page> preferred = preferredLegacyPlan(text,start,end,value -> lines.applyAsInt(value)<=2,
+          value -> lines.applyAsInt(value)<=1);
+      if(validPreferred(text,start,end,preferred,measured,spec)) return preferred;
+      if(CaptionLanguagePager.wellFormed(text,spec)
+          && spec.fits(text,measured.preferredPx,measured.width,2))
+        return Collections.singletonList(new Page(text,start,end));
+    }
     return CaptionLanguagePager.plan(text,start,end,measured,spec);
+  }
+
+  private static boolean validPreferred(String text,long start,long end,List<Page> pages,
+      CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
+    if(pages.isEmpty() || !CaptionLanguagePager.wellFormed(text,spec)) return false;
+    int[] boundaries=CaptionUnicode.characterBoundaries(text,spec.locale);
+    boolean[] protectedCuts=CaptionLanguagePager.protectedOffsets(text);
+    int offset=0;long at=start;
+    for(Page page:pages) {
+      if(page.start!=at || page.end<=page.start
+          || pages.size()>1 && page.end-page.start<MIN_PAGE_MS
+          || !spec.fits(page.text,budget.preferredPx,budget.width,2)
+          || !text.startsWith(page.text,offset)) return false;
+      offset+=page.text.length();at=page.end;
+      if(java.util.Arrays.binarySearch(boundaries,offset)<0 || protectedCuts[offset]) return false;
+    }
+    return offset==text.length() && at==end;
   }
 
   private static List<Page> choose(String text, long start, long end,
@@ -245,8 +280,10 @@ final class RebuildPageLayout {
 
   static int indexAt(List<Page> pages, long position) {
     if (pages == null || pages.isEmpty()) return -1;
-    if (position < pages.get(0).start) return 0;
-    for (int i = 0; i < pages.size(); i++) if (position < pages.get(i).end) return i;
-    return pages.size() - 1;
+    for (int i = 0; i < pages.size(); i++) {
+      Page page = pages.get(i);
+      if (page.start <= position && position < page.end) return i;
+    }
+    return -1;
   }
 }

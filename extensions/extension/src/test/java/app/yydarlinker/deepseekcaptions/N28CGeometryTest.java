@@ -59,9 +59,9 @@ public class N28CGeometryTest {
     TextView label=new TextView(h.a);label.setTextLocale(Locale.JAPAN);
     CaptionRenderSpec.LEGACY.apply(label);assertEquals(Locale.JAPAN,label.getTextLocale());
   }
-  @Test public void legacyChineseStillRejectsTheOldCpsGate()throws Exception {
-    assertTrue(RebuildPageLayout.plan("这是一条完整的测试字幕。",0,500,x->true).isEmpty());
-    show("这是一条完整的测试字幕。","zh-Hans",500);assertTrue(pages().isEmpty());assertEquals("",view().getText().toString());
+  @Test public void legacyChinesePreservesCompleteShortWindowInsteadOfHardCpsReject()throws Exception {
+    assertEquals(1,RebuildPageLayout.plan("这是一条完整的测试字幕。",0,500,x->true).size());
+    show("这是一条完整的测试字幕。","zh-Hans",500);assertEquals(1,pages().size());assertEquals("这是一条完整的测试字幕。",view().getText().toString());
   }
   @Test public void overSoftReadingSpeedDisplaysEveryLetterAndRecordsWatch()throws Exception {
     String text="This complete caption remains visible despite a fast reading interval.";

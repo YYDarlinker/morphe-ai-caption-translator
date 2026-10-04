@@ -4,9 +4,9 @@ import android.text.StaticLayout;
 import java.util.*;
 
 /** Non-Chinese presentation-only pagination, wholly inside one accepted event. */
-final class CaptionLanguagePager {
+final class N34BeforeMeasurementMemoPagerFixture {
   static final long MIN_PAGE_MS = 1200;
-  private CaptionLanguagePager() {}
+  private N34BeforeMeasurementMemoPagerFixture() {}
   static List<RebuildPageLayout.Page> plan(String text,long start,long end,
       CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
     if(text==null || text.isEmpty() || end<=start || !wellFormed(text,spec))
@@ -177,9 +177,7 @@ final class CaptionLanguagePager {
     final int lines,units;final boolean fits;final double width,lineUnits;
     Measured(String part,android.text.StaticLayout layout,CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
       lines=layout.getLineCount();fits=spec.fits(part,layout,budget.width,spec.maxLines);
-      // Rejected geometry never participates in scoring; do not run extra ICU counters for it.
-      units=fits ? Math.max(1,spec.readingUnits(part)) : 0;
-      width=fits ? spec.actualWidth(layout) : 0;lineUnits=fits ? spec.lineUnits(part,layout) : 0;
+      units=Math.max(1,spec.readingUnits(part));width=spec.actualWidth(layout);lineUnits=spec.lineUnits(part,layout);
     }
   }
   private static final class Score implements Comparable<Score> {
@@ -201,14 +199,13 @@ final class CaptionLanguagePager {
     for(int p=0;p<=capacity;p++)Arrays.fill(previous[p],-1);
     cost[0][0]=new Score(0,0,0,0,0);
     int total=Math.max(1,spec.readingUnits(text));
-    Map<String,Measured> measurements=new HashMap<>();
+    Map<Long,Measured> measurements=new HashMap<>();
     for(int count=0;count<capacity;count++)for(int from=0;from<n-1;from++) {
       Score prior=cost[count][from];if(prior==null)continue;
       for(int to=from+1;to<n;to++) {
-        // Within this event/spec/geometry, identical complete parts have identical native layout.
-        String part=text.substring(cuts[from],cuts[to]);Measured measured=measurements.get(part);
-        if(measured==null){
-          measured=new Measured(part,spec.layout(part,budget.preferredPx,budget.width),budget,spec);measurements.put(part,measured);}
+        long key=((long)from<<32)|(to&0xffffffffL);Measured measured=measurements.get(key);
+        if(measured==null){String part=text.substring(cuts[from],cuts[to]);
+          measured=new Measured(part,spec.layout(part,budget.preferredPx,budget.width),budget,spec);measurements.put(key,measured);}
         if(measured.lines>spec.maxLines)break;
         if(!measured.fits)continue;
         double ms=duration*measured.units/(double)total;

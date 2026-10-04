@@ -115,7 +115,7 @@ final class RebuildReview {
     List<Issue> all = new ArrayList<>(plan.issues);
     for (RebuildProtocol.Event e : plan.events)
       if (!fits.test(e.text)) {
-        all.add(new Issue(e.from,e.to,"layout_overflow","This event does not fit the current measured caption budget; keep the complete event and repair its SOURCE boundary rather than rejecting the whole block.",true));
+        all.add(new Issue(e.from,e.to,"layout_overflow","This event does not fit the current measured caption budget; keep the complete event as an advisory; no paid semantic repair.",false));
       }
     return all.size()==plan.issues.size() ? plan : new RebuildProtocol.Plan(plan.events,plan.json,all,plan.reboundEvents);
   }
@@ -125,7 +125,7 @@ final class RebuildReview {
     for (RebuildProtocol.Event e : plan.events)
       if (!budget.canPresent(e))
         all.add(new Issue(e.from, e.to, "layout_overflow",
-            "The complete event exceeds the bounded page/time budget at the preferred font; retain its source and text.", true));
+            "The complete event exceeds the bounded page/time budget at the preferred font; retain its source and text; advisory only, no paid repair.", false));
     return all.size() == plan.issues.size() ? plan
         : new RebuildProtocol.Plan(plan.events, plan.json, all, plan.reboundEvents);
   }
@@ -158,8 +158,7 @@ final class RebuildReview {
     for(Issue issue:plan.issues) {
       // A paragraph warning is advisory once the full, source-bound plan is accepted.
       // Withholding it can hide a readable event for its entire owned interval.
-      if(issue.code.equals("layout_overflow")
-          || issue.code.equals("possible_polarity_change") || issue.code.equals("possible_arithmetic_misread")
+      if(issue.code.equals("possible_polarity_change") || issue.code.equals("possible_arithmetic_misread")
           || issue.code.equals("possible_subject_attachment")) {
         if(issue.from<=event.to && issue.to>=event.from)return true;
       }
@@ -176,10 +175,10 @@ final class RebuildReview {
     // fallback if neither bounded pages nor its existing fallback can show it.
     return false;
   }
-  static int score(List<Issue> issues){int n=0;for(Issue i:issues)if(i.repair)n++;return n;}
+  static int score(List<Issue> issues){int n=0;for(Issue i:issues)if(i.repair && !i.code.equals("layout_overflow"))n++;return n;}
   static String repair(List<Issue> issues) {
     StringBuilder out=new StringBuilder("Advisory fidelity review, not a proven error. Check these ranges against source and context; preserve already correct meanings. ");
-    for(Issue i:issues)if(i.repair){
+    for(Issue i:issues)if(i.repair && !i.code.equals("layout_overflow")){
       if(out.length()+i.describe().length()>1200)break;
       out.append(i.describe()).append(' ');
     }

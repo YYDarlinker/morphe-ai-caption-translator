@@ -23,12 +23,42 @@ final class CaptionRenderSpec {
   final CaptionLanguageProfile.Direction direction;
   final boolean legacy;
   final int maxLines = 2;
+  private final TextPaint measurementPaint;
+  private final TextDirectionHeuristic measurementDirection;
+  static long layoutCalls; // Diagnostic counters, never layout or scheduling authority.
 
   CaptionRenderSpec(String target, CaptionLanguageProfile profile, boolean chinese) {
+    this(target,profile,chinese,null,null);
+  }
+  private CaptionRenderSpec(String target,CaptionLanguageProfile profile,boolean chinese,
+      TextPaint paint,TextDirectionHeuristic heuristic) {
+    measurementPaint=paint;measurementDirection=heuristic;
     targetCode=target; this.profile=profile; legacy=chinese;
     locale=Locale.forLanguageTag(target.equals("UNKNOWN") ? "und" : target);
     direction=profile.direction;
     presentationPolicy=legacy ? "legacy_n26" : POLICY_VERSION;
+  }
+  CaptionRenderSpec withPaint(TextView view) {
+    TextPaint paint=new TextPaint(view.getPaint());
+    paint.setTextSize(1); // Size is an explicit plan key and is set separately by layout().
+    int direction=view.getTextDirection();TextDirectionHeuristic actual;
+    switch(direction) {
+      case View.TEXT_DIRECTION_LTR:actual=TextDirectionHeuristics.LTR;break;
+      case View.TEXT_DIRECTION_RTL:actual=TextDirectionHeuristics.RTL;break;
+      case View.TEXT_DIRECTION_ANY_RTL:actual=TextDirectionHeuristics.ANYRTL_LTR;break;
+      case View.TEXT_DIRECTION_LOCALE:actual=TextDirectionHeuristics.LOCALE;break;
+      case View.TEXT_DIRECTION_FIRST_STRONG_RTL:actual=TextDirectionHeuristics.FIRSTSTRONG_RTL;break;
+      case View.TEXT_DIRECTION_FIRST_STRONG_LTR:actual=TextDirectionHeuristics.FIRSTSTRONG_LTR;break;
+      default:actual=view.getLayoutDirection()==View.LAYOUT_DIRECTION_RTL
+          ? TextDirectionHeuristics.FIRSTSTRONG_RTL : TextDirectionHeuristics.FIRSTSTRONG_LTR;
+    }
+    return new CaptionRenderSpec(targetCode,profile,legacy,paint,actual);
+  }
+  boolean sameMeasurement(CaptionRenderSpec other) {
+    return other!=null && targetCode.equals(other.targetCode) && legacy==other.legacy
+        && measurementDirection==other.measurementDirection
+        && (measurementPaint==null ? other.measurementPaint==null
+            : other.measurementPaint!=null && measurementPaint.equalsForTextMeasurement(other.measurementPaint));
   }
   TextDirectionHeuristic heuristic() {
     return direction==CaptionLanguageProfile.Direction.RTL ? TextDirectionHeuristics.RTL
@@ -47,25 +77,27 @@ final class CaptionRenderSpec {
     if(!legacy) view.setTextLocale(locale);
   }
   StaticLayout layout(String value, float sizePx, int width) {
-    TextPaint paint=new TextPaint(Paint.ANTI_ALIAS_FLAG);
-    paint.setTypeface(Typeface.DEFAULT); paint.setTextSize(sizePx);
-    if(!legacy) paint.setTextLocale(locale);
+    layoutCalls++;
+    TextPaint paint=measurementPaint==null ? new TextPaint(Paint.ANTI_ALIAS_FLAG) : new TextPaint(measurementPaint);
+    if(measurementPaint==null) {paint.setTypeface(Typeface.DEFAULT);if(!legacy)paint.setTextLocale(locale);}
+    paint.setTextSize(sizePx);
     StaticLayout.Builder builder=StaticLayout.Builder.obtain(value,0,value.length(),paint,Math.max(1,width))
         .setIncludePad(false).setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
         .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
-    if(!legacy) builder.setTextDirection(heuristic()).setAlignment(Layout.Alignment.ALIGN_CENTER);
+    if(measurementDirection!=null || !legacy) builder.setTextDirection(
+        measurementDirection==null ? heuristic() : measurementDirection).setAlignment(Layout.Alignment.ALIGN_CENTER);
     return builder.build(); // No maxLines/ellipsis: measure the complete text before approving it.
   }
   boolean fits(String value, float sizePx, int width, int lines) {
     StaticLayout layout=layout(value,sizePx,width);
-    return legacy ? layout.getLineCount()<=lines : fits(value,layout,width,lines);
+    return fits(value,layout,width,lines);
   }
   boolean fits(String value, Layout layout, int width, int lines) {
     if(layout==null || layout.getLineCount()>lines || layout.getLineCount()<1) return false;
     if(layout.getLineEnd(layout.getLineCount()-1)!=value.length()) return false;
     int[] boundaries=CaptionUnicode.characterBoundaries(value,locale);
     for(int i=0;i<layout.getLineCount();i++) {
-      if(layout.getLineMax(i)>width+.01f
+      if(layout.getEllipsisCount(i)>0 || layout.getLineMax(i)>width+.01f
           || Arrays.binarySearch(boundaries,layout.getLineStart(i))<0
           || Arrays.binarySearch(boundaries,layout.getLineEnd(i))<0) return false;
     }

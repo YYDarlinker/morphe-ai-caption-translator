@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-04。N33源码b52b65b已工程及用户六项手机短验通过；N34独立显示/保守源修复卡待执行，产品未改。新093813中文7次8CPS空白/共用页时窗clamp已证、日语正确quote拒绝已重试；本轮追加manual VTT核对，169cue与JSON3文字/起止及原生产1224词完全对应，缺逐词标签。N34继承前轮N33分析18fallback/14defer/对齐回滚/autoVTT问题，并补齐双格式无副作用、真实重复与source_gap非音频静默验收。最新§4au/4av、N34-DISPLAY-RISK-REVIEW及N34-CODEX-TASK。
+> 最后更新：2026-10-04。N34已在N33源码基线上完成全语种owned-window/中文soft门槛/primary候选合并/保守源计时与VTT适配，独立三件套、本地全量和SDK35交付DEX宿主验证完成；最终身份与证据见最新§4aw及docs/N34-LOCAL-TEST-BUILD.md。N33手机六项设置短验仍为已通过历史；N34真实手机/音频同步短复验待用户，完成即停，不自派下一卡。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -17,12 +17,12 @@
 
 ## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
 
-1. **先读本实时状态档案**：优先本节与最新§4at/4au/4av、docs/N33-LOCAL-TEST-BUILD.md、docs/N34-DISPLAY-RISK-REVIEW.md、docs/N34-CODEX-TASK.md。当前产品N33而非旧N30/N31/N32。N33用户六项短验通过，N34下一张卡待执行；旧31/32卡失效，不复用旧实现，N27避让不恢复。
-2. **当前角色分工（用户最新）**：本规划聊天负责源码/诊断/官方规范审阅、只读原生产probe、具体方案/卡和两份状态管理；下一Codex单执行者按N34卡实现、验证、独立建包、本地提交后停。单执行者，不派DeepSeek，不自派修订/后续卡。手机只读、不push/安装/启动/app_process/清数据，正式签名与手机安装由用户做。
+1. **先读本实时状态档案**：优先本节与最新§4aw、docs/N34-LOCAL-TEST-BUILD.md；§4at/4au/4av、docs/N33-LOCAL-TEST-BUILD.md、docs/N34-DISPLAY-RISK-REVIEW.md、docs/N34-CODEX-TASK.md保留作为基线与授权历史。当前产品N34，N33为设置/两root稳定基线而非旧N30/N31/N32。N34闭合交付后停止，只待用户短复验；旧31/32卡失效，不复用旧实现，N27避让不恢复。
+2. **当前角色分工（本轮完成）**：规划聊天的管理/分析段落保留；Codex 单执行者已按 N34 完整卡实现、验证、独立建包并准备本地提交身份。完成后停止，不派 DeepSeek，不自派 N34r/N35。用户仅需短复验；正式签名与手机安装由用户做，执行者物理手机只读。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：N33完整工程＋用户手机六项设置/交互/播放冒烟验收通过，未宣称所有语种翻译语义通过；开工产品锚点b52b65b，4a76cd4及规划docs-only后继是正常HEAD。093813中文7fallback全触8CPS、未发生defer/late；日语1quote错配已重试且播放前就绪。源计时对齐仍estimated；共用Overlay页时窗clamp已独立复现。N34未施工。
-5. **执行顺序**：同一N34先中文soft rate/排版repair解耦与primary/candidate及晚到规则→全语种严格owned窗/最新主线程绘制时间/实际TextView兜底与可信trace→源局部安全alignment/结构VTT→50响应及旧样本重放、14目标场景/676基线与R1/400轮/真实SDK35代表caption/三组合最终DEX→独立-n34交付停。不修改Controller调度/Publication/CAS/Cache提交，不重做已验收N33设置，不提升quote重绑/并发来掩盖漏显。
+4. **当前阶段**：N34 从 N33 稳定源码基线闭合交付，最新完成身份/实际分母/三件套见§4aw及N34交付报告；N33用户六项设置短验为既有通过历史。N34原生全量、真实交付DEX SDK35宿主与源/格式重放完成；真实手机和音频同步不由本地自动证据自签。
+5. **执行状态**：N34 A→B→C→D 在同一授权卡内完成。后续聊天不得自动重跑旧 N31/N32/N27 或另起修订卡；先读最新§4aw与N34交付报告，等待用户短复验反馈。源调度/Publication/CAS/Cache提交、prompt/业务语义与N33设置仍保护。
 6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
 7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
 8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
@@ -876,3 +876,14 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 同一卡加强：manual VTT/JSON3全cue/word/precision/Planner/request/RebuildCache身份相等（相同cfg/target/ref条件）；SourceCaptionCache signed URL层可不同，不能强合并。manual无timestamp不能升级NATIVE，真实同句不同cue窗保留，不套rolling auto carry去重。
 - 源轨164个gap（初段常见82ms）不等于实测音频静默；source_gap原因只描述源数据无owned时间，不据此统一补齐/持有字幕、删除短cue或改hard650ms/speaker合同。
 - docs/N34-CODEX-TASK.md与N34-DISPLAY-RISK-REVIEW已补充，仍同一N34，无新修订/后续阶段，产品还是N33，两个状态副本同步；未实现/建包/手机操作/远程API。
+
+
+## 4aw. N34 已完成实现、验证与独立交付（2026-10-04）
+
+- N34 已按单卡闭合完成：当前源码/测试/纯输入 helper 修订，未恢复 N31/N32/N27；产品设置、两 root、prompt/semantic/source ownership、Publication/CAS/Cache 提交和用户数据合同保持。实现源码从 N33 docs-only 后继 HEAD 38a1ce4 开工。
+- A/B/C/D 结果：中文完整两行不再被 8CPS/样式 advisory 单独清空；lead/merge/late 使用 primary + optional candidate；所有 owned page 严格 [start,end)，测量完成后再次读取同 Session 最新 position/owner；真实 TextView 最多两行/完整文本/无 ellipsis；源计时 10 个安全局部段、191 words 采用，冲突/硬 gap 段保留 estimated；VTT 结构/实体/voice/style/ruby/timestamp/carry 适配只在纯输入层。
+- 最终 Gradle 全量 704/704，Python scoreboard 27/27，release contract 11/11。SDK35 final DEX/resources actual host 固定 emulator-5554 的 owned/actions 均 PASS；物理手机未写入、未安装、未启动、未清数据。
+- N34 三件套：MPP EFBB62E81FA430365FD1B1F1856F915439DAD475CB56884509B4DC224A0C7195 / 1,254,604B；MPE 84743177DAAEC8DEF9D539A6E2655D7BDE92A2FABA4885FDEEE5194D23FD3FF1 / 3,066,504B；unsigned APK 859D5D74F52E3AFDB9A72973E01A038A7DBE7D142A3DC743867EABD188390FF7 / 198,231,898B。详见 docs/N34-LOCAL-TEST-BUILD.md。
+- 最终 APK 11 DEX/58,267 classes；MPP/MPE/APK branch audit 全部 invalid_branches=0、dex_problems=0、binding_failures=0；官方方法反读 39 项与 N33 相等；AI-only/Remember-only/AI+Remember 组合 PASS，obsolete root 按名称拒绝。N34 实际 composition 92 PASS，N33 同官方也是92、N30历史对照93，不硬套旧 84/92 分母。
+- 历史权威身份清单 281,140 条、N33/N32/失败候选原件保留；ACCEPTANCE.md、scoreboard、官方输入与旧交付 bytes/SHA 未改。当前实现/测试/工具已完成，待本次实现提交及随后 docs-only 身份补记；完成即停，不自派 N34r/N35。
+- 用户短复验仍为：中文 25s/71–83s/168–170s/251–255s 与旧 119–122s lead；日语同片段加 pause/seek/fullscreen 返回，保存完整诊断。SDK35 宿主为合成 player surface，不冒称真实视频/音频同步或物理手机 after。

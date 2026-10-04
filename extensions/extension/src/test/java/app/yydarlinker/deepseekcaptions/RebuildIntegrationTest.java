@@ -982,7 +982,7 @@ public class RebuildIntegrationTest {
     assertEquals("",s.fallbackReason);
   }
 
-  @Test public void lateUnreadableShowsOnlyWaitingAndKeepsItsOwnEnd()throws Exception {
+  @Test public void lateArrivalDisplaysAcceptedTextWithoutBorrowingItsOwnEnd()throws Exception {
     engine.startMs=80;engine.duration=6960;
     blockResponse=true;start(false);RebuildController.Session s=session();await(()->s.blocks!=null);
     RebuildPlanner.Block b=s.blocks.get(0);
@@ -993,14 +993,14 @@ public class RebuildIntegrationTest {
       s.states[0]=RebuildController.READY;
     }
     RebuildController.time(6282);
-    assertTrue(s.lastShown,s.lastShown.endsWith("|"+CaptionStrings.get(a,"caption_translating")+"|"));
-    assertFalse(s.lastShown,s.lastShown.contains(event.text));
+    assertTrue(s.lastShown,s.lastShown.endsWith("|"+event.text+"|"));
+    assertFalse(s.lastShown,s.lastShown.contains(CaptionStrings.get(a,"caption_translating")));
     assertFalse(s.lastShown,s.lastShown.contains("This is one complete sentence."));
-    assertEquals("late_unreadable",s.fallbackReason);
+    assertEquals("",s.fallbackReason);
     String history=CaptionDiagnostics.fullText(a);
-    assertTrue(history.contains("REBUILD_LATE_UNREADABLE"));
+    assertTrue(history.contains("REBUILD_LATE_ARRIVAL_WATCH"));
     assertTrue(history.contains(";remaining=758"));
-    assertTrue(history.contains("reason=late_unreadable"));
+    assertTrue(history.contains("reason=late_arrival_watch"));
     RebuildLayoutTest.exportDiagnostics("controller-late-diagnostics.txt",history);
     RebuildController.time(7040);
     assertTrue(s.lastShown,s.lastShown.endsWith("||"));

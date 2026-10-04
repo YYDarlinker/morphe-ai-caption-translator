@@ -630,7 +630,11 @@ final class RebuildController {
     flush(s, notices);
     for (HttpURLConnection c : disconnect) c.disconnect();
     if (seek) CaptionOverlay.hide(() -> current(s) && s.generation == generation);
-    CaptionOverlay.position(displayPosition(s));
+    CaptionOverlay.position(displayPosition(s),new CaptionOverlay.RenderGuard() {
+      private final int epoch=s.generation;
+      public boolean isValid(){return current(s) && s.generation==epoch;}
+      public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
+    });
     kick(s);
     scheduleTick();
   }
@@ -719,7 +723,11 @@ final class RebuildController {
       if (!current(s)) return;
       s.position = observed;
     }
-    CaptionOverlay.position(displayPosition(s));
+    CaptionOverlay.position(displayPosition(s),new CaptionOverlay.RenderGuard() {
+      private final int epoch=s.generation;
+      public boolean isValid(){return current(s) && s.generation==epoch;}
+      public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
+    });
     kick(s);
     scheduleTick();
   }
@@ -779,7 +787,8 @@ final class RebuildController {
         if (precise * 10 < source.words.size() * 8)
           try {
             RawCaptionSource.Source ref = RawCaptionSource.reference(s.context, s.url, control);
-            if (ref != null) source = source.align(RebuildSource.read(ref.body, ref.document));
+            if (ref != null) source = source.align(RebuildSource.read(ref.body, ref.document),
+                detail->CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_ALIGNMENT","session="+s.id+";"+detail));
           } catch (Exception ignored) {
             RawCaptionSource.checkActive(control);
           }
@@ -1427,15 +1436,13 @@ final class RebuildController {
   private static RebuildDisplayMerge.Merged displayMergeForCurrent(Session s,
       RebuildProtocol.Event event, long position) {
     if (!s.languageContext.renderSpec.legacy || s.source == null || event == null) return null;
-    if (RebuildDisplayMerge.isLead(event)) {
-      RebuildProtocol.Event next = adjacentEvent(s, event, true);
-      RebuildDisplayMerge.Merged deferred = RebuildDisplayMerge.merge(s.source, event, next);
-      if (deferred != null && position < deferred.right.start) return deferred;
-    }
     RebuildProtocol.Event previous = adjacentEvent(s, event, false);
-    if (previous != null && (RebuildDisplayMerge.isLead(previous)
-        || RebuildDisplayMerge.isShort(event)))
+    if (previous != null && position>=event.start && (RebuildDisplayMerge.isLead(previous)
+        || RebuildDisplayMerge.isShort(event))) {
+      for(RebuildProtocol.Plan plan:s.plans)
+        if(plan!=null && plan.events.contains(previous) && RebuildReview.semanticBlocked(plan,previous))return null;
       return RebuildDisplayMerge.merge(s.source, previous, event);
+    }
     return null;
   }
 
@@ -1451,12 +1458,13 @@ final class RebuildController {
     String translating = CaptionStrings.get(s.context, "caption_translating");
     List<Notice> notices = new ArrayList<>();
     String text = "";
-    String fallbackReason = "";
+    String fallbackReason = "", displayEmptyReason="";
     boolean status = false;
     int generation;
     long revision, submission, selectedAt, observedAt;
     String eventId = "none";
     long eventStart = -1, eventEnd = -1;
+    RebuildDisplayMerge.Merged displayCandidate = null;
     synchronized (s) {
       if (!current(s) || !s.visible) return;
       generation = s.generation;
@@ -1495,33 +1503,21 @@ final class RebuildController {
             eventId = i + ":" + e.from + "-" + e.to;
             eventStart = e.start;
             eventEnd = e.end;
-            text = RebuildReview.uncertainNumbers(p,e) ? "〔原字幕数字存疑〕"+e.text : e.text;
+            text = e.text;
+            if(text.isEmpty())displayEmptyReason="non_speech";
             boolean blocked = RebuildReview.semanticBlocked(p,e);
-            RebuildDisplayMerge.Merged merged = blocked ? null : displayMergeForCurrent(s,e,selectedAt);
-            boolean deferredLead = merged != null && RebuildDisplayMerge.isLead(e)
-                && merged.left == e && selectedAt < merged.right.start;
-            if (deferredLead) {
-              // Do not show the lead by itself, and do not reveal the continuation early.
-              eventId = "deferred:" + i + ":" + e.from + "-" + e.to;
-              text = "";
+            if(RebuildReview.uncertainNumbers(p,e)) notice(notices,"REBUILD_DISPLAY_OBSERVATION",
+                "session="+s.id+";generation="+generation+";event="+eventId+";reason=source_number_ambiguity");
+            if(blocked) {
+              text="";eventId="source:"+eventId;fallbackReason="event_review";
             } else {
-              if (merged != null) {
-                eventId = merged.id();
-                eventStart = merged.start;
-                eventEnd = merged.end;
-                text = merged.text;
-              }
-              boolean late = merged == null && !eventId.equals(s.displayedEvent)
-                  && s.languageContext.renderSpec.legacy
-                  && (eventId.equals(s.withheldEvent) || lateUnreadable(e,selectedAt));
-              if(blocked || late) {
-                if(late && !eventId.equals(s.withheldEvent))notice(notices,"REBUILD_LATE_UNREADABLE","session="+s.id+";event="+eventId+";remaining="+(e.end-s.position));
-                if(late)s.withheldEvent=eventId;
-                // Keep the existing owned window; only the diagnostic explains a rejection.
-                text = blocked ? "" : translating;
-                eventId = "source:" + eventId;
-                fallbackReason=blocked?"event_review":"late_unreadable";
-              } else s.displayedEvent=eventId;
+              // Only immutable candidate metadata is extracted under the Session lock.
+              displayCandidate=displayMergeForCurrent(s,e,selectedAt);
+              if(!eventId.equals(s.displayedEvent) && s.languageContext.renderSpec.legacy
+                  && lateUnreadable(e,selectedAt)) notice(notices,"REBUILD_LATE_ARRIVAL_WATCH",
+                      "session="+s.id+";generation="+generation+";event="+eventId
+                      +";remaining="+(e.end-selectedAt)+";reason=late_arrival_watch");
+              s.displayedEvent=eventId;
             }
           } else if (p == null) {
             fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
@@ -1561,23 +1557,32 @@ final class RebuildController {
     }
     flush(s, notices);
     if (revision < 0) return;
+    final String appliedIdentity=s.id+":"+generation+":"+eventId;
+    final long appliedStart=eventStart,appliedEnd=eventEnd;
+    final String appliedReason=fallbackReason.equals("event_review") ? "semantic_blocked"
+        : fallbackReason.startsWith("failed:") ? "translation_failed"
+        : fallbackReason.isEmpty() ? (displayEmptyReason.isEmpty()?"source_gap":displayEmptyReason) : "pending_translation";
     CaptionOverlay.RenderGuard guard = new CaptionOverlay.RenderGuard() {
       public boolean isValid() {
         return current(s) && s.generation == generation && s.renderRevision == revision
             && s.renderSubmission == submission && s.visible;
       }
+      public String identity(){return appliedIdentity;}
+      public long windowStart(){return appliedStart;}
+      public long windowEnd(){return appliedEnd;}
+      public String blankReason(){return appliedReason;}
+      public long displayPosition(long supplied) { return RebuildController.displayPosition(s); }
       public void onApplied() { if (isValid()) s.appliedRenderRevision = revision; }
     };
     if (status) CaptionOverlay.showStatus(text, guard);
     else if (text.isEmpty() && fallbackReason.isEmpty()) CaptionOverlay.hide(guard);
-    else if (fallbackReason.equals("pending_engine") || fallbackReason.equals("pending_translation")
-        || fallbackReason.equals("late_unreadable"))
+    else if (fallbackReason.equals("pending_engine") || fallbackReason.equals("pending_translation"))
       CaptionOverlay.showWaitingEvent(text, guard, s.id + ":" + generation + ":" + eventId,
           eventStart, eventEnd, selectedAt);
     else
       CaptionOverlay.showEvent(
           text, guard, () -> "", s.id + ":" + generation + ":" + eventId,
-          eventStart, eventEnd, selectedAt,s.languageContext.renderSpec);
+          eventStart, eventEnd, selectedAt,s.languageContext.renderSpec,displayCandidate);
     if (DeepSeekConfig.displayTextDebugEnabled(s.context))
       CaptionDiagnostics.mark(
           s.context,

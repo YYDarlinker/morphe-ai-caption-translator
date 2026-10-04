@@ -36,15 +36,18 @@ public class RebuildA07VisibilityTest {
   }
 
   @Test
-  public void measuredOverflowAndSemanticRisksStillBlock() {
+  public void semanticRisksStillBlockButMeasuredOverflowIsAdvisory() {
     RebuildProtocol.Event event = new RebuildProtocol.Event(243, 280, 76092, 88640, A07_TEXT);
     for (String code : new String[] {
-        "layout_overflow", "possible_polarity_change", "possible_arithmetic_misread",
+        "possible_polarity_change", "possible_arithmetic_misread",
         "possible_subject_attachment"}) {
       RebuildProtocol.Plan accepted = new RebuildProtocol.Plan(
           Collections.singletonList(event), "{}", Collections.singletonList(
               new RebuildReview.Issue(243, 280, code, "hard display risk", true)));
       assertTrue(code, RebuildReview.blocked(accepted, event));
     }
+    RebuildProtocol.Plan layout=new RebuildProtocol.Plan(Collections.singletonList(event),"{}",Collections.singletonList(
+        new RebuildReview.Issue(243,280,"layout_overflow","display observation",false)));
+    assertFalse(RebuildReview.blocked(layout,event));assertEquals(0,RebuildReview.score(layout.issues));
   }
 }

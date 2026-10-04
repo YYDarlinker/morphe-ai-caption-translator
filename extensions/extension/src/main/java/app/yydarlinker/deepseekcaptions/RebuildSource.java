@@ -35,9 +35,17 @@ final class RebuildSource {
     final String text;
     final long start, end;
     final int cue;
-    final boolean nativeOffset;
+    final boolean nativeOffset, speakerBreak;
+    final List<Integer> speakerOffsets;
 
     Span(String t, long a, long z, int c, boolean n) {
+      this(t,a,z,c,n,false);
+    }
+    Span(String t,long a,long z,int c,boolean n,boolean speaker) {
+      this(t,a,z,c,n,speaker,Collections.emptyList());
+    }
+    Span(String t,long a,long z,int c,boolean n,boolean speaker,List<Integer> offsets) {
+      speakerBreak=speaker;speakerOffsets=offsets;
       text = t;
       start = a;
       end = z;
@@ -49,12 +57,17 @@ final class RebuildSource {
   final List<Word> words;
   final boolean coarseCueReconstructed;
   final int coarseCueCount;
+  final String formatEvidence;
 
   RebuildSource(List<Word> values) {
     this(values, false, 0);
   }
 
   private RebuildSource(List<Word> values, boolean reconstructed, int count) {
+    this(values,reconstructed,count,"");
+  }
+  private RebuildSource(List<Word> values,boolean reconstructed,int count,String evidence) {
+    formatEvidence=evidence;
     words = Collections.unmodifiableList(new ArrayList<>(values));
     coarseCueReconstructed = reconstructed;
     coarseCueCount = count;
@@ -136,6 +149,13 @@ final class RebuildSource {
     List<Span> spans = new ArrayList<>();
     Map<Integer, CoarseFrame> frames = new HashMap<>();
     String raw = new String(body, StandardCharsets.UTF_8).trim();
+    if(raw.startsWith("\uFEFF"))raw=raw.substring(1).trim();
+    boolean webVtt=raw.startsWith("WEBVTT");String formatEvidence="";
+    if(webVtt) {
+      WebVttSourceReader.Result vtt=WebVttSourceReader.read(raw);formatEvidence=vtt.evidence();
+      for(WebVttSourceReader.Range range:vtt.ranges)
+        spans.add(new Span(range.text,range.start,range.end,range.cue,range.nativeStart,range.speakerBreak,range.speakerOffsets));
+    }
     if (raw.startsWith("{")) {
       JSONArray es = new JSONObject(raw).optJSONArray("events");
       if (es != null)
@@ -208,7 +228,7 @@ final class RebuildSource {
           }
         }
     }
-    if (spans.isEmpty()) {
+    if (spans.isEmpty() && !webVtt) {
       int i = 0;
       for (CaptionDocument.Cue c : parsed.cues())
         spans.add(new Span(c.text, c.startMs, c.endMs, i++, false));
@@ -221,7 +241,7 @@ final class RebuildSource {
     for (Span span : spans) {
       List<String> ts = tokens(span.text);
       if (ts.isEmpty() || span.end <= span.start) continue;
-      if (span.nativeOffset && ts.size() == 1 && !nativeSeen.add(span.start + "|" + key(ts.get(0))))
+      if (!webVtt && span.nativeOffset && ts.size() == 1 && !nativeSeen.add(span.start + "|" + key(ts.get(0))))
         continue;
       if (!ordered.isEmpty() && ordered.get(ordered.size() - 1).start == span.start) {
         Span a = ordered.remove(ordered.size() - 1);
@@ -247,13 +267,26 @@ final class RebuildSource {
         end = ordered.get(i + 1).start;
         repaired |= estimated;
       }
-      add(out, span.text, span.start, end, span.cue, span.nativeOffset);
+      int first=out.size();Set<Integer> speakerWords=new HashSet<>();if(span.speakerBreak)speakerWords.add(0);
+      if(span.speakerOffsets.isEmpty())add(out,span.text,span.start,end,span.cue,span.nativeOffset);
+      else {
+        List<String> speech=new ArrayList<>();int from=0;
+        for(int mark:span.speakerOffsets)if(mark>=from && mark<span.text.length()) {
+          speech.addAll(tokens(span.text.substring(from,mark).replace('\u00a0',' ')));
+          speakerWords.add(speech.size());from=mark;
+        }
+        speech.addAll(tokens(span.text.substring(from).replace('\u00a0',' ')));
+        if(end-span.start<speech.size())throw new IllegalArgumentException("vtt_voice_time_capacity");
+        addTokens(out,speech,span.text,span.start,end,span.cue,span.nativeOffset);
+      }
+      for(int index:speakerWords)if(first+index>=first && first+index<out.size()){Word word=out.get(first+index);
+        out.set(first+index,new Word(">>"+word.text,word.start,word.end,word.cue,word.precision));}
     }
     if (out.isEmpty()) throw new IllegalArgumentException("source_empty");
     for (int i = 1; i < out.size(); i++)
       if (out.get(i).start < out.get(i - 1).end)
         throw new IllegalArgumentException("source_time_order");
-    return new RebuildSource(out, repaired, coarse);
+    return new RebuildSource(out, repaired, coarse,formatEvidence);
   }
 
   /**
@@ -327,6 +360,9 @@ final class RebuildSource {
   private static void add(
       List<Word> out, String text, long start, long end, int cue, boolean nativeOffset) {
     List<String> ts = tokens(text.replace('\u00a0', ' '));
+    addTokens(out,ts,text,start,end,cue,nativeOffset);
+  }
+  private static void addTokens(List<Word> out,List<String> ts,String text,long start,long end,int cue,boolean nativeOffset) {
     if (ts.isEmpty() || end <= start) return;
     if (end - start < ts.size()) {
       out.add(new Word(text.trim(), start, end, cue, Precision.ESTIMATED));
@@ -348,36 +384,77 @@ final class RebuildSource {
   }
 
   /** Local evidence alignment, not a global shift. Ambiguous words are deliberately left alone. */
-  RebuildSource align(RebuildSource reference) {
-    Map<String, Integer> left = ngrams(words), right = ngrams(reference.words);
-    Map<Integer, Integer> matches = new TreeMap<>();
-    int last = -1;
-    for (int i = 0; i + 2 < words.size(); i++) {
-      String k = gram(words, i);
-      Integer a = left.get(k), j = right.get(k);
-      if (a == null || a != i || j == null || j < 0 || j <= last) continue;
-      boolean valid = true;
-      for (int n = 0; n < 3; n++)
-        if (Math.abs(words.get(i + n).start - reference.words.get(j + n).start) > 10000)
-          valid = false;
-      if (valid) {
-        for (int n = 0; n < 3; n++) matches.put(i + n, j + n);
-        last = j + 2;
-        i += 2;
+  RebuildSource align(RebuildSource reference) { return align(reference,null); }
+
+  RebuildSource align(RebuildSource reference,java.util.function.Consumer<String> report) {
+    if(reference==null){alignmentReport(report,"reason=missing_reference;adopted_segments=0");return this;}
+    Map<String,Integer> left=ngrams(words),right=ngrams(reference.words);
+    Map<Integer,Integer> matches=new TreeMap<>();Set<Integer> anchors=new HashSet<>();int last=-1;
+    for(int i=0;i+2<words.size();i++) {
+      String key=gram(words,i);Integer a=left.get(key),j=right.get(key);
+      if(a==null || a!=i || j==null || j<0 || j<=last)continue;
+      boolean valid=true;
+      for(int n=0;n<3;n++)if(Math.abs(words.get(i+n).start-reference.words.get(j+n).start)>10000)valid=false;
+      if(valid){for(int n=0;n<3;n++)matches.put(i+n,j+n);anchors.add(i);last=j+2;i+=2;}
+    }
+    if(matches.size()<6){alignmentReport(report,"reason=insufficient_unique_anchors;matched_words="+matches.size()+";adopted_segments=0");return this;}
+    List<Word> proposed=new ArrayList<>(words);int adopted=0,skipped=0,aligned=0;StringBuilder evidence=new StringBuilder();
+    List<Integer> eligible=new ArrayList<>();
+    for(Map.Entry<Integer,Integer> e:matches.entrySet()) {
+      Word a=words.get(e.getKey()),b=reference.words.get(e.getValue());
+      if(a.precision==Precision.ESTIMATED && b.precision==Precision.NATIVE && b.start<b.end)eligible.add(e.getKey());
+    }
+    for(int at=0;at<eligible.size();) {
+      int from=eligible.get(at),to=from,jFrom=matches.get(from);at++;
+      while(at<eligible.size()) {
+        int next=eligible.get(at);
+        if(next!=to+1 || matches.get(next)!=matches.get(to)+1
+            || RebuildPlanner.hardBreakBefore(this,next) || RebuildPlanner.hardBreakBefore(reference,matches.get(next)))break;
+        to=next;at++;
       }
+      boolean complete=false;
+      for(int anchor:anchors)if(anchor>=from && anchor+2<=to){complete=true;break;}
+      String reason=complete ? "" : "incomplete_native_anchor";
+      if(reason.isEmpty()) {
+        long prior=from==0 ? -1 : proposed.get(from-1).end;
+        for(int i=from;i<=to;i++) {
+          Word b=reference.words.get(matches.get(i));
+          if(b.start<0 || b.start>=b.end || b.start<prior){reason="segment_time_or_boundary_conflict";break;}
+          prior=b.end;
+        }
+        if(reason.isEmpty() && to+1<words.size() && prior>proposed.get(to+1).start)reason="segment_time_or_boundary_conflict";
+      }
+      if(reason.isEmpty()) {
+        for(int cut=Math.max(1,from);cut<=Math.min(words.size()-1,to+1);cut++) {
+          Word oldLeft=words.get(cut-1),oldRight=words.get(cut);
+          Word newLeft=cut-1>=from && cut-1<=to ? reference.words.get(matches.get(cut-1)) : proposed.get(cut-1);
+          Word newRight=cut>=from && cut<=to ? reference.words.get(matches.get(cut)) : proposed.get(cut);
+          if(!oldRight.text.startsWith(">>") && (oldRight.start-oldLeft.end>=650)!=(newRight.start-newLeft.end>=650)) {
+            reason="hard_source_gap_changed";break;
+          }
+        }
+      }
+      if(reason.isEmpty()) {
+        for(int i=from;i<=to;i++){Word a=words.get(i),b=reference.words.get(matches.get(i));
+          proposed.set(i,new Word(a.text,b.start,b.end,a.cue,Precision.ALIGNED));aligned++;}
+        adopted++;reason="adopted";
+      } else skipped++;
+      if(adopted+skipped<=16){if(evidence.length()>0)evidence.append(',');evidence.append(from).append('-').append(to)
+          .append('@').append(jFrom).append(':').append(reason);}
     }
-    if (matches.size() < 6) return this;
-    List<Word> proposed = new ArrayList<>(words);
-    for (Map.Entry<Integer, Integer> entry : matches.entrySet()) {
-      int i = entry.getKey();
-      Word a = words.get(i), b = reference.words.get(entry.getValue());
-      if (b.precision == Precision.NATIVE)
-        proposed.set(i, new Word(a.text, b.start, b.end, a.cue, Precision.ALIGNED));
-    }
-    // All changes form one transaction: never clip unmatched speech to make anchors fit.
-    for (int i = 1; i < proposed.size(); i++)
-      if (proposed.get(i).start < proposed.get(i - 1).end) return this;
-    return new RebuildSource(proposed, coarseCueReconstructed, coarseCueCount);
+    alignmentReport(report,"matched_words="+matches.size()+";native_candidates="+eligible.size()
+        +";adopted_segments="+adopted+";skipped_segments="+skipped+";aligned_words="+aligned
+        +";segments_bounded="+evidence+";segments_omitted="+Math.max(0,adopted+skipped-16));
+    return adopted==0 ? this : new RebuildSource(proposed,coarseCueReconstructed,coarseCueCount,formatEvidence);
+  }
+  String precisionEvidence() {
+    int nativeWords=0,estimatedWords=0,alignedWords=0;
+    for(Word word:words) switch(word.precision){case NATIVE:nativeWords++;break;case ALIGNED:alignedWords++;break;default:estimatedWords++;}
+    return "native="+nativeWords+";estimated="+estimatedWords+";aligned="+alignedWords
+        +(formatEvidence.isEmpty()?"":";"+formatEvidence);
+  }
+  private static void alignmentReport(java.util.function.Consumer<String> report,String detail) {
+    if(report!=null)report.accept(detail);
   }
 
   private static String gram(List<Word> w, int i) {

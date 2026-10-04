@@ -135,6 +135,7 @@ final class RawCaptionSource {
             diagnosticPrefix + "_CACHE_HIT",
             (cacheAsPrimary ? "Reused source caption cache: " : "Reused timing reference cache: ")
                 + cached.body.length + " bytes");
+        sourceEvidence(context,valid,diagnosticPrefix);
         return valid;
       } catch (Exception invalid) {
         // Older releases cached 200/HTML and malformed tracks before parsing them.
@@ -169,7 +170,23 @@ final class RawCaptionSource {
         diagnosticPrefix + "_OK",
         (cacheAsPrimary ? "Source captions: " : "ASR timing reference: ")
             + fetched.body.length + " bytes");
+    sourceEvidence(context,valid,diagnosticPrefix);
     return valid;
+  }
+
+  private static void sourceEvidence(Context context,LoadedTrack track,String kind) {
+    String body=new String(track.body,java.nio.charset.StandardCharsets.UTF_8).trim();
+    if(body.startsWith("\uFEFF"))body=body.substring(1).trim();
+    String code=sourceLanguage(track.url,track.document);
+    if(code.length()>48 || !code.matches("[A-Za-z0-9]{1,8}(?:-[A-Za-z0-9]{1,8})*"))code="UNKNOWN";
+    String format=body.startsWith("{")?"json3":body.startsWith("WEBVTT")?"vtt":body.startsWith("<")?"xml":"srt";
+    try {
+      byte[] hash=java.security.MessageDigest.getInstance("SHA-256").digest(track.body);StringBuilder hex=new StringBuilder();
+      for(byte value:hash)hex.append(String.format(java.util.Locale.ROOT,"%02x",value&255));
+      CaptionDiagnostics.mark(context,"SOURCE_INPUT_EVIDENCE","kind="+kind+";format="+format
+          +";track_kind="+(query(track.url,"kind").equals("asr")?"asr":"manual")
+          +";source_code="+code+";bytes="+track.body.length+";sha256="+hex);
+    } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
   }
 
   static void checkActive(DeepSeekApiClient.RequestControl control) throws InterruptedException {

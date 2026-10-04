@@ -56,4 +56,4 @@ N35 已按执行卡完成本地实现、全量验证、独立建包和组合审�
 
 N34 baseline 三件套和 docs/N35-RESTORE-N34.ps1 保留。若必须回退，先确保 trial 工作区没有未保存/staged 项，再按 N35-ROLLBACK-READY.md 的 inspect/restore 流程生成新的本地恢复提交；不使用 reset --hard，不删除 N35 失败证据。
 
-实现提交：IMPLEMENTATION_COMMIT_TO_FILL（随后会补写真实 commit/anchor 身份）。
+实现提交：1967dac（随后会补写真实 commit/anchor 身份）。

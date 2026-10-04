@@ -964,3 +964,13 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - actualcapability/锚/source/event/page/clock/frame逐层证据＋十四target代表/原704基线/400并发/SDK35实际getter与settingfling/三组合/finalDEX/原N34包hash保护，一次闭合-n35交付，真实phone音频和旧f40body缺失边界不能测试绿替代。
 
 当前产品仍N34，没有实现N35/新包/手机写入或远程翻译API。本轮网络仅用户要求的公开视频caption/primary文本只读核验；新依赖/工具/音视频未下载，Git未push/release。
+
+
+## 4az. N35 完整时间链执行、验证与本地交付（2026-10-04）
+
+- N35 已完成源码实现与验证：参照 descriptor 多候选/能力选择/1500ms-3-attempt budget；WORD/SEGMENT/CUE evidence；partial boundary-constrained local retiming；source/event/page basis；official player read-only adapter + same-origin media fallback + hook/frozen clock；root-lifetime IME lease；preview label/layout cache。保持 quote/from/to/数字/semantic safety、R1-CAS/locks/durable/cache/请求预算、650ms/speaker hard break、N33 settings/two-root 与 N34 owned-window 保护。
+- 本地实现提交：1967dac（feat(n35): repair caption timing chain and preview frame stability）。后续仅补本状态/身份记录，不 amend/push。
+- 全量 JDK21 isolated verification：708 tests，failures=0，errors=0，skipped=0；N35 timing/source replay 18/18；display/preview/viewport focused 69/69；integration/contract/connection 136/136。默认 JDK25 的 ASM major 69 问题单独留在 .verification/n35/failed-default-jdk25，不作为产品失败。
+- 独立离线 source build、patch-list、Patcher composition 通过；组合 92 PASS lines/COMPOSITION_PASS，final APK 11 root DEX/58,281 classes；MPP/MPE/APK n35 bytes/SHA 见 docs/N35-LOCAL-TEST-BUILD.md 与 .verification/n35/final-checks.json。N34 三包、official input、baseline SHA/bytes 未变。
+- reference 口径保持诚实：机制 fixture 已证明 partial offsets 会被保留并实际局部采用；旧 runtime f40f646a... 的 17,840B body 仍未取得，未连接真实手机，不能宣称实际音频波形或用户短验同步。新诊断会记录 downloaded/parsed/matched/capable/chosen/applied 和 bounded body capture。
+- preview root lease 与缓存改动已通过 69 项 focused regression；未进行物理手机写入/安装/启动/push/清数据/发布。交付产物为独立 -n35 路径，N34 可按 N35-RESTORE-N34.ps1 回退。用户自行完成 after 短验后停止，不自派 N35r/N36。

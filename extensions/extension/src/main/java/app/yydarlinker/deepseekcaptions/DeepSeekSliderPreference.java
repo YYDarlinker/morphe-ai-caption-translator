@@ -18,7 +18,7 @@ import java.util.List;
 
 /** Inline slider that persists on finger release; no additional dialog or Save button is used. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekSliderPreference extends android.preference.Preference {
+public final class DeepSeekSliderPreference extends CaptionSettingPreference {
     static final String KEY_TEXT_SIZE = "deepseek_caption_text_size";
     static final String KEY_OPACITY = "deepseek_caption_background_opacity";
     private static final String[] SIZE_TIER_KEYS = {
@@ -35,6 +35,8 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
     /** Reference settings-row width and horizontal padding, used only to resolve the rail inset. */
     private static final int ROW_REFERENCE_DP = 380;
     private static final int ROW_PADDING_DP = 20;
+    private java.lang.ref.WeakReference<RailBar> ownRail=new java.lang.ref.WeakReference<>(null);
+    private java.lang.ref.WeakReference<LinearLayout> ownNames=new java.lang.ref.WeakReference<>(null);
 
     public DeepSeekSliderPreference(Context context) {
         super(context);
@@ -92,7 +94,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         ));
 
         TextView title = new TextView(context);
-        title.setText(getTitle());
+        uiText(title,()->String.valueOf(getTitle()));
         CaptionSettingsStyle.title(title);
         title.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
         heading.addView(title, new LinearLayout.LayoutParams(
@@ -108,7 +110,9 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         SeekBar sizeBar = sizeSlider ? new SizeTierSeekBar(this, context) : null;
         SeekBar opacityBar = sizeSlider ? null : new OpacitySeekBar(this, context);
         SeekBar slider = sizeSlider ? sizeBar : opacityBar;
+        ownRail=new java.lang.ref.WeakReference<>((RailBar)slider);
         CaptionSettingsStyle.slider(slider);
+        CaptionTextResolver.direction(slider,false); // The existing N25 physical fraction mapping handles RTL.
         slider.setTag(sizeSlider ? "ai_size_tier_slider" : "ai_opacity_slider");
         slider.setMinimumHeight(dp(48));
         slider.setContentDescription(getTitle());
@@ -124,6 +128,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         ));
 
         LinearLayout tierNames = sizeSlider ? tierNames((SizeTierSeekBar) sizeBar) : null;
+        ownNames=new java.lang.ref.WeakReference<>(tierNames);
         if (tierNames != null) {
             root.addView(tierNames, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -135,7 +140,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         CharSequence summaryText = KEY_TEXT_SIZE.equals(getKey()) ? tierDescription(current) : getSummary();
         TextView summary = new TextView(context);
         if (summaryText != null && summaryText.length() > 0) {
-            summary.setText(summaryText);
+            uiText(summary,()->KEY_TEXT_SIZE.equals(getKey())?tierDescription(minimum+slider.getProgress()):String.valueOf(getSummary()));
             CaptionSettingsStyle.caption(summary);
             root.addView(summary, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -196,6 +201,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         final int[] natural=new int[SIZE_TIER_KEYS.length];
         for (int tier = 0; tier < SIZE_TIER_KEYS.length; tier++) {
             TextView name = tierLabel(SIZE_TIER_KEYS[tier]);
+            uiText(name,SIZE_TIER_KEYS[tier]);
             // The width the label wants on one line: what decides the rail inset and what the row places.
             // A weight-1 cell measures to an equal share instead, which would hide a name that does not
             // fit its share, so the natural size is captured here and used by the layout below.
@@ -207,6 +213,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         LinearLayout names = new LinearLayout(getContext()) {
             @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
                 int count=getChildCount();
+                int[] translatedWidths=tierLabelWidths();System.arraycopy(translatedWidths,0,natural,0,count);
                 // The label row is a full-width sibling of the slider with no horizontal padding of its own,
                 // so the slider's padded frame and this row's frame start at the same x and every
                 // coordinate below can be derived from the slider's own numbers.
@@ -215,13 +222,14 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
                 int inset=span>0?tierLabelInset(natural,span):0;
                 float step=count>1?(span-2f*inset)/(count-1):0f;
                 int previousRight=-1;
+                int tallest=0;
                 for (int i = 0; i < count; i++) {
                     View label = getChildAt(i);
                     int height = label.getMeasuredHeight();
                     // A label is placed only horizontally here, so its own vertical band is whatever the
                     // standard row layout computed; the very first pass can still hold zeros.
                     int labelTop = label.getBottom() > label.getTop() ? label.getTop() : 0;
-                    int labelBottom = label.getBottom() > label.getTop() ? label.getBottom() : height;
+                    int labelBottom = labelTop + height;
                     if (span <= 0) {
                         label.layout(pad, labelTop, pad + Math.max(0,natural[i]), labelBottom);
                         previousRight = pad + Math.max(0,natural[i]);
@@ -242,9 +250,13 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
                     // its own tick. Otherwise the label keeps the leftmost position its share allows.
                     int x = Math.round(pad + inset + i * step - width / 2f);
                     x = Math.max(floorX, Math.min(pad + span - width, x));
+                    labelBottom=labelTop+label.getMeasuredHeight();
                     label.layout(x, labelTop, x + width, labelBottom);
+                    tallest=Math.max(tallest,labelBottom);
                     previousRight = Math.max(previousRight, x + width);
                 }
+                // A locale rebind can need a taller font or a second line; retain the original rail maths.
+                if(tallest>getHeight()){setMinimumHeight(tallest);requestLayout();}
             }
         };
         names.setTag("ai_size_tier_names");
@@ -264,7 +276,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
      */
     private TextView tierLabel(String key) {
         TextView name = new TextView(getContext());
-        name.setText(CaptionStrings.settings(getContext(), key));
+        name.setText(CaptionStrings.settings(getContext(),key));
         CaptionSettingsStyle.caption(name);
         name.setGravity(Gravity.CENTER);
         name.setSingleLine(false);
@@ -342,6 +354,10 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
         }
         names.invalidate();
     }
+    @Override protected void refreshDynamicText(){
+        RailBar rail=ownRail.get();LinearLayout names=ownNames.get();
+        if(rail!=null){rail.refreshTextGeometry();rail.setContentDescription(getTitle());if(names!=null){updateTierNames(rail,names,rail.getProgress()+minimum());names.requestLayout();}}
+    }
 
     /**
      * One geometry for the whole slider. The rail runs over the inclusive padded frame, narrowed at both
@@ -388,6 +404,7 @@ public final class DeepSeekSliderPreference extends android.preference.Preferenc
             setMeasuredDimension(resolveSize(MeasureSpec.getSize(widthSpec), widthSpec),
                     resolveSize(height, heightSpec));
         }
+        void refreshTextGeometry(){onSizeChanged(getWidth(),getHeight(),getWidth(),getHeight());requestLayout();invalidate();}
 
         final int centerY() {
             return getPaddingTop() + (getHeight() - getPaddingTop() - getPaddingBottom()) / 2;

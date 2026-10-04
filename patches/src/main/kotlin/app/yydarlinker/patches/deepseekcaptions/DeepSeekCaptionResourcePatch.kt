@@ -158,7 +158,7 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
         }
 
         fun Element.addCategory(title: String): Element {
-            val category = ownerDocument.createElement("PreferenceCategory")
+            val category = ownerDocument.createElement("app.yydarlinker.deepseekcaptions.CaptionSettingCategory")
             category.setAttribute("android:title", captionResourceTitle(title))
             appendChild(category)
             return category

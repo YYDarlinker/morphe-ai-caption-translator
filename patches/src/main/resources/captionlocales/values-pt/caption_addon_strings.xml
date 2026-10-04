@@ -206,9 +206,9 @@
     <string name="cap_size_tier_hint" formatted="false">"%1$s: detalhes %2$spx · tela cheia %3$spx"</string>
     <string name="cap_size_tier_l" formatted="false">"Grande"</string>
     <string name="cap_size_tier_s" formatted="false">"Pequeno"</string>
-    <string name="cap_size_tier_standard" formatted="false">"Padrão"</string>
-    <string name="cap_size_tier_xl" formatted="false">"Muito grande"</string>
-    <string name="cap_size_tier_xs" formatted="false">"Muito pequeno"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Normal"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Máximo"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Mínimo"</string>
     <string name="cap_source_retry" formatted="false">"Conexão das legendas interrompida. Tentando novamente…"</string>
     <string name="cap_source_unavailable" formatted="false">"Legendas de origem indisponíveis. Selecione a faixa novamente."</string>
     <string name="cap_style" formatted="false">"Estilo das legendas"</string>
@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"Usar YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"Tradução de legendas com IA · Ativada"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"Tradução de legendas com IA · Desativada"</string>
-    <string name="cap_ai_summary" formatted="false">"Traduza legendas ao vivo com seu serviço de IA"</string>
+    <string name="cap_ai_summary" formatted="false">"Depois de ativar, escolha um idioma na lista «Traduzir automaticamente» do YouTube para traduzir as legendas em tempo real com o serviço de IA configurado."</string>
     <string name="cap_languages_title" formatted="false">"Idiomas de tradução automática"</string>
-    <string name="cap_languages_summary" formatted="false">"Escolha idiomas para adicionar ao menu de tradução do YouTube"</string>
+    <string name="cap_languages_summary" formatted="false">"Adicione os idiomas selecionados à lista «Traduzir automaticamente» do YouTube. Pode selecionar vários idiomas."</string>
     <string name="cap_languages_count" formatted="false">"%1$d idiomas selecionados"</string>
     <string name="cap_languages_save" formatted="false">"Salvar"</string>
     <string name="cap_languages_existing" formatted="false">"Já disponível"</string>
@@ -232,4 +232,12 @@
     <string name="cap_languages_unavailable" formatted="false">"Indisponível"</string>
     <string name="cap_languages_empty" formatted="false">"Nenhum idioma selecionado; o menu nativo não muda"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"O ID do modelo não pode estar vazio"</string>
+    <string name="cap_api_address_invalid" formatted="false">"Introduza um URL base HTTP(S) válido e compatível com OpenAI, sem credenciais incorporadas nem fragmentos."</string>
+    <string name="cap_language_zh_hans" formatted="false">"Chinês (simplificado)"</string>
+    <string name="cap_language_zh_hant" formatted="false">"Chinês (tradicional)"</string>
+    <string name="cap_paste" formatted="false">"Colar"</string>
+    <string name="cap_select_all" formatted="false">"Selecionar tudo"</string>
+    <string name="cap_value_retained" formatted="false">"%1$s; o último valor válido é mantido"</string>
+    <string name="cap_model_ids_empty" formatted="false">"O servidor não retornou IDs de modelos selecionáveis"</string>
 </resources>

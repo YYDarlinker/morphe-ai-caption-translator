@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Inline model editor plus automatic OpenAI-compatible model discovery. */
 @SuppressWarnings("deprecation")
-public final class DeepSeekModelPreference extends android.preference.Preference implements ApiProfiles.Editor {
+public final class DeepSeekModelPreference extends CaptionSettingPreference implements ApiProfiles.Editor {
     static final String KEY_MODEL = "deepseek_caption_model";
 
     private static final long AUTO_SAVE_DELAY_MS = 850L;
@@ -145,7 +145,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.row(root);
 
         TextView title = new TextView(context);
-        title.setText(getTitle());
+        uiText(title,()->String.valueOf(getTitle()));
         CaptionSettingsStyle.title(title);
         title.setPadding(0,0,0,dp(8));
         root.addView(title, matchWrap());
@@ -156,7 +156,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.editor(editor);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         editor.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        editor.setHint(CaptionStrings.settings(getContext(), "model_hint_manual_only"));
+        uiHint(editor,"model_hint_manual_only");
         String initial = DeepSeekConfig.load(context).model;
         editor.setText(initial);
         editor.setSelection(initial.length());
@@ -171,7 +171,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         CaptionSettingsStyle.button(refresh);
         refresh.setMinimumWidth(0);
         refresh.setMinHeight(dp(48));
-        refresh.setText(CaptionStrings.settings(getContext(), "refresh"));
+        uiText(refresh,"refresh");
         refresh.setAllCaps(false);
         refresh.setOnClickListener(view -> fetchModels(true));
         controls.addView(refresh, new LinearLayout.LayoutParams(
@@ -197,7 +197,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         choices.setOnClickListener(view -> showModelMenu());
         choices.setVisibility(View.GONE);
         controls.addView(choices,0,new LinearLayout.LayoutParams(0,dp(48),1f));
-        state.setPadding(0,dp(4),0,0);state.setMaxLines(2);
+        state.setPadding(0,dp(4),0,0);state.setMaxLines(Integer.MAX_VALUE);state.setEllipsize(null);
         root.addView(state,matchWrap());
 
         final EditText createdEditor=editor;
@@ -310,12 +310,11 @@ public final class DeepSeekModelPreference extends android.preference.Preference
                 if (message == null || message.trim().isEmpty()) {
                     message = error.getClass().getSimpleName();
                 }
-                final String detail = message;
+                final Throwable failure = error;
                 main.post(() -> {
                     if (generation != fetchGeneration) return;
                     if (refresh != null) refresh.setEnabled(true);
-                    setState(String.format(java.util.Locale.ROOT,
-                            CaptionStrings.settings(getContext(), "model_load_failed"), detail), true);
+                    uiText(state,()->String.format(java.util.Locale.ROOT,CaptionStrings.settings(getContext(),"model_load_failed"),failureText(getContext(),failure)));state.setAlpha(1f);
                 });
             }
         });
@@ -337,6 +336,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
                 : CaptionStrings.settings(getContext(), "model") + " (" + shownModels.size() + ")";
         choices.setText(label + "  ▾");
         choices.setContentDescription(CaptionStrings.settings(getContext(), "model") + ": " + label);
+        CaptionTextResolver.direction(choices,shownModels.contains(name));
     }
 
     private void dismissModelMenu() {
@@ -355,7 +355,9 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         LinearLayout rows = new LinearLayout(context);
         rows.setOrientation(LinearLayout.VERTICAL);
         String heading = CaptionStrings.settings(context, "model") + " (" + shownModels.size() + ")";
-        rows.addView(modelMenuRow(context, heading, false, true, null, null),
+        TextView headingRow=modelMenuRow(context, heading, false, true, null, null);
+        uiText(headingRow,()->"    "+CaptionStrings.settings(getContext(),"model")+" ("+shownModels.size()+")");
+        rows.addView(headingRow,
                 new LinearLayout.LayoutParams(-1, dp(48)));
         String selected = editor.getText().toString().trim();
         for (String model : shownModels) {
@@ -400,6 +402,7 @@ public final class DeepSeekModelPreference extends android.preference.Preference
         row.setSingleLine(true);row.setEllipsize(android.text.TextUtils.TruncateAt.END);
         row.setText((selected?"✓  ":"    ")+model);
         row.setContentDescription(model+(selected?", "+CaptionStrings.settings(context,"selected_suffix"):""));
+        CaptionTextResolver.direction(row,!heading);
         int fg=CaptionSettingsStyle.primary(context);
         row.setTextColor(heading?CaptionSettingsStyle.secondary(context):fg);
         android.graphics.drawable.ColorDrawable fill=new android.graphics.drawable.ColorDrawable(selected?CaptionSettingsStyle.tint(fg,20):android.graphics.Color.TRANSPARENT);
@@ -441,9 +444,9 @@ public final class DeepSeekModelPreference extends android.preference.Preference
             String detail = error.getMessage();
             if (detail == null || detail.trim().isEmpty()) detail = CaptionStrings.settings(getContext(),"model_save_failed");
             // One template for the whole sentence: the provider's own wording is the only variable here.
-            setState(String.format(java.util.Locale.ROOT, "%1$s%2$s",
-                    detail, CaptionStrings.settings(getContext(),"keep_last_valid")), true);
-            if (reportInvalid && editor != null) editor.setError(detail);
+            final String failure=detail;
+            uiText(state,()->String.format(java.util.Locale.ROOT,CaptionStrings.settings(getContext(),"value_retained"),CaptionStrings.localize(getContext(),failure)));state.setAlpha(1f);
+            if (reportInvalid && editor != null) editor.setError(CaptionStrings.localize(getContext(),detail));
         }
     }
 
@@ -453,9 +456,24 @@ public final class DeepSeekModelPreference extends android.preference.Preference
      */
     private void setState(String text, boolean important) {
         if (state == null) return;
-        state.setText(CaptionStrings.settings(getContext(), text));
+        uiText(state,text);
         state.setAlpha(important ? 1f : 0.72f);
     }
+
+    /** Only the catalog's authored error envelope is UI text; provider details remain byte-for-byte. */
+    static String failureText(Context context,Throwable failure){
+        String detail=failure.getMessage();
+        if(detail==null||detail.trim().isEmpty())return failure.getClass().getSimpleName();
+        StackTraceElement[] trace=failure.getStackTrace();
+        boolean authored=trace.length>0&&DeepSeekModelCatalog.class.getName().equals(trace[0].getClassName())&&"fetch".equals(trace[0].getMethodName());
+        if(!authored)return detail;
+        if("接口没有返回可选择的模型 ID".equals(detail))return CaptionStrings.settings(context,"model_ids_empty");
+        if("请先填写 API Key".equals(detail))return CaptionStrings.settings(context,"model_hint_key_first");
+        java.util.regex.Matcher http=java.util.regex.Pattern.compile("^模型列表 HTTP ([0-9]{3})(?:：(.*))?$",java.util.regex.Pattern.DOTALL).matcher(detail);
+        if(http.matches())return "HTTP "+http.group(1)+(http.group(2)==null?"":": "+http.group(2));
+        return detail;
+    }
+    @Override protected void refreshDynamicText(){if(choices!=null)updatePickerLabel();}
 
     @Override public boolean flushProfile(){
         if(editor==null||boundRevision!=ApiProfiles.revision()||!boundProfile.equals(ApiProfiles.active(getContext())))return true;

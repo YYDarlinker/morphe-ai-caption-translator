@@ -15,7 +15,7 @@ fun main(args:Array<String>){
     fun load(key:String)=loadPatchesFromJar(setOf(file(key))).byPatchesFile.getValue(file(key))
     val official=load("official");val addon=load("addon")
     val names=values.getValue("selection").split("|").filter { it.isNotBlank() }
-    val roots=names.map { name->addon.single { it.name==name } }
+    val roots=names.map { name->addon.singleOrNull { it.name==name } ?:error("Unknown caption root: $name") }
     val output=file("output");check(!output.exists()){ "Use a new output directory" };output.mkdirs()
     val scratch=Files.createTempDirectory(output.toPath(),"session-").toFile()
     var failure:Throwable?=null

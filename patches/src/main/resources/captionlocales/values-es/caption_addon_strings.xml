@@ -206,9 +206,9 @@
     <string name="cap_size_tier_hint" formatted="false">"%1$s: detalles %2$spx · pantalla completa %3$spx"</string>
     <string name="cap_size_tier_l" formatted="false">"Grande"</string>
     <string name="cap_size_tier_s" formatted="false">"Pequeño"</string>
-    <string name="cap_size_tier_standard" formatted="false">"Estándar"</string>
-    <string name="cap_size_tier_xl" formatted="false">"Muy grande"</string>
-    <string name="cap_size_tier_xs" formatted="false">"Muy pequeño"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Normal"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Máximo"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Mínimo"</string>
     <string name="cap_source_retry" formatted="false">"Conexión de subtítulos interrumpida. Reintentando…"</string>
     <string name="cap_source_unavailable" formatted="false">"Subtítulos de origen no disponibles. Vuelve a seleccionar la pista."</string>
     <string name="cap_style" formatted="false">"Estilo de subtítulos"</string>
@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"Usar YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"Traducción de subtítulos con IA · Activada"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"Traducción de subtítulos con IA · Desactivada"</string>
-    <string name="cap_ai_summary" formatted="false">"Traduce subtítulos en directo con tu servicio de IA"</string>
+    <string name="cap_ai_summary" formatted="false">"Al activar esta función, elige un idioma en la lista «Traducir automáticamente» de YouTube para traducir los subtítulos en tiempo real con el servicio de IA configurado."</string>
     <string name="cap_languages_title" formatted="false">"Idiomas de traducción automática"</string>
-    <string name="cap_languages_summary" formatted="false">"Elige idiomas para añadir al menú de traducción de YouTube"</string>
+    <string name="cap_languages_summary" formatted="false">"Añade los idiomas seleccionados a la lista «Traducir automáticamente» de YouTube. Puedes seleccionar varios idiomas."</string>
     <string name="cap_languages_count" formatted="false">"%1$d idiomas seleccionados"</string>
     <string name="cap_languages_save" formatted="false">"Guardar"</string>
     <string name="cap_languages_existing" formatted="false">"Ya disponible"</string>
@@ -232,4 +232,12 @@
     <string name="cap_languages_unavailable" formatted="false">"No disponible"</string>
     <string name="cap_languages_empty" formatted="false">"Sin idiomas seleccionados; el menú nativo no cambia"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"El ID del modelo no puede estar vacío"</string>
+    <string name="cap_api_address_invalid" formatted="false">"Introduce una URL base HTTP(S) válida y compatible con OpenAI, sin credenciales integradas ni fragmentos."</string>
+    <string name="cap_language_zh_hans" formatted="false">"Chino (simplificado)"</string>
+    <string name="cap_language_zh_hant" formatted="false">"Chino (tradicional)"</string>
+    <string name="cap_paste" formatted="false">"Pegar"</string>
+    <string name="cap_select_all" formatted="false">"Seleccionar todo"</string>
+    <string name="cap_value_retained" formatted="false">"%1$s; se conserva el último valor válido"</string>
+    <string name="cap_model_ids_empty" formatted="false">"El servidor no devolvió ningún ID de modelo seleccionable"</string>
 </resources>

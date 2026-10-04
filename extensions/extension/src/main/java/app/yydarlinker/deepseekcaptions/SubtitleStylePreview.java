@@ -11,7 +11,7 @@ import java.util.*;
 
 /** Theme-aware 16:9 preview scaled from the calibrated full-screen reference. */
 @SuppressWarnings("deprecation")
-public final class SubtitleStylePreview extends android.preference.Preference {
+public final class SubtitleStylePreview extends CaptionSettingPreference {
     static final float LANDSCAPE_REFERENCE_WIDTH_PX=2736f;
     /** Catalog key holding the one-line sample each supported interface language renders. */
     static final String SAMPLE_KEY="preview_sample";
@@ -51,6 +51,7 @@ public final class SubtitleStylePreview extends android.preference.Preference {
                 Math.min(right,frameWidth),Math.min(bottom,frameHeight));
     }
     private static final Set<Preview> views=Collections.newSetFromMap(new WeakHashMap<Preview,Boolean>());
+    private java.lang.ref.WeakReference<Preview> ownPreview=new java.lang.ref.WeakReference<>(null);
     public SubtitleStylePreview(Context c){super(c);init();}
     public SubtitleStylePreview(Context c,AttributeSet a){super(c,a);init();}
     public SubtitleStylePreview(Context c,AttributeSet a,int d){super(c,a,d);init();}
@@ -63,16 +64,18 @@ public final class SubtitleStylePreview extends android.preference.Preference {
     @Override protected View onCreateView(ViewGroup parent){
         Context c=getContext();LinearLayout root=new LinearLayout(c);root.setOrientation(LinearLayout.VERTICAL);CaptionSettingsStyle.row(root);
         Preview preview=new Preview(c);preview.setTag("ai_style_preview_canvas");views.add(preview);
+        ownPreview=new java.lang.ref.WeakReference<>(preview);
         LinearLayout.LayoutParams previewParams=new LinearLayout.LayoutParams(-1,-2);
         previewParams.topMargin=CaptionSettingsStyle.dp(c,6);
         root.addView(preview,previewParams);
-        TextView hint=new TextView(c);hint.setText(CaptionStrings.settings(c,"preview_hint"));CaptionSettingsStyle.caption(hint);
+        TextView hint=new TextView(c);uiText(hint,"preview_hint");CaptionSettingsStyle.caption(hint);
         LinearLayout.LayoutParams hintParams=new LinearLayout.LayoutParams(-1,-2);
         hintParams.topMargin=CaptionSettingsStyle.dp(c,2);
         root.addView(hint,hintParams);
         return root;
     }
     static void update(String key,int value){for(Preview p:new ArrayList<>(views)){if(key.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE))p.sizeTier=CaptionFontSize.clampTier(value);else p.opacity=value;p.invalidate();}}
+    @Override protected void refreshDynamicText(){Preview preview=ownPreview.get();if(preview!=null){preview.setContentDescription(CaptionStrings.settings(getContext(),"preview"));CaptionTextResolver.direction(preview,false);preview.invalidate();}}
     /** The sample line resolved through the settings catalog for whatever interface language is active. */
     static String sample(Context c){return CaptionStrings.settings(c,SAMPLE_KEY);}
     // Use all available row width; video and captions share one 16:9 coordinate system.
@@ -94,7 +97,10 @@ public final class SubtitleStylePreview extends android.preference.Preference {
      * are the only things the caller supplies.
      */
     static TextView sampleLabel(Context c,String sample,int sizeTier,int opacity,float screenWidthPx,float contentWidth){
-        return sampleLabel(c,sample,sizeTier,opacity,screenWidthPx,contentWidth,RebuildController.previewRenderSpec());
+        // Bind the UI sample and its width measurement to the same locale. Playback specs stay separate.
+        String code=CaptionTextResolver.locale(c).toLanguageTag();
+        CaptionRenderSpec uiSpec=new CaptionRenderSpec(code,CaptionLanguageProfile.fromCode(code),false);
+        return sampleLabel(c,sample,sizeTier,opacity,screenWidthPx,contentWidth,uiSpec);
     }
     static TextView sampleLabel(Context c,String sample,int sizeTier,int opacity,float screenWidthPx,float contentWidth,
             CaptionRenderSpec spec){

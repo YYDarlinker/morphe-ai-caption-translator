@@ -31,4 +31,5 @@ public class CaptionFlyoutPreference extends AddonSwitchPreference {
         if(isChecked()!=visible)setChecked(visible);
         super.onBindView(view);
     }
+    @Override protected void refreshDynamicText(){setTitle(CaptionStrings.settings(getContext(),titleKey()));setSummary(CaptionStrings.settings(getContext(),summaryKey()));}
 }

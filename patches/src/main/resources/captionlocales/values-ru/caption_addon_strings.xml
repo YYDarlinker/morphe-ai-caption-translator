@@ -204,11 +204,11 @@
     <string name="cap_size" formatted="false">"Размер шрифта"</string>
     <string name="cap_size_hint" formatted="false">"Стандартный: сведения 44.5px · полный экран 55.5px"</string>
     <string name="cap_size_tier_hint" formatted="false">"%1$s: сведения %2$spx · полный экран %3$spx"</string>
-    <string name="cap_size_tier_l" formatted="false">"Большой"</string>
-    <string name="cap_size_tier_s" formatted="false">"Маленький"</string>
-    <string name="cap_size_tier_standard" formatted="false">"Стандартный"</string>
-    <string name="cap_size_tier_xl" formatted="false">"Очень большой"</string>
-    <string name="cap_size_tier_xs" formatted="false">"Очень маленький"</string>
+    <string name="cap_size_tier_l" formatted="false">"Крупный"</string>
+    <string name="cap_size_tier_s" formatted="false">"Малый"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Норма"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Макси"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Мини"</string>
     <string name="cap_source_retry" formatted="false">"Соединение с субтитрами прервано. Повторная попытка…"</string>
     <string name="cap_source_unavailable" formatted="false">"Исходные субтитры недоступны. Выберите дорожку ещё раз."</string>
     <string name="cap_style" formatted="false">"Стиль субтитров"</string>
@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"Использовать YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"ИИ-перевод субтитров · Включён"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"ИИ-перевод субтитров · Выключен"</string>
-    <string name="cap_ai_summary" formatted="false">"Переводите субтитры в реальном времени с вашим ИИ-сервисом"</string>
+    <string name="cap_ai_summary" formatted="false">"После включения выберите язык в списке YouTube «Автоматический перевод», чтобы переводить субтитры в реальном времени с помощью настроенного сервиса ИИ."</string>
     <string name="cap_languages_title" formatted="false">"Языки автоперевода"</string>
-    <string name="cap_languages_summary" formatted="false">"Выберите языки для добавления в меню перевода YouTube"</string>
+    <string name="cap_languages_summary" formatted="false">"Добавьте выбранные языки в список YouTube «Автоматический перевод». Можно выбрать несколько языков."</string>
     <string name="cap_languages_count" formatted="false">"Выбрано языков: %1$d"</string>
     <string name="cap_languages_save" formatted="false">"Сохранить"</string>
     <string name="cap_languages_existing" formatted="false">"Уже доступен"</string>
@@ -232,4 +232,12 @@
     <string name="cap_languages_unavailable" formatted="false">"Недоступен"</string>
     <string name="cap_languages_empty" formatted="false">"Языки не выбраны; исходное меню не изменится"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"Идентификатор модели не может быть пустым"</string>
+    <string name="cap_api_address_invalid" formatted="false">"Введите корректный базовый HTTP(S)-адрес, совместимый с OpenAI, без встроенных учётных данных и фрагмента."</string>
+    <string name="cap_language_zh_hans" formatted="false">"Китайский (упрощённый)"</string>
+    <string name="cap_language_zh_hant" formatted="false">"Китайский (традиционный)"</string>
+    <string name="cap_paste" formatted="false">"Вставить"</string>
+    <string name="cap_select_all" formatted="false">"Выбрать всё"</string>
+    <string name="cap_value_retained" formatted="false">"%1$s; сохранено последнее допустимое значение"</string>
+    <string name="cap_model_ids_empty" formatted="false">"Сервер не вернул доступных для выбора идентификаторов моделей"</string>
 </resources>

@@ -206,9 +206,9 @@
     <string name="cap_size_tier_hint" formatted="false">"%1$s: Videodetails %2$spx · Vollbild %3$spx"</string>
     <string name="cap_size_tier_l" formatted="false">"Groß"</string>
     <string name="cap_size_tier_s" formatted="false">"Klein"</string>
-    <string name="cap_size_tier_standard" formatted="false">"Standard"</string>
-    <string name="cap_size_tier_xl" formatted="false">"Sehr groß"</string>
-    <string name="cap_size_tier_xs" formatted="false">"Sehr klein"</string>
+    <string name="cap_size_tier_standard" formatted="false">"Normal"</string>
+    <string name="cap_size_tier_xl" formatted="false">"Riesig"</string>
+    <string name="cap_size_tier_xs" formatted="false">"Winzig"</string>
     <string name="cap_source_retry" formatted="false">"Untertitelverbindung unterbrochen. Erneuter Versuch…"</string>
     <string name="cap_source_unavailable" formatted="false">"Quelluntertitel nicht verfügbar. Bitte Untertitelspur erneut auswählen."</string>
     <string name="cap_style" formatted="false">"Untertitelstil"</string>
@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"YouTube verwenden"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"KI-Untertitelübersetzung · Ein"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"KI-Untertitelübersetzung · Aus"</string>
-    <string name="cap_ai_summary" formatted="false">"Untertitel live mit deinem KI-Dienst übersetzen"</string>
+    <string name="cap_ai_summary" formatted="false">"Wähle nach dem Aktivieren eine Sprache in der YouTube-Liste „Automatisch übersetzen“, um Untertitel mit deinem eingerichteten KI-Dienst in Echtzeit zu übersetzen."</string>
     <string name="cap_languages_title" formatted="false">"Sprachen für automatische Übersetzung"</string>
-    <string name="cap_languages_summary" formatted="false">"Sprachen zum YouTube-Übersetzungsmenü hinzufügen"</string>
+    <string name="cap_languages_summary" formatted="false">"Füge die ausgewählten Sprachen zur YouTube-Liste „Automatisch übersetzen“ hinzu. Du kannst mehrere Sprachen auswählen."</string>
     <string name="cap_languages_count" formatted="false">"%1$d Sprachen ausgewählt"</string>
     <string name="cap_languages_save" formatted="false">"Speichern"</string>
     <string name="cap_languages_existing" formatted="false">"Bereits vorhanden"</string>
@@ -232,4 +232,12 @@
     <string name="cap_languages_unavailable" formatted="false">"Nicht verfügbar"</string>
     <string name="cap_languages_empty" formatted="false">"Keine Sprache ausgewählt; das native Menü bleibt unverändert"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"Die Modell-ID darf nicht leer sein"</string>
+    <string name="cap_api_address_invalid" formatted="false">"Gib eine gültige OpenAI-kompatible HTTP(S)-Basis-URL ohne eingebettete Zugangsdaten oder Fragment ein."</string>
+    <string name="cap_language_zh_hans" formatted="false">"Chinesisch (vereinfacht)"</string>
+    <string name="cap_language_zh_hant" formatted="false">"Chinesisch (traditionell)"</string>
+    <string name="cap_paste" formatted="false">"Einfügen"</string>
+    <string name="cap_select_all" formatted="false">"Alles auswählen"</string>
+    <string name="cap_value_retained" formatted="false">"%1$s; der letzte gültige Wert bleibt erhalten"</string>
+    <string name="cap_model_ids_empty" formatted="false">"Der Endpunkt hat keine auswählbaren Modell-IDs zurückgegeben"</string>
 </resources>

@@ -107,7 +107,26 @@ final class DeepSeekConfig {
     }
 
     static String defaultPrompt(Context context) {
+        return legacyRuntimeDefaultPrompt(context);
+    }
+
+    /** Display only: never stored in a Snapshot, provider request, fingerprint or cache identity. */
+    static String displayDefaultPrompt(Context context) {
         return CaptionStrings.settings(context, "default_prompt");
+    }
+
+    /** Exactly the N30 runtime reader. This exception is not an entry point for visible UI text. */
+    private static String legacyRuntimeDefaultPrompt(Context context) {
+        try {
+            Object value = Class.forName("app.morphe.extension.shared.ResourceUtils")
+                    .getMethod("getString", String.class).invoke(null, "cap_default_prompt");
+            if (value instanceof String && !value.equals("cap_default_prompt")) return (String) value;
+        } catch (Exception ignored) { /* N30 fallback below. */ }
+        if (context != null) try {
+            int id = context.getResources().getIdentifier("cap_default_prompt", "string", context.getPackageName());
+            if (id != 0) return context.getString(id);
+        } catch (Exception ignored) { /* Same N30 English fallback. */ }
+        return "Translate faithfully, naturally and concisely into the target language, using native phrasing. Preserve names, terminology, numbers, tone and necessary punctuation. Do not add explanations absent from the source.";
     }
 
     static void savePrompt(Context context, String value) {

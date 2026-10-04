@@ -222,9 +222,9 @@
     <string name="cap_use_youtube" formatted="false">"استخدام YouTube"</string>
     <string name="cap_ai_quick_toggle_on" formatted="false">"ترجمة الترجمة المصاحبة بالذكاء الاصطناعي · مفعّلة"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"ترجمة الترجمة المصاحبة بالذكاء الاصطناعي · معطّلة"</string>
-    <string name="cap_ai_summary" formatted="false">"ترجمة نصوص الفيديو مباشرة باستخدام خدمة الذكاء الاصطناعي لديك"</string>
+    <string name="cap_ai_summary" formatted="false">"بعد التفعيل، اختر لغة من قائمة «الترجمة التلقائية» في YouTube لترجمة الترجمة النصية فورًا باستخدام خدمة الذكاء الاصطناعي التي أعددتها."</string>
     <string name="cap_languages_title" formatted="false">"لغات الترجمة التلقائية"</string>
-    <string name="cap_languages_summary" formatted="false">"اختر لغات لإضافتها إلى قائمة الترجمة التلقائية في YouTube"</string>
+    <string name="cap_languages_summary" formatted="false">"أضف اللغات المحددة إلى قائمة «الترجمة التلقائية» في YouTube. يمكنك اختيار عدة لغات."</string>
     <string name="cap_languages_count" formatted="false">"تم اختيار %1$d لغة"</string>
     <string name="cap_languages_save" formatted="false">"حفظ"</string>
     <string name="cap_languages_existing" formatted="false">"متاحة بالفعل"</string>
@@ -232,4 +232,12 @@
     <string name="cap_languages_unavailable" formatted="false">"غير متاحة"</string>
     <string name="cap_languages_empty" formatted="false">"لم يتم اختيار لغات؛ لن تتغير القائمة الأصلية"</string>
     <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
+    <string name="cap_model_empty" formatted="false">"لا يمكن ترك معرّف النموذج فارغًا"</string>
+    <string name="cap_api_address_invalid" formatted="false">"أدخل عنوان HTTP(S) أساسيًا صالحًا ومتوافقًا مع OpenAI، دون بيانات اعتماد مضمنة أو جزء مرجعي."</string>
+    <string name="cap_language_zh_hans" formatted="false">"الصينية (المبسطة)"</string>
+    <string name="cap_language_zh_hant" formatted="false">"الصينية (التقليدية)"</string>
+    <string name="cap_paste" formatted="false">"لصق"</string>
+    <string name="cap_select_all" formatted="false">"تحديد الكل"</string>
+    <string name="cap_value_retained" formatted="false">"%1$s؛ تم الاحتفاظ بآخر قيمة صالحة"</string>
+    <string name="cap_model_ids_empty" formatted="false">"لم تُرجع نقطة النهاية معرّفات نماذج قابلة للاختيار"</string>
 </resources>

@@ -811,3 +811,20 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - .verification/n33-planner/：inputs/hash、80历史before/after、独立official locale dump、141 UI调用点/22类、18 fallback、14defer、生产source probe和JSON总结。本规划聊天未跑全项目Java/组合/DEX；669/669为历史N30执行记录。
 
 后续执行者先读这节与N33卡，产品基线允许docs-only后继自动开工，避免重复HEAD短hash暂停。所有新产物-n33不覆盖旧包，完成停；用户下一步将N33卡交新执行聊天。
+
+
+## 4at. N33 从恢复 N30 独立完成、十四语种实际覆盖及两根交付（2026-10-04）
+
+- 已按 N33 卡完整实现/验证/独立建包；开工 HEAD 6cbee8bc7fd8d80364bfb65612efc80c94e35c88 是 7d6821e 的 docs-only 后继，tracked 非 docs 与 d5ca720 相等。N31 仅提取纯翻译 string 值，其余 N31/N32 实现、hook、host、stub、脚本和产物未复用。
+- AI 与语言入口固定说明；语言窗口十四个纯名称/checkbox，无视频可用状态，简繁名称准确，save/cancel/Back 多选与 N30 Activity/窗口/导航路径保留。直接删除公开独立简中 root，正式 MPP/patches-list/README 两根为 AI caption translator、Remember caption selection；AI OFF 的既有原生多选添加能力保留。
+- 新 UI-only String/Locale resolver，只读真实 Morphe EnumSetting；临时资源 Context 仅内部取字，不给窗口/View/业务。final Framework PreferenceScreen 不继承/换导航，自有 child 标准 getParent/attach/bind + 一个按官方实际 locale key 过滤的 weak SharedPreferences listener 合并 main post，只刷新自有 AI 树；无官方 Fragment 字节码改动、owner/epoch guard 或全树轮询。
+- 240 keys × 14 / 3360 配对，XML/catalog/fallback 同步。标题、summary、分类、hint、accessibility、五档、默认显示、preview、诊断 UI 与按钮/Toast 覆盖；模型获取的内部空列表说明本地化，HTTP 状态包络规范为技术代码，provider 原文保留。档名完整原生短词、不缩字；N25 几何/物理端点、主题与动作职责保持。
+- displayDefaultPrompt 与 N30 legacy runtime 默认/canonical effectivePreference 分开；切语言、rebind、滚动、flush/profile copy/save 不误存默认显示串，已存 custom 原文不迁移。字幕调度/缓存/源/目标政策/render spec/font/metrics 和 18 中文业务 golden 保持，未施工漏/晚/短机制。
+- 官方真实 AppLanguage 只有泛中文 ZH、没有繁中显式项。用户明确同意：官方 13 个显式选项 × {320,420dp} × {1.0,1.3} × 真 light/dark = 104 cases；独立 DEFAULT+繁中宿主实际解析 zh-Hant-TW，另 8 cases。按实际 locale 去重，本补丁十四语种实际覆盖为 112 cases；额外 DEFAULT 简中 8 cases 不计为新增语言，不把 13+DEFAULT 的数量冒称十四语种通过，未新增官方枚举。
+- 最终实际 DEX/resources 独立验证宿主、emulator-5554/SDK35/ART/WMS：真实官方 debounced listener 点按根→视频→AI→语言窗口，保存/取消/Back/General 正常；API 空 key 0、本地成功/503、模型刷新 popup/选择、MediaStore 写入 IS_PENDING=0/raw UTF-8、profile 改名/删除、清 key/cache/diagnostics/reset 均 PASS。模型失败/无数据及请求途中切法语的反馈/按钮恢复另有真实事件。Android9 分段标题/序号/clipboard 生产分支在 SDK35 真窗口及 SDK28 JVM 验证，不冒称 Android9 OS WMS或用户手机播放验证。
+- 真明暗由官方 isDarkModeEnabled/背景色确认；完整最大档 preview 全文单行/lineEnd 与实际 onDraw box 在框内，所有 picker 行按真实 320/420dp 窗口完整测量。当前控件→资源/key→locale→运行时 inventory 11760 观察、193 调用点/26 类；繁中设置/默认/preview/五档/diagnostics/语言窗口均实测。
+- 本轮 N30 before 669/669，最终 N33 Java 676/676（新增 7 反例、failure/error/skipped=0），Python27/27及 release11/11。N30/最终各104实际 loopback 请求，default/custom × zh-Hans/Hant/ja/ar ×13 UI locale 的 cfg.prompt/effectivePreference/prompt SHA/cache identity/request/plan JSON 全部零差异。最终 Java 输入 SHA 599169b13f3da65385f9c1cbf06c6e7c6eab6a930425201e928e81b0dfe0e2f2；206 文件逐项复核一致。
+- 三有效 root 组合3/3；旧 root、残缺 locale bundle、未知 menu signature/partial DEX 拒绝。实际 patch PASS92，相同 N30 官方1.45组合93，删除一 root；不硬改旧84计数。最终11DEX/58257类/322999方法/626770分支，invalid/problem/binding=0；39个官方设置相关方法的寄存器/指令/偏移/异常处理与 N30 完全一致，无旧31/32绑定类型/替换官方类/验证 fixture 泄漏。MPP72 entries，内嵌MPE=独立MPE；CRC/resource/aapt/metadata全通过，正式APK unsigned预期拒绝验签。
+- 冻结计分4通过/4既有失败/4未验证及三invisible_ms=0保持，ACCEPTANCE/frozen无diff；80旧交付及277713旧文件SHA/bytes零差异。失败候选/负例全部保留，新输出n33，未root clean。docs/N33-LOCAL-TEST-BUILD.md完整记录哈希/源码/默认协议/真实交互/边界/旧UI断言55值变化与用户短复验。
+- 正式新三件套（版本1.3.5、官方1.45.0、原host21.16.256/min28）：build/local-test/patches-1.3.5-本地测试包-n33.mpp，1242450B / F60F7B50295566D0FC887A3392E78B017685E9B37F4C3C9EC36BE45CBE1C866E；extension-1.3.5-本地测试包-n33.mpe，3044228B / 5D501610F230FC28ADDDF9D3F363586933C61DF434FE8DE75E11403620F26970；build/n33-composition-final/YouTube-21.16.256-本地测试包-n33-unsigned.apk，198221091B / 08AA970CC8A63643083108DE8732B92247C0A08212C2FF87C47EF95AB172B4CC。
+- 本地实现提交及 anchor/n33-<真实源码短hash> 的具体身份在随后的 docs-only 身份补记中落定，源码不得 amend；两份 PROJECT-STATE 同步。远程翻译API/新依赖下载/手机写入安装启动清数据/Git push发布为0。N33完成即停，N34未开始、不生成下一卡。

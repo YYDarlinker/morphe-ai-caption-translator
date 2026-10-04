@@ -6,6 +6,7 @@ import android.util.AttributeSet;
 /** Native Morphe switch that persists immediately. */
 @SuppressWarnings("deprecation")
 public final class DeepSeekEnabledPreference extends AddonSwitchPreference {
+    private CaptionLocaleSubscription localeSubscription;
     public DeepSeekEnabledPreference(Context context) {
         super(context);
         initialize();
@@ -45,10 +46,15 @@ public final class DeepSeekEnabledPreference extends AddonSwitchPreference {
     }
 
     @Override protected void onBindView(android.view.View view) {
+        attachLanguage();
         boolean saved=DeepSeekConfig.enabled(getContext());
         if(isChecked()!=saved){setChecked(saved);updateSummary();}
         super.onBindView(view);
     }
+    @Override protected void onAttachedToActivity(){super.onAttachedToActivity();attachLanguage();}
+    private void attachLanguage(){CaptionLocaleSubscription next=CaptionLocaleSubscription.attach(this);if(localeSubscription!=null&&localeSubscription!=next)localeSubscription.close();localeSubscription=next;}
+    @Override protected void onPrepareForRemoval(){if(localeSubscription!=null){localeSubscription.close();localeSubscription=null;}super.onPrepareForRemoval();}
+    @Override protected void refreshDynamicText(){setTitle(CaptionStrings.settings(getContext(),"enable_ai"));updateSummary();}
 
     private void updateSummary() {
         DeepSeekConfig.Snapshot current = DeepSeekConfig.load(getContext());

@@ -188,8 +188,8 @@ public class ProfileUiRegressionTest {
         LinearLayout parent=new LinearLayout(a);View old=p.getView(null,parent);
         Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.JAPAN));
         a.getResources().updateConfiguration(config,a.getResources().getDisplayMetrics());
-        View fresh=p.getView(old,parent);assertNotSame(old,fresh);
-        assertEquals(DeepSeekConfig.defaultPrompt(a),((EditText)fresh.findViewById(android.R.id.edit)).getText().toString());
+        View fresh=p.getView(old,parent);assertSame(old,fresh);
+        assertEquals(DeepSeekConfig.displayDefaultPrompt(a),((EditText)fresh.findViewById(android.R.id.edit)).getText().toString());
         assertFalse(ApiProfiles.values(a).contains("prompt"));
     }
 

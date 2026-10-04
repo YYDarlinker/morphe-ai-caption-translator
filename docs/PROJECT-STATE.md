@@ -885,5 +885,12 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - 最终 Gradle 全量 704/704，Python scoreboard 27/27，release contract 11/11。SDK35 final DEX/resources actual host 固定 emulator-5554 的 owned/actions 均 PASS；物理手机未写入、未安装、未启动、未清数据。
 - N34 三件套：MPP EFBB62E81FA430365FD1B1F1856F915439DAD475CB56884509B4DC224A0C7195 / 1,254,604B；MPE 84743177DAAEC8DEF9D539A6E2655D7BDE92A2FABA4885FDEEE5194D23FD3FF1 / 3,066,504B；unsigned APK 859D5D74F52E3AFDB9A72973E01A038A7DBE7D142A3DC743867EABD188390FF7 / 198,231,898B。详见 docs/N34-LOCAL-TEST-BUILD.md。
 - 最终 APK 11 DEX/58,267 classes；MPP/MPE/APK branch audit 全部 invalid_branches=0、dex_problems=0、binding_failures=0；官方方法反读 39 项与 N33 相等；AI-only/Remember-only/AI+Remember 组合 PASS，obsolete root 按名称拒绝。N34 实际 composition 92 PASS，N33 同官方也是92、N30历史对照93，不硬套旧 84/92 分母。
-- 历史权威身份清单 281,140 条、N33/N32/失败候选原件保留；ACCEPTANCE.md、scoreboard、官方输入与旧交付 bytes/SHA 未改。当前实现/测试/工具已完成，待本次实现提交及随后 docs-only 身份补记；完成即停，不自派 N34r/N35。
+- 历史权威身份清单 281,140 条、N33/N32/失败候选原件保留；ACCEPTANCE.md、scoreboard、官方输入与旧交付 bytes/SHA 未改。实现提交 26edf555c8956e12a4b0448b72aef34597141409 / anchor/n34-26edf55 已创建，main/test/tools 与锚点保持相等；本次只做随后 docs-only 身份补记；完成即停，不自派 N34r/N35。
 - 用户短复验仍为：中文 25s/71–83s/168–170s/251–255s 与旧 119–122s lead；日语同片段加 pause/seek/fullscreen 返回，保存完整诊断。SDK35 宿主为合成 player surface，不冒称真实视频/音频同步或物理手机 after。
+
+### N34最终本地身份
+
+- 源码提交 `26edf555c8956e12a4b0448b72aef34597141409`，tag `anchor/n34-26edf55`；无 amend/推送/发布。两份状态同步，工作区除官方输入 `patches-1.45.0.mpp` 外干净。
+- 最新最终源码全量 evidence `full-final-06`：704/704（failure/error/skipped0），input SHA `904c8368030aaf86b148c349830ca289125c3048c83c5e03527b93d815c21c38`、210 main/test/resource 文件；额外 actual-response-replay-04 6/6、82 loopback requests/81 accepted/1 source_quote_mismatch correct reject/remote0，performance-final-03 1/1。
+- candidate-03/正式三件套同字节，SDK35 final-03宿主 copied DEX/resources provenance、owned-final-04/actions-final-02 PASS，final-03三件套 branch audit0错误，39官方方法相等。历史281140条hash changed0。
+- 已停止N34工程任务，仅待用户上述短复验与完整诊断；实际音频早/晚、物理手机效果不自签通过。

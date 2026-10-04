@@ -16,9 +16,11 @@
 
 ## 输入与源码身份
 
+- 本地实现提交：`26edf555c8956e12a4b0448b72aef34597141409`；源码锚点：`anchor/n34-26edf55`。本报告身份补记为随后 docs-only 提交，main/test/tools 与实现锚点保持相等；不 amend、不推送、不发布。
+
 - 开工源码 HEAD：`38a1ce447b3bd57e1e97d3fbe93e86f0baea6b5b`，为 N33 源锚点的 docs-only 后继；tracked 产品源码相对 N33 无并行差异。官方输入仍为 `patches-1.45.0.mpp`，SHA256 `DBA660DF61D95131A22242CABE9C44B4B04861B7BA6EBEFFE91C4B3647D55B93`。
 - 原版 YouTube 输入 APK 为 184,012,881B / SHA256 `724D2BF15D31DAC98DB00D82914DB3876EDF66E62FE2845001F204209ECF4C00`，独立复核与已提交 N18r/N28A 历史身份相同；未使用手机已 patch APK。
-- 原始诊断、人工 JSON3/VTT、旧交付和 N33/N34 规划证据按原路径保存；N34 独立证据目录为 `E:/Projects/morphe-caption-v2/.verification/n34`。权威历史身份清单包含 281,140 个文件条目；未删除旧失败候选或 N33/N32 证据。
+- 原始诊断、人工 JSON3/VTT、旧交付和 N33/N34 规划证据按原路径保存；N34 独立证据目录为 `E:/Projects/morphe-caption-v2/.verification/n34`。权威历史身份清单包含 281,140 个文件条目，最终重核 changed=0；未删除旧失败候选或 N33/N32 证据。
 - 人工 manual JSON3/VTT 仍为 23,150B / 12,061B，169 cues；两格式规范化文字/start/end 相等，普通 VTT 没有逐词 timestamp，不被伪升级为 NATIVE。
 
 源时刻/precision 合法变化会自然改变原 RebuildCache.identity；测试证明新 identity 冷 miss/写入后热 hit，旧 identity 文件未删除或改写。缺 reference 或没有安全段时仍保持原源字段/identity。本轮没有强读旧时间缓存，也不宣称源改善的首次冷请求没有成本；source_gap 只表示轨中无 owned 词/窗，不等于实测音频静默。
@@ -57,7 +59,7 @@ MPP 内嵌 MPE 与独立 MPE 字节一致；公开 root 仍只有 AI caption tra
 
 每个旧测试文件的确切 diff 与授权依据另存 `.verification/n34/old-assertion-changes.json`。原 NATIVE 源禁止 retime 的旧错误 fixture 已补原值不变断言，并用 ESTIMATED 主源保留原成功对齐断言；不是把坏时间或 source coverage 放宽。
 
-首次 branch auditor 的旧 N27 controls-callback 必须存在默认模式产生误报；最终以与 N33 完全相同的 require-ai=false 审计撤回的旧观察器，实际 AIInstalled/现行 callback/fingerprint/原生绑定由三个 CompositionDexAudit 继续强校验，不为通过恢复 N27 hook。
+首次 branch auditor 在默认模式要求旧 N27 controls-callback 必须存在，因此产生误报；最终以与 N33 完全相同的 require-ai=false 审计撤回的旧观察器，实际 AIInstalled/现行 callback/fingerprint/原生绑定由三个 CompositionDexAudit 继续强校验，不为通过恢复 N27 hook。
 
 ## 证据入口
 

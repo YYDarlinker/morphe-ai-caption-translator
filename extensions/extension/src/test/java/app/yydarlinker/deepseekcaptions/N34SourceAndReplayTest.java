@@ -13,12 +13,15 @@ import org.robolectric.annotation.*;
 @GraphicsMode(GraphicsMode.Mode.NATIVE) @LooperMode(LooperMode.Mode.PAUSED)
 public class N34SourceAndReplayTest {
   RebuildLayoutTest h;
-  static final String BASE="D:/下载/.deno/bin/";
-  static final String NAME="The Truth About the Bezelless Concept Phone [ngPkbaZliaU].en.";
   @Before public void setup(){h=new RebuildLayoutTest();h.setup();RebuildLayoutTest.bounds=new android.graphics.Rect(0,0,1264,700);CaptionOverlay.showCaption("Ready.");}
   @After public void done(){h.done();}
   RebuildSource read(String content)throws Exception {byte[] bytes=content.getBytes(StandardCharsets.UTF_8);return RebuildSource.read(bytes,CaptionDocument.parse(bytes,"text/vtt"));}
-  byte[] input(String kind,String format)throws Exception{return Files.readAllBytes(Path.of(BASE+kind+"/"+NAME+format));}
+  byte[] input(String kind,String format)throws Exception{
+    String fixture="/n30/"+kind.replace("_en","")+"."+format;
+    try(java.io.InputStream in=getClass().getResourceAsStream(fixture)) {
+      assertNotNull("tracked original input "+fixture,in);return in.readAllBytes();
+    }
+  }
   RebuildSource inputSource(String kind,String format)throws Exception {byte[] bytes=input(kind,format);return RebuildSource.read(bytes,CaptionDocument.parse(bytes,"text/plain"));}
   JSONArray words(RebuildSource source)throws Exception {
     JSONArray rows=new JSONArray();for(int i=0;i<source.words.size();i++){RebuildSource.Word w=source.words.get(i);

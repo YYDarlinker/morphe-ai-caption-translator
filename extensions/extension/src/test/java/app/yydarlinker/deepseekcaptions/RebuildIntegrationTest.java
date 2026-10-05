@@ -181,6 +181,8 @@ public class RebuildIntegrationTest {
     release.countDown();
     CountDownLatch gate = n24Gate;
     if (gate != null) gate.countDown();
+    CountDownLatch finalGate = n37PrefetchGate;
+    if (finalGate != null) finalGate.countDown();
     RebuildController.stop();
     if (mediaSession != null) mediaSession.release();
     Field f = DeepSeekCaptionHook.class.getDeclaredField("youtubeCronetEngine");
@@ -1494,6 +1496,9 @@ public class RebuildIntegrationTest {
     RebuildController.Session s=n24Session(6,6000);
     s.plans[0]=new RebuildProtocol.Plan(Collections.emptyList(),"{}",Collections.emptyList());
     s.states[0]=RebuildController.READY;s.everReady=true;s.position=0;s.prefetchPausedUntil=0;
+    // Hold the two initial responses: completing one legally replenishes the lane.
+    n24GateBlocks.add(s.blocks.get(1).id());n24GateBlocks.add(s.blocks.get(2).id());
+    n24Gate=new CountDownLatch(1);
     RebuildController.time(0);
     // D4: one in-flight prefetch must not by itself block the second qualified successor.
     assertEquals(1,s.attempts[1]);
@@ -1502,6 +1507,9 @@ public class RebuildIntegrationTest {
     await(()->n24Saw(s.blocks.get(1).id()));
     await(()->n24Saw(s.blocks.get(2).id()));
     assertFalse(n24Saw(s.blocks.get(3).id()));
+    RebuildController.stop();n24Gate.countDown();
+    await(()->n24InFlight.get()==0);
+    n24GateBlocks.clear();n24Gate=null;
     // A block beyond the 30 second window is never dispatched, budget or not.
     RebuildController.Session far=n24Session(6,20000);
     far.plans[0]=new RebuildProtocol.Plan(Collections.emptyList(),"{}",Collections.emptyList());
@@ -1521,14 +1529,23 @@ public class RebuildIntegrationTest {
     // The release assertion names block 0: actually send it before the rapid landing storm.
     // Otherwise the legal unsent-focus replacement can cancel it before the mock sees a request.
     await(()->n24Saw(s.blocks.get(0).id())&&s.jobs[0]!=null&&s.jobs[0].sent);
+    // Keep the final landing observable even on a fast local/CI server.
+    n37PrefetchGate=new CountDownLatch(1);n37PrefetchBlocks.add(s.blocks.get(5).id());
     for(int i=1;i<6;i++)RebuildController.time(i*6000L+100);
+    // Intermediate landings may already be sent and occupy both focus lanes. Check
+    // pressure before releasing them; do not require a third focus request to bypass them.
+    int stormFocus=n24InFlight(s,true),stormPrefetch=n24InFlight(s,false);
+    assertTrue("storm foreground bound",stormFocus<=2);
+    assertTrue("storm background bound",stormPrefetch<=2);
+    assertTrue("storm total bound",stormFocus+stormPrefetch<=4);
+    n24Gate.countDown();
     await(()->n24Saw(s.blocks.get(5).id())&&s.jobs[5]!=null&&s.jobs[5].sent);
     int focus=n24InFlight(s,true),prefetch=n24InFlight(s,false);
     assertTrue("foreground must never exceed two",focus<=2);
     assertTrue("background must never exceed two",prefetch<=2);
     assertTrue("client translation requests must never exceed four",focus+prefetch<=4);
     assertTrue("the fixture server never saw more than four at once",n24MaxInFlight.get()<=4);
-    n24Gate.countDown();
+    n24Gate.countDown();n37PrefetchGate.countDown();
     await(()->s.plans[0]!=null||s.plans[1]!=null);
   }
 

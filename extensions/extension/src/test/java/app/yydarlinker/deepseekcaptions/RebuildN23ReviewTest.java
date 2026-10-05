@@ -59,9 +59,11 @@ public class RebuildN23ReviewTest {
       words.add(new RebuildSource.Word(w.getString(1),w.getLong(2),w.getLong(3),w.getInt(4),RebuildSource.Precision.valueOf(w.getString(5))));
     }
     RebuildSource source=new RebuildSource(words);
-    Path root=Path.of("").toAbsolutePath();
-    while(!Files.exists(root.resolve(".verification/n20-20260930/offline-layout-mirror.json"))) root=root.getParent();
-    JSONArray events=new JSONObject(new String(Files.readAllBytes(root.resolve(".verification/n20-20260930/offline-layout-mirror.json")),StandardCharsets.UTF_8)).getJSONArray("events");
+    JSONArray events;
+    try(java.io.InputStream in=getClass().getResourceAsStream("/n23/offline-layout-mirror.json")) {
+      assertNotNull("tracked original N20 mirror",in);
+      events=new JSONObject(new String(in.readAllBytes(),StandardCharsets.UTF_8)).getJSONArray("events");
+    }
     assertEquals(540,events.length());
     Map<Integer,RebuildPlanner.Block> blocks=new HashMap<>();
     JSONArray bs=corpus.getJSONArray("blocks");

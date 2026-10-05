@@ -36,7 +36,7 @@ Do not select the old AI-caption addon or another overlapping caption-memory pat
 
 ## Configure and translate
 
-1. Open **YouTube → Settings → Morphe → AI caption translator**.
+1. Open **YouTube → Settings → Morphe → Video → AI caption translation**.
 2. Set your API address, API key and model. Use **Test API** to check the configuration. You can save separate named profiles for different services.
 3. Open **Automatic translation languages** in the same settings page and check the languages you want to add to YouTube’s Auto-translate list.
 4. Enable AI captions. In a video’s subtitle menu, choose **Auto-translate → your target language**. That selection uses your configured AI service to translate the available source subtitles.

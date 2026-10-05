@@ -21,6 +21,7 @@ final class CaptionOverlay {
     default void onApplied() {}
     default long displayPosition(long supplied) { return supplied; }
     default String identity(){return "";}
+    default String session(){return "";}
     default long windowStart(){return -1;}
     default long windowEnd(){return -1;}
     default String blankReason(){return "";}
@@ -34,6 +35,7 @@ final class CaptionOverlay {
   private static WeakReference<Activity> activityRef = new WeakReference<>(null);
   private static WeakReference<FrameLayout> hostRef = new WeakReference<>(null),
       anchorRef = new WeakReference<>(null);
+  private static CaptionHorizontalPlacement horizontalPlacement;
   private static WeakReference<TextView> textRef = new WeakReference<>(null);
 
   /** Immutable geometry; background translation can measure without touching Views. */
@@ -497,6 +499,7 @@ final class CaptionOverlay {
   }
 
   private static void hideView() {
+    if(horizontalPlacement!=null)horizontalPlacement.cancel();
     lastBlankIdentity = null;
     FrameLayout a = anchorRef.get();
     if(a!=null)a.setVisibility(View.GONE);
@@ -509,6 +512,8 @@ final class CaptionOverlay {
   }
 
   private static void detach() {
+    if(horizontalPlacement!=null)horizontalPlacement.cancel();
+    horizontalPlacement=null;
     FrameLayout h = hostRef.get(), a = anchorRef.get();
     if (h != null && h.getViewTreeObserver().isAlive())
       h.getViewTreeObserver().removeOnPreDrawListener(WATCH);
@@ -543,6 +548,8 @@ final class CaptionOverlay {
     // geometry checks may make it visible, so a transition can never expose an unverified overlay.
     anchor.setVisibility(View.GONE);
     anchor.setTag("yydarlinker.deepseek.caption.anchor");
+    // Only the outer coordinate system is physical LTR; the TextView keeps its target spec.
+    anchor.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
     anchor.setClipChildren(false);
     anchor.setClipToPadding(false);
     anchor.setElevation(dp(a, 12));
@@ -571,6 +578,7 @@ final class CaptionOverlay {
     hostRef = new WeakReference<>(h);
     anchorRef = new WeakReference<>(anchor);
     textRef = new WeakReference<>(text);
+    horizontalPlacement=new CaptionHorizontalPlacement(h,anchor,text);
     h.getViewTreeObserver().addOnPreDrawListener(WATCH);
     dirty = true;
     return true;
@@ -801,23 +809,21 @@ final class CaptionOverlay {
         CaptionSurface.isShorts()
             ? DeepSeekConfig.shortsPosition(a)
             : DeepSeekConfig.captionPositionY(a, landscape);
-    int leftMargin = b.left + (b.width() - width) / 2;
     int topMargin = Math.max(b.top, Math.min(b.bottom - height, b.top + Math.round(b.height() * y) - height / 2));
-    FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) anchor.getLayoutParams();
-    // Position-only changes and identical parameters must not re-enter the parent layout.
-    if(params.width != width || params.height != height || params.gravity != (Gravity.TOP | Gravity.START)
-        || params.leftMargin != leftMargin || params.topMargin != topMargin) {
-      params.width = width;
-      params.height = height;
-      params.gravity = Gravity.TOP | Gravity.START;
-      params.leftMargin = leftMargin;
-      params.topMargin = topMargin;
-      anchor.setLayoutParams(params);
-    }
+    // The surface rectangle is in physical host coordinates, never logical start/end coordinates.
+    CaptionHorizontalPlacement.place(host,anchor,b,width,height,topMargin);
     if(anchor.getVisibility() != View.VISIBLE) {
       anchor.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
       anchor.setVisibility(View.VISIBLE);
     }
+    final long appliedOwner=CaptionPlayerAuthority.ownerEpoch(), appliedRender=playerRenderEpoch;
+    final String appliedIdentity=pendingIdentity;
+    final RenderGuard appliedGuard=currentGuard;
+    horizontalPlacement.observe(a,b,shorts?"shorts":fullScreen?"fullscreen":"detail",
+        appliedGuard==null?"":appliedGuard.session(),appliedOwner,appliedRender,
+        ()->appliedOwner==CaptionPlayerAuthority.ownerEpoch() && appliedRender==playerRenderEpoch
+            && appliedIdentity.equals(pendingIdentity) && appliedGuard==currentGuard
+            && (appliedGuard==null || appliedGuard.isValid()) && !suppressed() && !guardedExpansion());
     if((mode.equals("original_fallback") || mode.equals("overflow_status")) && !detail.equals(lastNotice))
       CaptionDiagnostics.mark(a,"REBUILD_LAYOUT_FALLBACK",detail);
     lastNotice=detail;

@@ -1682,6 +1682,7 @@ final class RebuildController {
             && s.renderSubmission == submission && s.visible;
       }
       public String identity(){return appliedIdentity;}
+      public String session(){return Long.toString(s.id);}
       public long windowStart(){return appliedStart;}
       public long windowEnd(){return appliedEnd;}
       public String blankReason(){return appliedReason;}

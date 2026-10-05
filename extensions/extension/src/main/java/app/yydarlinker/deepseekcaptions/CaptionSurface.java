@@ -174,6 +174,11 @@ final class CaptionSurface {
     return best;
   }
 
+  /** Read-only direction evidence from the current cached player; never triggers discovery. */
+  static int playerLayoutDirection() {
+    View p=player.get();return p==null ? View.LAYOUT_DIRECTION_INHERIT : p.getLayoutDirection();
+  }
+
   static Rect videoBounds(View host) {
     View p = player();
     Rect b = renderedBounds(p, host);

@@ -61,7 +61,23 @@ Turning AI off returns translation to YouTube’s native behavior. Selecting an 
 ## Available patches
 
 <!-- PATCHES_START EXPANDED -->
-<!-- Generated from the actual release bundle. -->
+> **[v1.4.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.4.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
+<details open>
+<summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 21.16.256 | 21.13.164 | 21.07.247 |
+| :---: | :---: | :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [AI caption translator](#ai-caption-translator) | Translates every YouTube Auto-translate language in real time through your OpenAI-compatible API. |  |
+| [Remember caption selection](#remember-caption-selection) | Remembers caption language, source/translation mode and on/off selection across videos for this app session, with or without AI. |  |
+
+</details>
+
 <!-- PATCHES_END -->
 
 ## Development and license

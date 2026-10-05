@@ -1,4 +1,6 @@
-# PROJECT-STATE — N37 本地交付；实体手机 after 待用户短验
+# PROJECT-STATE — N37R2 本地交付；实体手机居中 after 待确认
+
+> 最新状态（2026-10-05T17:43:37+08:00）：N37R2 单执行者完成。核心 `6ff1053c74c2deaa10bf733f5328d3b6756abd49` / `anchor/n37r2-6ff1053`，完成锚点 `anchor/n37r2-final`。Java750/750（原N37的727身份全保留）；Python27/27、发行合同11/11；SDK35交付DEX实测86次、定位事件91条，最大中心误差0.5px；三包组合、DEX/分支/API28、资源、内嵌MPE和unsigned审计通过。实体手机未写，真实YouTube/OEM after待用户确认。没有README/版本/补丁源元数据修改、发布或推送。本卡完成即停，不自派后继卡；详`docs/N37R2-LOCAL-TEST-BUILD.md`、`docs/N37R2-SHA256.json`与最新§4bd。下方N37段落作为历史保留。
 
 > 最后更新：2026-10-05T14:38:57+08:00（Asia/Shanghai）。N37实现与本地验证、最终三包整理完成；源码98ac1a16440f64d8b1e095d0f4496cae7cdcece9 / anchor/n37-98ac1a1，完成锚点anchor/n37-final。最终Java727/727、fail/error/skip0；Python27/27、发行11/11；241keys×14、原生IME/profile与12边界场景＋归档backlog已核对。N36历史与规划更新保留；实体手机未写，真实OEM after待用户3–5分钟短验。本卡停止，不自派N37r/N38。详docs/N37-LOCAL-TEST-BUILD.md及docs/N37-SHA256.json；最新§4bc覆盖旧待施工口径。
 >
@@ -1068,3 +1070,14 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 - actual AI-only／Remember-only结构组合与both编译通过；三包DEX分支invalid0/problems0/binding0；APK11DEX，MPP内MPE一致、CRC/DEX头/resources/aapt链、官方选定39方法一致、正式APKunsigned。审计require-ai=false是N27observer已撤回，不改审计或恢复N27；最初错误口径失败保留。
 - 实体手机未写、未签名安装、未触网、新依赖或工具下载0、未push/publish/reset/amend/清数据。模拟器原override1500×2400/density480／原IME恢复核对。
 - 用户最后短验：有字详情MIN/MAX3次；最新标题/间隙边界慢快拖及prompt后隐藏IME；两句边界pause/resume与一次真实paused rewind；换video/target/cache，导出完整diagnostic。手机after待用户，本卡完成即停止，不自派N37r/N38。
+
+
+## 4bd. N37R2：所有可显示 AI 字幕场景的物理水平居中（2026-10-05）
+
+- 基线 `anchor/n37-final` / `3c36bf4`，产品 `98ac1a1`；本卡核心 `6ff1053c74c2deaa10bf733f5328d3b6756abd49`，核心锚点 `anchor/n37r2-6ff1053`，完成锚点 `anchor/n37r2-final`。
+- 复现：物理 leftMargin 配 `Gravity.START` 在 RTL 宿主被右侧解析；14组合 before 中阿语UI11项偏移，Shorts＋英语字幕偏差685px。
+- 改动：统一物理 LEFT/LTR 外层＋视频可见rect中心公式；内部目标语言/Bidi规则不改；消除旧 horizontal translation/relative margin；真实布局后诊断有 owner/render/session 有效性保护。
+- 验证：Java750/750，新增23并保留727旧身份；焦点31/31，Python27/27，发行合同11/11；API35真实交付DEX 86观测覆盖要求14×4矩阵、Shorts下一条、全屏进出；91生产定位记录逐观测核对，最大误差0.5px。
+- 交付：n37r2 MPP/MPE/unsigned APK，SHA-256见`docs/N37R2-SHA256.json`；两单根结构及联合组合、11/2/1 DEX分支、77新增指令引用maxAPI24、3374资源、MPE内嵌一致、39宿主方法不变均通过。
+- N35计时、N36authority、N37输入/诊断优化保持原源码与旧测试合同；原冻结语义4通过/4失败/4未验证不改。
+- 停止：实体手机未写/未验；未改README、发布1.4.0或补丁源元数据，也未push。真实实体机确认各应用语言与播放器场景都居中前不进入发布。本卡完成即停，不派后继。

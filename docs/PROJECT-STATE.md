@@ -1,5 +1,7 @@
 # PROJECT-STATE — N37R2 本地交付；实体手机居中 after 待确认
 
+> 工作区维护（2026-10-05）：本项目 C 盘开发资料已校验迁入 E:\Projects\morphe-caption-v2；76,347 个文件、逻辑约 15.18 GiB，清单内 C 盘原文件剩余 0。产品仍为 N37R2（核心 6ff1053；原完成锚点 a6fcbbb 不变），本次仅文档/AGENTS 工作区规则更新，无产品修改或发布。后续全部项目写入使用 E 盘；E 盘未挂载时停止，不自动回退 C 盘。新的状态副本为 E:\Projects\morphe-caption-v2\.verification\state-mirror\PROJECT-STATE.md。路径映射、保留的共享工具/发现索引/空目录详见 docs/WORKSPACE-MIGRATION-20261005.md。
+
 > 最新状态（2026-10-05T17:43:37+08:00）：N37R2 单执行者完成。核心 `6ff1053c74c2deaa10bf733f5328d3b6756abd49` / `anchor/n37r2-6ff1053`，完成锚点 `anchor/n37r2-final`。Java750/750（原N37的727身份全保留）；Python27/27、发行合同11/11；SDK35交付DEX实测86次、定位事件91条，最大中心误差0.5px；三包组合、DEX/分支/API28、资源、内嵌MPE和unsigned审计通过。实体手机未写，真实YouTube/OEM after待用户确认。没有README/版本/补丁源元数据修改、发布或推送。本卡完成即停，不自派后继卡；详`docs/N37R2-LOCAL-TEST-BUILD.md`、`docs/N37R2-SHA256.json`与最新§4bd。下方N37段落作为历史保留。
 
 > 最后更新：2026-10-05T14:38:57+08:00（Asia/Shanghai）。N37实现与本地验证、最终三包整理完成；源码98ac1a16440f64d8b1e095d0f4496cae7cdcece9 / anchor/n37-98ac1a1，完成锚点anchor/n37-final。最终Java727/727、fail/error/skip0；Python27/27、发行11/11；241keys×14、原生IME/profile与12边界场景＋归档backlog已核对。N36历史与规划更新保留；实体手机未写，真实OEM after待用户3–5分钟短验。本卡停止，不自派N37r/N38。详docs/N37-LOCAL-TEST-BUILD.md及docs/N37-SHA256.json；最新§4bc覆盖旧待施工口径。

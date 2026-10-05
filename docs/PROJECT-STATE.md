@@ -1,5 +1,7 @@
 # PROJECT-STATE — N37R2 本地交付；实体手机居中 after 待确认
 
+> 1.4.0发布施工（2026-10-05）：用户已授权按方案直接发布，并将稳定目标扩为21.16.256（推荐）、21.13.164、21.07.247，官方历史兼容自1.42.0起、推荐1.45.0，具体交集见docs/COMPATIBILITY.md。已准备双语README、架构/发布/贡献/Issue说明及CI修正；产品运行时仍为N37R2，未更改字幕机制。当前正在验证当前源码和历史组合，尚未发布。发布前备份分支backup/pre-release-1.4.0-a54ad5a保留；工作在dev，社区申请/帖子仅备稿未外发。实体手机居中after没有新增证据。
+
 > 发布规划（2026-10-05）：用户要求将N37R2作为1.4.0正式发布并先核查汇报方案。本轮完成官方模板/patcher架构/Manager补丁源/社区规则及现有仓库只读审阅，方案见 docs/RELEASE-1.4.0-PLAN.md。重点先修复按1.3.5版本误走旧recovered树的CI、重写用户README与中文指南、补齐Issue链接/活动架构、建立dev→main非squash流程，复用semantic-release自动生成并发布1.4.0；产品保留6ff1053基线。官网已链接社区索引，当前未收录本源；Awesome Morphe有明确Bundle Request渠道。未改产品/README/版本/CI，未推送、发布或对外投递；实体手机居中after未新增证据。
 
 > 工作区维护（2026-10-05）：本项目 C 盘开发资料已校验迁入 E:\Projects\morphe-caption-v2；76,347 个文件、逻辑约 15.18 GiB，清单内 C 盘原文件剩余 0。产品仍为 N37R2（核心 6ff1053；原完成锚点 a6fcbbb 不变），本次仅文档/AGENTS 工作区规则更新，无产品修改或发布。后续全部项目写入使用 E 盘；E 盘未挂载时停止，不自动回退 C 盘。新的状态副本为 E:\Projects\morphe-caption-v2\.verification\state-mirror\PROJECT-STATE.md。路径映射、保留的共享工具/发现索引/空目录详见 docs/WORKSPACE-MIGRATION-20261005.md。

@@ -26,3 +26,14 @@ android { sourceSets.getByName("debug").res.srcDir("../../patches/src/main/resou
     sourceSets.getByName("debug").res.srcDir("src/test/res") }
 
 android { testOptions { unitTests.isIncludeAndroidResources = true } }
+
+// Evidence-producing regression tests must also run from a clean CI checkout.
+// Local watchdog runners can supply the same explicit output property.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    maxHeapSize = "2g"
+    val evidenceDirectory = providers.gradleProperty("scheduler.output").orNull
+        ?.let { rootProject.file(it) }
+        ?: rootProject.layout.buildDirectory.dir("test-evidence").get().asFile
+    systemProperty("scheduler.output", evidenceDirectory.absolutePath)
+    doFirst { evidenceDirectory.mkdirs() }
+}

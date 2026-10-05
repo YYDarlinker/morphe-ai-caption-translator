@@ -1,5 +1,7 @@
 # PROJECT-STATE — N37R2 本地交付；实体手机居中 after 待确认
 
+> 发布规划（2026-10-05）：用户要求将N37R2作为1.4.0正式发布并先核查汇报方案。本轮完成官方模板/patcher架构/Manager补丁源/社区规则及现有仓库只读审阅，方案见 docs/RELEASE-1.4.0-PLAN.md。重点先修复按1.3.5版本误走旧recovered树的CI、重写用户README与中文指南、补齐Issue链接/活动架构、建立dev→main非squash流程，复用semantic-release自动生成并发布1.4.0；产品保留6ff1053基线。官网已链接社区索引，当前未收录本源；Awesome Morphe有明确Bundle Request渠道。未改产品/README/版本/CI，未推送、发布或对外投递；实体手机居中after未新增证据。
+
 > 工作区维护（2026-10-05）：本项目 C 盘开发资料已校验迁入 E:\Projects\morphe-caption-v2；76,347 个文件、逻辑约 15.18 GiB，清单内 C 盘原文件剩余 0。产品仍为 N37R2（核心 6ff1053；原完成锚点 a6fcbbb 不变），本次仅文档/AGENTS 工作区规则更新，无产品修改或发布。后续全部项目写入使用 E 盘；E 盘未挂载时停止，不自动回退 C 盘。新的状态副本为 E:\Projects\morphe-caption-v2\.verification\state-mirror\PROJECT-STATE.md。路径映射、保留的共享工具/发现索引/空目录详见 docs/WORKSPACE-MIGRATION-20261005.md。
 
 > 最新状态（2026-10-05T17:43:37+08:00）：N37R2 单执行者完成。核心 `6ff1053c74c2deaa10bf733f5328d3b6756abd49` / `anchor/n37r2-6ff1053`，完成锚点 `anchor/n37r2-final`。Java750/750（原N37的727身份全保留）；Python27/27、发行合同11/11；SDK35交付DEX实测86次、定位事件91条，最大中心误差0.5px；三包组合、DEX/分支/API28、资源、内嵌MPE和unsigned审计通过。实体手机未写，真实YouTube/OEM after待用户确认。没有README/版本/补丁源元数据修改、发布或推送。本卡完成即停，不自派后继卡；详`docs/N37R2-LOCAL-TEST-BUILD.md`、`docs/N37R2-SHA256.json`与最新§4bd。下方N37段落作为历史保留。

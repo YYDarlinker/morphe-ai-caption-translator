@@ -1,6 +1,6 @@
-# PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
+# PROJECT-STATE — N37 本地交付；实体手机 after 待用户短验
 
-> 最后更新：2026-10-05（Asia/Shanghai）。N36已交付且用户完成after，发现小窗旧字幕残留、字幕样式标题/间隙处跳位、压力问题与暂停回上一句；规划者本轮已审阅并备好N37卡，尚未产品施工。产品6319fd6/完成3bf88d2不变，backup/pre-n37-n36-3bf88d2已固定。已读手机日志/帧统计并拉包，自有390类方法身份一致，未写手机。已确认实际入口进COMPACT不hide已画View；fresh native暂停时间被旧rawMedia/hook freeze盖住；collapsed诊断普通getView同步drain/Future.get归档，且同Locale再绑定仍requestLayout。N37保留N36快转场/N35参照/N34安全/N33语言，修这些共享机制；完整卡、审阅与可逆回退均在docs。716全量的1fail需请求身份对账，不能算通过。最新§4bb覆盖旧N36待执行/用户待短验口径。
+> 最后更新：2026-10-05T14:38:57+08:00（Asia/Shanghai）。N37实现与本地验证、最终三包整理完成；源码98ac1a16440f64d8b1e095d0f4496cae7cdcece9 / anchor/n37-98ac1a1，完成锚点anchor/n37-final。最终Java727/727、fail/error/skip0；Python27/27、发行11/11；241keys×14、原生IME/profile与12边界场景＋归档backlog已核对。N36历史与规划更新保留；实体手机未写，真实OEM after待用户3–5分钟短验。本卡停止，不自派N37r/N38。详docs/N37-LOCAL-TEST-BUILD.md及docs/N37-SHA256.json；最新§4bc覆盖旧待施工口径。
 >
 > **N36 身份**：开工 HEAD `7a53e461615232d85d55b9a9b75762b0a784c102`（N35 完成 HEAD `013cc93b266b339ad05dea11b1bd29177cbcbffe` 的 docs-only 后继，`git diff 1967dacf..HEAD -- . ':(exclude)docs'` 为空）；本卡产品提交见 `docs/N36-SHA256.json` 的 `source_commit` / `source_anchor`。
 >
@@ -32,17 +32,14 @@
 > 用途：任何 AI 会话（Kimi 或 Codex）接续本项目时，先读本文件，无需翻阅长对话历史。
 > 本文件是唯一的“记忆”，对话记录不是。仓库 `docs/PROJECT-STATE.md` 为权威副本，每卡开工时同步。
 
-## 0. 上下文压缩后恢复须知（2026-10-05，最新角色与卡序）
+## 0. 上下文压缩后恢复须知（2026-10-05，N37收尾）
 
-1. **先读本实时状态档案**：优先本节和最新§4bb、docs/N37-N36-REVIEW-AND-REPLAN.md、docs/N37-EXECUTION-TASK.md、docs/N37-ROLLBACK-READY.md。产品N36/6319fd6，N37只规划完成。HEAD的docs-only后继合法，不按旧短哈希误停。N27避让不恢复，VISIONOS已解决。Codex推荐，用户本轮允许DeepSeek或Codex单执行者。
-2. **当前角色分工**：本聊天负责规划/审阅/状态与回退准备，已审查N36实际用户after并写N37卡；执行聊天收到卡后实施/验证/独立建包/本地提交后停止，不能自行开N37r/N38，也不同时多个聊天施工。规划者本轮没有实施N37产品或建正式包。
-
-3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
-4. **当前阶段**：稳定N34源26edf555c8956e12a4b0448b72aef34597141409、交付bfe5a0a及新docs-only后继。用户漏显改善、同步/preview开放；N35完整重写尚未源码施工，§4ax小修范围已撤销。副本文案/role当前以§4ay为准，原N34包/失败证据与用户数据不动。
-5. **执行状态**：N34 A→B→C→D 在同一授权卡内完成。后续聊天不得自动重跑旧 N31/N32/N27 或另起修订卡；先读最新§4aw与N34交付报告，等待用户短复验反馈。源调度/Publication/CAS/Cache提交、prompt/业务语义与N33设置仍保护。
-6. **已定选择**：九项选择见§4i，不重新询问。最新位置决定固定为“旁白翻译 → AI字幕翻译”，覆盖旧2A自然排序建议；其余项目相对顺序不动。中文现有体验保留；新语种读速软目标、两行与几何硬约束；语言菜单默认空集合且AI关闭仍保留。
-7. **单执行者与同步**：任何时刻不让两个执行者同时改同一仓库；管理更新不清除、不擅自提交产品变更。仓库与外部档案需保持一致（§2.8），出现差异先读并核对时间/内容，不按路径盲目覆盖。交接包快照仅供恢复阅读，不自动覆盖更新后的权威文件。
-8. **路径**：实际执行仓库 `E:\Projects\morphe-caption-v2`；本聊天C盘工作树 `C:\Users\14776\.codex\worktrees\d73e\morphe-caption-v2` 是旧N24状态，不用于当前施工或判断最新源码。JDK/SDK等环境见§1。真机发现记录为观察，不擅自加入或改写验收判据。
+1. **当前阶段**：N37本地交付完成，源码 `98ac1a16440f64d8b1e095d0f4496cae7cdcece9`、`anchor/n37-98ac1a1`；完成锚点`anchor/n37-final`。先读最新§4bc、docs/N37-LOCAL-TEST-BUILD.md、docs/N37-SHA256.json；旧§4bb规划事实保留为历史，不再按N36待施工继续运行。
+2. **角色与停止线**：Codex单执行者完成实现、验证、打包副本和本地提交；没有派新卡、远程API或实体手机写入。等待用户原卡3–5分钟after，不自行N37r/N38，不推送或发布。
+3. **最新硬证据**：全量full-04为727/727，failure/error/skipped0；N36原716身份全保留＋11。Python27/27、发行11/11；241keys×14；actual composition、CRC/DEX/分支、原生IME与保存/profile回收、自然边界和archive backlog记录绑定最后代码。旧full失败与原断言保留，不拿candidate当最终。
+4. **边界**：手机OEM现场未复现／未安装，不能宣称用户现场已修复闭环或全部帧无jank。自然矩阵仅共享机制验证。N27避让不恢复，ACCEPTANCE/frozen4/4/4与invisible口径不变。
+5. **保护与回退**：原N36/N35/N34包、official1.45.0未跟踪输入、各锚点、规划docs/历史证据保留。N37-RESTORE-N36.ps1未执行，只有用户明确选择后方可恢复，先保存WIP/证据；源码恢复不代表手机换包。
+6. **状态同步**：仓库docs/PROJECT-STATE.md为权威，与外部kimi档案一致；保留旧管理历史，不整文件回盖旧副本。唯一仓库E:/Projects/morphe-caption-v2，旧C盘worktree不施工。
 
 ## 1. 项目与路径
 
@@ -1059,3 +1056,15 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 
 - 本轮发现外部PROJECT-STATE仍逐字等于前规划提交7a53e46，没有N36管理头；仓库有完整N36头。已保存两份before在n37-planner，确认外部没有独立新内容，按仓库完整保留管理记录后新增本段，再同步两侧，不丢管理更新。
 - 规划完成，产品未改、正式N37未建；未签名/安装实体手机/推送/发布。等待用户交执行聊天或新指示。
+
+## 4bc. N37本地交付与停止（2026-10-05，最新执行状态）
+
+- 源码 `98ac1a16440f64d8b1e095d0f4496cae7cdcece9` / `anchor/n37-98ac1a1`；完成锚点 `anchor/n37-final` 由Git解析；基线N36产品6319fd6/完成3bf88d2原样保留。N37三包路径、完整SHA/bytes、time lane、source/verification身份见docs/N37-SHA256.json，before/after/合同修订及边界见docs/N37-LOCAL-TEST-BUILD.md。
+- A：正式outer→原inner→Controller→Guard主线程许可否定同次撤绘，owner epoch拒旧、queued render作废、touch/focus/a11y清理；不清计划/cache。B：native/media/hook选源Observation一致，暂停freeze/current selection共享，真实rewind可用且seek一次。
+- C：UIpeek已脱敏snapshot，后台writer/report/archive，weak窗口／request／locale／profile／clear epoch门；atomic latest summary和旧后台尾读迁移；幂等文字/locale/preview绑定。D：显式失败category增量，REUSED per-job边沿与重复累计，原n24身份focus2+prefetch2/四block各一次，不机械总2改4。
+- 最终全量full-04：727tests、0failure、0error、0skip；原716identity全保留＋11。之前full-01=3fail/full-02=1fail及原断言/身份/试验包保留。稳定代码一次最后全量，此后docs-only不复跑。
+- Python27/27；发行11/11；241keys×14=3374。冻结4通过/4失败/4未验证，三类invisible_ms0，ACCEPTANCE/版本/原输入/Publication/CAS/预算/deadline/source-cache语义未变。
+- 真SDK35 test-only host使用实际最终APK生产DEX/原资源/官方设置，52跨进程IME回执，4字段输入/delete/paste/真实保存、prompt中日composing、回收重开和dummy profile往返通过。12中日阿×1.0/1.3×手机／320dp自然标题-间隙-preview边界场景与14999msarchive backlog通过；无canvas.requestFocus，不作OEM唯一栈/零jank承诺。UI矩阵复用身份仅两个player Hook接缝变化，其他UI输入一致。
+- actual AI-only／Remember-only结构组合与both编译通过；三包DEX分支invalid0/problems0/binding0；APK11DEX，MPP内MPE一致、CRC/DEX头/resources/aapt链、官方选定39方法一致、正式APKunsigned。审计require-ai=false是N27observer已撤回，不改审计或恢复N27；最初错误口径失败保留。
+- 实体手机未写、未签名安装、未触网、新依赖或工具下载0、未push/publish/reset/amend/清数据。模拟器原override1500×2400/density480／原IME恢复核对。
+- 用户最后短验：有字详情MIN/MAX3次；最新标题/间隙边界慢快拖及prompt后隐藏IME；两句边界pause/resume与一次真实paused rewind；换video/target/cache，导出完整diagnostic。手机after待用户，本卡完成即停止，不自派N37r/N38。

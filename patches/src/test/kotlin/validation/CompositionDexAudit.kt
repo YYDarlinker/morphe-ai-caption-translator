@@ -267,7 +267,29 @@ fun main(args:Array<String>){
         println("NATIVE_CONTAINER_TYPED_RETURNS=true")
         val utils=classes.getValue("Lapp/morphe/extension/youtube/patches/utils/FlyoutUtils;")
         check(AccessFlags.PUBLIC.isSet(utils.methods.single { it.name=="getFlyoutMenuInfo" }.accessFlags))
-        val instructions=utils.methods.single { it.name=="addFlyoutElements" }.implementation!!.instructions.toList()
+        val entry=utils.methods.single { it.name=="addFlyoutElements" }
+        val body=utils.methods.single { method -> method.implementation?.instructions?.any { instruction ->
+            val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
+            reference?.definingClass==menu.type && reference.name=="onMenu"
+        }==true }
+        if(body!=entry) {
+            check(body.returnType=="V" && body.parameterTypes.map { it.toString() }==listOf("Ljava/lang/Object;") && AccessFlags.STATIC.isSet(body.accessFlags))
+            val allocated=entry.implementation!!.instructions.mapNotNull { instruction ->
+                if(instruction.opcode!=com.android.tools.smali.dexlib2.Opcode.NEW_INSTANCE)null
+                else ((instruction as? ReferenceInstruction)?.reference as? com.android.tools.smali.dexlib2.iface.reference.TypeReference)?.type
+            }
+            check(allocated.count { type -> classes[type]?.let { runnable ->
+                "Ljava/lang/Runnable;" in runnable.interfaces && runnable.methods.any { method ->
+                    method.name=="run" && method.returnType=="V" && method.parameterTypes.isEmpty() &&
+                        method.implementation?.instructions?.any { instruction ->
+                            val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
+                            reference?.definingClass==utils.type && reference.name==body.name &&
+                                reference.returnType=="V" && reference.parameterTypes.map { it.toString() }==listOf("Ljava/lang/Object;")
+                        }==true
+                }
+            }==true }==1){"Deferred menu hook must be uniquely reachable from the actual entry Runnable"}
+        }
+        val instructions=body.implementation!!.instructions.toList()
         fun called(i:Int)=((instructions[i] as? ReferenceInstruction)?.reference as? MethodReference)?.name
         val hook=instructions.indices.single { called(it)=="onMenu" }
         val divider=instructions.indices.single { called(it)=="addDivider" }

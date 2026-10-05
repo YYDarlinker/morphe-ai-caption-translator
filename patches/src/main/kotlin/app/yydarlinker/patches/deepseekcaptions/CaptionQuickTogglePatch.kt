@@ -124,7 +124,7 @@ internal fun BytecodePatchContext.prepareCaptionQuickToggle(): () -> Unit {
     // Insert at the shared group's boundary, BEFORE its conditional divider and signal reset.
     // The index is the official inflater's next insertion position (dialog vs popup differ).
     // Retain incoming branch labels on the hook: zero/hidden official buttons must also reach it.
-    entry.replaceInstruction(guard,"invoke-static {p0, v$indexRegister}, ${runtime.type}->onMenu(Ljava/lang/Object;I)I")
+    menuBody.replaceInstruction(guard,"invoke-static {p0, v$indexRegister}, ${runtime.type}->onMenu(Ljava/lang/Object;I)I")
     menuBody.addInstructionsWithLabels(guard+1,"move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",ExternalLabel("after_divider",afterDivider))
     info.accessFlags=(info.accessFlags and AccessFlags.PRIVATE.value.inv()) or AccessFlags.PUBLIC.value
     // ART does not narrow the null branch's reference register to a null type.

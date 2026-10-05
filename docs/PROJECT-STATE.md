@@ -1,6 +1,6 @@
 # PROJECT-STATE — Morphe AI Caption Translator 质量迭代项目状态档案
 
-> 最后更新：2026-10-05（Asia/Shanghai）。**N36 已完成本地实施与交付，待用户 3-5 分钟短验。**
+> 最后更新：2026-10-05（Asia/Shanghai）。N36已交付且用户完成after，发现小窗旧字幕残留、字幕样式标题/间隙处跳位、压力问题与暂停回上一句；规划者本轮已审阅并备好N37卡，尚未产品施工。产品6319fd6/完成3bf88d2不变，backup/pre-n37-n36-3bf88d2已固定。已读手机日志/帧统计并拉包，自有390类方法身份一致，未写手机。已确认实际入口进COMPACT不hide已画View；fresh native暂停时间被旧rawMedia/hook freeze盖住；collapsed诊断普通getView同步drain/Future.get归档，且同Locale再绑定仍requestLayout。N37保留N36快转场/N35参照/N34安全/N33语言，修这些共享机制；完整卡、审阅与可逆回退均在docs。716全量的1fail需请求身份对账，不能算通过。最新§4bb覆盖旧N36待执行/用户待短验口径。
 >
 > **N36 身份**：开工 HEAD `7a53e461615232d85d55b9a9b75762b0a784c102`（N35 完成 HEAD `013cc93b266b339ad05dea11b1bd29177cbcbffe` 的 docs-only 后继，`git diff 1967dacf..HEAD -- . ':(exclude)docs'` 为空）；本卡产品提交见 `docs/N36-SHA256.json` 的 `source_commit` / `source_anchor`。
 >
@@ -17,7 +17,7 @@
 >
 
 
-> 最后更新：2026-10-04（Asia/Shanghai）。N35已交付并完成用户after，当前产品1967dac/完成HEAD013cc93；本轮规划者审阅诊断215344与14.27秒滚动录像，确认五条通用机制before5/5：无IME强拉、preview重绑失缓存、旧owner隔离继承、恢复probe占槽、真实player通知被caption clear作废。另查主线程日志反复Keystore解密/动画重排；压力请求队列并非主要延迟，network与取消需分辨。N36详细卡/审阅/回退资料已准备，尚未产品施工；backup/pre-n36-n35-013cc93固定。N35/N34/官方三包SHA未变，恢复脚本仅InspectOnly。N35真实f40参照body本轮已取得并SHA验证，partial实际retime752词，保留时间成果。最新§4ba覆盖旧N35待执行口径；单执行者Codex推荐、DeepSeek允许，真实IME/滚动/转场先于一次最终全量，同输入不重复建包。
+> 历史更新（已由2026-10-05最新状态覆盖）：2026-10-04（Asia/Shanghai）。N35已交付并完成用户after，当前产品1967dac/完成HEAD013cc93；本轮规划者审阅诊断215344与14.27秒滚动录像，确认五条通用机制before5/5：无IME强拉、preview重绑失缓存、旧owner隔离继承、恢复probe占槽、真实player通知被caption clear作废。另查主线程日志反复Keystore解密/动画重排；压力请求队列并非主要延迟，network与取消需分辨。N36详细卡/审阅/回退资料已准备，尚未产品施工；backup/pre-n36-n35-013cc93固定。N35/N34/官方三包SHA未变，恢复脚本仅InspectOnly。N35真实f40参照body本轮已取得并SHA验证，partial实际retime752词，保留时间成果。最新§4ba覆盖旧N35待执行口径；单执行者Codex推荐、DeepSeek允许，真实IME/滚动/转场先于一次最终全量，同输入不重复建包。
 > **用户签字（2026-09-30，N20 显示策略）**：① 等待期（译文未就绪：启动、暂停后、拖动进度条后）字幕区显示 **“翻译中…”**；② 译文最终失败或被安全网拦截时字幕区**完全空白**；③ 不再向屏幕输出 `[原文 / Original]` 与技术文案，原因一律只进诊断；④ 授权按此修订 ACCEPTANCE.md 的 A01 与 A13 判据（其余判据与冻结证据不得改动）；⑤ 字号档位可视化：滑轨上加 **5 个刻度点**、轨道下方一排**档名（超小/小/标准/大/超大）**并与刻度对齐，当前档高亮；**档名行不标注 px 数值**；拖动吸附与松手保存不变。
 > **字号设计核验（2026-09-30，审阅者用 PIL 直接量 66.jpg / 67.jpg 原图）**：B站横屏全屏单字墨迹高 median **57px**（30 字样本，直方图峰值 58px，阈值 190；档案早前另一阈值测得“经”55/“频”56），B站竖屏详情页 median **45px**（20 字样本，峰值 46px）；与设定值 55.5 / 44.5 相差 ≤1.5px（全屏 2.7%、详情页 1.1%），属单字取样与阈值差异。五档常量、默认档、全屏 ×1.247、预览比例、旧值迁移、诊断字段均已逐项核对，**未发现谬误**。三处需知细节（均为既有设计，非缺陷）：排版排不下时字号下限压到**超小档**（34/42.4px）；评论区收窄 >20% 时字高随视频矩形同步缩小（N19 未改）；旧 r 值迁移以 1264px 为参考屏宽换算，仅影响升级瞬间一次。各档设备值（1264×2736 屏）：详情页 34 / 39 / 44.5 / 50 / 56px，全屏 42.4 / 48.6 / 55.5 / 62.4 / 69.8px。
 > **用户最终决策（N19，覆盖 N17c 的单一 r 方案）**：
@@ -32,10 +32,10 @@
 > 用途：任何 AI 会话（Kimi 或 Codex）接续本项目时，先读本文件，无需翻阅长对话历史。
 > 本文件是唯一的“记忆”，对话记录不是。仓库 `docs/PROJECT-STATE.md` 为权威副本，每卡开工时同步。
 
-## 0. 上下文压缩后恢复须知（2026-10-02，覆盖历史角色与卡序）
+## 0. 上下文压缩后恢复须知（2026-10-05，最新角色与卡序）
 
-1. **先读本实时状态档案**：优先本节和最新§4ba、docs/N36-N35-REVIEW-AND-REPLAN.md、docs/N36-EXECUTION-TASK.md、docs/N36-ROLLBACK-READY.md及N35交付记录。当前产品N35，N36仅规划完成；任务卡/状态的docs-only后继合法，不按HEAD旧短哈希误停。N27控件避让不恢复，VISIONOS已解决；用户允许本卡DeepSeek或Codex单执行者。
-2. **当前角色分工**：本聊天是规划者/审阅者，已准备N36执行卡并核验回退。下一执行聊天按卡完整实现/本地验证/独立建包/提交后停止；用户反馈/真机短验后再回本聊天。不能自行开N36r/N37，不并行多个执行聊天，不因复杂任务擅自把范围转给另一模型。
+1. **先读本实时状态档案**：优先本节和最新§4bb、docs/N37-N36-REVIEW-AND-REPLAN.md、docs/N37-EXECUTION-TASK.md、docs/N37-ROLLBACK-READY.md。产品N36/6319fd6，N37只规划完成。HEAD的docs-only后继合法，不按旧短哈希误停。N27避让不恢复，VISIONOS已解决。Codex推荐，用户本轮允许DeepSeek或Codex单执行者。
+2. **当前角色分工**：本聊天负责规划/审阅/状态与回退准备，已审查N36实际用户after并写N37卡；执行聊天收到卡后实施/验证/独立建包/本地提交后停止，不能自行开N37r/N38，也不同时多个聊天施工。规划者本轮没有实施N37产品或建正式包。
 
 3. **审阅**：先在 E 盘执行仓库只读核对 HEAD、锚点、工作区及 diff，再审阅执行报告和真实证据。计分板由执行者按卡运行，规划者核对报告与产物，不把执行者结果说成自己复跑。不足以判定的证据如实写未验证，不改变冻结事实和 ACCEPTANCE 判据。
 4. **当前阶段**：稳定N34源26edf555c8956e12a4b0448b72aef34597141409、交付bfe5a0a及新docs-only后继。用户漏显改善、同步/preview开放；N35完整重写尚未源码施工，§4ax小修范围已撤销。副本文案/role当前以§4ay为准，原N34包/失败证据与用户数据不动。
@@ -1023,3 +1023,39 @@ N31设置重启修复身份：核心 `1bc94aed459300b79bd5ee93dca03d2db99d593c` 
 ### 停止点
 
 规划完成并本地持久化，不实施N36，不签名/安装/推送/发布。等用户交执行聊天或提供新指示。
+
+
+## 4bb. N36用户after审查及N37规划（2026-10-05，最新管理状态）
+
+### 身份与真实权限
+
+- 产品6319fd69900b1f08b231b14161713021d0fb616d、完成3bf88d2c0047bb1ecd88f4389ec42627bc219aa9；anchor/n36-6319fd6、anchor/n36-final及backup/pre-n37-n36-3bf88d2核实。N36/N35/N34三包及official1.45原SHA/bytes均不变。N37尚未实施/建包。
+- 实体手机ASQHUT6422001234连接，只有读取logcat/dumpsys/gfx与拉安装APK；未安装/启动/input/push/app_process/清数据/改设置。自有390类method canonical比较全部一致，整APK签名/宿主不同不要求字节等。安装更新时间2026-10-05 08:28:43，21.16.256/minSdk28/targetSdk36。
+- .verification/n37-planner保存本轮证据。手机capture前台是通知栏/文件管理器，AI设置窗累计242帧/13jank/p99 73ms，不当作精确边界现场trace，不把10月3日旧crash归N36。
+- 既有SDK35 emulator5554用原N36 DEX/资源/官方设置的测试host观察；测试独立签名，正式包未签。自然焦点，未强制preview focus；原模拟器override1500×2400/density480与手机1264×2736/560对照后已恢复原值。无API/新工具下载。
+
+### 四项根因与限制
+
+1. 小窗残留：正式Hook→Controller.player不走Overlay.setPlayerType隐藏支路；Guard COMPACT只停未来扫描/render，没有hide已绘制anchor。真实showEvent＋正式通知before，Authority COMPACT而anchor VISIBLE。修许可否定的廉价同步hide/revoke，不清计划/cache，不回退N36快转场。
+2. 用户纠正位置为“字幕样式与预览上缘之间”。上游两条已复现：a) DeepSeekDiagnosticsPreference即使收起仍uiText body supplier，普通getView→CaptionDiagnostics.uiText→drainNow→summary/readSummary/Future.get，归档受控暂停时主线程绑定被卡住；b) TextResolver同Locale无条件setTextLocale仍parent requestLayout（SDK28/35），暖preview外层同输入getView仍layoutRequested。N36appendSummary实际append多文件，reader扫全历史。后卡用已脱敏内存snapshot、后台显式刷新/export与有界最新slot；同文案/Locale变化才setter。物理某一次edge全部原因未现场trace，不谎称OEM唯一分支，交付前真实重日志自然边界after。
+3. 压力：报告有N35旧数据。已确认N36段3645history，42request/39response/2cancel/1未terminal，slot median16/p90 54/max67ms，source queue13样本median13/max15ms，network median4070/p90 4916/max6518ms。累计21errors不能算本段新网络失败。1310REUSED/merged0尚未真正降噪。RebuildApi network_cancelled/network_deadline_expired被Audit network优先吃掉，新增类别应显式映射，旧累计不猜重分配、尝试/tokens保留。
+4. 暂停：同session12/generation0无seek可见时间28290→27922/32235→31861/43120→43060，换回旧句。position(s)选native后又freeze rawmedia；time(ms)freeze hook；displayPosition先读这个旧优先通道。受控Controller native paused28290/media27922原路径确复现。修同源position+state的暂停Observation/freeze，保留jitter与真实paused小backward seek，不能Math.max/钉最后页/固定提前量。
+
+### Before与未收敛验证
+
+- mechanism-before-01 3/3（含mixed type分类观察，不一概算3bug）；settings-binding-before-01 2/2 SDK28/35；preview-bind-before-01 1/1；diagnostic-ui-before-02 1/1完整blocked-main栈；request-count-before-01 1/1合法两focus＋两prefetch四block各一次。均before，不是N37 after。编译失败diagnostic-ui-before-01原样保留，不计为测试通过。
+- N36真实full-delivered-01=716/1failure/0error/0skip；原n24total=2 vs4缺逐request身份。新probe证明4可能是合法prefetch，但不冒称原full唯一原因。N37按原失败场景记identity，合法预取则分focus/预算计数，真重复/泄漏则修实际生命周期；禁止2机械改4、独立JVM/skip遮盖。最终完整全量必须0fail/error/skip。
+- N36真实IME commit未取证是:ime与instrumentation两份static导致测试没发送命令；后卡在test服务本进程经真实连接执行命令/ack并验证字段/保存值，不以“平台不能验证”为永久限制。正式产品无测试类。
+
+### 后卡与保护
+
+- N37一张卡内：A廉价同步hide → B暂停同源 → C诊断snapshot/幂等绑定 → D压力分类/原测试身份 → 一次最终验证/三包。Codex推荐，DeepSeek允许，单执行者完成停。
+- 文件：N37-EXECUTION-TASK.md、N37-N36-REVIEW-AND-REPLAN.md、N37-N36-BASELINE.json、N37-ROLLBACK-READY.md、N37-RESTORE-N36.ps1。恢复脚本只InspectOnly；没有实际回退。N36有已知缺陷，回它只代表本轮起点；旧N35/N34恢复保留。
+- 保留N35ref/retime/source/event/page/cache/prompt/schema、N34安全、N33十四语/default-custom/导航/两roots/menu、N36快转场/指纹脱敏、profiles/Keystore、CAS/锁/5s barrier、2+2/总4/请求预算、字幕字高/位置/16:9/Shorts、official1.45/21.16.256/minSdk28/1.3.5、ACCEPTANCE/frozen4/4/4。N27不恢复。
+- UI热路径report barrier/IO/drain/redaction/key0；暖同值setter/layout0；导出仍后台完整性barrier。必要loading文案14语言；不改窗口Context/官方类，不扩大并发/deadline，不视频特化。
+- 一次稳定identity全量＋真实UI/IME专项在打包前；doc-only不重跑/建包，formal MPP自身组合与DEX/分支/接口审计真实闸，不能继承exists-only/assert-or-True判据。原历史保护范围Git＋指定包，不扫几十万文件。
+
+### 状态同步修正与停止
+
+- 本轮发现外部PROJECT-STATE仍逐字等于前规划提交7a53e46，没有N36管理头；仓库有完整N36头。已保存两份before在n37-planner，确认外部没有独立新内容，按仓库完整保留管理记录后新增本段，再同步两侧，不丢管理更新。
+- 规划完成，产品未改、正式N37未建；未签名/安装实体手机/推送/发布。等待用户交执行聊天或新指示。

@@ -109,6 +109,7 @@ public class N29BootstrapTest {
   RebuildController.Session s=fixture(2);wall(815,s,815);schedule(s);await(firstSeen);until(()->s.jobs[0].sent);
   s.prefetchPausedUntil=SystemClock.elapsedRealtime()+5000;schedule(s);assertNull(s.jobs[1]);assertEquals(0,cacheReads.get());
   s.prefetchPausedUntil=0;h.mediaSession=new MediaSession(h.a,"n29");MediaController c=new MediaController(h.a,h.mediaSession.getSessionToken());
+  Shadows.shadowOf(c).setPackageName(h.a.getPackageName()); // same-owner MediaSession, as on Android
   Shadows.shadowOf(c).setPlaybackState(new PlaybackState.Builder().setState(PlaybackState.STATE_PAUSED,815,0).build());h.a.setMediaController(c);
   schedule(s);assertNull(s.jobs[1]);assertEquals(0,cacheReads.get());h.a.setMediaController(null);
   s.jobs[0].sent=false;schedule(s);assertNull(s.jobs[1]);assertEquals(1,h.calls.get());s.jobs[0].sent=true;

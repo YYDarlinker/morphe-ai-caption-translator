@@ -93,8 +93,14 @@ final class CaptionTextResolver {
     static void direction(View view, boolean data) {
         Locale selected = locale(view.getContext());
         boolean rtl = !data && "ar".equals(selected.getLanguage());
-        view.setLayoutDirection(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        view.setTextDirection(data ? View.TEXT_DIRECTION_LTR : (rtl ? View.TEXT_DIRECTION_RTL : View.TEXT_DIRECTION_LOCALE));
-        if (view instanceof TextView) ((TextView) view).setTextLocale(selected);
+        int layout=rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR;
+        int text=data ? View.TEXT_DIRECTION_LTR : (rtl ? View.TEXT_DIRECTION_RTL : View.TEXT_DIRECTION_LOCALE);
+        if(view.getLayoutDirection()!=layout)view.setLayoutDirection(layout);
+        if(view.getTextDirection()!=text)view.setTextDirection(text);
+        if(view instanceof TextView){
+            TextView target=(TextView)view;
+            android.os.LocaleList locales=new android.os.LocaleList(selected);
+            if(!locales.equals(target.getTextLocales()))target.setTextLocales(locales);
+        }
     }
 }

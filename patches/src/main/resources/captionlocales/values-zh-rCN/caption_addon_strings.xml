@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"全选"</string>
     <string name="cap_value_retained" formatted="false">"%1$s；保留上次有效值"</string>
     <string name="cap_model_ids_empty" formatted="false">"接口没有返回可选择的模型 ID"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"正在读取诊断…"</string>
 </resources>

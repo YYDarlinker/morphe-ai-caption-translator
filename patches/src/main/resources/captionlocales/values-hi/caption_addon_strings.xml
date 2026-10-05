@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"सभी चुनें"</string>
     <string name="cap_value_retained" formatted="false">"%1$s; पिछला मान्य मान रखा गया है"</string>
     <string name="cap_model_ids_empty" formatted="false">"एंडपॉइंट ने चुनने योग्य मॉडल ID नहीं लौटाए"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"निदान लोड हो रहा है…"</string>
 </resources>

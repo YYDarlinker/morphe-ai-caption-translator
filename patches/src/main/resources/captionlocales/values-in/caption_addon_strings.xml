@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"Pilih semua"</string>
     <string name="cap_value_retained" formatted="false">"%1$s; nilai valid terakhir dipertahankan"</string>
     <string name="cap_model_ids_empty" formatted="false">"Endpoint tidak mengembalikan ID model yang dapat dipilih"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"Memuat diagnostik…"</string>
 </resources>

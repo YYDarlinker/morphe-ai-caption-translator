@@ -54,8 +54,6 @@ final class CaptionDiagnostics {
 
     /** Latest bounded summary, read from the archive lane so the display path never commits prefs. */
     private static String[] summary(Context context) {
-        String[] queued = CaptionDiagnosticsWriter.pendingSummary();
-        if (queued != null) return queued;
         String record = CaptionDiagnosticArchive.readSummary(context, CaptionDiagnosticsWriter.epoch());
         if (record != null && !record.isEmpty()) {
             String[] parts = record.split(String.valueOf(SEPARATOR), -1);
@@ -84,11 +82,15 @@ final class CaptionDiagnostics {
     }
 
     static void clear(Context context) {
-        try { CaptionDiagnosticWriterClear(context); } catch (Throwable ignored) {}
-        try { prefs(context).edit().clear().apply(); } catch (Throwable ignored) {}
-        try { CaptionDiagnosticArchive.clear(context); } catch (Throwable ignored) {}
-        try { CaptionQualityTrace.clear(context); } catch (Throwable ignored) {}
-        try { TokenCostAudit.clear(context); } catch (Throwable ignored) {}
+        CaptionDiagnosticsWriter.clear(context);
+        CaptionDiagnosticSnapshot.invalidate();
+        CaptionDiagnosticArchive.clear(context);
+        long epoch=CaptionDiagnosticsWriter.epoch();
+        CaptionDiagnosticsWriter.background(()->{
+            if(epoch!=CaptionDiagnosticsWriter.epoch())return;
+            prefs(context).edit().clear().apply();
+            CaptionQualityTrace.clear(context);TokenCostAudit.clear(context);
+        });
     }
 
     private static void CaptionDiagnosticWriterClear(Context context) {
@@ -133,8 +135,7 @@ final class CaptionDiagnostics {
      * writer first, so what the user opens never hides records that were already produced.
      */
     static String uiText(Context context) {
-        CaptionDiagnosticsWriter.drainNow(context);
-        return uiText(context, true);
+        return CaptionDiagnosticSnapshot.peekText(context);
     }
 
     /**
@@ -142,7 +143,11 @@ final class CaptionDiagnostics {
      * {@link #fullText(Context)}: its headings stay exactly as they were, because the saved report has to
      * remain byte-comparable with earlier exports and must not absorb the reader's interface language.
      */
-    static String uiText(Context context, boolean localized) {
+    static String uiText(Context context,boolean localized){
+        return localized?uiText(context):reportText(context,false);
+    }
+    /** Complete bounded panel formatter, only used by the background report/export lane. */
+    static String reportText(Context context, boolean localized) {
         // Reading any report form first materialises the bounded queue, so a report never hides records
         // that were already produced. The drain is idempotent and free when the queue is empty.
         CaptionDiagnosticsWriter.drainNow(context);
@@ -221,11 +226,11 @@ final class CaptionDiagnostics {
         CaptionDiagnosticsWriter.drainNow(c);
         CaptionDiagnosticsWriter.flush(c);
         String history=CaptionDiagnosticArchive.read(c,"history"),quality=CaptionDiagnosticArchive.read(c,"quality"),timing=CaptionDiagnosticArchive.read(c,"timing");
-        return uiText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; build=n36; official=1.45.0; presentation=n29-presentation-v3; presentation_revision=n36-player-authority-v1"+"; exported_at="+System.currentTimeMillis()
+        return reportText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+RebuildProtocol.VERSION+"; build=n37; official=1.45.0; presentation=n29-presentation-v3; presentation_revision=n37-consistent-observation-v1"+"; exported_at="+System.currentTimeMillis()
             +"; completeness=bounded_not_guaranteed; history_records="+records(history,false)+"; quality_records="+records(quality,true)+"; timing_records="+records(timing,true)
             +"; truncation_markers="+(occurrences(history,"record truncated")+occurrences(quality,"record truncated")+occurrences(timing,"record truncated"))
             +"; dropped_records="+CaptionDiagnosticsWriter.droppedCount()+"; merged_records="+CaptionDiagnosticsWriter.mergedCount()
-            +"; queue_epoch="+CaptionDiagnosticsWriter.epoch()
+            +"; reused_repeats="+CaptionDiagnosticsWriter.reusedRepeatCount()+"; queue_epoch="+CaptionDiagnosticsWriter.epoch()
             +"; debug="+DeepSeekConfig.displayTextDebugEnabled(c)+"]\n"
             + "\n[Extended history: chronological; last 24h; up to 8 MiB per channel]\n"
             + history + "\n[Extended quality evidence; captured only while debug enabled]\n"+quality

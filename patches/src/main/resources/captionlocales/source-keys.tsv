@@ -150,3 +150,4 @@ Phụ đề đọc tự nhiên.	cap_preview
 选择要加入 YouTube 自动翻译菜单的语言	cap_languages_summary
 Invalid API URL: use an HTTP(S) OpenAI-compatible base URL without credentials or fragments	cap_api_address_invalid
 模型不能为空	cap_model_empty
+Loading diagnostics…	cap_diagnostics_loading

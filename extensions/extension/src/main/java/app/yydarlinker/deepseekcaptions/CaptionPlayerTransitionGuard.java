@@ -130,6 +130,10 @@ final class CaptionPlayerTransitionGuard {
 
     /** Called on the main thread after the authority merged a notification or changed owner/state. */
     static void onAuthorityChanged(){
+        // Permission denial retracts an existing paint in this very commit, not at the next tick.
+        // Passing the current epoch prevents delayed cleanup of an old owner hiding a newer one.
+        if(!CaptionPlayerAuthority.displayPermitted())
+            CaptionOverlay.denyDisplay(CaptionPlayerAuthority.ownerEpoch());
         // A cleared authority also clears this coordinator: a stale Activity reference must never be
         // re-declared as the owner of a later session.
         if(CaptionPlayerAuthority.activity()==null){

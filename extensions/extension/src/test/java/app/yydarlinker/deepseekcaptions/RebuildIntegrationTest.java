@@ -57,6 +57,20 @@ public class RebuildIntegrationTest {
   final AtomicInteger n24MaxInFlight = new AtomicInteger();
   /** N24: when set the fixture answers per block so a presentation can be traced to its own block. */
   volatile boolean n24TextByBlock;
+  volatile RebuildController.Session n37LedgerSession;
+  final java.util.concurrent.ConcurrentLinkedQueue<String> n37RequestLedger=new java.util.concurrent.ConcurrentLinkedQueue<>();
+  volatile CountDownLatch n37PrefetchGate;
+  final Set<String> n37PrefetchBlocks=ConcurrentHashMap.newKeySet();
+  void n37Identity(String phase,String blockId)throws Exception{
+    RebuildController.Session s=n37LedgerSession;if(s==null)return;
+    synchronized(s){for(int i=0;i<s.blocks.size();i++)if(s.blocks.get(i).id().equals(blockId)){
+      RebuildController.Job j=s.jobs[i];
+      n37RequestLedger.add(new JSONObject().put("phase",phase).put("session",s.id).put("block",blockId)
+        .put("index",i).put("requestID",j==null?-1:j.traceId).put("purpose",j==null?"completed":j.priority?"focus":"prefetch")
+        .put("generation",s.generation).put("time",SystemClock.elapsedRealtime())
+        .put("cancel",j!=null&&j.cancelled).put("publication_finish_sent",s.publication.finishSent()).toString());break;
+    }}
+  }
 
   @Before
   public void setup() throws Exception {
@@ -86,11 +100,14 @@ public class RebuildIntegrationTest {
                   new JSONObject(
                       req.getJSONArray("messages").getJSONObject(1).getString("content"));
               String blockId = input.optString("block", "");
+              n37Identity("received",blockId);
               n24SeenBlocks.add(blockId);
               n24BlockCalls.computeIfAbsent(blockId, k -> new AtomicInteger()).incrementAndGet();
               // The N24 tests hold chosen blocks open to prove that a second slot stays usable.
               CountDownLatch gate = n24Gate;
               if (gate != null && n24GateBlocks.contains(blockId)) gate.await(15, TimeUnit.SECONDS);
+              if(n37PrefetchGate!=null&&n37PrefetchBlocks.contains(blockId))n37PrefetchGate.await(15,TimeUnit.SECONDS);
+              n37Identity("response",blockId);
               if (mode == 1 && req.has("response_format"))
                 return new MockResponse()
                     .setResponseCode(400)
@@ -236,7 +253,7 @@ public class RebuildIntegrationTest {
       if (condition.getAsBoolean()) return;
       Thread.sleep(15);
     }
-    fail("timeout;calls=" + calls + ";diagnostics=" + CaptionDiagnostics.uiText(a));
+    fail("timeout;calls=" + calls + ";diagnostics=" + N37DiagnosticsReports.read(a));
   }
 
   void start(boolean original) throws Exception {
@@ -1181,7 +1198,8 @@ public class RebuildIntegrationTest {
       long reported = frozen + (i % 2 == 0 ? 16 : 0);
       reportMedia(controller, PlaybackState.STATE_PAUSED, reported);
       advance(80);
-      assertEquals("ordinary clock must remain available to scheduling", reported, s.position);
+      assertEquals("schedule and render must consume the same paused freeze", frozen, s.position);
+      assertEquals("raw winning observation is retained for evidence", reported, s.observation.position);
       assertEquals(frozen, s.pausedDisplayPosition);
       assertEquals(frozen, overlayPosition());
       assertEquals(0, overlayPage());
@@ -1292,7 +1310,7 @@ public class RebuildIntegrationTest {
     assertEquals("large raw change must bypass the ordinary clock's evidence guard",
         5000, s.pausedDisplayPosition);
     assertEquals(5000, overlayPosition());
-    assertNotEquals("display freeze must not rewrite the scheduling clock", 5000, s.position);
+    assertEquals("a validated native-unavailable pause seek must share schedule/render time", 5000, s.position);
     reportMedia(controller, PlaybackState.STATE_PAUSED, 5016);
     advance(80);
     assertEquals(5000, overlayPosition());
@@ -1396,21 +1414,39 @@ public class RebuildIntegrationTest {
   }
 
   @Test public void n24BlockedOldFocusStillLeavesTheSecondSlotForTheNewLanding() throws Exception {
-    RebuildController.Session s=n24Session(4,6000);
-    String first=s.blocks.get(0).id(), second=s.blocks.get(1).id();
-    // Gate before anything schedules, so the old landing is still open when the new one arrives.
-    n24GateBlocks.add(first);n24Gate=new CountDownLatch(1);
-    RebuildController.time(0);
-    await(()->n24Saw(first));
-    assertEquals("the old landing holds one foreground slot",1,n24InFlight(s,true));
-    // D2: the new landing must be served by the free slot, not queued behind the blocked request.
-    RebuildController.time(6500);
-    await(()->n24Saw(second));
-    assertTrue("both foreground slots are usable at once",n24MaxInFlight.get()>=2);
-    assertEquals(1,s.attempts[0]);assertEquals(1,s.attempts[1]);
-    n24Gate.countDown();
-    await(()->s.plans[0]!=null&&s.plans[1]!=null);
-    assertEquals("no request was duplicated",2,calls.get());
+    RebuildController.Session s=n24Session(4,6000);n37LedgerSession=s;
+    String first=s.blocks.get(0).id(),second=s.blocks.get(1).id();
+    n24GateBlocks.add(first);n24GateBlocks.add(second);n24Gate=new CountDownLatch(1);
+    n37PrefetchGate=new CountDownLatch(1);
+    n37PrefetchBlocks.add(s.blocks.get(2).id());n37PrefetchBlocks.add(s.blocks.get(3).id());
+    try{
+      RebuildController.time(0);await(()->n24Saw(first));
+      assertEquals("the old landing holds one foreground slot",1,n24InFlight(s,true));
+      RebuildController.time(6500);await(()->n24Saw(second));
+      assertTrue("both foreground slots are usable at once",n24MaxInFlight.get()>=2);
+      assertEquals(1,s.attempts[0]);assertEquals(1,s.attempts[1]);
+      assertEquals("before acceptance only the two focus requests are possible",2,calls.get());
+      n24Gate.countDown();await(()->s.plans[0]!=null&&s.plans[1]!=null);
+      int originalObservation=calls.get();
+      await(()->n24Saw(s.blocks.get(2).id())&&n24Saw(s.blocks.get(3).id()));
+      assertEquals("two focus plus two distinct legal successors",4,calls.get());
+      assertEquals(4,n24BlockCalls.size());
+      for(int i=0;i<4;i++)assertEquals("each block exactly once",1,n24BlockCalls.get(s.blocks.get(i).id()).get());
+      synchronized(s){
+        for(int i=2;i<4;i++){
+          assertFalse("successors retain the prefetch lane",s.jobs[i].priority);
+          assertTrue("unchanged 30-second lookahead",s.blocks.get(i).start<=s.position+30000);
+        }
+      }
+      long focus=n37RequestLedger.stream().filter(line->line.contains("\"phase\":\"received\"")&&line.contains("\"purpose\":\"focus\"")).count();
+      long prefetch=n37RequestLedger.stream().filter(line->line.contains("\"phase\":\"received\"")&&line.contains("\"purpose\":\"prefetch\"")).count();
+      assertEquals(2,focus);assertEquals(2,prefetch);
+      n37PrefetchGate.countDown();await(()->s.plans[2]!=null&&s.plans[3]!=null);
+      JSONArray ledger=new JSONArray();for(String line:n37RequestLedger)ledger.put(new JSONObject(line));
+      N28CGeometryTest.export("n37-original-n24-request-identities.json",new JSONObject()
+          .put("original_assertion_expected_total",2).put("original_after_acceptance_observed",originalObservation)
+          .put("focus",focus).put("prefetch",prefetch).put("total",calls.get()).put("ledger",ledger));
+    }finally{n24Gate.countDown();n37PrefetchGate.countDown();n37LedgerSession=null;}
   }
 
   @Test public void n24TwoFocusInFlightRetainOnlyTheNewestPendingLanding() throws Exception {
@@ -1482,9 +1518,11 @@ public class RebuildIntegrationTest {
     RebuildController.Session s=n24Session(6,6000);
     n24GateAll(s);
     RebuildController.time(0);
+    // The release assertion names block 0: actually send it before the rapid landing storm.
+    // Otherwise the legal unsent-focus replacement can cancel it before the mock sees a request.
+    await(()->n24Saw(s.blocks.get(0).id())&&s.jobs[0]!=null&&s.jobs[0].sent);
     for(int i=1;i<6;i++)RebuildController.time(i*6000L+100);
-    await(()->n24MaxInFlight.get()>=1);
-    Thread.sleep(150);
+    await(()->n24Saw(s.blocks.get(5).id())&&s.jobs[5]!=null&&s.jobs[5].sent);
     int focus=n24InFlight(s,true),prefetch=n24InFlight(s,false);
     assertTrue("foreground must never exceed two",focus<=2);
     assertTrue("background must never exceed two",prefetch<=2);

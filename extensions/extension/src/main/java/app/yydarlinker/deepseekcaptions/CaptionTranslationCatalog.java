@@ -35,6 +35,7 @@ static final String[][] SOURCES={
 {"关闭后使用 YouTube 原生字幕显示","message_7b7480271fa5"},
 {"الترجمة تبدو طبيعية.","preview"},
 {"Phụ đề đọc tự nhiên.","preview"},
+{"Loading diagnostics…","diagnostics_loading"},
 {"可点“刷新”重试，或直接输入模型 ID","model_hint"},
 {"时间参照与异常（独立保留，含时间戳）：","message_dedc85cbb813"},
 {"请先配置 API，再启用 AI 翻译","configure_api"},
@@ -442,7 +443,8 @@ private static String[][] values_en(){return new String[][]{
 {"paste","Paste"},
 {"select_all","Select all"},
 {"value_retained","%1$s; keeping the last valid value"},
-{"model_ids_empty","The endpoint returned no selectable model IDs"}
+{"model_ids_empty","The endpoint returned no selectable model IDs"},
+{"diagnostics_loading","Loading diagnostics…"}
 };}
 private static String[][] values_zh_rCN(){return new String[][]{
 {"age_close"," 秒前）"},
@@ -684,7 +686,8 @@ private static String[][] values_zh_rCN(){return new String[][]{
 {"paste","粘贴"},
 {"select_all","全选"},
 {"value_retained","%1$s；保留上次有效值"},
-{"model_ids_empty","接口没有返回可选择的模型 ID"}
+{"model_ids_empty","接口没有返回可选择的模型 ID"},
+{"diagnostics_loading","正在读取诊断…"}
 };}
 private static String[][] values_zh_rTW(){return new String[][]{
 {"age_close"," 秒前）"},
@@ -926,7 +929,8 @@ private static String[][] values_zh_rTW(){return new String[][]{
 {"paste","貼上"},
 {"select_all","全選"},
 {"value_retained","%1$s；保留上次有效值"},
-{"model_ids_empty","介面未傳回可選擇的模型 ID"}
+{"model_ids_empty","介面未傳回可選擇的模型 ID"},
+{"diagnostics_loading","正在讀取診斷…"}
 };}
 private static String[][] values_es(){return new String[][]{
 {"age_close"," segundos)"},
@@ -1168,7 +1172,8 @@ private static String[][] values_es(){return new String[][]{
 {"paste","Pegar"},
 {"select_all","Seleccionar todo"},
 {"value_retained","%1$s; se conserva el último valor válido"},
-{"model_ids_empty","El servidor no devolvió ningún ID de modelo seleccionable"}
+{"model_ids_empty","El servidor no devolvió ningún ID de modelo seleccionable"},
+{"diagnostics_loading","Cargando diagnóstico…"}
 };}
 private static String[][] values_fr(){return new String[][]{
 {"age_close"," secondes)"},
@@ -1410,7 +1415,8 @@ private static String[][] values_fr(){return new String[][]{
 {"paste","Coller"},
 {"select_all","Tout sélectionner"},
 {"value_retained","%1$s ; dernière valeur valide conservée"},
-{"model_ids_empty","Le serveur n’a renvoyé aucun identifiant de modèle sélectionnable"}
+{"model_ids_empty","Le serveur n’a renvoyé aucun identifiant de modèle sélectionnable"},
+{"diagnostics_loading","Chargement du diagnostic…"}
 };}
 private static String[][] values_de(){return new String[][]{
 {"age_close"," Sekunden)"},
@@ -1652,7 +1658,8 @@ private static String[][] values_de(){return new String[][]{
 {"paste","Einfügen"},
 {"select_all","Alles auswählen"},
 {"value_retained","%1$s; der letzte gültige Wert bleibt erhalten"},
-{"model_ids_empty","Der Endpunkt hat keine auswählbaren Modell-IDs zurückgegeben"}
+{"model_ids_empty","Der Endpunkt hat keine auswählbaren Modell-IDs zurückgegeben"},
+{"diagnostics_loading","Diagnose wird geladen…"}
 };}
 private static String[][] values_pt(){return new String[][]{
 {"age_close"," segundos)"},
@@ -1894,7 +1901,8 @@ private static String[][] values_pt(){return new String[][]{
 {"paste","Colar"},
 {"select_all","Selecionar tudo"},
 {"value_retained","%1$s; o último valor válido é mantido"},
-{"model_ids_empty","O servidor não retornou IDs de modelos selecionáveis"}
+{"model_ids_empty","O servidor não retornou IDs de modelos selecionáveis"},
+{"diagnostics_loading","Carregando diagnóstico…"}
 };}
 private static String[][] values_ru(){return new String[][]{
 {"age_close"," секунд назад)"},
@@ -2136,7 +2144,8 @@ private static String[][] values_ru(){return new String[][]{
 {"paste","Вставить"},
 {"select_all","Выбрать всё"},
 {"value_retained","%1$s; сохранено последнее допустимое значение"},
-{"model_ids_empty","Сервер не вернул доступных для выбора идентификаторов моделей"}
+{"model_ids_empty","Сервер не вернул доступных для выбора идентификаторов моделей"},
+{"diagnostics_loading","Загрузка диагностики…"}
 };}
 private static String[][] values_ja(){return new String[][]{
 {"age_close"," 秒前）"},
@@ -2378,7 +2387,8 @@ private static String[][] values_ja(){return new String[][]{
 {"paste","貼り付け"},
 {"select_all","すべて選択"},
 {"value_retained","%1$s。前回の有効な値を保持します"},
-{"model_ids_empty","選択できるモデル ID が返されませんでした"}
+{"model_ids_empty","選択できるモデル ID が返されませんでした"},
+{"diagnostics_loading","診断を読み込んでいます…"}
 };}
 private static String[][] values_ko(){return new String[][]{
 {"age_close","초 전)"},
@@ -2620,7 +2630,8 @@ private static String[][] values_ko(){return new String[][]{
 {"paste","붙여넣기"},
 {"select_all","모두 선택"},
 {"value_retained","%1$s. 마지막 유효한 값을 유지합니다"},
-{"model_ids_empty","선택 가능한 모델 ID가 반환되지 않았습니다"}
+{"model_ids_empty","선택 가능한 모델 ID가 반환되지 않았습니다"},
+{"diagnostics_loading","진단을 불러오는 중…"}
 };}
 private static String[][] values_ar(){return new String[][]{
 {"age_close"," ثانية)"},
@@ -2862,7 +2873,8 @@ private static String[][] values_ar(){return new String[][]{
 {"paste","لصق"},
 {"select_all","تحديد الكل"},
 {"value_retained","%1$s؛ تم الاحتفاظ بآخر قيمة صالحة"},
-{"model_ids_empty","لم تُرجع نقطة النهاية معرّفات نماذج قابلة للاختيار"}
+{"model_ids_empty","لم تُرجع نقطة النهاية معرّفات نماذج قابلة للاختيار"},
+{"diagnostics_loading","جارٍ تحميل التشخيص…"}
 };}
 private static String[][] values_hi(){return new String[][]{
 {"age_close"," सेकंड पहले)"},
@@ -3104,7 +3116,8 @@ private static String[][] values_hi(){return new String[][]{
 {"paste","चिपकाएँ"},
 {"select_all","सभी चुनें"},
 {"value_retained","%1$s; पिछला मान्य मान रखा गया है"},
-{"model_ids_empty","एंडपॉइंट ने चुनने योग्य मॉडल ID नहीं लौटाए"}
+{"model_ids_empty","एंडपॉइंट ने चुनने योग्य मॉडल ID नहीं लौटाए"},
+{"diagnostics_loading","निदान लोड हो रहा है…"}
 };}
 private static String[][] values_id(){return new String[][]{
 {"age_close"," detik lalu)"},
@@ -3346,7 +3359,8 @@ private static String[][] values_id(){return new String[][]{
 {"paste","Tempel"},
 {"select_all","Pilih semua"},
 {"value_retained","%1$s; nilai valid terakhir dipertahankan"},
-{"model_ids_empty","Endpoint tidak mengembalikan ID model yang dapat dipilih"}
+{"model_ids_empty","Endpoint tidak mengembalikan ID model yang dapat dipilih"},
+{"diagnostics_loading","Memuat diagnostik…"}
 };}
 private static String[][] values_vi(){return new String[][]{
 {"age_close"," giây trước)"},
@@ -3588,6 +3602,7 @@ private static String[][] values_vi(){return new String[][]{
 {"paste","Dán"},
 {"select_all","Chọn tất cả"},
 {"value_retained","%1$s; giữ giá trị hợp lệ gần nhất"},
-{"model_ids_empty","Máy chủ không trả về ID mô hình có thể chọn"}
+{"model_ids_empty","Máy chủ không trả về ID mô hình có thể chọn"},
+{"diagnostics_loading","Đang tải chẩn đoán…"}
 };}
 }

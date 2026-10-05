@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"Selecionar tudo"</string>
     <string name="cap_value_retained" formatted="false">"%1$s; o último valor válido é mantido"</string>
     <string name="cap_model_ids_empty" formatted="false">"O servidor não retornou IDs de modelos selecionáveis"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"Carregando diagnóstico…"</string>
 </resources>

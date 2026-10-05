@@ -31,10 +31,16 @@ final class CaptionDiagnosticsWriter {
     /** Bounded lane for records that carry real lifecycle evidence; never starved by display noise. */
     private static final ArrayDeque<Record> DECISIONS_QUEUE = new ArrayDeque<>();
     private static final Map<String,String> SNAPSHOTS = new LinkedHashMap<>(4, 0.75f, true);
-    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static volatile Thread worker;
+    private static final Object DRAIN_LOCK=new Object();
+    private static final java.util.concurrent.ThreadPoolExecutor WRITER=new java.util.concurrent.ThreadPoolExecutor(
+        1,1,30,java.util.concurrent.TimeUnit.SECONDS,new java.util.concurrent.ArrayBlockingQueue<>(64),
+        r->{Thread thread=new Thread(r,"caption-diagnostics-writer");thread.setDaemon(true);worker=thread;return thread;});
     private static boolean drainPosted;
-    private static long dropped, merged, written, redactions, seedOnlyRedactions;
+    private static long dropped, merged, written, redactions, seedOnlyRedactions, reusedRepeats;
     private static long epoch, lastResolvedAt;
+    private static String decisionTail="";
+    private static boolean decisionsLoaded;
 
     private CaptionDiagnosticsWriter() {}
 
@@ -80,7 +86,7 @@ final class CaptionDiagnosticsWriter {
             post = !drainPosted;
             if (post) drainPosted = true;
         }
-        if (post) MAIN.post(() -> drain(app));
+        if (post) WRITER.execute(() -> drain(app));
     }
 
     /**
@@ -89,10 +95,23 @@ final class CaptionDiagnosticsWriter {
      * playback path, only after everything the user can see has already been applied.
      */
     private static void drain(Context context) {
+        synchronized(DRAIN_LOCK){
+            for(int n=0;n<16;n++){
+                synchronized(LOCK){if(QUEUE.isEmpty()&&DECISIONS_QUEUE.isEmpty())break;}
+                drainBatch(context);
+            }
+            synchronized(LOCK){
+                if(QUEUE.isEmpty()&&DECISIONS_QUEUE.isEmpty())drainPosted=false;
+                else {drainPosted=true;WRITER.execute(()->drain(context));}
+            }
+        }
+    }
+    private static void drainBatch(Context context) {
         Record[] batch;
         int batchSize;
+        long batchEpoch;
         synchronized (LOCK) {
-            drainPosted = false;
+            batchEpoch=epoch;
             java.util.ArrayList<Record> selected = new java.util.ArrayList<>(MAX_BATCH);
             // Both bounded lanes are represented in every batch, with the decision lane first, so a
             // flood of ordinary display observations can never starve the records that carry the real
@@ -122,19 +141,23 @@ final class CaptionDiagnosticsWriter {
             latestAt = record.at;
             if (CaptionDiagnostics.isDecision(record.stage)) decisions.append(line).append('\n');
         }
-        if (archive.length() > 0) {
-            CaptionDiagnosticArchive.append(context, "history", trim(archive.toString()));
-            written += batchSize;
-        }
-        String decisionText = decisions.length() == 0 ? "" : trim(decisions.toString());
-        if (latestAt > 0) {
-            CaptionDiagnosticArchive.appendSummary(context, latestStage, latestDetail, latestAt, decisionText, epoch());
-        }
-        synchronized (LOCK) {
-            if (!QUEUE.isEmpty() || !DECISIONS_QUEUE.isEmpty()) {
-                drainPosted = true;
-                MAIN.post(() -> drain(context));
+        boolean restore;
+        synchronized(LOCK){restore=!decisionsLoaded;if(restore)decisionsLoaded=true;}
+        if(restore)CaptionDiagnosticArchive.readSummaryAsync(context,batchEpoch,previous->{
+            if(previous==null)return;
+            String[] parts=previous.split("\u0001",-1);if(parts.length<5)return;
+            synchronized(LOCK){
+                if(batchEpoch!=epoch)return;
+                decisionTail=parts[4]+decisionTail;
+                if(decisionTail.length()>12000)decisionTail=decisionTail.substring(decisionTail.length()-12000);
             }
+        });
+        synchronized(LOCK){
+            if(batchEpoch!=epoch)return;
+            if(decisions.length()>0){decisionTail+=decisions.toString();if(decisionTail.length()>12000)decisionTail=decisionTail.substring(decisionTail.length()-12000);}
+            if(archive.length()>0){CaptionDiagnosticArchive.append(context,"history",trim(archive.toString()));written+=batchSize;}
+            if(latestAt>0)CaptionDiagnosticArchive.appendSummary(context,latestStage,latestDetail,latestAt,
+                ()->{synchronized(LOCK){return batchEpoch==epoch?decisionTail:"";}},batchEpoch);
         }
     }
 
@@ -202,14 +225,16 @@ final class CaptionDiagnosticsWriter {
      * Verification entry: drains every queued record on the calling thread. Production reaches the
      * same writer through the main-thread drain; tests use this so a record is observable immediately.
      */
+    static void background(Runnable task){WRITER.execute(task);}
     static void drainNow(Context context) {
-        if (context == null) return;
-        for (int guard = 0; guard < 64; guard++) {
-            boolean empty;
-            synchronized (LOCK) { empty = QUEUE.isEmpty() && DECISIONS_QUEUE.isEmpty(); }
-            if (empty) return;
+        if(context==null)return;
+        Runnable task=()->{for(int n=0;n<64;n++){
+            synchronized(LOCK){if(QUEUE.isEmpty()&&DECISIONS_QUEUE.isEmpty())return;}
             drain(context);
-        }
+        }};
+        if(Thread.currentThread()==worker){task.run();return;}
+        try{WRITER.submit(task).get(5,java.util.concurrent.TimeUnit.SECONDS);}
+        catch(Exception failed){throw new IllegalStateException("diagnostics writer barrier",failed);}
     }
 
     static void clear(Context context) {
@@ -218,6 +243,7 @@ final class CaptionDiagnosticsWriter {
             DECISIONS_QUEUE.clear();
             SNAPSHOTS.clear();
             lastResolvedAt = 0;
+            decisionTail="";decisionsLoaded=false;
             epoch++;
         }
     }
@@ -225,6 +251,8 @@ final class CaptionDiagnosticsWriter {
     /** Immutable identity of the current clearing epoch; records from an older epoch are not revived. */
     static long epoch() { synchronized (LOCK) { return epoch; } }
 
+    static void noteReuseRepeat(){synchronized(LOCK){reusedRepeats++;}}
+    static long reusedRepeatCount(){synchronized(LOCK){return reusedRepeats;}}
     static long droppedCount() { synchronized (LOCK) { return dropped; } }
     static long mergedCount() { synchronized (LOCK) { return merged; } }
     static long writtenCount() { synchronized (LOCK) { return written; } }
@@ -260,7 +288,7 @@ final class CaptionDiagnosticsWriter {
         if (writtenNow == 0 && droppedNow == 0 && mergedNow == 0) return "";
         return "\n\n[" + label + ": written=" + writtenNow + "; merged_repeats=" + mergedNow
                 + "; dropped=" + droppedNow + "; pending=" + pending
-                + "; credential_unavailable=" + unavailableNow + "]\n";
+                + "; reused_repeats="+reusedRepeatCount()+"; credential_unavailable=" + unavailableNow + "]\n";
     }
 
     static void resetForTests() {
@@ -269,12 +297,14 @@ final class CaptionDiagnosticsWriter {
             DECISIONS_QUEUE.clear();
             SNAPSHOTS.clear();
             drainPosted = false;
+            reusedRepeats=0;
             dropped = 0;
             merged = 0;
             written = 0;
             redactions = 0;
             seedOnlyRedactions = 0;
             lastResolvedAt = 0;
+            decisionTail="";decisionsLoaded=false;
             epoch++;
         }
     }

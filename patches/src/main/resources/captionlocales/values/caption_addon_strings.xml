@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"Select all"</string>
     <string name="cap_value_retained" formatted="false">"%1$s; keeping the last valid value"</string>
     <string name="cap_model_ids_empty" formatted="false">"The endpoint returned no selectable model IDs"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"Loading diagnostics…"</string>
 </resources>

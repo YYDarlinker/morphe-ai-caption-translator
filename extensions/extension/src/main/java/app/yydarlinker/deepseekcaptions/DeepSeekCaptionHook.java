@@ -58,26 +58,32 @@ public final class DeepSeekCaptionHook {
     static boolean deferPlayerNotification(Enum<?> type,boolean outer) {
         if(android.os.Looper.myLooper()==android.os.Looper.getMainLooper())return false;
         synchronized(PLAYER_NOTIFICATION_LOCK) {
-            queuedPlayerType=type;queuedPlayerOuter=outer;queuedPlayerOwnerEpoch=CaptionPlayerAuthority.ownerEpoch();
+            long capturedEpoch=CaptionPlayerAuthority.ownerEpoch();
+            if(!playerNotificationPosted || queuedPlayerOwnerEpoch!=capturedEpoch)queuedPlayerOuter=false;
+            queuedPlayerType=type;queuedPlayerOuter|=outer;queuedPlayerOwnerEpoch=capturedEpoch;
             if(!playerNotificationPosted){playerNotificationPosted=true;PLAYER_MAIN.post(()->{
                 Enum<?> next;boolean full;long epoch;
-                synchronized(PLAYER_NOTIFICATION_LOCK){next=queuedPlayerType;full=queuedPlayerOuter;epoch=queuedPlayerOwnerEpoch;queuedPlayerType=null;playerNotificationPosted=false;}
+                synchronized(PLAYER_NOTIFICATION_LOCK){next=queuedPlayerType;full=queuedPlayerOuter;epoch=queuedPlayerOwnerEpoch;queuedPlayerType=null;queuedPlayerOuter=false;playerNotificationPosted=false;}
                 if(epoch!=CaptionPlayerAuthority.ownerEpoch())return;
                 if(full)DeepSeekCaptionHookV2.onPlayerType(next);else onPlayerType(next);
             });}
         }
         return true;
     }
+    /** Main-thread outer callback scope; the original public inner seam remains the delivery path. */
+    static boolean deliveringOuterPlayerNotification;
     public static void onPlayerType(Enum<?> playerType) {
         if(deferPlayerNotification(playerType,false))return;
+        applyPlayerNotification(playerType,deliveringOuterPlayerNotification);
+    }
+    static void applyPlayerNotification(Enum<?> playerType,boolean outer) {
         try {
-            if (playerType != null) {
-                String type = playerType.name();
+            if(playerType!=null){
+                String type=playerType.name();
                 DynamicCaptionController.onPlayerType(type);
-                CaptionPlayerTransitionGuard.onPlayerType(type);
+                CaptionPlayerTransitionGuard.onPlayerType(type,outer);
             }
-        } catch (Throwable ignored) {
-        }
+        }catch(Throwable ignored){}
     }
 
     public static void onVideoTime(long timeMs) {

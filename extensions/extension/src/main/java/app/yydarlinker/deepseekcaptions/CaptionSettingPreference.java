@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 public class CaptionSettingPreference extends android.preference.Preference {
     private final String titleSlot, summarySlot;
     private final List<TextSlot> textSlots = new ArrayList<>();
+    private boolean binding;
     private WeakReference<View> currentView = new WeakReference<>(null);
     private static final class TextSlot {
         final WeakReference<TextView> view;
@@ -26,8 +27,35 @@ public class CaptionSettingPreference extends android.preference.Preference {
         }
         void refresh() {
             TextView target = view.get();
-            if (target != null) { if (hint) target.setHint(value.get()); else target.setText(value.get()); }
+            if(target!=null){
+                CharSequence next=value.get();
+                if(!sameText(hint?target.getHint():target.getText(),next)){
+                    if(hint)target.setHint(next);else target.setText(next);
+                }
+            }
         }
+    }
+    /** Text equality must also retain real span/style changes, not just equal visible characters. */
+    static boolean sameText(CharSequence a,CharSequence b){
+        if(a==b)return true;
+        if(!android.text.TextUtils.equals(a,b))return false;
+        java.util.List<Object> left=styleSpans(a),right=styleSpans(b);
+        if(left.size()!=right.size())return false;
+        for(int i=0;i<left.size();i++){
+            Object x=left.get(i),y=right.get(i);if(!x.equals(y))return false;
+            android.text.Spanned sx=(android.text.Spanned)a,sy=(android.text.Spanned)b;
+            if(sx.getSpanStart(x)!=sy.getSpanStart(y)||sx.getSpanEnd(x)!=sy.getSpanEnd(y)
+                ||sx.getSpanFlags(x)!=sy.getSpanFlags(y))return false;
+        }
+        return true;
+    }
+    private static java.util.List<Object> styleSpans(CharSequence value){
+        java.util.List<Object> result=new java.util.ArrayList<>();
+        if(value instanceof android.text.Spanned){android.text.Spanned styled=(android.text.Spanned)value;
+            for(Object span:styled.getSpans(0,value.length(),Object.class))
+                if(!(span instanceof android.text.NoCopySpan))result.add(span);
+        }
+        return result;
     }
     public CaptionSettingPreference(Context c) { this(c, null); }
     public CaptionSettingPreference(Context c, AttributeSet a) { this(c, a, android.R.attr.preferenceStyle); }
@@ -57,8 +85,8 @@ public class CaptionSettingPreference extends android.preference.Preference {
     }
     protected void refreshDynamicText() {}
     final void refreshCaptionText() {
-        if (titleSlot != null) setTitle(CaptionStrings.settings(getContext(), titleSlot));
-        if (summarySlot != null) setSummary(CaptionStrings.settings(getContext(), summarySlot));
+        if(titleSlot!=null){String next=CaptionStrings.settings(getContext(),titleSlot);if(!sameText(getTitle(),next))setTitle(next);}
+        if(summarySlot!=null){String next=CaptionStrings.settings(getContext(),summarySlot);if(!sameText(getSummary(),next))setSummary(next);}
         refreshDynamicText();
         textSlots.removeIf(slot -> slot.view.get() == null);
         for (TextSlot slot : textSlots) {
@@ -68,12 +96,15 @@ public class CaptionSettingPreference extends android.preference.Preference {
                     target instanceof android.widget.EditText && !DeepSeekTextPreference.KEY_PROMPT.equals(getKey()));
         }
         View row = currentView.get();
-        if (row != null) refreshRow(row);
+        if(row!=null && !binding)refreshRow(row);
     }
     @Override public View getView(View convert, ViewGroup parent) {
-        refreshCaptionText();
-        View row = super.getView(convert, parent);
-        currentView = new WeakReference<>(row); return row;
+        binding=true;
+        try {
+            refreshCaptionText();
+            View row=super.getView(convert,parent);
+            currentView=new WeakReference<>(row);return row;
+        }finally{binding=false;}
     }
     @Override protected void onBindView(View row) { super.onBindView(row); refreshRow(row); }
     private void refreshRow(View row) {
@@ -81,8 +112,11 @@ public class CaptionSettingPreference extends android.preference.Preference {
         for (int id : new int[]{android.R.id.title, android.R.id.summary}) {
             TextView label = row.findViewById(id);
             if (label != null) {
-                label.setText(id == android.R.id.title ? getTitle() : getSummary());
-                label.setSingleLine(false); label.setMaxLines(Integer.MAX_VALUE); label.setEllipsize(null);
+                CharSequence next=id==android.R.id.title?getTitle():getSummary();
+                if(!sameText(label.getText(),next))label.setText(next);
+                if(label.getMaxLines()==1)label.setSingleLine(false);
+                if(label.getMaxLines()!=Integer.MAX_VALUE)label.setMaxLines(Integer.MAX_VALUE);
+                if(label.getEllipsize()!=null)label.setEllipsize(null);
                 CaptionTextResolver.direction(label, false);
             }
         }

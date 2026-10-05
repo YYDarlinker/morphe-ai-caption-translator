@@ -28,6 +28,6 @@ public class CaptionLocalizationTest {
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionDiagnostics.clear(a);
         String payload="display=字幕样式 模型 自动翻译;source=do not alter";
         CaptionDiagnostics.mark(a,"CONTEXTUAL_DISPLAY_SELECTED",payload);
-        assertTrue(CaptionDiagnostics.uiText(a).contains(payload));CaptionDiagnostics.clear(a);a.finish();
+        assertTrue(N37DiagnosticsReports.read(a).contains(payload));CaptionDiagnostics.clear(a);a.finish();
     }
 }

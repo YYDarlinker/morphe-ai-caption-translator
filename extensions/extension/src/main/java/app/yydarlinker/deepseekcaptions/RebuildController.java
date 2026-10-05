@@ -76,6 +76,10 @@ final class RebuildController {
     long lastSeekAt = -1, prefetchPausedUntil;
     volatile long pausedDisplayPosition = -1;
     private PlaybackState pausedHookState;
+    private long pauseOwnerEpoch=-1, pauseClockEpoch=-1;
+    private String pauseSource="";
+    volatile RebuildClock.Observation observation;
+    private long observedSeekSerial=-1;
     volatile String status = "";
     int sourceFailures, repairCount;
     volatile int generation;
@@ -287,6 +291,8 @@ final class RebuildController {
     final long queuedAt = SystemClock.elapsedRealtime();
     long slotWaitMs, httpStartedAt, networkMs;
     int httpRounds;
+    String reuseEdge="";
+    long reuseRepeats;
 
     Job(Session s, int i) {
       this(s, i, false);
@@ -615,13 +621,18 @@ final class RebuildController {
         ? CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,now,nativeSample.state,nativeSample.speed)
         : new RebuildClock.Update(false,0,"unavailable");
     PlaybackState state = playbackState();
+    if(state==null)CLOCK.discardMedia(now);
     long projectedBeforeHook=CLOCK.current(now);
     RebuildClock.Update hookUpdate=CLOCK.updateHook(ms,now);
-    boolean seek=nativeUpdate.seek||(!nativeSample.available&&hookUpdate.seek);
+    boolean seek=nativeUpdate.seek||(!nativeSample.available&&hookUpdate.seek)
+        || s.observedSeekSerial>=0&&s.observedSeekSerial!=CLOCK.seekSerial();
     long presentation = nativeSample.available ? CLOCK.current(now)
         : CLOCK.position(now,state==null?-1:state.getPosition(),state==null?0:state.getLastPositionUpdateTime(),
             state==null?0:state.getPlaybackSpeed(),state==null?0:state.getState());
-    if(!nativeSample.available&&state==null&&!hookUpdate.seek)presentation=Math.max(projectedBeforeHook,presentation);
+    if(!nativeSample.available&&state==null&&!hookUpdate.seek){
+      presentation=Math.max(projectedBeforeHook,presentation);
+      CLOCK.preserveHookProjection(presentation);
+    }
     List<Notice> notices = new ArrayList<>();
     List<HttpURLConnection> disconnect = new ArrayList<>();
     int generation;
@@ -629,10 +640,10 @@ final class RebuildController {
       if (!current(s)) return;
       if(seek){endFallback(s,s.position,"seek",notices); notice(notices,"REBUILD_SEEK","session="+s.id+";from="+s.position+";to="+presentation+";clock_source="+CLOCK.source()+";"+CLOCK.diagnostic(now)); }
       s.position = presentation;
-      // Explicit hooks take precedence over paused media jitter, including a small rewind.
-      s.pausedDisplayPosition = state != null && state.getState() == PlaybackState.STATE_PAUSED
-          ? Math.max(0, ms) : -1;
-      s.pausedHookState = s.pausedDisplayPosition >= 0 ? state : null;
+      RebuildClock.Observation selected=CLOCK.observation(now);
+      freeze(s,selected,state,true,ms);
+      presentation=s.pausedDisplayPosition>=0?s.pausedDisplayPosition:selected.position;
+      s.position=presentation;
       if (seek) {
         s.noteSeek(now, notices);
         s.generation++;
@@ -645,6 +656,7 @@ final class RebuildController {
               if (j.connection != null) disconnect.add(j.connection);
             }
       }
+      s.observedSeekSerial=CLOCK.seekSerial();
       generation = s.generation;
     }
     flush(s, notices);
@@ -677,54 +689,100 @@ final class RebuildController {
 
   private static long position(Session s) {
     long now = SystemClock.elapsedRealtime();
-    OfficialPlayerClockAdapter.Sample nativeSample=OfficialPlayerClockAdapter.read(video);
-    if(nativeSample.available)CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,now,nativeSample.state,nativeSample.speed);
-    PlaybackState state = playbackState();
-    long reported = state == null ? -1 : state.getPosition();
-    long regular = state==null ? CLOCK.current(now)
-        : CLOCK.position(now,reported,state.getLastPositionUpdateTime(),state.getPlaybackSpeed(),state.getState());
-    if (s != null) {
-      synchronized (s) {
-        if (state == null || state.getState() != PlaybackState.STATE_PAUSED) {
-          s.pausedDisplayPosition = -1;
-          s.pausedHookState = null;
-        } else {
-          // Read the raw report only for the first pause and the real-change safety valve.
-          // A report already seen by an explicit hook cannot undo that hook's seek.
-          boolean oldHookReport = s.pausedHookState != null
-              && reported == s.pausedHookState.getPosition()
-              && state.getLastPositionUpdateTime() == s.pausedHookState.getLastPositionUpdateTime();
-          if (!oldHookReport) s.pausedHookState = null;
-          if (s.pausedDisplayPosition >= 0 && reported >= 0
-              && !oldHookReport
-              && Math.abs(reported - s.pausedDisplayPosition) > 1500)
-            s.pausedDisplayPosition = -1;
-          if (s.pausedDisplayPosition < 0)
-            s.pausedDisplayPosition = reported >= 0 ? reported : regular;
-        }
+    OfficialPlayerClockAdapter.Sample nativeSample=OfficialPlayerClockAdapter.read(s==null?video:s.owner);
+    if(nativeSample.available)CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,
+        nativeSample.readElapsed,nativeSample.state,nativeSample.speed);
+    PlaybackState state=playbackState();
+    if(state!=null)CLOCK.acceptMedia(state.getPosition(),state.getLastPositionUpdateTime(),now,
+        state.getPlaybackSpeed(),state.getState());
+    else CLOCK.discardMedia(now);
+    RebuildClock.Observation selected=CLOCK.observation(now);
+    if(s==null)return selected.position;
+    synchronized(s){
+      observeSeek(s,selected,now);
+      freeze(s,selected,state,false,0);
+      return s.pausedDisplayPosition>=0?s.pausedDisplayPosition:selected.position;
+    }
+  }
+
+  /** Native/media queries may discover a seek before its hook acknowledgement. Consume it once. */
+  private static void observeSeek(Session s,RebuildClock.Observation selected,long now){
+    long serial=CLOCK.seekSerial();
+    if(s.observedSeekSerial>=0&&s.observedSeekSerial!=serial&&current(s)){
+      s.noteSeek(now);s.generation++;s.lastShown="";s.displayedEvent="";s.withheldEvent="";
+      s.position=selected.position;
+      CaptionDiagnostics.mark(s.context,"REBUILD_SEEK","session="+s.id+";generation="+s.generation
+          +";to="+selected.position+";clock_source="+selected.source+";clock_seek_serial="+serial,s.credential);
+    }
+    s.observedSeekSerial=serial;
+  }
+
+  /** One owner/session/seek-bound freeze, derived only from the winning observation. */
+  private static void freeze(Session s,RebuildClock.Observation selected,PlaybackState raw,
+      boolean hook,long hookPosition){
+    s.observation=selected;
+    long owner=CaptionPlayerAuthority.ownerEpoch();
+    if(!selected.paused()){
+      s.pausedDisplayPosition=-1;s.pausedHookState=null;s.pauseSource="";
+      s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;
+      return;
+    }
+    boolean nativeSelected=RebuildClock.OFFICIAL_PLAYER_QUERY.equals(selected.source);
+    long donor=selected.position;
+    boolean changed=s.pausedDisplayPosition<0 || s.pauseOwnerEpoch!=owner
+        || s.pauseClockEpoch!=selected.epoch || !s.pauseSource.equals(selected.source);
+    if(nativeSelected){
+      // A currently queried paused native position is authoritative, including a real rewind.
+      // Repeated +/-16 ms reports are jitter; a matching explicit callback may confirm a tiny seek.
+      changed |= Math.abs(donor-s.pausedDisplayPosition)>16
+          || hook && hookPosition==donor && donor!=s.pausedDisplayPosition;
+      s.pausedHookState=null;
+    }else{
+      boolean oldHook=raw!=null && s.pausedHookState!=null
+          && raw.getPosition()==s.pausedHookState.getPosition()
+          && raw.getLastPositionUpdateTime()==s.pausedHookState.getLastPositionUpdateTime();
+      if(hook){
+        // Native unavailable: preserve the established explicit hook-seek fallback. Its old
+        // MediaSession acknowledgement cannot restore the pre-seek position on the next read.
+        donor=Math.max(0,hookPosition);changed=true;s.pausedHookState=raw;
+      }else if(!oldHook && Math.abs(donor-s.pausedDisplayPosition)>1500){
+        changed=true;s.pausedHookState=null;
       }
     }
-    return regular;
+    if(changed){
+      boolean edge=s.pausedDisplayPosition<0 || s.pauseOwnerEpoch!=owner
+          || !s.pauseSource.equals(selected.source);
+      s.pausedDisplayPosition=donor;
+      s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;s.pauseSource=selected.source;
+      if(edge)CaptionDiagnostics.mark(s.context,"REBUILD_PAUSE_OBSERVATION",
+          "session="+s.id+";generation="+s.generation+";position="+donor
+          +";selected_position="+selected.position+";selected_state="+selected.state
+          +";clock_source="+selected.source+";sample_at="+selected.sampleAt
+          +";clock_epoch="+selected.epoch+";owner_epoch="+owner+";reason="+selected.reason,s.credential);
+    }
   }
 
   private static long displayPosition(Session s) {
-    long frozen = s.pausedDisplayPosition;
-    if(frozen>=0)return frozen;
-    long now=SystemClock.elapsedRealtime();
-    long live=CLOCK.current(now);
+    // A current native query can expose a real paused seek after layout. Without it, project only
+    // the already-selected clock; never reintroduce raw MediaSession as a second display donor.
+    OfficialPlayerClockAdapter.Sample sample=OfficialPlayerClockAdapter.read(s.owner);
+    if(sample.available){
+      CLOCK.acceptNative(sample.videoId,sample.position,sample.readElapsed,sample.state,sample.speed);
+      synchronized(s){
+        RebuildClock.Observation selected=CLOCK.observation(sample.readElapsed);
+        observeSeek(s,selected,sample.readElapsed);freeze(s,selected,null,false,0);
+      }
+    }
+    if(s.pausedDisplayPosition>=0)return s.pausedDisplayPosition;
+    long now=SystemClock.elapsedRealtime(),live=CLOCK.current(now);
     if(!CLOCK.fresh(now))return s.position;
-    long delta=live-s.position;
-    return delta>=8?live:s.position;
+    return live-s.position>=8?live:s.position;
   }
   private static boolean paused() {
-    try {
-      Activity a = activity.get();
-      MediaController c = a == null ? null : a.getMediaController();
-      PlaybackState s = c == null ? null : c.getPlaybackState();
-      return s != null && s.getState() == PlaybackState.STATE_PAUSED;
-    } catch (Exception e) {
-      return false;
-    }
+    Session s=active;
+    if(!current(s))return false;
+    position(s); // A scheduler-only entry still selects the current position/state pair.
+    return s.observation!=null&&s.observation.paused();
   }
 
   private static void scheduleTick() {
@@ -1158,12 +1216,18 @@ final class RebuildController {
         if (!focus && !s.everReady) break;
         if (s.states[i] != WAITING || s.retryAt[i] > now) {
           // D3: an existing job for this block is reused, whichever lane it came from.
-          if (s.jobs[i] != null && s.plans[i] == null && s.states[i] == RUNNING)
-            CaptionDiagnostics.mark(s.context, "REBUILD_BLOCK_REUSED",
-                "session=" + s.id + ";block=" + b.index
-                    + ";reason=" + (s.jobs[i].priority ? "in_flight_focus" : "in_flight_prefetch")
-                    + ";request=" + s.jobs[i].traceId + ";dispatched=" + s.jobs[i].dispatched,
-                s.credential, "REUSED|" + s.id + "|" + b.index + "|" + s.jobs[i].traceId);
+          if(s.jobs[i]!=null&&s.plans[i]==null&&s.states[i]==RUNNING){
+            Job reused=s.jobs[i];
+            String edge=s.generation+"|"+reused.priority+"|"+reused.dispatched+"|"+reused.sent;
+            if(!edge.equals(reused.reuseEdge)){
+              reused.reuseEdge=edge;
+              CaptionDiagnostics.mark(s.context,"REBUILD_BLOCK_REUSED",
+                  "session="+s.id+";block="+b.index+";generation="+s.generation
+                      +";reason="+(reused.priority?"in_flight_focus":"in_flight_prefetch")
+                      +";request="+reused.traceId+";dispatched="+reused.dispatched+";sent="+reused.sent
+                      +";repeated_observations="+reused.reuseRepeats,s.credential,"");
+            }else{reused.reuseRepeats++;CaptionDiagnosticsWriter.noteReuseRepeat();}
+          }
           continue;
         }
         // Disk candidates are reserved/read outside the monitor before any lane is charged.
@@ -1410,7 +1474,8 @@ final class RebuildController {
           + ";validation_ms=" + Math.max(0, SystemClock.elapsedRealtime() - job.queuedAt - job.slotWaitMs - job.networkMs)
           + ";validation_repair_retries=" + Math.max(0, s.attempts[job.index] - 1)
           + ";http_rounds=" + job.httpRounds + ";cancelled=" + job.cancelled
-          + ";dispatched=" + job.dispatched + ";sent=" + job.sent);
+          + ";dispatched=" + job.dispatched + ";sent=" + job.sent
+          + ";reused_repeats="+job.reuseRepeats);
       notices.clear();
       synchronized (s) {
         int focusLeft = dispatched(s, true, job), prefetchLeft = dispatched(s, false, job);

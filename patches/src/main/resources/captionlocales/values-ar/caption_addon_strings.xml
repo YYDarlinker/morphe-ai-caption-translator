@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"تحديد الكل"</string>
     <string name="cap_value_retained" formatted="false">"%1$s؛ تم الاحتفاظ بآخر قيمة صالحة"</string>
     <string name="cap_model_ids_empty" formatted="false">"لم تُرجع نقطة النهاية معرّفات نماذج قابلة للاختيار"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"جارٍ تحميل التشخيص…"</string>
 </resources>

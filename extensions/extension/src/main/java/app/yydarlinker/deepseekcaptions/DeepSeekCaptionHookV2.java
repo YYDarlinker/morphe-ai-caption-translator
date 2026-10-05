@@ -36,7 +36,10 @@ public final class DeepSeekCaptionHookV2 {
 
     public static void onPlayerType(Enum<?> playerType) {
         if(DeepSeekCaptionHook.deferPlayerNotification(playerType,true))return;
-        DeepSeekCaptionHook.onPlayerType(playerType);
+        boolean outer=DeepSeekCaptionHook.deliveringOuterPlayerNotification;
+        DeepSeekCaptionHook.deliveringOuterPlayerNotification=true;
+        try { DeepSeekCaptionHook.onPlayerType(playerType); }
+        finally { DeepSeekCaptionHook.deliveringOuterPlayerNotification=outer; }
         // YouTube can rebuild subtitle windows during fullscreen/miniplayer transitions while the
         // previous renderer View remains attached. Force one player-local recheck; the existing
         // transition guard still owns the visual animation and this adds no independent timer.

@@ -37,10 +37,11 @@ final class CaptionPlayerAuthority {
     private static WeakReference<Activity> activity = new WeakReference<>(null);
     private static WeakReference<View> decor = new WeakReference<>(null);
     private static String video = "";
-    private static long ownerEpoch;
+    private static volatile long ownerEpoch;
     private static long notificationSequence;
     private static long batchSequence;
     private static long observedBatch = -1;
+    private static boolean batchClosePosted;
 
     private static int state = UNKNOWN;
     /** Bounded evidence counters; production never branches on them. */
@@ -53,6 +54,7 @@ final class CaptionPlayerAuthority {
     /** Set by a real notification or reconcile so the next surface pass may search despite the throttle. */
     private static boolean surfaceDirty;
 
+    private static final android.os.Handler MAIN = new android.os.Handler(Looper.getMainLooper());
     private CaptionPlayerAuthority() {}
 
     static long ownerEpoch(){return ownerEpoch;}
@@ -113,6 +115,7 @@ final class CaptionPlayerAuthority {
     }
 
     static void setOwner(Activity next){
+        if(Looper.myLooper()!=Looper.getMainLooper()){MAIN.post(() -> setOwner(next));return;}
         Activity current=activity.get();
         if(current==next){
             // Re-declaring the same owner after a close re-opens it as unproven instead of leaving the
@@ -139,6 +142,7 @@ final class CaptionPlayerAuthority {
     }
 
     static void setVideo(String id){
+        if(Looper.myLooper()!=Looper.getMainLooper()){MAIN.post(() -> setVideo(id));return;}
         String next=id==null?"":id.trim();
         if(next.equals(video))return;
         video=next;
@@ -154,6 +158,7 @@ final class CaptionPlayerAuthority {
     }
 
     static void close(){
+        if(Looper.myLooper()!=Looper.getMainLooper()){MAIN.post(() -> close());return;}
         state=CLOSED;
         playerType="";
         typeAuthoritative=false;
@@ -193,7 +198,14 @@ final class CaptionPlayerAuthority {
      * a network call or a keystore read: it only merges the authoritative type and updates the state.
      */
     static void onNotification(String rawType,boolean outer){
+        if(Looper.myLooper()!=Looper.getMainLooper()){MAIN.post(() -> onNotification(rawType,outer));return;}
         String type=rawType==null?"":rawType.trim().toUpperCase(Locale.ROOT);
+        if(!batchClosePosted){
+            batchSequence++;pendingOuterRestore=false;pendingNativeScan=false;
+            batchClosePosted=true;
+            final long batch=batchSequence;
+            MAIN.post(() -> {if(batch==batchSequence)batchClosePosted=false;});
+        }
         notificationSequence++;
         pendingNativeScan=true;
         surfaceDirty=true;
@@ -236,7 +248,7 @@ final class CaptionPlayerAuthority {
         activity=new WeakReference<>(null);
         decor=new WeakReference<>(null);
         video="";
-        ownerEpoch=0;notificationSequence=0;batchSequence=0;observedBatch=-1;
+        ownerEpoch=0;notificationSequence=0;batchSequence=0;observedBatch=-1;batchClosePosted=false;
         state=UNKNOWN;playerType="";typeAuthoritative=false;
         pendingOuterRestore=false;pendingNativeScan=false;
         OfficialPlayerTypeReader.resetForTests();

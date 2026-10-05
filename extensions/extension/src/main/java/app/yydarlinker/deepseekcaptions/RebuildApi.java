@@ -27,6 +27,7 @@ final class RebuildApi {
     final long elapsedMs, remainingMs;
     /** True when the connection was closed by our own stop/retire rather than by the network. */
     final boolean cancelled;
+    final TokenCostAudit.FailureCategory category;
     TransportFailure(Exception cause, String phase, long start, long deadline) {
       this(cause, phase, start, deadline, null, false);
     }
@@ -35,6 +36,7 @@ final class RebuildApi {
       super(cause.getClass().getSimpleName(), cause);
       this.phase=phase;
       cancelled=intentional;
+      category=transportCategory(cause,phase,guard,intentional);
       reason = intentional ? "cancelled" : transportReason(cause, phase, guard);
       elapsedMs=TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start);
       long remaining=guard!=null?guard.remainingMs():Math.max(0,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));
@@ -47,15 +49,23 @@ final class RebuildApi {
    * consulted first, so a timer-fired disconnect is reported as an expiry instead of a socket error;
    * remaining time is never used to guess which side failed first.
    */
+  static TokenCostAudit.FailureCategory transportCategory(Exception cause,String phase,NetworkDeadline guard,boolean cancelled){
+    if(cancelled)return TokenCostAudit.FailureCategory.CANCELLED;
+    if(guard!=null&&guard.timerFired())return TokenCostAudit.FailureCategory.DEADLINE_EXPIRED;
+    if(cause instanceof SocketTimeoutException)return "connect".equals(phase)
+        ?TokenCostAudit.FailureCategory.CONNECT_TIMEOUT:TokenCostAudit.FailureCategory.READ_TIMEOUT;
+    return TokenCostAudit.FailureCategory.NETWORK_IO;
+  }
+
   static String transportReason(Exception error, String phase) {
     return transportReason(error, phase, null);
   }
 
   static String transportReason(Exception error, String phase, NetworkDeadline guard) {
     if(error instanceof TransportFailure)return ((TransportFailure)error).reason;
+    if(guard!=null&&guard.timerFired())return "deadline_expired";
     if(error instanceof InterruptedIOException)
       return "connect".equals(phase)?"connection_establishment_timeout":"read_interrupted";
-    if(guard!=null&&guard.timerFired())return "deadline_expired";
     if(error instanceof ConnectException || error instanceof UnknownHostException
         || error instanceof NoRouteToHostException)return "connection_establishment_failed";
     if(error instanceof SocketException)return "connection_socket_exception";
@@ -219,17 +229,20 @@ final class RebuildApi {
       } catch (Exception error) {
         trace(control,"REBUILD_HTTP_FAILURE","attempt="+attempt+";reason="+(error instanceof Failure ? ((Failure)error).code
             : error instanceof TransportFailure ? ((TransportFailure)error).reason : error.getClass().getSimpleName())
+            +";category="+(error instanceof TransportFailure?((TransportFailure)error).category.name()
+                :error instanceof Failure?"HTTP_CONFIG":TokenCostAudit.failureCategory(error.getClass().getSimpleName()).name())
             +(error instanceof TransportFailure ? ";phase="+((TransportFailure)error).phase
               +";elapsed_ms="+((TransportFailure)error).elapsedMs+";remaining_deadline_ms="+((TransportFailure)error).remainingMs : ""));
         if (error instanceof Failure && ((Failure) error).configuration) {
           if (blocked.size() > 128) blocked.clear();
           blocked.put(identity, ((Failure) error).code);
         }
-        TokenCostAudit.recordFailure(
-            audit,
-            attempt,
-            error instanceof Failure ? ((Failure) error).code
-                : error instanceof TransportFailure ? "network_"+((TransportFailure)error).reason : error.getClass().getSimpleName());
+        TokenCostAudit.recordFailure(audit,attempt,
+            error instanceof TransportFailure?((TransportFailure)error).category
+                :error instanceof Failure?TokenCostAudit.FailureCategory.HTTP_CONFIG
+                :TokenCostAudit.failureCategory(error.getClass().getSimpleName()),
+            error instanceof Failure?((Failure)error).code
+                :error instanceof TransportFailure?((TransportFailure)error).reason:error.getClass().getSimpleName());
         throw error;
       }
     }

@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"Chọn tất cả"</string>
     <string name="cap_value_retained" formatted="false">"%1$s; giữ giá trị hợp lệ gần nhất"</string>
     <string name="cap_model_ids_empty" formatted="false">"Máy chủ không trả về ID mô hình có thể chọn"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"Đang tải chẩn đoán…"</string>
 </resources>

@@ -87,6 +87,7 @@
     "diagnostic_hint",
     "diagnostics",
     "diagnostics_hint",
+    "diagnostics_loading",
     "display_debug",
     "enable_ai",
     "engine",
@@ -482,7 +483,8 @@
       "paste": "Paste",
       "select_all": "Select all",
       "value_retained": "%1$s; keeping the last valid value",
-      "model_ids_empty": "The endpoint returned no selectable model IDs"
+      "model_ids_empty": "The endpoint returned no selectable model IDs",
+      "diagnostics_loading": "Loading diagnostics…"
     },
     "zh-rCN": {
       "age_close": " 秒前）",
@@ -724,7 +726,8 @@
       "paste": "粘贴",
       "select_all": "全选",
       "value_retained": "%1$s；保留上次有效值",
-      "model_ids_empty": "接口没有返回可选择的模型 ID"
+      "model_ids_empty": "接口没有返回可选择的模型 ID",
+      "diagnostics_loading": "正在读取诊断…"
     },
     "zh-rTW": {
       "age_close": " 秒前）",
@@ -966,7 +969,8 @@
       "paste": "貼上",
       "select_all": "全選",
       "value_retained": "%1$s；保留上次有效值",
-      "model_ids_empty": "介面未傳回可選擇的模型 ID"
+      "model_ids_empty": "介面未傳回可選擇的模型 ID",
+      "diagnostics_loading": "正在讀取診斷…"
     },
     "es": {
       "age_close": " segundos)",
@@ -1208,7 +1212,8 @@
       "paste": "Pegar",
       "select_all": "Seleccionar todo",
       "value_retained": "%1$s; se conserva el último valor válido",
-      "model_ids_empty": "El servidor no devolvió ningún ID de modelo seleccionable"
+      "model_ids_empty": "El servidor no devolvió ningún ID de modelo seleccionable",
+      "diagnostics_loading": "Cargando diagnóstico…"
     },
     "fr": {
       "age_close": " secondes)",
@@ -1450,7 +1455,8 @@
       "paste": "Coller",
       "select_all": "Tout sélectionner",
       "value_retained": "%1$s ; dernière valeur valide conservée",
-      "model_ids_empty": "Le serveur n’a renvoyé aucun identifiant de modèle sélectionnable"
+      "model_ids_empty": "Le serveur n’a renvoyé aucun identifiant de modèle sélectionnable",
+      "diagnostics_loading": "Chargement du diagnostic…"
     },
     "de": {
       "age_close": " Sekunden)",
@@ -1692,7 +1698,8 @@
       "paste": "Einfügen",
       "select_all": "Alles auswählen",
       "value_retained": "%1$s; der letzte gültige Wert bleibt erhalten",
-      "model_ids_empty": "Der Endpunkt hat keine auswählbaren Modell-IDs zurückgegeben"
+      "model_ids_empty": "Der Endpunkt hat keine auswählbaren Modell-IDs zurückgegeben",
+      "diagnostics_loading": "Diagnose wird geladen…"
     },
     "pt": {
       "age_close": " segundos)",
@@ -1934,7 +1941,8 @@
       "paste": "Colar",
       "select_all": "Selecionar tudo",
       "value_retained": "%1$s; o último valor válido é mantido",
-      "model_ids_empty": "O servidor não retornou IDs de modelos selecionáveis"
+      "model_ids_empty": "O servidor não retornou IDs de modelos selecionáveis",
+      "diagnostics_loading": "Carregando diagnóstico…"
     },
     "ru": {
       "age_close": " секунд назад)",
@@ -2176,7 +2184,8 @@
       "paste": "Вставить",
       "select_all": "Выбрать всё",
       "value_retained": "%1$s; сохранено последнее допустимое значение",
-      "model_ids_empty": "Сервер не вернул доступных для выбора идентификаторов моделей"
+      "model_ids_empty": "Сервер не вернул доступных для выбора идентификаторов моделей",
+      "diagnostics_loading": "Загрузка диагностики…"
     },
     "ja": {
       "age_close": " 秒前）",
@@ -2418,7 +2427,8 @@
       "paste": "貼り付け",
       "select_all": "すべて選択",
       "value_retained": "%1$s。前回の有効な値を保持します",
-      "model_ids_empty": "選択できるモデル ID が返されませんでした"
+      "model_ids_empty": "選択できるモデル ID が返されませんでした",
+      "diagnostics_loading": "診断を読み込んでいます…"
     },
     "ko": {
       "age_close": "초 전)",
@@ -2660,7 +2670,8 @@
       "paste": "붙여넣기",
       "select_all": "모두 선택",
       "value_retained": "%1$s. 마지막 유효한 값을 유지합니다",
-      "model_ids_empty": "선택 가능한 모델 ID가 반환되지 않았습니다"
+      "model_ids_empty": "선택 가능한 모델 ID가 반환되지 않았습니다",
+      "diagnostics_loading": "진단을 불러오는 중…"
     },
     "ar": {
       "age_close": " ثانية)",
@@ -2902,7 +2913,8 @@
       "paste": "لصق",
       "select_all": "تحديد الكل",
       "value_retained": "%1$s؛ تم الاحتفاظ بآخر قيمة صالحة",
-      "model_ids_empty": "لم تُرجع نقطة النهاية معرّفات نماذج قابلة للاختيار"
+      "model_ids_empty": "لم تُرجع نقطة النهاية معرّفات نماذج قابلة للاختيار",
+      "diagnostics_loading": "جارٍ تحميل التشخيص…"
     },
     "hi": {
       "age_close": " सेकंड पहले)",
@@ -3144,7 +3156,8 @@
       "paste": "चिपकाएँ",
       "select_all": "सभी चुनें",
       "value_retained": "%1$s; पिछला मान्य मान रखा गया है",
-      "model_ids_empty": "एंडपॉइंट ने चुनने योग्य मॉडल ID नहीं लौटाए"
+      "model_ids_empty": "एंडपॉइंट ने चुनने योग्य मॉडल ID नहीं लौटाए",
+      "diagnostics_loading": "निदान लोड हो रहा है…"
     },
     "id": {
       "age_close": " detik lalu)",
@@ -3386,7 +3399,8 @@
       "paste": "Tempel",
       "select_all": "Pilih semua",
       "value_retained": "%1$s; nilai valid terakhir dipertahankan",
-      "model_ids_empty": "Endpoint tidak mengembalikan ID model yang dapat dipilih"
+      "model_ids_empty": "Endpoint tidak mengembalikan ID model yang dapat dipilih",
+      "diagnostics_loading": "Memuat diagnostik…"
     },
     "vi": {
       "age_close": " giây trước)",
@@ -3628,7 +3642,8 @@
       "paste": "Dán",
       "select_all": "Chọn tất cả",
       "value_retained": "%1$s; giữ giá trị hợp lệ gần nhất",
-      "model_ids_empty": "Máy chủ không trả về ID mô hình có thể chọn"
+      "model_ids_empty": "Máy chủ không trả về ID mô hình có thể chọn",
+      "diagnostics_loading": "Đang tải chẩn đoán…"
     }
   },
   "source_keys": {
@@ -3783,6 +3798,7 @@
     "自动翻译语言": "languages_title",
     "选择要加入 YouTube 自动翻译菜单的语言": "languages_summary",
     "Invalid API URL: use an HTTP(S) OpenAI-compatible base URL without credentials or fragments": "api_address_invalid",
-    "模型不能为空": "model_empty"
+    "模型不能为空": "model_empty",
+    "Loading diagnostics…": "diagnostics_loading"
   }
 }

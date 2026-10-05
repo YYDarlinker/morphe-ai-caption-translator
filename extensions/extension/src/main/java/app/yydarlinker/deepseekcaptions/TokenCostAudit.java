@@ -408,30 +408,40 @@ final class TokenCostAudit {
         }
     }
 
-    static void recordFailure(Request request, int attempt, String kind) {
-        if (request == null || attempt <= 0) return;
-        synchronized (LOCK) {
-            stateLocked();
-            final String clean = kind == null ? "unknown" : kind.toLowerCase(Locale.ROOT);
-            updateBucketsLocked(request, bucket -> {
-                add(bucket, "failures", 1L);
-                if (clean.startsWith("http")) {
-                    add(bucket, "http_failures", 1L);
-                    if (clean.contains("429")) add(bucket, "http_429_failures", 1L);
-                    else if (isHttp5xx(clean)) add(bucket, "http_5xx_failures", 1L);
-                    else if (isHttp4xx(clean)) add(bucket, "http_4xx_failures", 1L);
-                    else add(bucket, "http_other_failures", 1L);
-                } else if (clean.contains("timeout")) {
-                    add(bucket, "timeout_failures", 1L);
-                } else if (clean.contains("network")) {
-                    add(bucket, "network_failures", 1L);
-                } else if (clean.contains("cancel") || clean.contains("interrupt")) {
-                    add(bucket, "cancelled_failures", 1L);
-                } else {
-                    add(bucket, "other_failures", 1L);
+    enum FailureCategory { CANCELLED,DEADLINE_EXPIRED,CONNECT_TIMEOUT,READ_TIMEOUT,NETWORK_IO,HTTP_CONFIG,OTHER }
+    static FailureCategory failureCategory(String kind){
+        String value=kind==null?"":kind.toLowerCase(Locale.ROOT);
+        if(value.contains("cancel"))return FailureCategory.CANCELLED;
+        if(value.contains("deadline_expired"))return FailureCategory.DEADLINE_EXPIRED;
+        if(value.startsWith("http"))return FailureCategory.HTTP_CONFIG;
+        if(value.contains("timeout"))return value.contains("connect")?FailureCategory.CONNECT_TIMEOUT:FailureCategory.READ_TIMEOUT;
+        if(value.contains("network")||value.contains("socket")||value.contains("interrupt"))return FailureCategory.NETWORK_IO;
+        return FailureCategory.OTHER;
+    }
+    static void recordFailure(Request request,int attempt,String kind){recordFailure(request,attempt,failureCategory(kind),kind);}
+    /** New attempts record one explicit category. Historical accumulated buckets are never rewritten. */
+    static void recordFailure(Request request,int attempt,FailureCategory category,String kind){
+        if(request==null||attempt<=0)return;
+        synchronized(LOCK){
+            stateLocked();final String clean=kind==null?"unknown":kind.toLowerCase(Locale.ROOT);
+            updateBucketsLocked(request,bucket->{
+                add(bucket,"failures",1L);
+                add(bucket,"category_"+category.name().toLowerCase(Locale.ROOT),1L);
+                switch(category){
+                    case CANCELLED:add(bucket,"cancelled_failures",1L);break;
+                    case DEADLINE_EXPIRED:add(bucket,"deadline_expired_failures",1L);add(bucket,"timeout_failures",1L);break;
+                    case CONNECT_TIMEOUT:case READ_TIMEOUT:add(bucket,"timeout_failures",1L);break;
+                    case NETWORK_IO:add(bucket,"network_failures",1L);break;
+                    case HTTP_CONFIG:
+                        add(bucket,"http_failures",1L);
+                        if(clean.contains("429"))add(bucket,"http_429_failures",1L);
+                        else if(isHttp5xx(clean))add(bucket,"http_5xx_failures",1L);
+                        else if(isHttp4xx(clean))add(bucket,"http_4xx_failures",1L);
+                        else add(bucket,"http_other_failures",1L);
+                        break;
+                    default:add(bucket,"other_failures",1L);
                 }
-            });
-            persistLocked();
+            });persistLocked();
         }
     }
 

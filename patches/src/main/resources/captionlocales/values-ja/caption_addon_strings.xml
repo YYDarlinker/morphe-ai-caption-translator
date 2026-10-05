@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"すべて選択"</string>
     <string name="cap_value_retained" formatted="false">"%1$s。前回の有効な値を保持します"</string>
     <string name="cap_model_ids_empty" formatted="false">"選択できるモデル ID が返されませんでした"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"診断を読み込んでいます…"</string>
 </resources>

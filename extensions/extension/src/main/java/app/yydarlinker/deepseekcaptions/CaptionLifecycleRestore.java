@@ -97,7 +97,8 @@ final class CaptionLifecycleRestore {
             CaptionDiagnostics.mark(
                     activity,
                     "PLAYER_TRANSITION_CAPTION_GUARD",
-                    "Player layout transition; holding the current AI caption track and ignoring transient native-caption updates"
+                    "Player layout transition; holding the current AI caption track and ignoring transient native-caption updates",
+                    CaptionCredentialRef.NONE
             );
         }
     }

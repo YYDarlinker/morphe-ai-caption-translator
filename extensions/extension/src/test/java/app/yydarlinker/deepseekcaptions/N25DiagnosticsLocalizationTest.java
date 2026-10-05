@@ -45,7 +45,7 @@ public class N25DiagnosticsLocalizationTest {
                 // stages that also feeds the timestamped decisions channel, which has its own heading.
                 CaptionDiagnostics.mark(c,"REBUILD_PRESENTED","block=3;tier=2;unit=7");
                 CaptionDiagnostics.mark(c,"ANCHOR_RESPONSE_REJECTED","unit=12;reason=protocol_json");
-                String ui=CaptionDiagnostics.uiText(c);
+                String ui=N37DiagnosticsReports.read(c);
                 String raw=CaptionDiagnostics.uiText(c,false);
                 String export=CaptionDiagnostics.fullText(c);
                 // The panel speaks the interface language: its headings are the catalog values. A heading

@@ -240,4 +240,5 @@
     <string name="cap_select_all" formatted="false">"모두 선택"</string>
     <string name="cap_value_retained" formatted="false">"%1$s. 마지막 유효한 값을 유지합니다"</string>
     <string name="cap_model_ids_empty" formatted="false">"선택 가능한 모델 ID가 반환되지 않았습니다"</string>
+    <string name="cap_diagnostics_loading" formatted="false">"진단을 불러오는 중…"</string>
 </resources>

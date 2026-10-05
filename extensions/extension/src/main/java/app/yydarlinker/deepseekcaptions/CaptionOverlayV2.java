@@ -277,8 +277,10 @@ final class CaptionOverlay {
       long start,long end,long position,boolean waiting,CaptionRenderSpec spec,RebuildDisplayMerge.Merged candidate) {
     if (g != null && !g.isValid()) return;
     long command = g == null ? COMMAND.incrementAndGet() : COMMAND.get();
+    final long renderEpoch=playerRenderEpoch;
     main(
         () -> {
+          if(renderEpoch!=playerRenderEpoch)return;
           if (g != null) {
             if (!g.isValid()) return;
             COMMAND.incrementAndGet();
@@ -309,8 +311,10 @@ final class CaptionOverlay {
   static void hide(RenderGuard g) {
     if (g != null && !g.isValid()) return;
     long command = g == null ? COMMAND.incrementAndGet() : COMMAND.get();
+    final long renderEpoch=playerRenderEpoch;
     main(
         () -> {
+          if(renderEpoch!=playerRenderEpoch)return;
           if (g != null) {
             if (!g.isValid()) return;
             COMMAND.incrementAndGet();
@@ -472,6 +476,26 @@ final class CaptionOverlay {
     lastLayout = 0;
     reconcilingDisplayTime = false;
   }
+  /** Main-thread constant-time retraction. Accepted plans/cache/positions are deliberately retained. */
+  static void denyDisplay(long ownerEpoch) {
+    if(Looper.myLooper()!=Looper.getMainLooper()) {
+      MAIN.post(() -> denyDisplay(ownerEpoch));
+      return;
+    }
+    if(ownerEpoch!=CaptionPlayerAuthority.ownerEpoch())return;
+    invalidatePlayerRender();
+    COMMAND.incrementAndGet();
+    dragging=false;
+    FrameLayout anchor=anchorRef.get();
+    TextView text=textRef.get();
+    if(text!=null){text.cancelPendingInputEvents();text.clearFocus();}
+    if(anchor!=null){
+      anchor.cancelPendingInputEvents();anchor.clearFocus();
+      anchor.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+      anchor.setVisibility(View.INVISIBLE);
+    }
+  }
+
   private static void hideView() {
     lastBlankIdentity = null;
     FrameLayout a = anchorRef.get();
@@ -790,7 +814,10 @@ final class CaptionOverlay {
       params.topMargin = topMargin;
       anchor.setLayoutParams(params);
     }
-    if(anchor.getVisibility() != View.VISIBLE) anchor.setVisibility(View.VISIBLE);
+    if(anchor.getVisibility() != View.VISIBLE) {
+      anchor.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+      anchor.setVisibility(View.VISIBLE);
+    }
     if((mode.equals("original_fallback") || mode.equals("overflow_status")) && !detail.equals(lastNotice))
       CaptionDiagnostics.mark(a,"REBUILD_LAYOUT_FALLBACK",detail);
     lastNotice=detail;
@@ -907,7 +934,8 @@ final class CaptionOverlay {
 
   private static boolean drag(View v, MotionEvent e) {
     Activity a = activityRef.get();
-    if (a == null || previous.height() <= 0) return false;
+    if (a == null || previous.height() <= 0 || !anchorVisible()
+        || suppressed() || guardedExpansion()) { dragging=false; return false; }
     switch (e.getActionMasked()) {
       case MotionEvent.ACTION_DOWN:
         downY = e.getRawY();

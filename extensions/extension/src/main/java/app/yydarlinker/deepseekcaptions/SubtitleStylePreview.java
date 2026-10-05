@@ -65,6 +65,7 @@ public final class SubtitleStylePreview extends CaptionSettingPreference {
     @Override protected View onCreateView(ViewGroup parent){
         Context c=getContext();LinearLayout root=new LinearLayout(c);root.setOrientation(LinearLayout.VERTICAL);CaptionSettingsStyle.row(root);
         Preview preview=new Preview(c);preview.setTag("ai_style_preview_canvas");views.add(preview);
+        CaptionTextResolver.direction(preview,false);
         ownPreview=new java.lang.ref.WeakReference<>(preview);
         LinearLayout.LayoutParams previewParams=new LinearLayout.LayoutParams(-1,-2);
         previewParams.topMargin=CaptionSettingsStyle.dp(c,6);

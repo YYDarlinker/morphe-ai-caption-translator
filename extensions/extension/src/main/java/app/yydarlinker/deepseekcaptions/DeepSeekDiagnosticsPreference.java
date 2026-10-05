@@ -10,6 +10,39 @@ public final class DeepSeekDiagnosticsPreference extends CaptionSettingPreferenc
     public DeepSeekDiagnosticsPreference(Context c,AttributeSet a){super(c,a);init();}
     public DeepSeekDiagnosticsPreference(Context c,AttributeSet a,int d){super(c,a,d);init();}
     public DeepSeekDiagnosticsPreference(Context c,AttributeSet a,int d,int r){super(c,a,d,r);init();}
+    private java.lang.ref.WeakReference<Panel> currentPanel=new java.lang.ref.WeakReference<>(null);
+    private final class Panel {
+        final java.lang.ref.WeakReference<View> root;
+        final java.lang.ref.WeakReference<TextView> body;
+        final java.lang.ref.WeakReference<View> expanded;
+        long request;
+        String lastLocale="";
+        CaptionDiagnosticSnapshot.Snapshot complete;
+        CaptionDiagnosticSnapshot.Callback callback;
+        Panel(View root,TextView body,View expanded){this.root=new java.lang.ref.WeakReference<>(root);this.body=new java.lang.ref.WeakReference<>(body);this.expanded=new java.lang.ref.WeakReference<>(expanded);}
+        String text(){CaptionDiagnosticSnapshot.Snapshot safe=CaptionDiagnosticSnapshot.peek(getContext());complete=safe;
+            return safe==null?CaptionStrings.settings(getContext(),"diagnostics_loading"):safe.text;}
+        void refresh(){
+            View view=root.get();TextView text=body.get();if(view==null||text==null)return;
+            String value=text();if(!sameText(text.getText(),value))text.setText(value);
+            final long ticket=++request;final Object token=view.getWindowToken();final View window=view.getRootView();
+            lastLocale=CaptionTextResolver.locale(getContext()).toLanguageTag();
+            callback=snapshot->{
+                View row=root.get(),open=expanded.get();TextView target=body.get();
+                if(currentPanel.get()!=this||ticket!=request||row==null||target==null||open==null||open.getVisibility()!=View.VISIBLE
+                    ||!row.isAttachedToWindow()||row.getRootView()!=window||row.getWindowToken()!=token||!snapshot.key.current(getContext()))return;
+                complete=snapshot;if(!sameText(target.getText(),snapshot.text))target.setText(snapshot.text);
+            };
+            CaptionDiagnosticSnapshot.request(getContext(),callback);
+        }
+        void cancel(){request++;callback=null;}
+    }
+    @Override protected void refreshDynamicText(){
+        Panel panel=currentPanel.get();if(panel==null)return;
+        View open=panel.expanded.get();
+        if(open!=null&&open.getVisibility()==View.VISIBLE
+            &&!panel.lastLocale.equals(CaptionTextResolver.locale(getContext()).toLanguageTag()))panel.refresh();
+    }
     private void init(){setPersistent(false);setSelectable(false);}
     @Override protected View onCreateView(ViewGroup parent){
         Context c=getContext();LinearLayout box=new LinearLayout(c);box.setOrientation(LinearLayout.VERTICAL);CaptionSettingsStyle.row(box);
@@ -22,8 +55,14 @@ public final class DeepSeekDiagnosticsPreference extends CaptionSettingPreferenc
         TextView body=new TextView(c);body.setTag("ai_diagnostics_body");CaptionSettingsStyle.caption(body);body.setTextIsSelectable(true);body.setPadding(CaptionSettingsStyle.dp(c,12),CaptionSettingsStyle.dp(c,10),CaptionSettingsStyle.dp(c,12),CaptionSettingsStyle.dp(c,10));
         ScrollView scroll=new ScrollView(c){@Override public boolean onInterceptTouchEvent(MotionEvent e){if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);return super.onInterceptTouchEvent(e);}};
         scroll.setTag("ai_diagnostics_scroll");scroll.setBackground(CaptionSettingsStyle.surface(c,false));scroll.setFillViewport(false);scroll.setVerticalScrollBarEnabled(true);scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
-        Button refresh=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"refresh"),false,false,()->{});refresh.setTag("ai_diagnostics_refresh");refresh.setOnClickListener(v->{body.setText(CaptionDiagnostics.uiText(c));scroll.scrollTo(0,0);});actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));
-        Button copy=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"copy"),false,false,()->{});copy.setTag("ai_diagnostics_copy");copy.setOnClickListener(v->{ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);if(manager!=null){manager.setPrimaryClip(ClipData.newPlainText(CaptionStrings.settings(c,"diagnostics"),body.getText()));Toast.makeText(c,CaptionStrings.settings(c,"message_896c4b51d7e9"),Toast.LENGTH_SHORT).show();}});actions.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+        Panel panel=new Panel(box,body,expanded);currentPanel=new java.lang.ref.WeakReference<>(panel);
+        box.setTag(panel);
+        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){
+            public void onViewAttachedToWindow(View v){if(expanded.getVisibility()==View.VISIBLE)panel.refresh();}
+            public void onViewDetachedFromWindow(View v){panel.cancel();}
+        });
+        Button refresh=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"refresh"),false,false,()->{});refresh.setTag("ai_diagnostics_refresh");refresh.setOnClickListener(v->{panel.refresh();scroll.scrollTo(0,0);});actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));
+        Button copy=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"copy"),false,false,()->{});copy.setTag("ai_diagnostics_copy");copy.setOnClickListener(v->{ClipboardManager manager=(ClipboardManager)c.getSystemService(Context.CLIPBOARD_SERVICE);if(manager!=null&&panel.complete!=null&&panel.complete.key.current(c)){manager.setPrimaryClip(ClipData.newPlainText(CaptionStrings.settings(c,"diagnostics"),panel.complete.text));Toast.makeText(c,CaptionStrings.settings(c,"message_896c4b51d7e9"),Toast.LENGTH_SHORT).show();}});actions.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         ProfileActionStrip archiveActions=new ProfileActionStrip(c);
         Button save=CaptionSettingsStyle.action(c,CaptionStrings.settings(c,"save_diagnostics"),false,false,()->{});save.setTag("ai_diagnostics_save");archiveActions.addView(save,new LinearLayout.LayoutParams(0,-2,1));
         save.setOnClickListener(v->{save.setEnabled(false);new Thread(()->{
@@ -38,7 +77,7 @@ public final class DeepSeekDiagnosticsPreference extends CaptionSettingPreferenc
                 CaptionStrings.settings(c,"clear_diagnostics"),
                 CaptionStrings.settings(c,"clear_diagnostics_confirm"),
                 CaptionStrings.settings(c,"clear_diagnostics"),
-                ()->{CaptionDiagnostics.clear(c);body.setText(CaptionDiagnostics.uiText(c));}));
+                ()->{panel.cancel();CaptionDiagnostics.clear(c);panel.complete=null;panel.refresh();}));
         body.setTypeface(android.graphics.Typeface.MONOSPACE);
         expanded.addView(scroll,new LinearLayout.LayoutParams(-1,CaptionSettingsStyle.dp(c,240)));
         int gap=CaptionSettingsStyle.dp(c,8);
@@ -49,8 +88,8 @@ public final class DeepSeekDiagnosticsPreference extends CaptionSettingPreferenc
         expanded.addView(clear,clearParams);box.addView(expanded);
         uiText(toggle,()->{String label=CaptionStrings.settings(c,expanded.getVisibility()==View.VISIBLE?"collapse":"expand");toggle.setContentDescription(label);return label;});
         uiText(refresh,"refresh");uiText(copy,"copy");uiText(save,"save_diagnostics");uiText(clear,"clear_diagnostics");
-        uiText(body,()->CaptionDiagnostics.uiText(c));
-        toggle.setOnClickListener(v->{boolean open=expanded.getVisibility()!=View.VISIBLE;if(open)body.setText(CaptionDiagnostics.uiText(c));expanded.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(CaptionStrings.settings(c,open?"collapse":"expand"));toggle.setContentDescription(open?CaptionStrings.settings(c,"collapse"):CaptionStrings.settings(c,"expand"));});return box;
+        uiText(body,panel::text);
+        toggle.setOnClickListener(v->{boolean open=expanded.getVisibility()!=View.VISIBLE;expanded.setVisibility(open?View.VISIBLE:View.GONE);if(open)panel.refresh();else panel.cancel();toggle.setText(CaptionStrings.settings(c,open?"collapse":"expand"));toggle.setContentDescription(open?CaptionStrings.settings(c,"collapse"):CaptionStrings.settings(c,"expand"));});return box;
     }
     static String saveReport(Context c,String report) throws java.io.IOException {
         String name=writeReport(c,report);

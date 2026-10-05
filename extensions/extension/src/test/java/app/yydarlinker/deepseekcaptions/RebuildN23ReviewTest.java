@@ -84,7 +84,8 @@ public class RebuildN23ReviewTest {
     report.put("reverted_rules",new JSONArray().put("possible_subject_attachment target-side 之后|之後 gate restored")
         .put("possible_omission licensed-or-unlicensed head-noun rule removed"));
     report.put("observed_subject_attachment_hits",report.getJSONObject("possible_subject_attachment").getInt("count"));
-    Files.createDirectories(root.resolve(".verification/n24"));
-    Files.write(root.resolve(".verification/n24/review-hits.json"),report.toString(2).getBytes(StandardCharsets.UTF_8));
+    Path output=Path.of(System.getProperty("scheduler.output"));
+    Files.createDirectories(output);
+    Files.write(output.resolve("review-hits.json"),report.toString(2).getBytes(StandardCharsets.UTF_8));
   }
 }

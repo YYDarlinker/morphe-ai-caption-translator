@@ -128,3 +128,6 @@ https://github.com/nvbangg/awesome-morphe/blob/main/.github/ISSUE_TEMPLATE/bundl
 
 
 干净云端验证首次完成750项时出现7项失败：N34的5项依赖D盘字幕路径，N23依赖本地.verification镜像，N24预取预算断言在两个初始响应已完成后误把合法补位算作超预算。本地随后全量又暴露快速跳转测试要求最后目标在中间目标已占满focus槽时仍立即发送的不确定等待。已保留原失败日志；测试输入改用仓库内逐字节相同的n30资源和N20镜像，测试控件使用已有响应gate界定验证时点，保留所有旧断言/时限且新增风暴期间的lane界限检查。产品调度/CAS代码未改。CI已取消dev push与PR重复验证，默认只跑PR一次；自动PR创建所需设置按官方模板启用，默认工作流token仍为read。
+
+
+历史1.42.0/21.07.247实际组合before明确拒绝在AI quick toggle共享divider接缝：旧官方addFlyoutElements只向Runnable延后分发，实际组装/分隔线在DEX合成代理中；1.45.0则直接组装。适配使用实际NEW_INSTANCE Runnable、单Object捕获构造器和run()中的typed static调用解析唯一真实body，不写死R8名字或版本号，不跳过divider核验。所有结构均在第一处修改前解析；1.45直接路径保持。字幕Java运行时未变。需重跑旧组合after与推荐组合/最终正式资产。

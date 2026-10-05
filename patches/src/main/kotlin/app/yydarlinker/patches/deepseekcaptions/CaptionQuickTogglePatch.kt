@@ -11,6 +11,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
@@ -55,7 +56,47 @@ internal fun BytecodePatchContext.prepareCaptionQuickToggle(): () -> Unit {
     val pathRegister=(if(AccessFlags.STATIC.isSet(detector.accessFlags))0 else 1)+params.take(bytes-1).sumOf(::words)
     requireUnique(detector.implementation!!.registerCount >= (if(AccessFlags.STATIC.isSet(detector.accessFlags))0 else 1)+params.sumOf(::words), "detector parameter registers")
     requireUnique(runtime.methods.count { it.name=="observeMenuPath" && it.parameterTypes.map { t->t.toString() }==listOf(pathType,"[B") && it.returnType=="V" }==1, "typed menu observer")
-    val instructions=entry.implementation!!.instructions.toList()
+    // Older official bundles defer the group insertion to a captured Runnable.
+    // Follow its actual DEX call to the typed static body; never guess an R8 lambda
+    // name or inject at the outer entry before menu detection has completed.
+    fun dividerCount(method: com.android.tools.smali.dexlib2.iface.Method) =
+        method.implementation?.instructions?.count { instruction ->
+            val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
+            reference?.definingClass==utils.type && reference.name=="addDivider"
+        } ?: 0
+    val menuBody=if(dividerCount(entry)==1) entry else {
+        requireUnique(dividerCount(entry)==0,"direct divider count")
+        val outer=entry.implementation!!.instructions.toList()
+        requireUnique(outer.count { instruction ->
+            val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
+            reference?.definingClass=="Lapp/morphe/extension/shared/Utils;" &&
+                reference.name=="runOnMainThreadDelayed" && reference.returnType=="V" &&
+                reference.parameterTypes.map { it.toString() }==listOf("Ljava/lang/Runnable;","J")
+        }==1,"deferred menu dispatch")
+        val delegates=outer.filter { it.opcode==Opcode.NEW_INSTANCE }.mapNotNull {
+            ((it as? ReferenceInstruction)?.reference as? TypeReference)?.type
+        }.distinct().map { classDefBy(it) }.filter { "Ljava/lang/Runnable;" in it.interfaces }
+            .flatMap { runnable ->
+                requireUnique(outer.count { instruction ->
+                    val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
+                    reference?.definingClass==runnable.type && reference.name=="<init>" &&
+                        reference.parameterTypes.map { it.toString() }==listOf(objectType)
+                }==1,"captured menu constructor")
+                runnable.methods.filter { it.name=="run" && it.returnType=="V" && it.parameterTypes.isEmpty() }
+                    .flatMap { it.implementation?.instructions?.toList() ?: emptyList() }
+                    .mapNotNull { ((it as? ReferenceInstruction)?.reference as? MethodReference) }
+                    .filter { it.definingClass==utils.type && it.returnType=="V" &&
+                        it.parameterTypes.map { type->type.toString() }==listOf(objectType) }
+                    .mapNotNull { reference -> utils.methods.singleOrNull { method ->
+                        method.name==reference.name && method.returnType==reference.returnType &&
+                            method.parameterTypes.map { it.toString() }==listOf(objectType) &&
+                            AccessFlags.STATIC.isSet(method.accessFlags)
+                    } }
+            }.distinct().filter { dividerCount(it)==1 }
+        requireUnique(delegates.size==1,"reachable deferred divider body")
+        delegates.single()
+    }
+    val instructions=menuBody.implementation!!.instructions.toList()
     val dividerCalls=instructions.indices.filter { i -> (instructions[i] as? ReferenceInstruction)?.reference.let { it is MethodReference && it.definingClass==utils.type && it.name=="addDivider" } }
     requireUnique(dividerCalls.size==1,"shared divider call")
     val dividerCall=dividerCalls.single()
@@ -84,7 +125,7 @@ internal fun BytecodePatchContext.prepareCaptionQuickToggle(): () -> Unit {
     // The index is the official inflater's next insertion position (dialog vs popup differ).
     // Retain incoming branch labels on the hook: zero/hidden official buttons must also reach it.
     entry.replaceInstruction(guard,"invoke-static {p0, v$indexRegister}, ${runtime.type}->onMenu(Ljava/lang/Object;I)I")
-    entry.addInstructionsWithLabels(guard+1,"move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",ExternalLabel("after_divider",afterDivider))
+    menuBody.addInstructionsWithLabels(guard+1,"move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",ExternalLabel("after_divider",afterDivider))
     info.accessFlags=(info.accessFlags and AccessFlags.PRIVATE.value.inv()) or AccessFlags.PUBLIC.value
     // ART does not narrow the null branch's reference register to a null type.
     // Do not merge FlyoutMenuInfo and LinearLayout at one return: that becomes Object

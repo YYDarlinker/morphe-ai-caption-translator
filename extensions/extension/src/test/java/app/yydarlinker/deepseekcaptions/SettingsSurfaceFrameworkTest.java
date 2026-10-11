@@ -35,7 +35,7 @@ public class SettingsSurfaceFrameworkTest {
     CaptionSurface.activity(a);assertSame(shorts,CaptionSurface.discover(host,new HashSet<>(Arrays.asList(40,41))));assertTrue(CaptionSurface.isShorts());assertNotNull(CaptionSurface.bounds(host));
     shorts.setVisibility(View.GONE);CaptionSurface.discover(host,new HashSet<>(Arrays.asList(40,41)));assertFalse(CaptionSurface.isShorts());a.finish();
  }
- @Test public void diagnosticsHasScrollableFullTextAndExplicitButtons(){Activity a=activity(false);DeepSeekDiagnosticsPreference p=new DeepSeekDiagnosticsPreference(a);LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));ScrollView scroll=(ScrollView)root.findViewWithTag("ai_diagnostics_scroll");assertNotNull(scroll);assertTrue(scroll.getChildAt(0) instanceof TextView);assertEquals(View.GONE,((View)scroll.getParent()).getVisibility());root.findViewWithTag("ai_diagnostics_toggle").performClick();assertEquals(View.VISIBLE,((View)scroll.getParent()).getVisibility());assertTrue(scroll.getLayoutParams().height>0);a.finish();}
+ @Test public void diagnosticsCreatesScrollablePreviewAndExplicitButtonsOnlyWhenExpanded(){Activity a=activity(false);DeepSeekDiagnosticsPreference p=new DeepSeekDiagnosticsPreference(a);LinearLayout root=(LinearLayout)p.onCreateView(new FrameLayout(a));assertNull(root.findViewWithTag("ai_diagnostics_scroll"));assertEquals(5,DiagnosticsLazyRowTest.nodes(root));root.findViewWithTag("ai_diagnostics_toggle").performClick();ScrollView scroll=(ScrollView)root.findViewWithTag("ai_diagnostics_scroll");assertNotNull(scroll);assertTrue(scroll.getChildAt(0) instanceof TextView);assertEquals(View.VISIBLE,((View)scroll.getParent()).getVisibility());assertTrue(scroll.getLayoutParams().height>0);for(String tag:new String[]{"ai_diagnostics_refresh","ai_diagnostics_copy","ai_diagnostics_save","ai_diagnostics_clear"})assertNotNull(root.findViewWithTag(tag));a.finish();}
  @Test public void singleLandscapePreviewHasNoOrientationControlAndUpdatesSharedStyle(){
     Activity a=activity(false);
     SubtitleStylePreview p=new SubtitleStylePreview(a);
@@ -59,10 +59,10 @@ public class SettingsSurfaceFrameworkTest {
  }
  @Test public void protocolEvidenceSurvivesDisplayNoiseAndCanBeCleared(){
     Activity a=activity(false);CaptionDiagnostics.clear(a);
-    CaptionDiagnostics.mark(a,"ANCHOR_RESPONSE_REJECTED","unit=12;reason=protocol_json");
-    for(int n=0;n<100;n++)CaptionDiagnostics.mark(a,"CONTEXTUAL_DISPLAY_SELECTED",String.join("",Collections.nCopies(180,"x")));
+    CaptionDiagnostics.mark(a,"REBUILD_EVENTS_REJECTED","request=12;reason=json_shape");
+    for(int n=0;n<100;n++)CaptionDiagnostics.mark(a,"REBUILD_SELECTED",String.join("",Collections.nCopies(180,"x")));
     // The saved export keeps its raw, unlocalized report; the panel body is the localized summary.
-    String report=CaptionDiagnostics.uiText(a,false);assertTrue(report.contains("Timing decisions and errors"));assertTrue(report.contains("unit=12;reason=protocol_json"));
-    CaptionDiagnostics.clear(a);assertFalse(CaptionDiagnostics.uiText(a,false).contains("protocol_json"));a.finish();
+    String report=CaptionDiagnostics.uiText(a,false);assertTrue(report.contains("Timing decisions and errors"));assertTrue(report.contains("request=12;reason=json_shape"));
+    CaptionDiagnostics.clear(a);assertFalse(CaptionDiagnostics.uiText(a,false).contains("json_shape"));a.finish();
  }
 }

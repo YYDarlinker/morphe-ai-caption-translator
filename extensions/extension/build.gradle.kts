@@ -1,39 +1,32 @@
-extension {
-    name = "extensions/extension.mpe"
-}
-
+extension { name = "extensions/extension.mpe" }
 android {
     namespace = "app.yydarlinker.extension"
     buildFeatures { buildConfig = true }
     defaultConfig {
+        minSdk = 28
         buildConfigField("String", "CAPTION_PATCH_VERSION", "\"${rootProject.version}\"")
+        buildConfigField("String", "CAPTION_BUILD_ID", "\"${providers.gradleProperty("captionBuildId").getOrElse("n39-core-separation-wip")}\"")
     }
+    sourceSets.getByName("main").java.srcDirs("../../presentation/src/main/java", "../../ui/src/main/java", "../../infrastructure/src/main/java", "../../application-host/src/main/java")
+    sourceSets.getByName("debug").res.srcDir("../../patches/src/main/resources/captionlocales")
+    sourceSets.getByName("debug").res.srcDir("src/test/res")
+    testOptions { unitTests.isReturnDefaultValues = true; unitTests.isIncludeAndroidResources = true }
 }
-
-
 dependencies {
+    implementation(project(":caption-contracts"))
+    implementation(project(":translation-core"))
+    implementation(project(":caption-shared"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
-android { testOptions { unitTests.isReturnDefaultValues = true } }
-
-dependencies { testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0") }
-
-dependencies { testImplementation("org.robolectric:robolectric:4.14.1") }
-
-// Test-only resource installation lets Robolectric exercise the same locale XML shipped to YouTube.
-android { sourceSets.getByName("debug").res.srcDir("../../patches/src/main/resources/captionlocales")
-    sourceSets.getByName("debug").res.srcDir("src/test/res") }
-
-android { testOptions { unitTests.isIncludeAndroidResources = true } }
-
-// Evidence-producing regression tests must also run from a clean CI checkout.
-// Local watchdog runners can supply the same explicit output property.
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     maxHeapSize = "2g"
-    val evidenceDirectory = providers.gradleProperty("scheduler.output").orNull
-        ?.let { rootProject.file(it) }
-        ?: rootProject.layout.buildDirectory.dir("test-evidence").get().asFile
-    systemProperty("scheduler.output", evidenceDirectory.absolutePath)
-    doFirst { evidenceDirectory.mkdirs() }
+    systemProperty("n39.root", rootProject.projectDir.absolutePath)
+    systemProperty("scheduler.output", providers.gradleProperty("scheduler.output").getOrElse(rootProject.file("validation/integration/test-evidence").absolutePath))
+    if (gradle.startParameter.isOffline) {
+        systemProperty("robolectric.offline", "true")
+        systemProperty("robolectric.dependency.dir", rootProject.file("work/toolchain/robolectric").absolutePath)
+    }
 }

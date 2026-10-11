@@ -49,9 +49,9 @@ public class N28AUnicodeTest {
     assertEquals(2,CaptionUnicode.lineHalfUnits("#️⃣",ja));assertEquals(2,CaptionUnicode.lineHalfUnits("#️⃣",ko));
     assertEquals(2,CaptionUnicode.lineHalfUnits("👩🏽‍💻",ja));assertEquals(2,CaptionUnicode.lineHalfUnits("각",ko));
   }
-  @Test public void legacyChineseCodepointSemanticsRemainExact() {
-    assertEquals(8,CaptionUnicode.readingUnits("中e\u0301\r\n\u2067👍🏽",CaptionLanguageProfile.fromCode("zh-Hans")));
-    assertEquals(16,CaptionUnicode.lineHalfUnits("中e\u0301\r\n\u2067👍🏽",CaptionLanguageProfile.fromCode("zh-Hant")));
+  @Test public void chineseVisibleGraphemesExcludeControlsAndCompositeMarks() {
+    assertEquals(3,CaptionUnicode.readingUnits("中e\u0301\r\n\u2067👍🏽",CaptionLanguageProfile.fromCode("zh-Hans")));
+    assertEquals(6,CaptionUnicode.lineHalfUnits("中e\u0301\r\n\u2067👍🏽",CaptionLanguageProfile.fromCode("zh-Hant")));
   }
   @Test public void legalLinesRespectNbspCrLfAndSafeIndicBoundaries() {
     assertArrayEquals(new int[]{0,3},CaptionUnicode.lineBoundaries("a\u00a0b",Locale.ENGLISH));

@@ -26,7 +26,7 @@ public class N30LocalizationRuntimeTest {
    for(int i=0;i<page.getChildCount()-2;i++)check((TextView)page.getChildAt(i));check(entry.findViewById(android.R.id.title));check(entry.findViewById(android.R.id.summary));check(row.findViewById(android.R.id.title));check(row.findViewById(android.R.id.summary));
    rows.put(new JSONObject().put("locale",tag).put("resource_keys",KEYS.length).put("width_dp",320).put("font_scale",1.3).put("height_px",page.getHeight()).put("ellipsis",0).put("rtl",tag.equals("ar")));
    if(Arrays.asList("en","zh-CN","fr","ar").contains(tag)){String dir=System.getenv("N30_EVIDENCE_DIR");if(dir!=null){Bitmap b=Bitmap.createBitmap(width,page.getHeight(),Bitmap.Config.ARGB_8888);page.draw(new Canvas(b));try(FileOutputStream out=new FileOutputStream(new File(dir,"n30-ui-"+tag+".png"))){b.compress(Bitmap.CompressFormat.PNG,100,out);}}}
-  }a.finish();N28CGeometryTest.export("n30-localization-runtime.json",new JSONObject().put("rows",rows));
+  }a.finish();N39TestEvidence.export("n30-localization-runtime.json",new JSONObject().put("rows",rows));
  }
  static void check(TextView text){assertNotNull(text);assertNotNull(text.getLayout());assertEquals(text.length(),text.getLayout().getLineEnd(text.getLayout().getLineCount()-1));for(int i=0;i<text.getLayout().getLineCount();i++)assertEquals(0,text.getLayout().getEllipsisCount(i));}
  @Test public void fullNativeMultiChoiceRowsWrapAt320DpInEveryLocale(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();

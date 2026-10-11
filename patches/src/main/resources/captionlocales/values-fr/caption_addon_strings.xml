@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"Supprimer la clé API"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Développez pour consulter et copier le diagnostic"</string>
     <string name="cap_diagnostics" formatted="false">"Diagnostic des sous-titres"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"Activez le débogage du texte pour les tests longs ; Enregistrer le diagnostic complet exporte les 24 dernières heures (limite de 16 MiB). Le résumé ci-dessous ne montre que l\'activité récente."</string>
+    <string name="cap_diagnostics_hint" formatted="false">"Activez le débogage du texte pour les tests longs ; Enregistrer le diagnostic complet exporte les 24 dernières heures (limite de 16 MiB). Le résumé ci-dessous ne montre que l\'activité récente. L’aperçu est limité ; Copier et Enregistrer conservent le rapport complet."</string>
     <string name="cap_display_debug" formatted="false">"Débogage du texte : %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Activer la traduction par IA"</string>
     <string name="cap_engine" formatted="false">"Moteur"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"Ajouter un profil"</string>
     <string name="cap_profile_add_failed" formatted="false">"Impossible d’ajouter un profil. Vérifiez les champs et la limite de 30 profils."</string>
     <string name="cap_profile_clear_key" formatted="false">"Effacer la clé API de ce profil"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"Efface uniquement la clé enregistrée et la saisie de clé non enregistrée de ce profil. L’adresse, le modèle et les consignes restent inchangés, ainsi que les autres profils. La clé n’est pas révoquée auprès du fournisseur."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Effacez la clé enregistrée et la saisie en attente de ce profil. L’adresse et le modèle sont conservés ; les autres profils ne changent pas. La clé n’est pas révoquée chez le fournisseur."</string>
     <string name="cap_profile_close" formatted="false">"Fermer"</string>
     <string name="cap_profile_collapse" formatted="false">"Replier les actions"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Confirmer la suppression"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"Configuration existante"</string>
     <string name="cap_profile_delete" formatted="false">"Supprimer le profil"</string>
     <string name="cap_profile_delete_inline" formatted="false">"Supprimer ce profil et sa clé enregistrée sur cet appareil ? Les autres profils sont conservés. Cette action est irréversible."</string>
-    <string name="cap_profile_delete_summary" formatted="false">"Supprime de cet appareil l’adresse, le modèle, les consignes et la clé chiffrée de ce profil. Les autres profils et réglages des sous-titres sont conservés. Si ce profil est actif, le premier profil restant est activé. Cette action est irréversible."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Supprimez de cet appareil l’adresse, le modèle et la clé chiffrée de ce profil. Conservez les autres profils et les réglages des sous-titres. Si le profil actif est supprimé, le premier profil restant est activé. Cette action est irréversible."</string>
     <string name="cap_profile_delete_switch" formatted="false">"Après suppression, activer :"</string>
     <string name="cap_profile_finish_name" formatted="false">"Enregistrez ou annulez d’abord la modification du nom."</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Corrigez les champs incomplets avant de changer de profil"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"Actions du profil"</string>
     <string name="cap_profile_name" formatted="false">"Nom du profil"</string>
     <string name="cap_profile_name_error" formatted="false">"Saisissez un nom de 1 à 60 caractères"</string>
-    <string name="cap_profile_new_summary" formatted="false">"Les nouveaux profils ont des consignes par défaut, sans clé ni modèle. Complétez les champs dans les paramètres."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Les nouveaux profils ne copient ni la clé ni le modèle. Complétez les paramètres API après la création."</string>
     <string name="cap_profile_rename" formatted="false">"Renommer"</string>
     <string name="cap_profile_save" formatted="false">"Enregistrer"</string>
     <string name="cap_profiles_summary" formatted="false">"Gérer le profil actuel"</string>
     <string name="cap_profiles_title" formatted="false">"Profils API"</string>
-    <string name="cap_prompt_summary" formatted="false">"Enregistré pour ce profil. Videz pour rétablir les consignes par défaut dans la langue de l’interface. Vos modifications sont conservées."</string>
+    <string name="cap_prompt_summary" formatted="false">"Les préférences personnalisées ajustent la formulation et le registre. La fidélité, la langue cible et la correspondance au texte source sont fixes. Enregistrées dans ce profil ; effacez pour rétablir les valeurs par défaut."</string>
     <string name="cap_quality_outcome" formatted="false">"Validation locale : acceptés / rejetés (qualité)"</string>
     <string name="cap_recent_trace" formatted="false">"Événements récents : "</string>
     <string name="cap_refresh" formatted="false">"Actualiser"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s ; dernière valeur valide conservée"</string>
     <string name="cap_model_ids_empty" formatted="false">"Le serveur n’a renvoyé aucun identifiant de modèle sélectionnable"</string>
     <string name="cap_diagnostics_loading" formatted="false">"Chargement du diagnostic…"</string>
+    <string name="cap_planner_model" formatted="false">"Modèle de préparation du sens source (facultatif)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"Laisser vide pour utiliser le modèle de traduction. Même URL API et clé ; aucun autre modèle n’est choisi automatiquement."</string>
 </resources>

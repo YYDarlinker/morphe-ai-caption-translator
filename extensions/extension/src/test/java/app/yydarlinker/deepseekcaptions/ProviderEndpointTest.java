@@ -1,7 +1,12 @@
 package app.yydarlinker.deepseekcaptions;
-import org.junit.*;import org.junit.runner.RunWith;import org.robolectric.*;import org.robolectric.annotation.*;import org.json.*;import static org.junit.Assert.*;
+import app.yydarlinker.caption.contracts.CaptionContracts.*;import java.util.*;import org.junit.*;import org.junit.runner.RunWith;import org.robolectric.*;import org.robolectric.annotation.*;import org.json.*;import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class) @Config(sdk=28)
 public class ProviderEndpointTest {
+ private JSONObject payload(String endpoint,String model)throws Exception {
+  TranslationSettings config=new TranslationSettings(true,endpoint,model,"faithful","fixture-key","stored_custom");
+  return ProviderRequestPolicy.request(config,"Return JSON subtitles",new JSONObject().put("owned_source","hello"),3072);
+ }
+
  @Test public void bailianDedicatedAndRegionalHostsAreRecognizedWithoutSpoofing(){
   for(String h:new String[]{"dashscope.aliyuncs.com","dashscope-intl.aliyuncs.com","dashscope-us.aliyuncs.com","llm-test.cn-beijing.maas.aliyuncs.com"})assertTrue(h,ProviderEndpoint.bailian(h));
   for(String h:new String[]{"evilmaas.aliyuncs.com","maas.aliyuncs.com.evil.test","api.deepseek.com.evil.test"})assertFalse(h,ProviderEndpoint.bailian(h));
@@ -21,10 +26,10 @@ public class ProviderEndpointTest {
  }
  @Test public void bailianRequestDisablesThinkingButUnknownGatewayStaysPortable()throws Exception{
   for(String host:new String[]{"dashscope.aliyuncs.com","dashscope-intl.aliyuncs.com","llm-test.cn-beijing.maas.aliyuncs.com"}){
-   JSONObject r=ProviderRequestPolicy.request(new DeepSeekConfig.Snapshot(true,"https://"+host+"/compatible-mode/v1","qwen-test","",16,70,"test"),"",new JSONObject(),512);
-   assertFalse(r.getBoolean("enable_thinking"));assertFalse(r.getBoolean("stream"));
+   JSONObject r=payload("https://"+host+"/compatible-mode/v1","qwen-test");
+   assertFalse(r.getBoolean("enable_thinking"));assertFalse(r.getBoolean("stream")); // Pinned upstream core uses complete JSON responses.
   }
-  JSONObject r=ProviderRequestPolicy.request(new DeepSeekConfig.Snapshot(true,"https://gateway.example/v1","deepseek-test","",16,70,"test"),"",new JSONObject(),512);
+  JSONObject r=payload("https://gateway.example/v1","deepseek-test");
   assertFalse(r.has("thinking"));assertFalse(r.has("enable_thinking"));
  }
  @Test public void officialHeadersAndQueriesDoNotMoveKeysToWrongAuthFields()throws Exception{
@@ -41,13 +46,13 @@ public class ProviderEndpointTest {
   }finally{server.shutdown();}
  }
  @Test public void jsonFallbackDoesNotReenableBailianThinking()throws Exception{
-  JSONObject r=ProviderRequestPolicy.request(new DeepSeekConfig.Snapshot(true,"https://llm-test.cn-beijing.maas.aliyuncs.com/compatible-mode/v1","deepseek-v4.1-flash","",16,70,"test"),"",new JSONObject(),512);
-  assertTrue(ProviderRequestPolicy.removeOptional(r,"response_format_unsupported"));assertFalse(r.has("response_format"));assertFalse(r.getBoolean("enable_thinking"));assertEquals(512,r.getInt("max_tokens"));
+  JSONObject r=payload("https://llm-test.cn-beijing.maas.aliyuncs.com/compatible-mode/v1","deepseek-v4.1-flash");
+  ProviderRequestPolicy.removeOptional(r,"response_format_unsupported");assertFalse(r.has("response_format"));assertFalse(r.getBoolean("enable_thinking"));assertEquals(3072,r.getInt("max_tokens"));
  }
  @Test public void officialOpenAiUsesCompletionBudgetAndAnthropicUsesJsonPrompt()throws Exception{
-  JSONObject a=ProviderRequestPolicy.request(new DeepSeekConfig.Snapshot(true,"https://api.openai.com/v1","gpt-test","",16,70,"test"),"",new JSONObject(),512);
-  assertFalse(a.has("max_tokens"));assertEquals(512,a.getInt("max_completion_tokens"));
-  JSONObject b=ProviderRequestPolicy.request(new DeepSeekConfig.Snapshot(true,"https://api.anthropic.com/v1","claude-test","",16,70,"test"),"",new JSONObject(),512);
+  JSONObject a=payload("https://api.openai.com/v1","gpt-test");
+  assertFalse(a.has("max_tokens"));assertEquals(3072,a.getInt("max_completion_tokens"));
+  JSONObject b=payload("https://api.anthropic.com/v1","claude-test");
   assertFalse(b.has("response_format"));assertTrue(b.getJSONArray("messages").toString().contains("JSON"));
  }
 

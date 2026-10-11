@@ -10,7 +10,7 @@ import android.view.View;
 import android.widget.*;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.settings.*;
-import java.util.*;
+import java.util.*;import app.yydarlinker.caption.contracts.CaptionContracts.*;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.robolectric.*;
@@ -54,42 +54,27 @@ public class N33LocaleAndDataTest {
         for(String tag:new String[]{"zh-Hans-TW","zh-CN"})assertEquals("zh-rCN",CaptionTextResolver.catalogLocale(Locale.forLanguageTag(tag)));
         assertEquals("id",CaptionTextResolver.catalogLocale(new Locale("in")));assertEquals("en",CaptionTextResolver.catalogLocale(Locale.forLanguageTag("tr")));
     }
-    @Test public void uiLocaleDoesNotChangeSnapshotsPromptsFingerprintsOrCacheIdentity(){
+    @Test public void uiLocaleDoesNotChangeSnapshotsPromptsFingerprintsOrCacheIdentity()throws Exception {
         RebuildSource source=new RebuildSource(Arrays.asList(new RebuildSource.Word("This",0,600,0,RebuildSource.Precision.NATIVE),new RebuildSource.Word("test.",600,1800,0,RebuildSource.Precision.NATIVE)));
+        RebuildPlanner.Block block=RebuildPlanner.plan(source,CaptionLanguageContext.LEGACY).get(0);
         for(String stored:new String[]{"","custom 原文 API key 模型 层"}){
             SharedPreferences p=ApiProfiles.values(activity);if(stored.isEmpty())p.edit().remove("prompt").commit();else p.edit().putString("prompt",stored).commit();
-            Map<String,?> bytes=new TreeMap<>(p.getAll());DeepSeekConfig.Snapshot before=DeepSeekConfig.load(activity);
+            Map<String,?> bytes=new TreeMap<>(p.getAll());DeepSeekConfig.ProviderSettings before=DeepSeekConfig.load(activity);
             for(String target:new String[]{"zh-Hans","zh-Hant","ja","ar"}){
-                CaptionLanguageContext policy=CaptionLanguageContext.explicit("en",target);
-                String prompt=RebuildApi.prompt(before,target,policy),cache=RebuildCache.identity(source,before,target,policy),fingerprint=policy.fingerprint(before);
+                TranslationSettings config=new TranslationSettings(before.enabled,before.baseUrl,before.model,before.prompt,"fixture-key",before.preferenceProvenance);
+                CaptionLanguageContext context=CaptionLanguageContext.explicit("en",target);
+                String payload=RebuildProtocol.payload(source,block,target,"",context).toString(),cache=RebuildCache.identity(source,config,target,context),fingerprint=before.fingerprint();
                 for(AppLanguage language:AppLanguage.values()){
-                    choose(language);DeepSeekConfig.Snapshot after=DeepSeekConfig.load(activity);
+                    choose(language);DeepSeekConfig.ProviderSettings after=DeepSeekConfig.load(activity);
                     assertEquals(before.prompt,after.prompt);assertEquals(before.effectivePreference,after.effectivePreference);
-                    assertEquals(prompt,RebuildApi.prompt(after,target,policy));assertEquals(cache,RebuildCache.identity(source,after,target,policy));assertEquals(fingerprint,policy.fingerprint(after));
-                    assertEquals(bytes,p.getAll());
+                    TranslationSettings next=new TranslationSettings(after.enabled,after.baseUrl,after.model,after.prompt,"fixture-key",after.preferenceProvenance);
+                    assertEquals(payload,RebuildProtocol.payload(source,block,target,"",context).toString());assertEquals(cache,RebuildCache.identity(source,next,target,context));assertEquals(fingerprint,after.fingerprint());assertEquals(bytes,p.getAll());
                 }
             }
         }
     }
-    @Test public void displayedDefaultNeverAutosavesOnLanguageScrollFlushOrProfileCopy(){
-        choose(AppLanguage.JA);DeepSeekTextPreference p=new DeepSeekTextPreference(activity);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        EditText input=editor(p);assertEquals(DeepSeekConfig.displayDefaultPrompt(activity),input.getText().toString());
-        for(AppLanguage locale:new AppLanguage[]{AppLanguage.EN,AppLanguage.AR,AppLanguage.HANT}){
-            choose(locale);p.refreshCaptionText();Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));
-            assertTrue(p.flushProfile());assertFalse(ApiProfiles.values(activity).contains("prompt"));
-            assertEquals(DeepSeekConfig.displayDefaultPrompt(activity),input.getText().toString());
-        }
-        String other=ApiProfiles.create(activity,"用户 Profile 名","https://example.invalid");assertTrue(ApiProfiles.select(activity,other));
-        assertFalse(ApiProfiles.values(activity,"default").contains("prompt"));assertFalse(ApiProfiles.values(activity,other).contains("prompt"));
-    }
-    @Test public void realUserDefaultLookingTextRemainsCustomAndChangesLocaleWithoutTranslation(){
-        choose(AppLanguage.JA);String custom=DeepSeekConfig.displayDefaultPrompt(activity);
-        ApiProfiles.values(activity).edit().putString("prompt",custom).commit();
-        DeepSeekTextPreference p=new DeepSeekTextPreference(activity);p.setKey(DeepSeekTextPreference.KEY_PROMPT);EditText input=editor(p);
-        choose(AppLanguage.EN);p.refreshCaptionText();assertEquals(custom,input.getText().toString());assertTrue(p.flushProfile());
-        assertEquals("stored_custom",DeepSeekConfig.load(activity).preferenceProvenance);assertEquals(custom,ApiProfiles.values(activity).getString("prompt",""));
-        input.setText("");Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));assertFalse(ApiProfiles.values(activity).contains("prompt"));
-    }
+    
+    
     @Test public void ownRootListenerUsesSavedEnumAndNeverWritesCaptionConfiguration(){
         android.preference.PreferenceFragment fragment=new UnitFragment();activity.getFragmentManager().beginTransaction().add(fragment,"n33").commit();activity.getFragmentManager().executePendingTransactions();
         PreferenceScreen root=fragment.getPreferenceManager().createPreferenceScreen(activity);root.setKey("morphe_vot_screen__ai_captions");

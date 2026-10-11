@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"Delete API Key"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Expand to inspect and copy diagnostic records"</string>
     <string name="cap_diagnostics" formatted="false">"Caption diagnostics"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"Enable caption text debugging for long tests; Save full diagnostics exports the last 24 hours (16 MiB cap). The summary below is recent activity only."</string>
+    <string name="cap_diagnostics_hint" formatted="false">"Enable caption text debugging for long tests; Save full diagnostics exports the last 24 hours (16 MiB cap). The summary below is recent activity only. Preview is limited; Copy and Save contain the complete report."</string>
     <string name="cap_display_debug" formatted="false">"Display text debugging: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Enable AI caption translation"</string>
     <string name="cap_engine" formatted="false">"Engine"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"Add profile"</string>
     <string name="cap_profile_add_failed" formatted="false">"Unable to add profile. Check the fields and the 30-profile limit."</string>
     <string name="cap_profile_clear_key" formatted="false">"Clear this profile’s API key"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"Clear only this profile’s saved key and any unsaved key entry. Keep its address, model and translation requirements. Other profiles are unchanged. This does not revoke the key with the provider."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Clear this profile’s saved and pending key input. Keep its address and model; other profiles are unaffected. This does not revoke the key at the provider."</string>
     <string name="cap_profile_close" formatted="false">"Close"</string>
     <string name="cap_profile_collapse" formatted="false">"Collapse actions"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Confirm deletion"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"Original configuration"</string>
     <string name="cap_profile_delete" formatted="false">"Delete profile"</string>
     <string name="cap_profile_delete_inline" formatted="false">"Delete this profile and its saved key from this device? Other profiles are kept. This cannot be undone."</string>
-    <string name="cap_profile_delete_summary" formatted="false">"Delete this profile’s address, model, translation requirements and encrypted key from this device. Other profiles and subtitle settings are kept. If active, the first remaining profile becomes active. This cannot be undone."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Delete this profile’s address, model and encrypted key from this device. Keep other profiles and subtitle settings. Deleting the current profile activates the first remaining one. This cannot be undone."</string>
     <string name="cap_profile_delete_switch" formatted="false">"After deletion, activate:"</string>
     <string name="cap_profile_finish_name" formatted="false">"Save or cancel the name edit first."</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Correct the current unfinished fields before switching profiles"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"Profile actions"</string>
     <string name="cap_profile_name" formatted="false">"Profile name"</string>
     <string name="cap_profile_name_error" formatted="false">"Enter a name of 1–60 characters"</string>
-    <string name="cap_profile_new_summary" formatted="false">"New profiles use default translation requirements and have no API key or model. Complete the fields on the settings page."</string>
+    <string name="cap_profile_new_summary" formatted="false">"New profiles do not copy the key or model. Complete the API settings after creating one."</string>
     <string name="cap_profile_rename" formatted="false">"Rename"</string>
     <string name="cap_profile_save" formatted="false">"Save"</string>
     <string name="cap_profiles_summary" formatted="false">"Manage current profile"</string>
     <string name="cap_profiles_title" formatted="false">"API profiles"</string>
-    <string name="cap_prompt_summary" formatted="false">"Saved for this profile. Clear to restore defaults. Default wording follows the interface language; your edits stay unchanged."</string>
+    <string name="cap_prompt_summary" formatted="false">"Custom preferences adjust wording and register. Subtitle fidelity, target language and source ownership are fixed. Saved for this profile; clear to restore the default."</string>
     <string name="cap_quality_outcome" formatted="false">"Local validation: accepted / rejected (quality)"</string>
     <string name="cap_recent_trace" formatted="false">"Recent events: "</string>
     <string name="cap_refresh" formatted="false">"Refresh"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s; keeping the last valid value"</string>
     <string name="cap_model_ids_empty" formatted="false">"The endpoint returned no selectable model IDs"</string>
     <string name="cap_diagnostics_loading" formatted="false">"Loading diagnostics…"</string>
+    <string name="cap_planner_model" formatted="false">"Source meaning preparation model (optional)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"Leave blank to use the translation model. Uses the same API URL and Key; never selects another model automatically."</string>
 </resources>

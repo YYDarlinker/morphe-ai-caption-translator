@@ -20,7 +20,7 @@ public class CaptionSizeRangeTest {
             prefs.edit().putFloat("caption_text_size",13f)
                     .putString("caption_text_size_tenths","226").apply();
             assertEquals(2,DeepSeekConfig.displayStyle(activity).captionSizeTier);
-            assertEquals(2,DeepSeekConfig.load(activity).captionSizeTier);
+            assertEquals(2,DeepSeekConfig.displayStyle(activity).captionSizeTier);
             assertEquals(2,new SubtitleStylePreview.Preview(activity).sizeTier);
             assertFalse(prefs.contains("caption_glyph_height_ratio_bps"));
             DeepSeekConfig.saveCaptionSizeTier(activity,3);
@@ -34,10 +34,10 @@ public class CaptionSizeRangeTest {
         try {
             SharedPreferences prefs=activity.getSharedPreferences("deepseek_caption_translator",0);
             DeepSeekConfig.saveCaptionSizeTier(activity,-1);
-            assertEquals(0,DeepSeekConfig.load(activity).captionSizeTier);
+            assertEquals(0,DeepSeekConfig.displayStyle(activity).captionSizeTier);
             assertEquals(0,new SubtitleStylePreview.Preview(activity).sizeTier);
             DeepSeekConfig.saveCaptionSizeTier(activity,999);
-            assertEquals(4,DeepSeekConfig.load(activity).captionSizeTier);
+            assertEquals(4,DeepSeekConfig.displayStyle(activity).captionSizeTier);
             assertEquals(4,new SubtitleStylePreview.Preview(activity).sizeTier);
             DeepSeekConfig.saveCaptionSizeTier(activity,3);
             prefs.edit().putInt("caption_glyph_height_ratio_bps",203).apply();
@@ -45,7 +45,7 @@ public class CaptionSizeRangeTest {
             assertEquals(3,prefs.getInt("caption_size_tier",-1));
             // An incompatible legacy type must also remain unread once the new key exists.
             prefs.edit().putString("caption_glyph_height_ratio_bps","obsolete").apply();
-            assertEquals(3,DeepSeekConfig.load(activity).captionSizeTier);
+            assertEquals(3,DeepSeekConfig.displayStyle(activity).captionSizeTier);
         } finally { activity.finish(); }
     }
 
@@ -62,7 +62,7 @@ public class CaptionSizeRangeTest {
                 assertEquals("old ratio "+bps[i],expected[i],DeepSeekConfig.displayStyle(activity).captionSizeTier);
                 assertEquals(expected[i],prefs.getInt("caption_size_tier",-1));
                 prefs.edit().putInt("caption_glyph_height_ratio_bps",999).apply();
-                assertEquals("migration must not run twice",expected[i],DeepSeekConfig.load(activity).captionSizeTier);
+                assertEquals("migration must not run twice",expected[i],DeepSeekConfig.displayStyle(activity).captionSizeTier);
             }
         } finally { activity.finish(); }
     }

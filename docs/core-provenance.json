@@ -1,0 +1,199 @@
+{
+  "repository": "https://github.com/YYDarlinker/morphe-ai-caption-translator",
+  "branch": "main",
+  "commit": "ac65fe803ec2b11821b1131040f807922a2b8505",
+  "files": [
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
+      "upstream_sha256": "bc5ba7aab1c61dc785742e8cb63b3d69a5d11142aaf817d66d280bc415a4a1e3",
+      "sha256": "52295d81f3e5d712efe21873dfb5bbbbdb42824cc9724fb0d264d50892c677e0",
+      "snapshot": "translation-core/upstream/RebuildController.java.txt",
+      "upstream_git_blob": "814922f06c539681e1471379faf61cb7c6651548"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java",
+      "upstream_sha256": "674b53e2bf49ddf887be0f4a973a8f9eacde6cdf273c815e468e29b378eecfac",
+      "sha256": "dce1163445fd5d411ecdd15755bd21616d1142e77565d3307f3c15327d017bc4",
+      "snapshot": "translation-core/upstream/RebuildApi.java.txt",
+      "upstream_git_blob": "bb5d3dca2d84602d004b4f7956cb1385aeb5495a"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java",
+      "upstream_sha256": "666003c97ceb810e9221389e5fa1ffea21bbb35e62a925f065dd00c7c9f9a5bd",
+      "sha256": "cf689017948ce0dbe6e6e59f832989af060ea2249317148881637153f50514bb",
+      "snapshot": "translation-core/upstream/RebuildCache.java.txt",
+      "upstream_git_blob": "91c68c7b87d4bc6241088c55b6608dd38dfa3fd2"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildClock.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildClock.java",
+      "upstream_sha256": "2c8d6f67216a8da85843c741c64b2badae4b49a3b28b5678292002c8811250f4",
+      "sha256": "2c8d6f67216a8da85843c741c64b2badae4b49a3b28b5678292002c8811250f4",
+      "snapshot": "translation-core/upstream/RebuildClock.java.txt",
+      "upstream_git_blob": "37c538ddefa39bb7a3b8e5fafd094dffdfa03807"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
+      "upstream_sha256": "429f9f059f44113f171f0c7574dabd1b3b8fc589fc2f56489e86a978bc53866e",
+      "sha256": "429f9f059f44113f171f0c7574dabd1b3b8fc589fc2f56489e86a978bc53866e",
+      "snapshot": "translation-core/upstream/RebuildSource.java.txt",
+      "upstream_git_blob": "7f1c52768fb09e675c687a8232db3eabb521fd68"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java",
+      "upstream_sha256": "d63d4606f30ae9f4d33085dedf92c585fed9024d3a37ee213af720617dfea6bc",
+      "sha256": "d63d4606f30ae9f4d33085dedf92c585fed9024d3a37ee213af720617dfea6bc",
+      "snapshot": "translation-core/upstream/RebuildPlanner.java.txt",
+      "upstream_git_blob": "8712b04d8920d6e16632fe7ee558fb87b35b402e"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
+      "upstream_sha256": "02b60c2313df406b91d2e97b449414954427ae57fb98e3c9a57dc9a86b35cb3b",
+      "sha256": "754468e37e56fefce412c47f6da8f1138bb15753c82e5dd607c638e5867585ca",
+      "snapshot": "translation-core/upstream/RebuildProtocol.java.txt",
+      "upstream_git_blob": "d5dc8cc59c7db9b9411dbd90cfdfa4d725ec3f4c"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
+      "upstream_sha256": "1df47bbb596cb6cd6642cc5bb7825a71cad9258f848f1d3bbae1cc0b6a1af74d",
+      "sha256": "1b2654b0c604c8d5258d5295bff3af9faa0d20210df2b10ec93b8c7d3c1acded",
+      "snapshot": "translation-core/upstream/RebuildReview.java.txt",
+      "upstream_git_blob": "2081df9674521637c84641d26e2a813478274745"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java",
+      "upstream_sha256": "72618633fe3af40cc698e8190efac5808dd383e624db57af45fabc2659c8996f",
+      "sha256": "72618633fe3af40cc698e8190efac5808dd383e624db57af45fabc2659c8996f",
+      "snapshot": "translation-core/upstream/RebuildSemantics.java.txt",
+      "upstream_git_blob": "93a38c3242ca8656ef7cba00bd3ba346438f06ef"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildNumbers.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildNumbers.java",
+      "upstream_sha256": "303073f46f5c4b0ae1d47fede95084742321d62bfce19c6ca5a9ab321b63b925",
+      "sha256": "303073f46f5c4b0ae1d47fede95084742321d62bfce19c6ca5a9ab321b63b925",
+      "snapshot": "translation-core/upstream/RebuildNumbers.java.txt",
+      "upstream_git_blob": "76f7e49cb27f3666a8c70ae666ac850ce824ad04"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayMerge.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayMerge.java",
+      "upstream_sha256": "26b79e52ad166c9087ed02e12efe8f50c99f5e4634392538f113fa5ae190a523",
+      "sha256": "26b79e52ad166c9087ed02e12efe8f50c99f5e4634392538f113fa5ae190a523",
+      "snapshot": "translation-core/upstream/RebuildDisplayMerge.java.txt",
+      "upstream_git_blob": "966f77ed1c983f0dd8206566eedabc0af7c1dccc"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java",
+      "upstream_sha256": "e83578f627bf628347fd0d19281ba3bbd11189358dab60ad99228d8e076b4140",
+      "sha256": "525342d538c977ab1dbdd975640dc5c7a86c58e428692ba2145bc6b5107c3efc",
+      "snapshot": "translation-core/upstream/ProviderRequestPolicy.java.txt",
+      "upstream_git_blob": "0121dfb9e4f3d3942549e9827a2d7de66135c2d6"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java",
+      "upstream_sha256": "36254c73f2ea10a4f2771a09a03b682f67d67509dd3c713ed6ffc8e6fe694e73",
+      "sha256": "a8272e074b3e7846af540855d799e230dcde85d16291072e0da372faf61281e0",
+      "snapshot": "translation-core/upstream/DeepSeekApiClient.java.txt",
+      "upstream_git_blob": "56820ce6380ac6b58ec73643fdcd1260dab7d974"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java",
+      "upstream_sha256": "f32c42b4c04254b37c9185177fcbc3e516bad8baf0765115f83c0f8ba20e692b",
+      "sha256": "984c68c9cbc94e59f039b3282afa32b06d3d308408e96786cef36c0a83abed68",
+      "snapshot": "translation-core/upstream/RebuildPageLayout.java.txt",
+      "upstream_git_blob": "87f2365217ffc87af117c75021c7b310145c221b"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java",
+      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java",
+      "upstream_sha256": "74e1239b01957620538c687b446ddd17ede17fb902078cffc0629ab681d2bf7f",
+      "sha256": "1526516680465b9d397e03caeda675d5f68d7f11c964f2d6c880281b99563389",
+      "snapshot": "translation-core/upstream/CaptionLanguagePager.java.txt",
+      "upstream_git_blob": "52f1c42b4ac2f809341ac57bf56e8eecc6442232"
+    },
+    {
+      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/WordTimingReference.java",
+      "destination": "infrastructure/src/main/java/app/yydarlinker/deepseekcaptions/WordTimingReference.java",
+      "upstream_sha256": "348acf82714ee87ba2338e229add3a3ff8b65db024914e5ea29e72336327a399",
+      "sha256": "77a48bf0ca2cf46ea05540f29aad114573545085c0c031868020b9c41fa7e335",
+      "snapshot": "translation-core/upstream/WordTimingReference.java.txt",
+      "upstream_git_blob": "7d66174a3898386544647226cbb8d50f1befa3ff"
+    }
+  ],
+  "snapshot_representation": "Exact Windows checkout bytes; .gitattributes disables conversion. upstream_git_blob identifies the canonical blob in the fixed Git commit.",
+  "adaptation_scope": "platform, output and accounting port extraction; upstream event algorithm and literal protocol preserved",
+  "new_files": [
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/TranslationPresentation.java",
+      "sha256": "242da010efbffa0d72cc96ed661fbd680868a0d6c50e0ccf02b6169fc41ed673",
+      "purpose": "immutable pure upstream page output adapter"
+    }
+  ],
+  "protected_abi": [
+    {
+      "path": "application-host/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekCaptionHook.java",
+      "signatures": [
+        "public static String rewriteUrl(Object cronetEngine, String originalUrl)",
+        "public static void onPlayerType(Enum<?> playerType)",
+        "public static void onVideoId(String videoId)",
+        "public static void onVideoTime(long timeMs)",
+        "public static void setMainActivity(Activity activity)"
+      ]
+    },
+    {
+      "path": "application-host/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekCaptionHookV2.java",
+      "signatures": [
+        "public static String rewriteUrl(Object cronetEngine, String originalUrl)",
+        "public static void onNativeCaptionButtonController(ImageView button)",
+        "public static void onPlayerType(Enum<?> playerType)",
+        "public static void onVideoId(String videoId)",
+        "public static void onVideoTime(long timeMs)",
+        "public static void setMainActivity(Activity activity)"
+      ]
+    },
+    {
+      "path": "application-host/src/main/java/app/yydarlinker/deepseekcaptions/NativeCaptionBridge.java",
+      "signatures": [
+        "public static CharSequence displayName(Object track)",
+        "public static List<?> augmentTranslations(List<?> original)",
+        "public static List<?> nativeTracks(Object manager)",
+        "public static List<?> translatedTracks(Object manager)",
+        "public static Object augmentMetadata(Object metadata)",
+        "public static Object cloneSimplified(Object track)",
+        "public static Object cloneTranslation(Object track,String code)",
+        "public static Object resolveRemembered(Object manager)",
+        "public static String language(Object track)",
+        "public static String nativeModelVideo(Object manager)",
+        "public static String simplifiedUrl(String value)",
+        "public static String simplifiedVss(String value)",
+        "public static String translationLabel(String code)",
+        "public static String translationUrl(String url,String code)",
+        "public static String translationVss(String value,String code)",
+        "public static String url(Object track)",
+        "public static String vss(Object track)",
+        "public static boolean suppressNativeDraw()",
+        "public static int restoreDecision()",
+        "public static void onNativeAppliedEvent(Object manager,Object committed,Object requested,Object origin,int reason,String modelOwner)",
+        "public static void onNativeSelection(Object manager,Object track,Object origin)",
+        "public static void onNativeSelectionApplied(Object manager,Object track,Object origin,int reason,String modelOwner)",
+        "public static void onNativeSelectionWithReason(Object manager,Object track,Object origin,int reason)",
+        "public static void onNativeTrackApplied(Object manager,Object event)",
+        "public static void onOriginalTrackList(List<?> tracks)",
+        "public static void onSelection(Object track)",
+        "public static void selectNative(Object manager,Object track,Object origin,int reason)"
+      ]
+    }
+  ]
+}

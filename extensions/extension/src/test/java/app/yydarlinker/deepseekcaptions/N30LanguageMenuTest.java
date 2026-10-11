@@ -49,12 +49,12 @@ public class N30LanguageMenuTest {
     assertEquals(nativeTracks.size()+3,out.size());assertEquals(nativeTracks,new ArrayList<>(out).stream().filter(nativeTracks::contains).collect(java.util.stream.Collectors.toList()));
     assertSame(out,NativeCaptionBridge.augmentTranslations(out));Set<String> unique=new HashSet<>();for(Object track:out)assertTrue(unique.add(CaptionLanguageSelection.canonical(((Track)track).code)));
     for(int i=1;i<out.size();i++)assertTrue(collator.compare(LanguageMenuOrder.sortLabel(((Track)out.get(i-1)).name),LanguageMenuOrder.sortLabel(((Track)out.get(i)).name))<=0);
-    assertEquals(saved,CaptionLanguageSelection.read(a));assertEquals("",RebuildController.activeUrl());
+    assertEquals(saved,CaptionLanguageSelection.read(a));assertFalse(CaptionActions.isVisibleActive());
     org.json.JSONArray menu=new org.json.JSONArray();for(int p=0;p<out.size();p++){Track t=(Track)out.get(p);menu.put(new org.json.JSONObject().put("code",t.code).put("canonical_code",CaptionLanguageSelection.canonical(t.code)).put("display_name",t.name).put("position",p).put("native_object",nativeTracks.contains(t)));}
     evidence.put(new org.json.JSONObject().put("locale",tag).put("ai_enabled",enabled).put("menu",menu));
    }
   }
-  N28CGeometryTest.export("n30-menu-runtime.json",new org.json.JSONObject().put("rows",evidence).put("host_model","verified_track_seam_with_test_host_models"));
+  N39TestEvidence.export("n30-menu-runtime.json",new org.json.JSONObject().put("rows",evidence).put("host_model","verified_track_seam_with_test_host_models"));
  }
  static byte[] entry(String code,String label){ByteArrayOutputStream e=new ByteArrayOutputStream(),n=new ByteArrayOutputStream();CaptionLanguageMetadata.write(e,1,code.getBytes(java.nio.charset.StandardCharsets.UTF_8));CaptionLanguageMetadata.write(n,4,label.getBytes(java.nio.charset.StandardCharsets.UTF_8));CaptionLanguageMetadata.write(e,2,n.toByteArray());return e.toByteArray();}
  @Test public void metadataIsIdempotentPreservesNativeBytesAndUsesActualNativeLabel(){
@@ -67,7 +67,7 @@ public class N30LanguageMenuTest {
   CaptionLanguageSelection.save(a,Arrays.asList("ja","fr"));Set<String> saved=CaptionLanguageSelection.read(a);ai=false;
   Track t=new Track("en","English");List<Track> before=Arrays.asList(t);assertSame(before,NativeCaptionBridge.augmentTranslations(before));
   simplified=true;List<?> out=NativeCaptionBridge.augmentTranslations(before);assertEquals(2,out.size());assertFalse(DeepSeekConfig.enabled(a));assertEquals(saved,CaptionLanguageSelection.read(a));
-  assertFalse(NativeCaptionBridge.enabled());assertEquals("",RebuildController.activeUrl());
+  assertFalse(NativeCaptionBridge.enabled());assertFalse(CaptionActions.isVisibleActive());
  }
  @Test public void nativeDialogCancelDoesNotSaveAndSaveCanRemainEmptyWhileAiOff(){
   CaptionLanguagesPreference pref=new CaptionLanguagesPreference(a);AlertDialog dialog=pref.showLanguages();Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();dialog.getListView().performItemClick(dialog.getListView().getChildAt(0),0,0);

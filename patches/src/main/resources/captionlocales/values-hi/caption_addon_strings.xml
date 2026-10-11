@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"API कुंजी मिटाएँ"</string>
     <string name="cap_diagnostic_hint" formatted="false">"निदान रिकॉर्ड देखने और कॉपी करने के लिए विस्तार करें"</string>
     <string name="cap_diagnostics" formatted="false">"उपशीर्षक निदान"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"लंबे परीक्षणों के लिए टेक्स्ट डिबगिंग चालू करें; पूरा डायग्नॉस्टिक्स सहेजें अंतिम 24 घंटे के रिकॉर्ड निर्यात करता है (16 MiB की सीमा)। नीचे केवल हाल की गतिविधि का सारांश है।"</string>
+    <string name="cap_diagnostics_hint" formatted="false">"लंबे परीक्षणों के लिए टेक्स्ट डिबगिंग चालू करें; पूरा डायग्नॉस्टिक्स सहेजें अंतिम 24 घंटे के रिकॉर्ड निर्यात करता है (16 MiB की सीमा)। नीचे केवल हाल की गतिविधि का सारांश है। पूर्वावलोकन सीमित है; कॉपी और सहेजने में पूरी रिपोर्ट शामिल होती है।"</string>
     <string name="cap_display_debug" formatted="false">"टेक्स्ट डिबगिंग: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"AI उपशीर्षक अनुवाद चालू करें"</string>
     <string name="cap_engine" formatted="false">"इंजन"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"प्रोफ़ाइल जोड़ें"</string>
     <string name="cap_profile_add_failed" formatted="false">"प्रोफ़ाइल नहीं जुड़ सकी। फ़ील्ड और 30 प्रोफ़ाइल की सीमा जाँचें।"</string>
     <string name="cap_profile_clear_key" formatted="false">"इस प्रोफ़ाइल की API कुंजी साफ़ करें"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"केवल इस प्रोफ़ाइल की सहेजी कुंजी और बिना सहेजी कुंजी प्रविष्टि साफ़ करता है। पता, मॉडल, निर्देश और अन्य प्रोफ़ाइल बने रहते हैं। प्रदाता की ओर से कुंजी रद्द नहीं होती।"</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"केवल इस प्रोफ़ाइल की सहेजी गई कुंजी और अभी न सहेजी गई कुंजी का इनपुट मिटाएँ। पता और मॉडल बने रहते हैं; अन्य प्रोफ़ाइल नहीं बदलते। प्रदाता के पास कुंजी रद्द नहीं होती।"</string>
     <string name="cap_profile_close" formatted="false">"बंद करें"</string>
     <string name="cap_profile_collapse" formatted="false">"विकल्प समेटें"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"मिटाने की पुष्टि करें"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"मूल कॉन्फ़िगरेशन"</string>
     <string name="cap_profile_delete" formatted="false">"प्रोफ़ाइल मिटाएँ"</string>
     <string name="cap_profile_delete_inline" formatted="false">"इस प्रोफ़ाइल और डिवाइस पर सहेजी कुंजी को मिटाएँ? अन्य प्रोफ़ाइल सुरक्षित रहेंगी। यह वापस नहीं हो सकता।"</string>
-    <string name="cap_profile_delete_summary" formatted="false">"इस प्रोफ़ाइल का पता, मॉडल, अनुवाद निर्देश और एन्क्रिप्टेड कुंजी इस डिवाइस से मिटाता है। अन्य प्रोफ़ाइल और उपशीर्षक सेटिंग रहती हैं। सक्रिय प्रोफ़ाइल हटने पर पहली बची प्रोफ़ाइल सक्रिय होगी। यह वापस नहीं हो सकता।"</string>
+    <string name="cap_profile_delete_summary" formatted="false">"इस डिवाइस से प्रोफ़ाइल का पता, मॉडल और एन्क्रिप्ट की गई कुंजी हटाएँ। अन्य प्रोफ़ाइल और उपशीर्षक सेटिंग बनी रहती हैं। वर्तमान प्रोफ़ाइल हटाने पर बचा हुआ पहला प्रोफ़ाइल सक्रिय होता है। इसे वापस नहीं किया जा सकता।"</string>
     <string name="cap_profile_delete_switch" formatted="false">"मिटाने के बाद सक्रिय करें:"</string>
     <string name="cap_profile_finish_name" formatted="false">"पहले नाम का बदलाव सहेजें या रद्द करें।"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"प्रोफ़ाइल बदलने से पहले अधूरे फ़ील्ड सुधारें"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"प्रोफ़ाइल विकल्प"</string>
     <string name="cap_profile_name" formatted="false">"प्रोफ़ाइल नाम"</string>
     <string name="cap_profile_name_error" formatted="false">"1–60 अक्षरों का नाम दर्ज करें"</string>
-    <string name="cap_profile_new_summary" formatted="false">"नई प्रोफ़ाइल में डिफ़ॉल्ट अनुवाद निर्देश होते हैं, पर कुंजी और मॉडल नहीं। बनाने के बाद सेटिंग में फ़ील्ड भरें।"</string>
+    <string name="cap_profile_new_summary" formatted="false">"नए प्रोफ़ाइल में कुंजी या मॉडल कॉपी नहीं होता। बनाने के बाद API सेटिंग भरें।"</string>
     <string name="cap_profile_rename" formatted="false">"नाम बदलें"</string>
     <string name="cap_profile_save" formatted="false">"सहेजें"</string>
     <string name="cap_profiles_summary" formatted="false">"वर्तमान प्रोफ़ाइल प्रबंधित करें"</string>
     <string name="cap_profiles_title" formatted="false">"API प्रोफ़ाइल"</string>
-    <string name="cap_prompt_summary" formatted="false">"इस प्रोफ़ाइल में सहेजा जाता है। खाली करने पर इंटरफ़ेस की भाषा में डिफ़ॉल्ट निर्देश लौटेंगे। आपके बदलाव सुरक्षित रहेंगे।"</string>
+    <string name="cap_prompt_summary" formatted="false">"कस्टम पसंद केवल शब्दावली और शैली बदलती है। मूल के प्रति निष्ठा, लक्ष्य भाषा और मूल पाठ से संबंध तय हैं। इस प्रोफ़ाइल में सहेजा जाता है; डिफ़ॉल्ट बहाल करने के लिए खाली करें।"</string>
     <string name="cap_quality_outcome" formatted="false">"स्थानीय जाँच: स्वीकार / अस्वीकार (गुणवत्ता)"</string>
     <string name="cap_recent_trace" formatted="false">"हाल की घटनाएँ: "</string>
     <string name="cap_refresh" formatted="false">"रीफ़्रेश"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s; पिछला मान्य मान रखा गया है"</string>
     <string name="cap_model_ids_empty" formatted="false">"एंडपॉइंट ने चुनने योग्य मॉडल ID नहीं लौटाए"</string>
     <string name="cap_diagnostics_loading" formatted="false">"निदान लोड हो रहा है…"</string>
+    <string name="cap_planner_model" formatted="false">"स्रोत अर्थ तैयारी मॉडल (वैकल्पिक)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"खाली छोड़ने पर अनुवाद मॉडल का उपयोग होगा। उसी API URL और कुंजी का उपयोग करता है; दूसरा मॉडल अपने-आप नहीं चुनता।"</string>
 </resources>

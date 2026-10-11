@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"刪除 API Key"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展開查看並複製診斷記錄"</string>
     <string name="cap_diagnostics" formatted="false">"字幕診斷"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"長時間測試請開啟顯示文字偵錯；儲存完整診斷可匯出最近 24 小時記錄（容量上限 16 MiB）。下方僅顯示最近摘要。"</string>
+    <string name="cap_diagnostics_hint" formatted="false">"長時間測試請開啟顯示文字偵錯；儲存完整診斷可匯出最近 24 小時記錄（容量上限 16 MiB）。下方僅顯示最近摘要。 預覽有長度上限；複製與儲存保留完整報告。"</string>
     <string name="cap_display_debug" formatted="false">"顯示文字偵錯：%1$s"</string>
     <string name="cap_enable_ai" formatted="false">"啟用 AI 字幕翻譯"</string>
     <string name="cap_engine" formatted="false">"引擎"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"新增方案"</string>
     <string name="cap_profile_add_failed" formatted="false">"無法新增方案，請檢查輸入及 30 套方案上限。"</string>
     <string name="cap_profile_clear_key" formatted="false">"清除此方案的 API Key"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"僅清除此方案已儲存及尚未儲存的金鑰輸入，保留網址、模型與翻譯要求；其他方案不受影響。此操作不會向供應商註銷金鑰。"</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"僅清除此方案已儲存及尚未儲存的金鑰輸入，保留位址和模型；其他方案不受影響。此操作不會在服務商處註銷金鑰。"</string>
     <string name="cap_profile_close" formatted="false">"關閉"</string>
     <string name="cap_profile_collapse" formatted="false">"收起操作"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"確認刪除"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"原有設定"</string>
     <string name="cap_profile_delete" formatted="false">"刪除方案"</string>
     <string name="cap_profile_delete_inline" formatted="false">"刪除此方案及其儲存在本機的金鑰？其他方案不受影響，此操作無法復原。"</string>
-    <string name="cap_profile_delete_summary" formatted="false">"從本機刪除此方案的網址、模型、翻譯要求與加密金鑰，保留其他方案及字幕設定。若刪除目前方案，將啟用剩餘的第一套方案。此操作無法復原。"</string>
+    <string name="cap_profile_delete_summary" formatted="false">"從本機刪除此方案的位址、模型和加密金鑰，保留其他方案及字幕設定。若刪除目前方案，將啟用剩餘的第一套方案。此操作無法復原。"</string>
     <string name="cap_profile_delete_switch" formatted="false">"刪除後將啟用："</string>
     <string name="cap_profile_finish_name" formatted="false">"請先儲存或取消名稱修改。"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"請先修正目前未完成的輸入，再切換方案"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"方案操作"</string>
     <string name="cap_profile_name" formatted="false">"方案名稱"</string>
     <string name="cap_profile_name_error" formatted="false">"請輸入 1–60 個字元的方案名稱"</string>
-    <string name="cap_profile_new_summary" formatted="false">"新方案附有預設翻譯要求，不複製金鑰和模型。建立後請在設定頁面填妥相關欄位。"</string>
+    <string name="cap_profile_new_summary" formatted="false">"新方案不複製金鑰和模型。建立後補齊 API 設定。"</string>
     <string name="cap_profile_rename" formatted="false">"重新命名"</string>
     <string name="cap_profile_save" formatted="false">"儲存"</string>
     <string name="cap_profiles_summary" formatted="false">"管理目前方案"</string>
     <string name="cap_profiles_title" formatted="false">"API 設定方案"</string>
-    <string name="cap_prompt_summary" formatted="false">"僅用於目前方案。清空後恢復預設要求；預設文字隨介面語言切換，自訂內容保持不變。"</string>
+    <string name="cap_prompt_summary" formatted="false">"自訂要求用於措辭和語氣；字幕忠實性、目標語言與來源歸屬固定。僅用於目前方案，清空恢復預設要求。"</string>
     <string name="cap_quality_outcome" formatted="false">"本機驗證：接受 / 拒絕（其中品質問題）"</string>
     <string name="cap_recent_trace" formatted="false">"最近事件："</string>
     <string name="cap_refresh" formatted="false">"重新整理"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s；保留上次有效值"</string>
     <string name="cap_model_ids_empty" formatted="false">"介面未傳回可選擇的模型 ID"</string>
     <string name="cap_diagnostics_loading" formatted="false">"正在讀取診斷…"</string>
+    <string name="cap_planner_model" formatted="false">"來源意義準備模型（選填）"</string>
+    <string name="cap_planner_model_hint" formatted="false">"留空使用翻譯模型；僅透過相同 API 網址與 Key 呼叫，不自動選擇其他模型"</string>
 </resources>

@@ -1,0 +1,279 @@
+{
+  "files": [
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/AddonSwitchPreference.java",
+      "sha256": "00e9bf7d5e24b1e0e01c9101098dafb067ea5ad851b598f3b05c05006ad1fd4c",
+      "bytes": 2264
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/ApiInputPolicy.java",
+      "sha256": "a88e4dbb3d7d32e184ddb1f34e3fcfbeb364d20fed2b03806ad8535ac090cda0",
+      "bytes": 819
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/ApiKeyPreference.java",
+      "sha256": "bf35ef9cedec97c9a515feb8208c0c5e91e5bc2b8bdd07443528a0a97850afae",
+      "bytes": 555
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/ApiProfilesPreference.java",
+      "sha256": "66ae24076b800e8e4816508ac140fd715cca1788ce1fbef0c470d71e6452601b",
+      "bytes": 16021
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionAddonSupport.java",
+      "sha256": "689c55816eccbb63ee8f3a2d44c978bcdcb2a933cd9130225ae0d110298176fa",
+      "bytes": 909
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionButtonController.java",
+      "sha256": "45329938fac94d9c66b191d5593f6f0a5cf5666dfd95b7882d5d34dbd3b1e6dd",
+      "bytes": 38476
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionChoice.java",
+      "sha256": "0223b2ee32bc4bbad1516e690f353e81790ebf6812d4dce263487e6f41538341",
+      "bytes": 1170
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionEditorIds.java",
+      "sha256": "64566c9c9aea35644e02f3e251c5c3382bec1b387182190a225d7495a02d6bc8",
+      "bytes": 2230
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionEditorViewport.java",
+      "sha256": "c08cdd4c20829548b63a3a371bf08d303ef6eacde12279e89aba5d44a938584e",
+      "bytes": 14701
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionFlyoutPreference.java",
+      "sha256": "458bff811b90c6ff79cd5632ef8c69755df460187dadfba3f635e1de89da9abb",
+      "bytes": 2073
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionHorizontalPlacement.java",
+      "sha256": "eb1a5537a9afd445108c587e93d964f7df94eccefb7027f65380485448ae3b11",
+      "bytes": 4532
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionInputPolicy.java",
+      "sha256": "6f5b8f48fdcef837bcb856a41c719925951b5794c5d4378baed3456a095170c0",
+      "bytes": 307
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguageMetadata.java",
+      "sha256": "1e2b9e1f8864f1d77001f76bef0c075239386572b01e296fa51a9c911c8bd002",
+      "bytes": 4814
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguageSelection.java",
+      "sha256": "238b13e4a818ac3727f79b8af0538890438cf5370f1f07d0d894c1ac03f624a6",
+      "bytes": 2135
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagesPreference.java",
+      "sha256": "1d00286d73185f7460908beafbedd2dfd9e5ecd1dd96a9185cfe9d85ca30e2bd",
+      "bytes": 4132
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLocaleSubscription.java",
+      "sha256": "a259d780a513bee3adff28bc59d63a0811615b8684526220daa528430be29331",
+      "bytes": 4772
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionModePolicy.java",
+      "sha256": "a8d250ace74d54e7cfd2bf74f099e70626e2ba64f54b4f65a4f287fc436ed996",
+      "bytes": 380
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionQuickToggle.java",
+      "sha256": "d34a5f8c68b2f5d699ecca4036599b481150b8d3d0752403dbef22e0a6a7dcbb",
+      "bytes": 5244
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionSettingCategory.java",
+      "sha256": "cd9cf7545f9c6f0f1c516290b510d6dabe89de2af4887f5170b550fba3c12471",
+      "bytes": 1223
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionSettingPreference.java",
+      "sha256": "89303ecb4c3b4f399221dcf2ca3e3159e407a07014f2f834eef0846683f6df4f",
+      "bytes": 6526
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionSettingsDialogs.java",
+      "sha256": "6a338457ee106bfac8741ea24d2c658052ef5627bdc43a57db124023b00dd9e2",
+      "bytes": 5014
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionSettingsStyle.java",
+      "sha256": "cfe1db4e80e42da940efcd0fef18aa700d8141e31fa79c5e01977bec3512601a",
+      "bytes": 6642
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionShortsFlyoutPreference.java",
+      "sha256": "ba10fc6ac63ce71529d7d0e94b0e2fc982dfb2597d6332201396e9931aa2c83e",
+      "bytes": 980
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionStrings.java",
+      "sha256": "ee2f24d76ecf57bb9ea1cbf6167b602ee0ec87a985f757410038be44acbea400",
+      "bytes": 817
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionTextResolver.java",
+      "sha256": "6631f3620ce8bb19a40e0ebb39247448fef06d3fb31a5e54b16e489756dc66d4",
+      "bytes": 5645
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionTranslationCatalog.java",
+      "sha256": "d6b38bf3027c2cc86a17cbd6873b2998bd64e8bdb9a0ff4d9212cf2b51514954",
+      "bytes": 271368
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekActionPreference.java",
+      "sha256": "87edd015b2b5c23f44f2b850db83f1c8e6600faab38765976e0d8c9da42159b5",
+      "bytes": 5047
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekDiagnosticsPreference.java",
+      "sha256": "4efd7fe472e6440840dbfccf77ef2e20fe40d8e7b6c45290672bf54f6e604569",
+      "bytes": 14337
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekDisplayTextDebugPreference.java",
+      "sha256": "59a494fe3f1fd96d44fbb7d0b34a55b85fca9705cf0578a42e755e4c219fddc3",
+      "bytes": 1934
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekEnabledPreference.java",
+      "sha256": "ed09cb2dac0bb2a0acc9f1d44b2c5318d1994ceec74c206f682628736c44239b",
+      "bytes": 2759
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekModelCatalog.java",
+      "sha256": "75c7dc2b0e7394400a4bd82cabc9428931b09fe9ee258f760d10117377595b7b",
+      "bytes": 287
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekModelPreference.java",
+      "sha256": "7eb3f700959120e6615645a4687c8c60d200bf23ad94df182f709b17016570c3",
+      "bytes": 24049
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekSliderPreference.java",
+      "sha256": "293aa370ff5ef5feae698c7d994a75c7117bfa5bf598bc60d0419a3f363a6be4",
+      "bytes": 31694
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekTextPreference.java",
+      "sha256": "6582a93e12310fc9315fb6d1816f0bb0b99ec22fb6773c143174d54ea9915dad",
+      "bytes": 13378
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/InlineCaptionEditor.java",
+      "sha256": "e0d9851da8511b2abb2b98300836ae0717415e6952af9bbd0881349115e4a7b2",
+      "bytes": 6134
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/LanguageMenuOrder.java",
+      "sha256": "bed8df11267376f8156be63152418de7f1f552a07ab8a5dd49a563d7b5bba65f",
+      "bytes": 2339
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/ProfileActionStrip.java",
+      "sha256": "1914dd6da8b6d6095115023c6aa259fcd00a403751e5d4a98ebba295fd98a42e",
+      "bytes": 5510
+    },
+    {
+      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/SubtitleStylePreview.java",
+      "sha256": "ca8a870b04ae48a142db6bf75c1891e096fef34052a63f01fb50187cca750806",
+      "bytes": 14575
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/index.txt",
+      "sha256": "c77efa1a84b7b3bc11f8c04575b9871af2330f1060239ecf1a5c24ab1562c07f",
+      "bytes": 145
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/source-keys.tsv",
+      "sha256": "214c777fc0fe3ae1e79a6794cee085bb964e0d8b4843873a82f13bb21b5b16a4",
+      "bytes": 7457
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values/caption_addon_strings.xml",
+      "sha256": "676cd7d296a6c80275b034414c8ab844428ab013c4a4dfe6e84283a02b6207d6",
+      "bytes": 26582
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-ar/caption_addon_strings.xml",
+      "sha256": "4ddc05cc1ff558a09eecb6fd7d33efeee8516c62e3f15bd3c7804dde639525df",
+      "bytes": 32366
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-de/caption_addon_strings.xml",
+      "sha256": "783b10b4053f386a0cdb17ef4bc75e4e9186e1393205641e6ace3a09eacb6689",
+      "bytes": 28407
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-es/caption_addon_strings.xml",
+      "sha256": "8f4db7f60b6f256e223797a5a742d819a5d32b12bf464626c02e1773bbc60a9d",
+      "bytes": 28312
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-fr/caption_addon_strings.xml",
+      "sha256": "66f9c65bdd47b3ad74d4697fc705f032d28f2842db56061a51ab70233612de5d",
+      "bytes": 28901
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-hi/caption_addon_strings.xml",
+      "sha256": "0db3409d07a2d6d1d01a0b62591be89a69ddbd2231be12a0731fb775a8a1a3df",
+      "bytes": 39404
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-in/caption_addon_strings.xml",
+      "sha256": "897d93100a49179ed0d5e5686b80e003215a0cf9fed23fd2f42fd45545dadc7c",
+      "bytes": 27001
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-ja/caption_addon_strings.xml",
+      "sha256": "e4ead31097a1b78002868419a371fcb53a9dd2903e9bedd80284331f79d6c48b",
+      "bytes": 30049
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-ko/caption_addon_strings.xml",
+      "sha256": "b955042ede7cc2d2ac2ec1c802fb69d97e8c8cab54081b9095b90447d72e63d3",
+      "bytes": 28180
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-pt/caption_addon_strings.xml",
+      "sha256": "1adf0eec1d8810c65b25beaba2628fcbeb7d45241ee6741a7f5a0781262accea",
+      "bytes": 27985
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-ru/caption_addon_strings.xml",
+      "sha256": "53141d22e69aa15ccbcce4865f80fb0fa11e952b54b9a5f2ad0e8528d21d48cc",
+      "bytes": 35122
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-vi/caption_addon_strings.xml",
+      "sha256": "83caebc1bd58f0981f09b06714b623197f982c2f958a1535291e7c98c542295b",
+      "bytes": 29166
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-zh-rCN/caption_addon_strings.xml",
+      "sha256": "dab4b8bf34899f0f9061c3f3ab13084cca8fb36560e217ef100803be153c845f",
+      "bytes": 26091
+    },
+    {
+      "path": "patches/src/main/resources/captionlocales/values-zh-rTW/caption_addon_strings.xml",
+      "sha256": "7e2711fb84dbbc1f0ec2d060933541ec1861e0601a0c7ecb92892aa286abc496",
+      "bytes": 25902
+    },
+    {
+      "path": "localization/catalog.json",
+      "sha256": "cf2554283c58998065d2dd8c2a30a0969fe8120b3b7461a91aae9ba6421212e6",
+      "bytes": 291533
+    }
+  ]
+}

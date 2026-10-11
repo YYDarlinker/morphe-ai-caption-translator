@@ -266,15 +266,6 @@ internal val deepSeekCaptionResourcePatch = resourcePatch(
                 )
             }
 
-            screen.addCategory("翻译").apply {
-                addPreference(
-                    TEXT_PREF_CLASS,
-                    "deepseek_caption_prompt",
-                    "翻译要求",
-                    "各方案独立保存；清空恢复随界面语言变化的默认要求",
-                )
-            }
-
             screen.addCategory("字幕样式").apply {
                 addPreference("app.yydarlinker.deepseekcaptions.SubtitleStylePreview",
                     "deepseek_caption_style_preview", "字幕预览")

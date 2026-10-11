@@ -145,3 +145,7 @@ local.properties
 
 # Editor compilation output; the current Gradle build supplies all distributed code.
 /patches/bin/
+
+# Local verification artifacts and toolchains
+/work/
+/validation/

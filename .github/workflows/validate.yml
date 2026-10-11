@@ -36,7 +36,7 @@ jobs:
         with:
           name: caption-validation-${{ github.sha }}
           path: |
-            extensions/extension/build/reports/tests/
-            extensions/extension/build/test-results/
-            patches/build/libs/*.mpp
+            build/n39/gradle/extensions/extension/reports/tests/
+            build/n39/gradle/extensions/extension/test-results/
+            build/n39/gradle/patches/libs/*.mpp
           retention-days: 7

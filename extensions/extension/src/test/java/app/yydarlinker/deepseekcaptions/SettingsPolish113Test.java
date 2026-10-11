@@ -76,12 +76,12 @@ public class SettingsPolish113Test {
         // The inset is what lets the two end labels stay centred on their ticks inside the row.
         int inset=slider.railInsetPx();
         assertEquals("the row must reserve room for the end labels",slider.railInsetPx(),inset);
-        assertEquals("rail must start at the padded frame edge plus the label inset",
-                slider.getPaddingLeft()+inset,slider.railStart(),0f);
-        assertEquals("rail must end at the padded frame edge minus the label inset",
-                slider.getWidth()-slider.getPaddingRight()-inset,slider.railEnd(),0f);
-        assertEquals("first tier sits on the rail start",slider.railStart(),slider.tickCenterX(0),0f);
-        assertEquals("last tier sits on the rail end",slider.railEnd(),slider.tickCenterX(4),0f);
+        assertEquals("N38 native left padding includes the label inset",
+                slider.getPaddingLeft(),slider.railStart(),0f);
+        assertEquals("N38 native right padding includes the label inset",
+                slider.getWidth()-slider.getPaddingRight(),slider.railEnd(),0f);
+        assertEquals("first logical tier uses the resolved direction",slider.getLayoutDirection()==View.LAYOUT_DIRECTION_RTL?slider.railEnd():slider.railStart(),slider.tickCenterX(0),0f);
+        assertEquals("last logical tier uses the resolved direction",slider.getLayoutDirection()==View.LAYOUT_DIRECTION_RTL?slider.railStart():slider.railEnd(),slider.tickCenterX(4),0f);
         for(int tier=0;tier<5;tier++){
             assertEquals("tier "+tier+" tick must equal its thumb centre",
                     slider.thumbCenterX(tier/4f),slider.tickCenterX(tier),0f);
@@ -136,6 +136,7 @@ public class SettingsPolish113Test {
             View root=preference.onCreateView(new FrameLayout(activity));root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             SeekBar slider=(SeekBar)root.findViewWithTag("ai_size_tier_slider");
             root.measure(View.MeasureSpec.makeMeasureSpec(420,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,420,root.getMeasuredHeight());
+            Shadows.shadowOf(slider).getOnSeekBarChangeListener().onStartTrackingTouch(slider);
             for(int tier=0;tier<5;tier++){
                 slider.setProgress(tier);Shadows.shadowOf(slider).getOnSeekBarChangeListener().onProgressChanged(slider,tier,true);assertTierRail(root,tier);
             }
@@ -152,6 +153,7 @@ public class SettingsPolish113Test {
                 SeekBar slider=(SeekBar)root.findViewWithTag("ai_size_tier_slider");
                 for(int width:new int[]{320,420,960}){
                     root.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,width,root.getMeasuredHeight());
+                    Shadows.shadowOf(slider).getOnSeekBarChangeListener().onStartTrackingTouch(slider);
                     for(int tier=0;tier<5;tier++){
                         slider.setProgress(tier);Shadows.shadowOf(slider).getOnSeekBarChangeListener().onProgressChanged(slider,tier,true);
                         assertTierRail(root,tier);

@@ -16,8 +16,8 @@ import java.util.jar.Manifest
 fun main() {
     val version=File("../gradle.properties").readLines().map { it.trim() }
         .first { it.startsWith("version") && it.contains("=") }.substringAfter("=").trim()
-    val selected=File("build/libs/patches-$version.mpp")
-    require(selected.isFile) { "Missing current version bundle: $selected" }
+    val candidates=listOf(File("build/libs/patches-$version.mpp"),File("../build/n39/gradle/patches/libs/patches-$version.mpp"))
+    val selected=candidates.firstOrNull { it.isFile } ?: error("Missing current version bundle: ${candidates.joinToString()}")
     val patchFiles=setOf(selected)
     val loadedPatches = loadPatchesFromJar(patchFiles)
     val patchClassLoader = URLClassLoader(patchFiles.map { it.toURI().toURL() }.toTypedArray())

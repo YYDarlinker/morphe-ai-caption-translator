@@ -175,10 +175,8 @@ public class CaptionEditorViewportTest {
     @Test public void stableFieldIdsDifferPerField(){
         int url=CaptionEditorIds.forKey(DeepSeekTextPreference.KEY_BASE_URL);
         int key=CaptionEditorIds.forKey(DeepSeekTextPreference.KEY_API_KEY);
-        int prompt=CaptionEditorIds.forKey(DeepSeekTextPreference.KEY_PROMPT);
         int model=CaptionEditorIds.forKey(DeepSeekModelPreference.KEY_MODEL);
         assertEquals("the same field keeps one id across rebinds",url,CaptionEditorIds.forKey(DeepSeekTextPreference.KEY_BASE_URL));
-        assertNotEquals(url,key);assertNotEquals(url,prompt);assertNotEquals(key,prompt);
-        assertNotEquals(url,model);assertNotEquals(key,model);assertNotEquals(prompt,model);
+        assertNotEquals(url,key);assertNotEquals(url,model);assertNotEquals(key,model);
     }
 }

@@ -2,7 +2,7 @@
 import hashlib, json, sys, zipfile, io
 from pathlib import Path
 v=sys.argv[1]
-p=Path(f"patches/build/libs/patches-{v}.mpp")
+p=Path(f"build/n39/gradle/patches/libs/patches-{v}.mpp")
 with zipfile.ZipFile(p) as z:
     assert z.testzip() is None, "corrupt MPP"
     assert "classes.dex" in z.namelist(), "Manager requires root Android DEX"

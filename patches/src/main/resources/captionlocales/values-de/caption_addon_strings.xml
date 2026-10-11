@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"API-Schlüssel löschen"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Zum Anzeigen und Kopieren der Diagnose aufklappen"</string>
     <string name="cap_diagnostics" formatted="false">"Untertiteldiagnose"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"Für lange Tests die Textdiagnose einschalten; Vollständige Diagnose speichern exportiert die letzten 24 Stunden (Obergrenze 16 MiB). Die Zusammenfassung unten zeigt nur die letzten Aktivitäten."</string>
+    <string name="cap_diagnostics_hint" formatted="false">"Für lange Tests die Textdiagnose einschalten; Vollständige Diagnose speichern exportiert die letzten 24 Stunden (Obergrenze 16 MiB). Die Zusammenfassung unten zeigt nur die letzten Aktivitäten. Die Vorschau ist begrenzt; Kopieren und Speichern enthalten den vollständigen Bericht."</string>
     <string name="cap_display_debug" formatted="false">"Textdiagnose: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"KI-Übersetzung aktivieren"</string>
     <string name="cap_engine" formatted="false">"Engine"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"Profil hinzufügen"</string>
     <string name="cap_profile_add_failed" formatted="false">"Profil konnte nicht hinzugefügt werden. Eingaben und Grenze von 30 Profilen prüfen."</string>
     <string name="cap_profile_clear_key" formatted="false">"API-Schlüssel dieses Profils löschen"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"Löscht nur den gespeicherten Schlüssel und die ungespeicherte Schlüsseleingabe dieses Profils. Adresse, Modell und Vorgaben sowie andere Profile bleiben erhalten. Der Schlüssel wird beim Anbieter nicht widerrufen."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Gespeicherten Schlüssel und ausstehende Schlüsseleingabe dieses Profils löschen. Adresse und Modell bleiben erhalten; andere Profile bleiben unverändert. Der Schlüssel wird beim Anbieter nicht widerrufen."</string>
     <string name="cap_profile_close" formatted="false">"Schließen"</string>
     <string name="cap_profile_collapse" formatted="false">"Aktionen einklappen"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Löschen bestätigen"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"Bisherige Konfiguration"</string>
     <string name="cap_profile_delete" formatted="false">"Profil löschen"</string>
     <string name="cap_profile_delete_inline" formatted="false">"Dieses Profil und seinen gespeicherten Schlüssel vom Gerät löschen? Andere Profile bleiben erhalten. Dies lässt sich nicht rückgängig machen."</string>
-    <string name="cap_profile_delete_summary" formatted="false">"Löscht Adresse, Modell, Übersetzungsvorgaben und verschlüsselten Schlüssel dieses Profils vom Gerät. Andere Profile und Untertiteleinstellungen bleiben erhalten. Bei einem aktiven Profil wird das erste verbleibende Profil aktiviert. Dies lässt sich nicht rückgängig machen."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Adresse, Modell und verschlüsselten Schlüssel dieses Profils auf diesem Gerät löschen. Andere Profile und Untertiteleinstellungen bleiben erhalten. Beim Löschen des aktiven Profils wird das erste verbleibende aktiviert. Dies lässt sich nicht rückgängig machen."</string>
     <string name="cap_profile_delete_switch" formatted="false">"Nach dem Löschen aktivieren:"</string>
     <string name="cap_profile_finish_name" formatted="false">"Namensänderung zuerst speichern oder abbrechen."</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Unvollständige Eingaben vor dem Profilwechsel korrigieren"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"Profilaktionen"</string>
     <string name="cap_profile_name" formatted="false">"Profilname"</string>
     <string name="cap_profile_name_error" formatted="false">"Name mit 1–60 Zeichen eingeben"</string>
-    <string name="cap_profile_new_summary" formatted="false">"Neue Profile enthalten Standardübersetzungsvorgaben, aber keinen Schlüssel und kein Modell. Ergänzen Sie die Felder in den Einstellungen."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Neue Profile übernehmen weder Schlüssel noch Modell. Vervollständigen Sie nach dem Anlegen die API-Einstellungen."</string>
     <string name="cap_profile_rename" formatted="false">"Umbenennen"</string>
     <string name="cap_profile_save" formatted="false">"Speichern"</string>
     <string name="cap_profiles_summary" formatted="false">"Aktuelles Profil verwalten"</string>
     <string name="cap_profiles_title" formatted="false">"API-Profile"</string>
-    <string name="cap_prompt_summary" formatted="false">"Für dieses Profil gespeichert. Leeren stellt die Vorgaben in der Sprache der Oberfläche wieder her. Eigene Texte bleiben unverändert."</string>
+    <string name="cap_prompt_summary" formatted="false">"Eigene Vorgaben beeinflussen Formulierung und Sprachstil. Inhaltstreue, Zielsprache und Zuordnung zum Original sind fest. Für dieses Profil gespeichert; leeren, um die Vorgabe wiederherzustellen."</string>
     <string name="cap_quality_outcome" formatted="false">"Lokale Prüfung: akzeptiert / abgelehnt (Qualität)"</string>
     <string name="cap_recent_trace" formatted="false">"Letzte Ereignisse: "</string>
     <string name="cap_refresh" formatted="false">"Aktualisieren"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s; der letzte gültige Wert bleibt erhalten"</string>
     <string name="cap_model_ids_empty" formatted="false">"Der Endpunkt hat keine auswählbaren Modell-IDs zurückgegeben"</string>
     <string name="cap_diagnostics_loading" formatted="false">"Diagnose wird geladen…"</string>
+    <string name="cap_planner_model" formatted="false">"Modell zur Vorbereitung der Quellbedeutung (optional)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"Leer lassen, um das Übersetzungsmodell zu nutzen. Gleiche API-URL und gleicher Schlüssel; kein automatischer Modellwechsel."</string>
 </resources>

@@ -115,26 +115,12 @@ public class ProfileUiRegressionTest {
         String b=ApiProfiles.create(a,"B","https://b.example");
         a.getSharedPreferences("deepseek_caption_secret",0).edit().putString("api_key_ciphertext","A").putString("api_key_ciphertext_"+b,"B").apply();
         ApiProfiles.delete(a,"default");
-        assertEquals(b,ApiProfiles.active(a));assertTrue(DeepSeekConfig.enabled(a));assertEquals(3,DeepSeekConfig.load(a).captionSizeTier);
+        assertEquals(b,ApiProfiles.active(a));assertTrue(DeepSeekConfig.enabled(a));assertEquals(3,DeepSeekConfig.displayStyle(a).captionSizeTier);
         assertFalse(DeepSeekConfig.flyoutMenuEnabled(a));assertFalse(ApiProfiles.values(a,"default").contains("prompt"));
         assertFalse(ApiProfiles.list(a.getApplicationContext()).containsKey("default"));assertTrue(SecureApiKey.hasSavedValue(a));
     }
-    @Test public void newProfilePromptIsEditableAndStoredSeparately(){
-        String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
-        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        EditText editor=CaptionEditorIds.editorIn(p.getView(null,new LinearLayout(a)));
-        assertEquals(DeepSeekConfig.defaultPrompt(a),editor.getText().toString());assertTrue(editor.isEnabled());assertTrue(editor.isFocusableInTouchMode());
-        editor.setText("Keep technical names unchanged.");assertTrue(p.flushProfile());
-        assertEquals("Keep technical names unchanged.",ApiProfiles.values(a,b).getString("prompt",""));
-        ApiProfiles.select(a,"default");assertEquals(DeepSeekConfig.defaultPrompt(a),DeepSeekConfig.load(a).prompt);
-    }
-    @Test public void scrollRecreationCommitsUnsavedPromptAndNeverReusesAnotherPreferenceInstance(){
-        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        View old=p.getView(null,new LinearLayout(a));CaptionEditorIds.editorIn(old).setText("pending");
-        View fresh=p.getView(null,new LinearLayout(a));assertEquals("pending",CaptionEditorIds.editorIn(fresh).getText().toString());
-        DeepSeekTextPreference other=new DeepSeekTextPreference(a);other.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        assertNotSame(fresh,other.getView(fresh,new LinearLayout(a)));
-    }
+    
+    
     @Test public void defaultsFollowAllSupportedLocalesButCustomPromptsRemainVerbatim(){
         String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);
         String[] locales={"en","zh-CN","zh-TW","es","fr","de","pt","ru","ja","ko","ar","hi","id","vi"};
@@ -156,42 +142,17 @@ public class ProfileUiRegressionTest {
         DeepSeekConfig.savePrompt(a,DeepSeekConfig.defaultPrompt(a));assertFalse(ApiProfiles.values(a).contains("prompt"));
     }
 
-    @Test public void staleDetachedEditorRebindsAfterProfileEpochEvenWhenNotRegistered(){
-        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        LinearLayout parent=new LinearLayout(a);View old=p.getView(null,parent);
-        ApiProfiles.unregister(p); // Scrolled off the screen: it no longer receives notifications.
-        String b=ApiProfiles.create(a,"B","https://b.example");ApiProfiles.select(a,b);ApiProfiles.select(a,"default");
-        CaptionEditorIds.editorIn(old).setText("stale delayed edit");assertTrue(p.flushProfile());
-        assertEquals(DeepSeekConfig.defaultPrompt(a),DeepSeekConfig.load(a).prompt);
-        View fresh=p.getView(old,parent);assertNotSame(old,fresh);
-        assertEquals(DeepSeekConfig.defaultPrompt(a),CaptionEditorIds.editorIn(fresh).getText().toString());
-    }
+    
     @Test public void staleFinishedActivityCannotBlockCurrentProfileSwitch(){
         Activity old=Robolectric.buildActivity(Activity.class).setup().get();
         DeepSeekTextPreference p=new DeepSeekTextPreference(old);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);
         CaptionEditorIds.editorIn(p.getView(null,new LinearLayout(old))).setText("unfinished");old.finish();
         String b=ApiProfiles.create(a,"B","https://b.example");assertTrue(ApiProfiles.select(a,b));
     }
-    @Test public void promptPasteIsNotInterceptedByMorpheBreadcrumbCopy(){
-        assertTrue(ApiInputPolicy.owns(DeepSeekTextPreference.KEY_PROMPT));assertFalse(ApiInputPolicy.owns("morphe_debug"));
-    }
-    @Test public void inactiveDeleteLeavesCurrentEditorAndSettingsIntact(){
-        String b=ApiProfiles.create(a,"B","https://b.example");
-        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        EditText input=CaptionEditorIds.editorIn(p.getView(null,new LinearLayout(a)));input.setText("editing current");
-        ApiProfiles.delete(a,b);assertEquals("editing current",input.getText().toString());assertTrue(p.flushProfile());
-        assertEquals("editing current",DeepSeekConfig.load(a).prompt);
-    }
+    
+    
 
-    @Test public void visibleDefaultRebindsAfterLanguageChangeWithoutPersistingOldTranslation(){
-        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        LinearLayout parent=new LinearLayout(a);View old=p.getView(null,parent);
-        Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.JAPAN));
-        a.getResources().updateConfiguration(config,a.getResources().getDisplayMetrics());
-        View fresh=p.getView(old,parent);assertSame(old,fresh);
-        assertEquals(DeepSeekConfig.displayDefaultPrompt(a),CaptionEditorIds.editorIn(fresh).getText().toString());
-        assertFalse(ApiProfiles.values(a).contains("prompt"));
-    }
+    
 
     @Test public void selectorHasOnlyProfilesAddAndCancelAndLongPressDoesNotSwitch(){
         String b=ApiProfiles.create(a,"B","https://b.example");open();
@@ -208,16 +169,9 @@ public class ProfileUiRegressionTest {
         open();click("profile_add");first(tree(),EditText.class).setText("");click("profile_save");
         assertEquals("API 3",ApiProfiles.list(a).get(ApiProfiles.active(a)));
     }
-    @Test public void resolvedChineseSummaryIsNotTranslatedTwice(){
-        Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.SIMPLIFIED_CHINESE));
-        a.getResources().updateConfiguration(config,a.getResources().getDisplayMetrics());
-        DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-        String summary=CaptionStrings.settings(a,"prompt_summary");p.setSummary(summary);
-        LinearLayout root=(LinearLayout)p.getView(null,new LinearLayout(a));
-        assertEquals(summary,((TextView)root.getChildAt(2)).getText().toString());
-    }
+    
     @Test public void keyboardRelayoutPreservesFocusedEditorEvenWithoutConvertView(){
-        LinearLayout parent=new LinearLayout(a);DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
+        LinearLayout parent=new LinearLayout(a);DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_BASE_URL);
         View row=p.getView(null,parent);parent.addView(row);a.setContentView(parent);
         EditText editor=CaptionEditorIds.editorIn(row);editor.requestFocus();editor.setSelection(3);idle();
         View rebound=p.getView(null,parent);assertSame(row,rebound);assertSame(editor,CaptionEditorIds.editorIn(rebound));

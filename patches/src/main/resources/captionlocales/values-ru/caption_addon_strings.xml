@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"Удалить ключ API"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Разверните для просмотра и копирования диагностики"</string>
     <string name="cap_diagnostics" formatted="false">"Диагностика субтитров"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"Для долгих тестов включите отладку текста; «Сохранить полную диагностику» выгружает записи за последние 24 часа (лимит 16 MiB). Ниже показана только последняя сводка."</string>
+    <string name="cap_diagnostics_hint" formatted="false">"Для долгих тестов включите отладку текста; «Сохранить полную диагностику» выгружает записи за последние 24 часа (лимит 16 MiB). Ниже показана только последняя сводка. Предпросмотр ограничен; копирование и сохранение включают полный отчёт."</string>
     <string name="cap_display_debug" formatted="false">"Отладка текста: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Включить перевод с ИИ"</string>
     <string name="cap_engine" formatted="false">"Движок"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"Добавить профиль"</string>
     <string name="cap_profile_add_failed" formatted="false">"Не удалось добавить профиль. Проверьте поля и ограничение в 30 профилей."</string>
     <string name="cap_profile_clear_key" formatted="false">"Очистить API-ключ этого профиля"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"Очищает только сохранённый ключ и несохранённый ввод ключа этого профиля. Адрес, модель и требования сохраняются. Другие профили не затрагиваются. Ключ у провайдера не отзывается."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Удалить сохранённый ключ и ещё не сохранённый ввод ключа этого профиля. Адрес и модель сохранятся, другие профили не изменятся. Ключ у поставщика не отзывается."</string>
     <string name="cap_profile_close" formatted="false">"Закрыть"</string>
     <string name="cap_profile_collapse" formatted="false">"Свернуть действия"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Подтвердить удаление"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"Исходная конфигурация"</string>
     <string name="cap_profile_delete" formatted="false">"Удалить профиль"</string>
     <string name="cap_profile_delete_inline" formatted="false">"Удалить этот профиль и его сохранённый ключ с устройства? Другие профили сохранятся. Действие нельзя отменить."</string>
-    <string name="cap_profile_delete_summary" formatted="false">"Удаляет с устройства адрес, модель, требования к переводу и зашифрованный ключ этого профиля. Другие профили и настройки субтитров сохраняются. При удалении активного профиля включается первый оставшийся. Отменить действие нельзя."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Удалить с этого устройства адрес, модель и зашифрованный ключ профиля. Другие профили и настройки субтитров сохранятся. При удалении текущего профиля активируется первый оставшийся. Действие необратимо."</string>
     <string name="cap_profile_delete_switch" formatted="false">"После удаления включить:"</string>
     <string name="cap_profile_finish_name" formatted="false">"Сначала сохраните или отмените изменение названия."</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Исправьте незавершённые поля перед сменой профиля"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"Действия с профилем"</string>
     <string name="cap_profile_name" formatted="false">"Название профиля"</string>
     <string name="cap_profile_name_error" formatted="false">"Введите название длиной 1–60 символов"</string>
-    <string name="cap_profile_new_summary" formatted="false">"Новый профиль содержит стандартные требования к переводу, но не ключ и модель. Заполните поля на странице настроек."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Новые профили не копируют ключ и модель. После создания заполните настройки API."</string>
     <string name="cap_profile_rename" formatted="false">"Переименовать"</string>
     <string name="cap_profile_save" formatted="false">"Сохранить"</string>
     <string name="cap_profiles_summary" formatted="false">"Управление текущим профилем"</string>
     <string name="cap_profiles_title" formatted="false">"Профили API"</string>
-    <string name="cap_prompt_summary" formatted="false">"Сохраняется для этого профиля. Очистите для стандартных требований на языке интерфейса. Ваш текст остаётся без изменений."</string>
+    <string name="cap_prompt_summary" formatted="false">"Свои пожелания меняют формулировки и стиль. Точность перевода, целевой язык и соответствие исходному тексту фиксированы. Сохранено для этого профиля; очистите для возврата к настройке по умолчанию."</string>
     <string name="cap_quality_outcome" formatted="false">"Локальная проверка: принято / отклонено (качество)"</string>
     <string name="cap_recent_trace" formatted="false">"Последние события: "</string>
     <string name="cap_refresh" formatted="false">"Обновить"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s; сохранено последнее допустимое значение"</string>
     <string name="cap_model_ids_empty" formatted="false">"Сервер не вернул доступных для выбора идентификаторов моделей"</string>
     <string name="cap_diagnostics_loading" formatted="false">"Загрузка диагностики…"</string>
+    <string name="cap_planner_model" formatted="false">"Модель подготовки смысла исходного текста (необязательно)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"Пустое поле означает модель перевода. Используются тот же URL API и ключ; другая модель автоматически не выбирается."</string>
 </resources>

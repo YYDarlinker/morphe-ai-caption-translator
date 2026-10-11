@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"Hapus kunci API"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Perluas untuk melihat dan menyalin diagnostik"</string>
     <string name="cap_diagnostics" formatted="false">"Diagnostik subtitel"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"Aktifkan debug teks untuk pengujian lama; Simpan diagnostik lengkap mengekspor 24 jam terakhir (batas 16 MiB). Ringkasan di bawah hanya menampilkan aktivitas terbaru."</string>
+    <string name="cap_diagnostics_hint" formatted="false">"Aktifkan debug teks untuk pengujian lama; Simpan diagnostik lengkap mengekspor 24 jam terakhir (batas 16 MiB). Ringkasan di bawah hanya menampilkan aktivitas terbaru. Pratinjau dibatasi; Salin dan Simpan memuat laporan lengkap."</string>
     <string name="cap_display_debug" formatted="false">"Debug teks: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Aktifkan terjemahan AI"</string>
     <string name="cap_engine" formatted="false">"Mesin"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"Tambah profil"</string>
     <string name="cap_profile_add_failed" formatted="false">"Tidak dapat menambah profil. Periksa isian dan batas 30 profil."</string>
     <string name="cap_profile_clear_key" formatted="false">"Hapus kunci API profil ini"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"Hanya menghapus kunci tersimpan dan masukan kunci yang belum disimpan pada profil ini. Alamat, model, instruksi, dan profil lain tetap ada. Kunci tidak dicabut di penyedia."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Hapus kunci tersimpan dan masukan kunci yang belum tersimpan untuk profil ini saja. Alamat dan model tetap; profil lain tidak berubah. Kunci tidak dicabut di penyedia."</string>
     <string name="cap_profile_close" formatted="false">"Tutup"</string>
     <string name="cap_profile_collapse" formatted="false">"Tutup tindakan"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Konfirmasi hapus"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"Konfigurasi awal"</string>
     <string name="cap_profile_delete" formatted="false">"Hapus profil"</string>
     <string name="cap_profile_delete_inline" formatted="false">"Hapus profil ini dan kunci tersimpannya dari perangkat? Profil lain tetap ada. Tidak dapat dibatalkan."</string>
-    <string name="cap_profile_delete_summary" formatted="false">"Menghapus alamat, model, instruksi terjemahan, dan kunci terenkripsi profil ini dari perangkat. Profil lain dan pengaturan subtitle tetap ada. Jika aktif, profil pertama yang tersisa akan diaktifkan. Tidak dapat dibatalkan."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Hapus alamat, model, dan kunci terenkripsi profil ini dari perangkat. Profil lain dan pengaturan takarir tetap. Jika profil aktif dihapus, profil pertama yang tersisa akan aktif. Tindakan ini tidak dapat dibatalkan."</string>
     <string name="cap_profile_delete_switch" formatted="false">"Setelah dihapus, aktifkan:"</string>
     <string name="cap_profile_finish_name" formatted="false">"Simpan atau batalkan perubahan nama terlebih dahulu."</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Perbaiki isian yang belum selesai sebelum berganti profil"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"Tindakan profil"</string>
     <string name="cap_profile_name" formatted="false">"Nama profil"</string>
     <string name="cap_profile_name_error" formatted="false">"Masukkan nama sepanjang 1–60 karakter"</string>
-    <string name="cap_profile_new_summary" formatted="false">"Profil baru berisi instruksi terjemahan bawaan, tanpa kunci atau model. Lengkapi kolom pada halaman pengaturan."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Profil baru tidak menyalin kunci atau model. Lengkapi pengaturan API setelah membuat profil."</string>
     <string name="cap_profile_rename" formatted="false">"Ubah nama"</string>
     <string name="cap_profile_save" formatted="false">"Simpan"</string>
     <string name="cap_profiles_summary" formatted="false">"Kelola profil aktif"</string>
     <string name="cap_profiles_title" formatted="false">"Profil API"</string>
-    <string name="cap_prompt_summary" formatted="false">"Disimpan untuk profil ini. Kosongkan untuk memulihkan instruksi bawaan sesuai bahasa antarmuka. Teks Anda tetap sama."</string>
+    <string name="cap_prompt_summary" formatted="false">"Preferensi khusus mengatur pilihan kata dan ragam bahasa. Kesetiaan terjemahan, bahasa tujuan, dan kesesuaian dengan sumber tetap. Disimpan untuk profil ini; kosongkan untuk memulihkan bawaan."</string>
     <string name="cap_quality_outcome" formatted="false">"Validasi lokal: diterima / ditolak (kualitas)"</string>
     <string name="cap_recent_trace" formatted="false">"Kejadian terbaru: "</string>
     <string name="cap_refresh" formatted="false">"Muat ulang"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s; nilai valid terakhir dipertahankan"</string>
     <string name="cap_model_ids_empty" formatted="false">"Endpoint tidak mengembalikan ID model yang dapat dipilih"</string>
     <string name="cap_diagnostics_loading" formatted="false">"Memuat diagnostik…"</string>
+    <string name="cap_planner_model" formatted="false">"Model persiapan makna sumber (opsional)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"Kosongkan untuk memakai model terjemahan. Menggunakan URL API dan kunci yang sama; tidak memilih model lain otomatis."</string>
 </resources>

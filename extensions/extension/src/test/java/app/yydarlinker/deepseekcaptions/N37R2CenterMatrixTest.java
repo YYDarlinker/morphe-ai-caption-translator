@@ -15,7 +15,7 @@ import org.robolectric.annotation.*;
 
 /** Product overlay + Android FrameLayout layout; no mocked gravity or measured rectangle. */
 @RunWith(ParameterizedRobolectricTestRunner.class)
-@Config(sdk=28,shadows={RebuildLayoutTest.Geometry.class})
+@Config(sdk=28,shadows={N39UiGeometryFixture.Geometry.class})
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 public class N37R2CenterMatrixTest {
@@ -28,20 +28,20 @@ public class N37R2CenterMatrixTest {
     return rows;
   }
   final String app,target,scene;
-  RebuildLayoutTest h;FrameLayout host;final List<String> ledger=new ArrayList<>();
+  N39UiGeometryFixture h;FrameLayout host;final List<String> ledger=new ArrayList<>();
   public N37R2CenterMatrixTest(String app,String target,String scene){this.app=app;this.target=target;this.scene=scene;}
   @Before public void setup(){
     CaptionPlayerAuthority.resetForTests();CaptionPlayerTransitionGuard.resetForTests();
-    h=new RebuildLayoutTest();h.setup();h.a.getApplicationInfo().flags|=android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL;
+    h=new N39UiGeometryFixture();h.setup();h.a.getApplicationInfo().flags|=android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL;
     host=(FrameLayout)h.a.findViewById(android.R.id.content);
     h.a.getWindow().getDecorView().setLayoutDirection(app.equals("ar")?View.LAYOUT_DIRECTION_RTL:View.LAYOUT_DIRECTION_LTR);
     host.setLayoutDirection(app.equals("ar")?View.LAYOUT_DIRECTION_RTL:View.LAYOUT_DIRECTION_LTR);
-    RebuildLayoutTest.shorts=scene.equals("shorts");
-    RebuildLayoutTest.bounds=scene.equals("detail")?new Rect(71,35,672,375):scene.equals("fullscreen")?new Rect(113,20,1074,610):new Rect(149,50,650,920);
+    N39UiGeometryFixture.shorts=scene.equals("shorts");
+    N39UiGeometryFixture.bounds=scene.equals("detail")?new Rect(71,35,672,375):scene.equals("fullscreen")?new Rect(113,20,1074,610):new Rect(149,50,650,920);
     h.a.getResources().getDisplayMetrics().widthPixels=scene.equals("fullscreen")?1280:800;
     h.a.getResources().getDisplayMetrics().heightPixels=scene.equals("fullscreen")?720:1000;
   }
-  void layout(){host.measure(View.MeasureSpec.makeMeasureSpec(1280,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(1000,View.MeasureSpec.EXACTLY));host.layout(0,0,1280,1000);}
+  void layout(){h.awaitPreparedCaption();host.measure(View.MeasureSpec.makeMeasureSpec(1280,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(1000,View.MeasureSpec.EXACTLY));host.layout(0,0,1280,1000);}
   String[] samples(){
     if(target.equals("ar"))return new String[]{"字幕 النص", "السطر الأول\nالسطر الثاني",String.join(" ",Collections.nCopies(20,"تظل الترجمة في وسط الفيديو")),"في 2026 العدد 42 و API 3.5!"};
     if(target.equals("ja"))return new String[]{"字幕です", "最初の行\n二番目の行",String.join("",Collections.nCopies(20,"字幕は動画の中央です。")),"2026年、API 3.5は42件です。"};
@@ -51,8 +51,8 @@ public class N37R2CenterMatrixTest {
   @Test public void physicalCenterForEveryTextShape()throws Exception{
     int kind=0;
     for(String value:samples()){
-      CaptionOverlay.showEvent(value,()->true,()->"","matrix:"+kind,1000,61000,2000,CaptionLanguageContext.explicit("en",target).renderSpec);
-      layout();FrameLayout outer=h.anchor();TextView text=h.text();Rect video=RebuildLayoutTest.bounds;
+      CaptionOverlay.showEvent(value,()->true,()->"","matrix:"+kind,1000,61000,2000,CaptionLanguageContext.explicit("en",target).renderSpec,null);
+      layout();FrameLayout outer=h.anchor();TextView text=h.text();Rect video=N39UiGeometryFixture.bounds;
       float center=outer.getLeft()+outer.getTranslationX()+outer.getWidth()/2f-host.getScrollX();
       float error=center-video.exactCenterX();
       ledger.add("app="+app+";target="+target+";scene="+scene+";shape="+kind+";root_direction="+host.getLayoutDirection()+";outer_direction="+outer.getLayoutDirection()+";text_direction="+text.getTextDirection()+";gravity="+((FrameLayout.LayoutParams)outer.getLayoutParams()).gravity+";video="+video+";actual_center="+center+";error="+error);

@@ -42,6 +42,7 @@ public class CaptionRatioSettingsTest {
                 // N24: the size row no longer repeats the value beside the title; the tier line carries it.
                 assertEquals("size heading must contain only the title",1,((LinearLayout)root.getChildAt(0)).getChildCount());
                 SeekBar.OnSeekBarChangeListener listener=Shadows.shadowOf(slider).getOnSeekBarChangeListener();
+                listener.onStartTrackingTouch(slider);
                 String[] labels={"34 px","39 px","44.5 px","50 px","56 px"};
                 String[] names={"size_tier_xs","size_tier_s","size_tier_standard","size_tier_l","size_tier_xl"};
                 String[] full={"42.4","48.6","55.5","62.4","69.8"};
@@ -80,6 +81,7 @@ public class CaptionRatioSettingsTest {
             assertEquals("70%",value.getText().toString());
             SeekBar slider=(SeekBar)root.getChildAt(1);
             SeekBar.OnSeekBarChangeListener listener=Shadows.shadowOf(slider).getOnSeekBarChangeListener();
+            listener.onStartTrackingTouch(slider);
             slider.setProgress(25);listener.onProgressChanged(slider,25,true);
             assertEquals("25%",value.getText().toString());
             assertEquals("dragging only previews",70,DeepSeekConfig.displayStyle(activity).backgroundOpacity);

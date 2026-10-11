@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"Xóa khóa API"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Mở rộng để xem và sao chép chẩn đoán"</string>
     <string name="cap_diagnostics" formatted="false">"Chẩn đoán phụ đề"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"Bật gỡ lỗi văn bản cho các bài kiểm tra dài; Lưu chẩn đoán đầy đủ sẽ xuất 24 giờ gần nhất (giới hạn 16 MiB). Phần tóm tắt bên dưới chỉ hiển thị hoạt động gần đây."</string>
+    <string name="cap_diagnostics_hint" formatted="false">"Bật gỡ lỗi văn bản cho các bài kiểm tra dài; Lưu chẩn đoán đầy đủ sẽ xuất 24 giờ gần nhất (giới hạn 16 MiB). Phần tóm tắt bên dưới chỉ hiển thị hoạt động gần đây. Bản xem trước có giới hạn; Sao chép và Lưu giữ toàn bộ báo cáo."</string>
     <string name="cap_display_debug" formatted="false">"Gỡ lỗi văn bản: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Bật dịch phụ đề bằng AI"</string>
     <string name="cap_engine" formatted="false">"Bộ máy"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"Thêm hồ sơ"</string>
     <string name="cap_profile_add_failed" formatted="false">"Không thể thêm hồ sơ. Kiểm tra các trường và giới hạn 30 hồ sơ."</string>
     <string name="cap_profile_clear_key" formatted="false">"Xóa khóa API của hồ sơ này"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"Chỉ xóa khóa đã lưu và phần nhập khóa chưa lưu của hồ sơ này. Giữ địa chỉ, mô hình, hướng dẫn và các hồ sơ khác. Không thu hồi khóa ở phía nhà cung cấp."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Chỉ xóa khóa đã lưu và phần nhập khóa chưa lưu của hồ sơ này. Giữ nguyên địa chỉ và mô hình; các hồ sơ khác không đổi. Thao tác này không thu hồi khóa tại nhà cung cấp."</string>
     <string name="cap_profile_close" formatted="false">"Đóng"</string>
     <string name="cap_profile_collapse" formatted="false">"Thu gọn thao tác"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Xác nhận xóa"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"Cấu hình ban đầu"</string>
     <string name="cap_profile_delete" formatted="false">"Xóa hồ sơ"</string>
     <string name="cap_profile_delete_inline" formatted="false">"Xóa hồ sơ này và khóa đã lưu khỏi thiết bị? Các hồ sơ khác được giữ lại. Không thể hoàn tác."</string>
-    <string name="cap_profile_delete_summary" formatted="false">"Xóa địa chỉ, mô hình, hướng dẫn dịch và khóa mã hóa của hồ sơ này khỏi thiết bị. Giữ các hồ sơ khác và cài đặt phụ đề. Nếu đang dùng, hồ sơ đầu tiên còn lại sẽ được kích hoạt. Không thể hoàn tác."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Xóa địa chỉ, mô hình và khóa đã mã hóa của hồ sơ này khỏi thiết bị. Giữ các hồ sơ khác và cài đặt phụ đề. Nếu xóa hồ sơ hiện tại, hồ sơ đầu tiên còn lại sẽ được kích hoạt. Không thể hoàn tác."</string>
     <string name="cap_profile_delete_switch" formatted="false">"Sau khi xóa, kích hoạt:"</string>
     <string name="cap_profile_finish_name" formatted="false">"Hãy lưu hoặc hủy thay đổi tên trước."</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Sửa các trường chưa hoàn tất trước khi đổi hồ sơ"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"Thao tác hồ sơ"</string>
     <string name="cap_profile_name" formatted="false">"Tên hồ sơ"</string>
     <string name="cap_profile_name_error" formatted="false">"Nhập tên dài từ 1 đến 60 ký tự"</string>
-    <string name="cap_profile_new_summary" formatted="false">"Hồ sơ mới có hướng dẫn dịch mặc định, không sao chép khóa hay mô hình. Điền các trường trên trang cài đặt sau khi tạo."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Hồ sơ mới không sao chép khóa hoặc mô hình. Hoàn tất cài đặt API sau khi tạo."</string>
     <string name="cap_profile_rename" formatted="false">"Đổi tên"</string>
     <string name="cap_profile_save" formatted="false">"Lưu"</string>
     <string name="cap_profiles_summary" formatted="false">"Quản lý hồ sơ hiện tại"</string>
     <string name="cap_profiles_title" formatted="false">"Hồ sơ API"</string>
-    <string name="cap_prompt_summary" formatted="false">"Lưu cho hồ sơ này. Để trống để khôi phục hướng dẫn mặc định theo ngôn ngữ giao diện. Nội dung bạn sửa được giữ nguyên."</string>
+    <string name="cap_prompt_summary" formatted="false">"Tùy chọn riêng điều chỉnh cách diễn đạt và văn phong. Độ trung thực, ngôn ngữ đích và sự tương ứng với bản gốc là cố định. Lưu cho hồ sơ này; xóa để khôi phục mặc định."</string>
     <string name="cap_quality_outcome" formatted="false">"Kiểm tra cục bộ: chấp nhận / từ chối (chất lượng)"</string>
     <string name="cap_recent_trace" formatted="false">"Sự kiện gần đây: "</string>
     <string name="cap_refresh" formatted="false">"Làm mới"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s; giữ giá trị hợp lệ gần nhất"</string>
     <string name="cap_model_ids_empty" formatted="false">"Máy chủ không trả về ID mô hình có thể chọn"</string>
     <string name="cap_diagnostics_loading" formatted="false">"Đang tải chẩn đoán…"</string>
+    <string name="cap_planner_model" formatted="false">"Mô hình chuẩn bị nghĩa nguồn (tùy chọn)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"Để trống để dùng mô hình dịch. Dùng cùng URL API và khóa; không tự chọn mô hình khác."</string>
 </resources>

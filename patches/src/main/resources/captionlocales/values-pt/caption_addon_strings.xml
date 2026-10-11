@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"Excluir chave da API"</string>
     <string name="cap_diagnostic_hint" formatted="false">"Expanda para consultar e copiar o diagnóstico"</string>
     <string name="cap_diagnostics" formatted="false">"Diagnóstico de legendas"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"Ative a depuração de texto para testes longos; Salvar diagnóstico completo exporta as últimas 24 horas (limite de 16 MiB). O resumo abaixo mostra apenas a atividade recente."</string>
+    <string name="cap_diagnostics_hint" formatted="false">"Ative a depuração de texto para testes longos; Salvar diagnóstico completo exporta as últimas 24 horas (limite de 16 MiB). O resumo abaixo mostra apenas a atividade recente. A prévia é limitada; Copiar e Salvar incluem o relatório completo."</string>
     <string name="cap_display_debug" formatted="false">"Depuração de texto: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"Ativar tradução com IA"</string>
     <string name="cap_engine" formatted="false">"Mecanismo"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"Adicionar perfil"</string>
     <string name="cap_profile_add_failed" formatted="false">"Não foi possível adicionar o perfil. Verifique os campos e o limite de 30 perfis."</string>
     <string name="cap_profile_clear_key" formatted="false">"Limpar a chave API deste perfil"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"Limpa apenas a chave guardada e a entrada de chave não guardada deste perfil. Mantém o endereço, o modelo e as instruções. Não afeta outros perfis nem revoga a chave no fornecedor."</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"Limpe a chave guardada e a entrada pendente deste perfil. O endereço e o modelo são mantidos; os outros perfis não mudam. Isto não revoga a chave no fornecedor."</string>
     <string name="cap_profile_close" formatted="false">"Fechar"</string>
     <string name="cap_profile_collapse" formatted="false">"Recolher ações"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"Confirmar eliminação"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"Configuração original"</string>
     <string name="cap_profile_delete" formatted="false">"Eliminar perfil"</string>
     <string name="cap_profile_delete_inline" formatted="false">"Eliminar este perfil e a sua chave guardada do dispositivo? Os outros perfis são mantidos. Não é possível anular."</string>
-    <string name="cap_profile_delete_summary" formatted="false">"Elimina deste dispositivo o endereço, o modelo, as instruções e a chave encriptada deste perfil. Mantém os outros perfis e as definições de legendas. Se estiver ativo, ativa o primeiro perfil restante. Não é possível anular."</string>
+    <string name="cap_profile_delete_summary" formatted="false">"Elimine deste dispositivo o endereço, o modelo e a chave cifrada deste perfil. Mantenha os outros perfis e as definições das legendas. Se eliminar o perfil atual, o primeiro restante será ativado. Esta ação não pode ser anulada."</string>
     <string name="cap_profile_delete_switch" formatted="false">"Após eliminar, ativar:"</string>
     <string name="cap_profile_finish_name" formatted="false">"Guarde ou cancele primeiro a alteração do nome."</string>
     <string name="cap_profile_invalid_edits" formatted="false">"Corrija os campos incompletos antes de mudar de perfil"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"Ações do perfil"</string>
     <string name="cap_profile_name" formatted="false">"Nome do perfil"</string>
     <string name="cap_profile_name_error" formatted="false">"Introduza um nome de 1 a 60 caracteres"</string>
-    <string name="cap_profile_new_summary" formatted="false">"Os novos perfis incluem instruções predefinidas, sem chave nem modelo. Preencha os campos nas definições."</string>
+    <string name="cap_profile_new_summary" formatted="false">"Os novos perfis não copiam a chave nem o modelo. Complete as definições da API após a criação."</string>
     <string name="cap_profile_rename" formatted="false">"Renomear"</string>
     <string name="cap_profile_save" formatted="false">"Guardar"</string>
     <string name="cap_profiles_summary" formatted="false">"Gerir perfil atual"</string>
     <string name="cap_profiles_title" formatted="false">"Perfis de API"</string>
-    <string name="cap_prompt_summary" formatted="false">"Guardado neste perfil. Limpe para repor as instruções predefinidas no idioma da interface. As suas alterações são mantidas."</string>
+    <string name="cap_prompt_summary" formatted="false">"As preferências personalizadas ajustam a redação e o registro. A fidelidade, o idioma de destino e a correspondência com o original são fixos. Salvas neste perfil; limpe para restaurar o padrão."</string>
     <string name="cap_quality_outcome" formatted="false">"Validação local: aceitos / rejeitados (qualidade)"</string>
     <string name="cap_recent_trace" formatted="false">"Eventos recentes: "</string>
     <string name="cap_refresh" formatted="false">"Atualizar"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s; o último valor válido é mantido"</string>
     <string name="cap_model_ids_empty" formatted="false">"O servidor não retornou IDs de modelos selecionáveis"</string>
     <string name="cap_diagnostics_loading" formatted="false">"Carregando diagnóstico…"</string>
+    <string name="cap_planner_model" formatted="false">"Modelo de preparação do significado de origem (opcional)"</string>
+    <string name="cap_planner_model_hint" formatted="false">"Deixe em branco para usar o modelo de tradução. Usa a mesma URL da API e chave; não seleciona outro modelo automaticamente."</string>
 </resources>

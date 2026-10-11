@@ -9,7 +9,7 @@ public class ApiProfileSnapshotTest {
  @Test public void snapshotsNeverMixProfileEndpointAndSecret()throws Exception{
   Context c=RuntimeEnvironment.getApplication();String b=ApiProfiles.create(c,"B","https://b.example/v1");DeepSeekConfig.saveBaseUrl(c,"https://a.example/v1");
   java.util.concurrent.atomic.AtomicReference<Throwable> failure=new java.util.concurrent.atomic.AtomicReference<>();
-  Thread reader=new Thread(()->{try{for(int i=0;i<2000;i++){DeepSeekConfig.Snapshot s=DeepSeekConfig.load(c);assertEquals(s.baseUrl.contains("b.example")?"fake-key-"+b:"fake-key-default",s.apiKey);}}catch(Throwable e){failure.set(e);}});
+  Thread reader=new Thread(()->{try{for(int i=0;i<2000;i++){DeepSeekConfig.ProviderSettings s=DeepSeekConfig.load(c);assertEquals(CaptionCredentialRef.of(s.baseUrl.contains("b.example")?"fake-key-"+b:"fake-key-default").fingerprint,s.credentialId);}}catch(Throwable e){failure.set(e);}});
   reader.start();for(int i=0;i<100;i++){ApiProfiles.select(c,b);ApiProfiles.select(c,"default");}reader.join();if(failure.get()!=null)throw new AssertionError(failure.get());
  }
 }

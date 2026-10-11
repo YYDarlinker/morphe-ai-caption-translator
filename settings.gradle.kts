@@ -1,4 +1,4 @@
-rootProject.name = "anchored-ai-captions"
+rootProject.name = "morphe-caption-upstream-integrated"
 
 pluginManagement {
     repositories {
@@ -19,3 +19,7 @@ pluginManagement {
 plugins {
     id("app.morphe.patches") version "1.3.4"
 }
+
+include(":caption-contracts", ":caption-shared", ":translation-core")
+
+include(":ui-preview")

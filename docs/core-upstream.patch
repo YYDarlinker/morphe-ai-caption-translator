@@ -1,0 +1,1112 @@
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java
+@@ -1,6 +1,5 @@
+ package app.yydarlinker.deepseekcaptions;
+ 
+-import android.app.Activity;
+ import android.content.Context;
+ import android.media.session.*;
+ import android.os.*;
+@@ -49,7 +48,7 @@
+   private static volatile Session active;
+   private static volatile String video = "";
+   private static volatile long publicationEpoch;
+-  private static WeakReference<Activity> activity = new WeakReference<>(null);
++  private static WeakReference<Context> activity = new WeakReference<>(null);
+   private static boolean tickPosted;
+   private static volatile boolean compact;
+   private static long restoreUntil;
+@@ -64,7 +63,7 @@
+     final long id = IDS.incrementAndGet();
+     final Context context;
+     final String owner, identity, target;
+-    final DeepSeekConfig.Snapshot config;
++    final TranslationSettings config;
+     /** Credential identity of this immutable session config; a hash, never the key itself. */
+     final CaptionCredentialRef credential;
+     final boolean sourceOnly;
+@@ -97,7 +96,7 @@
+     int bootstrapCacheHit, bootstrapCacheMiss;
+     String bootstrapMark=""; // Diagnostic deduplication only; never an installation/runtime permission.
+     String displayedEvent = "", withheldEvent = "";
+-    RawCaptionSource.Source raw;
++    TranslationSourceAccess.Source raw;
+     RebuildSource source;
+     List<RebuildPlanner.Block> blocks;
+     RebuildProtocol.Plan[] plans, pendingPlans;
+@@ -121,12 +120,12 @@
+         String o,
+         String key,
+         String target,
+-        DeepSeekConfig.Snapshot cfg,
++        TranslationSettings cfg,
+         boolean original,
+         boolean show) {
+       this(c,u,o,key,target,cfg,original,show,CaptionLanguageContext.observe(u,target));
+     }
+-    Session(Context c,String u,String o,String key,String target,DeepSeekConfig.Snapshot cfg,
++    Session(Context c,String u,String o,String key,String target,TranslationSettings cfg,
+             boolean original,boolean show,CaptionLanguageContext context) {
+       this.context = c;
+       url = u;
+@@ -216,7 +215,7 @@
+         List<Notice> notices;
+         synchronized (this) { notices = retirementNotices; retirementNotices = Collections.emptyList(); }
+         flush(this, notices);
+-        if (!success) CaptionDiagnostics.mark(context, "REBUILD_RETIREMENT_FAILED",
++        if (!success) TranslationRuntime.mark(context, "REBUILD_RETIREMENT_FAILED",
+             "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
+       } catch (RuntimeException failure) {
+         success = false;
+@@ -252,7 +251,7 @@
+         retirementFailure = failure.getMessage();
+         boolean interrupted = Thread.currentThread().isInterrupted();
+         try {
+-          CaptionDiagnostics.mark(context, "REBUILD_RETIREMENT_FAILED",
++          TranslationRuntime.mark(context, "REBUILD_RETIREMENT_FAILED",
+               "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
+         } finally { if (interrupted) Thread.currentThread().interrupt(); }
+         throw failure;
+@@ -335,12 +334,12 @@
+         networkMs += roundTrip;
+         detail += ";network_round_trip_ms=" + roundTrip;
+       }
+-      CaptionDiagnostics.mark(session.context,stage,
++      TranslationRuntime.mark(session.context,stage,
+           "session="+session.id+";request="+traceId+";block="+index+";"+detail,session.credential,"");
+     }
+ 
+     public void onQualityEvidence(org.json.JSONObject source, String response, String metadata) {
+-      if (!DeepSeekConfig.displayTextDebugEnabled(session.context)) return;
++      if (!TranslationRuntime.debugEnabled(session.context)) return;
+       org.json.JSONObject evidence = source;
+       try {
+         evidence = new org.json.JSONObject(source.toString());
+@@ -362,7 +361,7 @@
+         }
+       } catch (Exception ignored) {
+       }
+-      CaptionQualityTrace.record(
++      TranslationRuntime.record(
+           session.context,
+           session.config.apiKey,
+           traceId,
+@@ -393,9 +392,8 @@
+     return current(s) ? s.url : "";
+   }
+ 
+-  static void activity(Activity a) {
++  static void activity(Context a) {
+     activity = new WeakReference<>(a);
+-    CaptionOverlay.setActivity(a);
+     tick();
+   }
+ 
+@@ -419,16 +417,15 @@
+     if (previous != null) {
+       clear(epoch);
+       previous.cancel();
+-      CaptionMusicSuppressor.kick();
++      TranslationRuntime.suppressNative(false);
+     }
+     if (changed) {
+       CLOCK.reset(SystemClock.elapsedRealtime());
+-      Activity currentActivity = activity.get();
++      Context currentActivity = activity.get();
+       if (currentActivity != null)
+-        CaptionDiagnostics.mark(currentActivity, "REBUILD_STARTUP_PHASE",
++        TranslationRuntime.mark(currentActivity, "REBUILD_STARTUP_PHASE",
+             "phase=video_loaded;elapsed_ms=" + SystemClock.elapsedRealtime() + ";video=" + id);
+     }
+-    SemanticCaptionTimeline.onVideoId(id);
+   }
+ 
+   /** Main: revocation/old UI invalidation only. Off-main: also the fixed five-second physical barrier. */
+@@ -444,16 +441,38 @@
+     clear(epoch);
+     // A stopped engine has no display owner. The authority returns to the safe UNKNOWN state instead
+     // of leaving the previous owner's permission in place for a queued off-main notification.
+-    CaptionPlayerAuthority.close();
++    TranslationRuntime.stopped();
+     // Do not let a stopped session donate a media snapshot to the next same-video session.
+     CLOCK.reset(SystemClock.elapsedRealtime());
+     if (s != null) s.cancel();
+-    CaptionMusicSuppressor.kick();
++    TranslationRuntime.suppressNative(false);
+   }
+ 
+   private static void clear(long epoch) {
+-    CaptionOverlay.clear(() -> publicationEpoch == epoch
++    TranslationOutput.clear(() -> publicationEpoch == epoch
+         && (active == null || active.renderRevision == 0));
++  }
++
++  /** Revoke first, drain admitted publication off-main, then restart only the unchanged owner. */
++  static void clearCache(Context context) {
++    Session previous=active;
++    String selected=previous==null?"":previous.url;
++    boolean original=previous!=null&&previous.sourceOnly,show=previous!=null&&previous.visible;
++    stop();
++    long epoch=publicationEpoch;
++    CLEANUP.execute(()->{
++      try {
++        if(previous!=null)previous.awaitRetirement();
++        RebuildCache.clear(context);
++        TranslationRuntime.host().clearSourceCache(context);
++        MAIN.post(()->{
++          if(publicationEpoch!=epoch||active!=null)return;
++          if(!selected.isEmpty())activate(context,selected,original,show);
++        });
++      } catch(RuntimeException failure) {
++        TranslationRuntime.mark(context,"TRANSLATION_CACHE_CLEAR_FAILED",failure.getClass().getSimpleName());
++      }
++    });
+   }
+ 
+   private static final class Notice {
+@@ -466,14 +485,14 @@
+   }
+ 
+   private static void flush(Session s, List<Notice> notices) {
+-    for (Notice n : notices) CaptionDiagnostics.mark(s.context, n.stage, n.detail);
++    for (Notice n : notices) TranslationRuntime.mark(s.context, n.stage, n.detail);
+   }
+ 
+   static void player(String type) {
+     // The one authority records the authoritative type and derives owner-scoped display permission.
+     // This path only tracks the short URL-restoration window that a compact excursion opens.
+     String t = type == null ? "" : type.toUpperCase(Locale.ROOT);
+-    boolean small = CaptionPlayerAuthority.isCompactType(t) && !CaptionSurface.isShorts();
++    boolean small = TranslationRuntime.isCompactType(t) && !TranslationRuntime.isShorts();
+     if (compact && !small) restoreUntil = SystemClock.elapsedRealtime() + 3000;
+     compact = small;
+   }
+@@ -483,12 +502,12 @@
+     if (!current(s)
+         || s.sourceOnly
+         || !s.visible
+-        || !CaptionChoice.translates()
++        || !TranslationRuntime.translates()
+         || (!compact
+-            && !CaptionPlayerAuthority.hasAuthoritativeType()
++            && !TranslationRuntime.authoritativeType()
+             && SystemClock.elapsedRealtime() > restoreUntil)) return url;
+-    String owner = PageCaptionController.videoIdFromUrl(url);
+-    return DeepSeekCaptionHook.isYouTubeTimedTextUrl(url)
++    String owner = CaptionUrls.videoId(url);
++    return CaptionUrls.isTimedText(url)
+             && (owner.isEmpty() || owner.equals(s.owner))
+         ? TargetLanguage.withCode(url, s.target)
+         : url;
+@@ -504,35 +523,35 @@
+     boolean show = s.visible, original = s.sourceOnly;
+     String url = s.url;
+     stop();
+-    if (DeepSeekConfig.enabled(c)) activate(c, url, original, show);
++    if (TranslationRuntime.settings(c).enabled) activate(c, url, original, show);
+   }
+ 
+   static void prewarm(Context c, String url) {
+     if (c == null
+-        || !CaptionChoice.isOn()
+-        || !CaptionChoice.translates()
+-        || !DeepSeekConfig.isReady(c)) return;
++        || !TranslationRuntime.selectionOn()
++        || !TranslationRuntime.translates()
++        || !TranslationRuntime.settings(c).ready()) return;
+     if (active != null) return;
+-    String target = DeepSeekConfig.defaultTargetLanguage(c);
++    String target = TranslationRuntime.target();
+     if (!target.isEmpty()) activate(c, TargetLanguage.withCode(url, target), false, false);
+   }
+ 
+   static void activate(Context c, String url, boolean original, boolean show) {
+-    if (c == null || !DeepSeekCaptionHook.isYouTubeTimedTextUrl(url)) return;
+-    DeepSeekConfig.Snapshot cfg = DeepSeekConfig.load(c);
++    if (c == null || !CaptionUrls.isTimedText(url)) return;
++    TranslationSettings cfg = TranslationRuntime.settings(c);
+     if (!cfg.enabled) return;
+-    String owner = PageCaptionController.videoIdFromUrl(url);
++    String owner = CaptionUrls.videoId(url);
+     if (owner.isEmpty()) owner = video;
+     if (owner.isEmpty() || !video.isEmpty() && !owner.equals(video)) return;
+     TargetLanguage language =
+-        original ? TargetLanguage.fromCode(CaptionChoice.language()) : TargetLanguage.fromUrl(url);
++        original ? TargetLanguage.fromCode(TranslationRuntime.target()) : TargetLanguage.fromUrl(url);
+     String target = language == null ? (original ? "source" : "") : language.code;
+     if (target.isEmpty()) return;
+     CaptionLanguageContext languageContext=CaptionLanguageContext.observe(url,target);
+     if(!original && languageContext.targetCode.equals("UNKNOWN"))return;
+     String key =
+         RebuildCache.hash(
+-            CaptionEngine.sourceCaptionUrl(url)
++            CaptionUrls.sourceCaptionUrl(url)
+                     .replaceAll("([?&])(?:expire|signature|sig)=[^&]*", "$1")
+                 + "|"
+                 + languageContext.fingerprint(cfg)
+@@ -545,7 +564,7 @@
+     // Track identity uses cache identity, not an expiring signature. All preparation is lock-free.
+     try {
+       key =
+-            SourceCaptionCache.key(CaptionEngine.sourceCaptionUrl(url))
++            TranslationRuntime.sourceKey(CaptionUrls.sourceCaptionUrl(url))
+                 + "|"
+                 + languageContext.fingerprint(cfg)
+                 + "|"
+@@ -560,7 +579,7 @@
+     Session candidate = new Session(c.getApplicationContext(), url, owner, key, target, cfg,
+         original, show, languageContext);
+     boolean unavailable = !original && !cfg.ready();
+-    String unavailableStatus = unavailable ? CaptionStrings.get(c, "configure_api") : "";
++    String unavailableStatus = unavailable ? TranslationRuntime.message(c, "configure_api") : "";
+     Session s, previous = null;
+     long epoch;
+     synchronized (RebuildController.class) {
+@@ -597,17 +616,17 @@
+     if (s == candidate) {
+       // A new engine session re-opens the player authority as unproven rather than inheriting a
+       // closed or quarantined state from the previous session on the same Activity.
+-      CaptionPlayerAuthority.setOwner(activity.get());
+-      CaptionDiagnostics.mark(s.context, "LANGUAGE_PROFILE_BOUND",
++      TranslationRuntime.sessionOpened();
++      TranslationRuntime.mark(s.context, "LANGUAGE_PROFILE_BOUND",
+           "session=" + s.id + ";" + s.languageContext.diagnosticFields());
+       clear(epoch);
+     }
+-    CaptionDiagnostics.mark(
++    TranslationRuntime.mark(
+         c,
+         "CAPTION_REBUILD",
+         "engine="+RebuildProtocol.VERSION+";session="+s.id+";video="+s.owner+";"+(original ? "source_passthrough" : "single_pass_events;source_owned_time;no_legacy_core"));
+     startup(s, "engine_session_created", "visible=" + s.visible);
+-    CaptionMusicSuppressor.forceNativeRendererScan();
++    TranslationRuntime.suppressNative(true);
+     kick(s);
+     scheduleTick();
+   }
+@@ -616,7 +635,7 @@
+     long now = SystemClock.elapsedRealtime();
+     Session s = active;
+     if (!current(s)) { CLOCK.updateHook(ms,now); return; }
+-    OfficialPlayerClockAdapter.Sample nativeSample=OfficialPlayerClockAdapter.read(s.owner);
++    TranslationRuntime.ClockSample nativeSample=TranslationRuntime.clock(s.owner);
+     RebuildClock.Update nativeUpdate=nativeSample.available
+         ? CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,now,nativeSample.state,nativeSample.speed)
+         : new RebuildClock.Update(false,0,"unavailable");
+@@ -661,8 +680,8 @@
+     }
+     flush(s, notices);
+     for (HttpURLConnection c : disconnect) c.disconnect();
+-    if (seek) CaptionOverlay.hide(() -> current(s) && s.generation == generation);
+-    CaptionOverlay.position(displayPosition(s),new CaptionOverlay.RenderGuard() {
++    if (seek) TranslationOutput.hide(() -> current(s) && s.generation == generation);
++    TranslationOutput.position(displayPosition(s),new TranslationOutput.RenderGuard() {
+       private final int epoch=s.generation;
+       public boolean isValid(){return current(s) && s.generation==epoch;}
+       public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
+@@ -672,16 +691,7 @@
+     scheduleTick();
+   }
+ 
+-  private static PlaybackState playbackState() {
+-    Activity a = activity.get();
+-    try {
+-      MediaController c = a == null ? null : a.getMediaController();
+-      return c == null || !a.getPackageName().equals(c.getPackageName())
+-          ? null : c.getPlaybackState();
+-    } catch (Exception ignored) {
+-    }
+-    return null;
+-  }
++  private static PlaybackState playbackState() { return TranslationRuntime.playbackState(); }
+ 
+   private static long position() {
+     return position(null);
+@@ -689,7 +699,7 @@
+ 
+   private static long position(Session s) {
+     long now = SystemClock.elapsedRealtime();
+-    OfficialPlayerClockAdapter.Sample nativeSample=OfficialPlayerClockAdapter.read(s==null?video:s.owner);
++    TranslationRuntime.ClockSample nativeSample=TranslationRuntime.clock(s==null?video:s.owner);
+     if(nativeSample.available)CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,
+         nativeSample.readElapsed,nativeSample.state,nativeSample.speed);
+     PlaybackState state=playbackState();
+@@ -711,7 +721,7 @@
+     if(s.observedSeekSerial>=0&&s.observedSeekSerial!=serial&&current(s)){
+       s.noteSeek(now);s.generation++;s.lastShown="";s.displayedEvent="";s.withheldEvent="";
+       s.position=selected.position;
+-      CaptionDiagnostics.mark(s.context,"REBUILD_SEEK","session="+s.id+";generation="+s.generation
++      TranslationRuntime.mark(s.context,"REBUILD_SEEK","session="+s.id+";generation="+s.generation
+           +";to="+selected.position+";clock_source="+selected.source+";clock_seek_serial="+serial,s.credential);
+     }
+     s.observedSeekSerial=serial;
+@@ -721,7 +731,7 @@
+   private static void freeze(Session s,RebuildClock.Observation selected,PlaybackState raw,
+       boolean hook,long hookPosition){
+     s.observation=selected;
+-    long owner=CaptionPlayerAuthority.ownerEpoch();
++    long owner=TranslationRuntime.ownerEpoch();
+     if(!selected.paused()){
+       s.pausedDisplayPosition=-1;s.pausedHookState=null;s.pauseSource="";
+       s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;
+@@ -754,7 +764,7 @@
+           || !s.pauseSource.equals(selected.source);
+       s.pausedDisplayPosition=donor;
+       s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;s.pauseSource=selected.source;
+-      if(edge)CaptionDiagnostics.mark(s.context,"REBUILD_PAUSE_OBSERVATION",
++      if(edge)TranslationRuntime.mark(s.context,"REBUILD_PAUSE_OBSERVATION",
+           "session="+s.id+";generation="+s.generation+";position="+donor
+           +";selected_position="+selected.position+";selected_state="+selected.state
+           +";clock_source="+selected.source+";sample_at="+selected.sampleAt
+@@ -765,7 +775,7 @@
+   private static long displayPosition(Session s) {
+     // A current native query can expose a real paused seek after layout. Without it, project only
+     // the already-selected clock; never reintroduce raw MediaSession as a second display donor.
+-    OfficialPlayerClockAdapter.Sample sample=OfficialPlayerClockAdapter.read(s.owner);
++    TranslationRuntime.ClockSample sample=TranslationRuntime.clock(s.owner);
+     if(sample.available){
+       CLOCK.acceptNative(sample.videoId,sample.position,sample.readElapsed,sample.state,sample.speed);
+       synchronized(s){
+@@ -801,19 +811,18 @@
+     if (!current(s)) return;
+     // A player transition owns the surface. No geometry scan, no overlay render and no session kick
+     // may run while the transition coordinator is still observing, so the animation never reflows.
+-    if (CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT
+-        || CaptionPlayerAuthority.state()==CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR) {
++    if (TranslationRuntime.transitioning()) {
+       scheduleTick();
+       return;
+     }
+     // Surface detection must also run while a former miniplayer has hidden the overlay.
+-    CaptionOverlay.refreshSurface();
++    TranslationOutput.refreshSurface();
+     long observed = position(s);
+     synchronized (s) {
+       if (!current(s)) return;
+       s.position = observed;
+     }
+-    CaptionOverlay.position(displayPosition(s),new CaptionOverlay.RenderGuard() {
++    TranslationOutput.position(displayPosition(s),new TranslationOutput.RenderGuard() {
+       private final int epoch=s.generation;
+       public boolean isValid(){return current(s) && s.generation==epoch;}
+       public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
+@@ -825,7 +834,7 @@
+ 
+   private static void kick(Session s) {
+     if (!current(s)) return;
+-    CaptionMusicSuppressor.kick();
++    TranslationRuntime.suppressNative(false);
+     boolean load = false;
+     synchronized (s) {
+       if (!current(s)) return;
+@@ -854,8 +863,8 @@
+     }
+     try {
+       startup(s, "source_load_start", "");
+-      RawCaptionSource.Source raw =
+-          RawCaptionSource.load(s.context, s.url, false, !s.sourceOnly, control);
++      TranslationSourceAccess.Source raw =
++          TranslationSourceAccess.load(s.context, s.url, false, !s.sourceOnly, control);
+       if (!current(s)) return;
+       long availablePosition = position(s);
+       synchronized (s) {
+@@ -869,33 +878,33 @@
+       render(s);
+       long phase=SystemClock.elapsedRealtime();
+       RebuildSource source = RebuildSource.read(raw.body, raw.document);
+-      CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=rebuild;ms="+(SystemClock.elapsedRealtime()-phase));
++      TranslationRuntime.mark(s.context,"REBUILD_SOURCE_PHASE","phase=rebuild;ms="+(SystemClock.elapsedRealtime()-phase));
+       phase=SystemClock.elapsedRealtime();
+       if (!s.sourceOnly && (source.hasPartialTiming() || source.nativeWordCount() < source.words.size())) {
+         try {
+-          RawCaptionSource.Source ref = RawCaptionSource.reference(s.context, s.url, source, control);
++          TranslationSourceAccess.Source ref = TranslationSourceAccess.reference(s.context, s.url, source, control);
+           if (ref != null) {
+             RebuildSource referenceEvidence = ref.timingEvidence != null
+                 ? ref.timingEvidence : RebuildSource.read(ref.body, ref.document);
+             RebuildSource beforeReference = source;
+             source = source.align(referenceEvidence,
+-                detail->CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_ALIGNMENT",
++                detail->TranslationRuntime.mark(s.context,"REBUILD_SOURCE_ALIGNMENT",
+                     "session="+s.id+";profile="+ref.timingProfile+";quality="+ref.timingQuality
+                         +";"+detail));
+-            CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_REFERENCE_APPLIED",
++            TranslationRuntime.mark(s.context,"REBUILD_SOURCE_REFERENCE_APPLIED",
+                 "session="+s.id+";profile="+ref.timingProfile+";quality="+ref.timingQuality
+                     +";before="+beforeReference.precisionEvidence()+";after="+source.precisionEvidence());
+           }
+         } catch (Exception ignored) {
+-          RawCaptionSource.checkActive(control);
+-          CaptionDiagnostics.mark(s.context,"ASR_REFERENCE_FETCH_FAILED",
+-              "session="+s.id+";reason="+CaptionDiagnostics.errorDetail(ignored));
+-        }
+-      }
+-      CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=reference;ms="+(SystemClock.elapsedRealtime()-phase));
++          TranslationSourceAccess.checkActive(control);
++          TranslationRuntime.mark(s.context,"ASR_REFERENCE_FETCH_FAILED",
++              "session="+s.id+";reason="+TranslationRuntime.errorDetail(ignored));
++        }
++      }
++      TranslationRuntime.mark(s.context,"REBUILD_SOURCE_PHASE","phase=reference;ms="+(SystemClock.elapsedRealtime()-phase));
+       phase=SystemClock.elapsedRealtime();
+       List<RebuildPlanner.Block> blocks = RebuildPlanner.plan(source,s.languageContext);
+-      CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=planner;ms="+(SystemClock.elapsedRealtime()-phase));
++      TranslationRuntime.mark(s.context,"REBUILD_SOURCE_PHASE","phase=planner;ms="+(SystemClock.elapsedRealtime()-phase));
+       phase=SystemClock.elapsedRealtime();
+       String key = RebuildCache.identity(source, s.config, s.target,s.languageContext);
+       RebuildProtocol.Plan[] plans = new RebuildProtocol.Plan[blocks.size()];
+@@ -915,7 +924,7 @@
+           restored++;
+         }
+       }
+-      CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=cache;ms="+(SystemClock.elapsedRealtime()-phase));
++      TranslationRuntime.mark(s.context,"REBUILD_SOURCE_PHASE","phase=cache;ms="+(SystemClock.elapsedRealtime()-phase));
+       long readyPosition = position(s);
+       RebuildProtocol.Plan[] pending = new RebuildProtocol.Plan[plans.length];
+       int[] attempts = new int[blocks.size()];
+@@ -951,13 +960,13 @@
+       }
+       startup(s, "engine_ready", "position_ms=" + s.position);
+       if (!blocks.isEmpty() && s.position >= blocks.get(0).end)
+-        CaptionDiagnostics.mark(s.context, "REBUILD_STARTUP_SKIP",
++        TranslationRuntime.mark(s.context, "REBUILD_STARTUP_SKIP",
+             "session=" + s.id + ";reason=skipped_due_to_late_ready;first_end_ms="
+                 + blocks.get(0).end + ";position_ms=" + s.position);
+       int precise = 0;
+       for (RebuildSource.Word w : source.words)
+         if (w.precision != RebuildSource.Precision.ESTIMATED) precise++;
+-      CaptionDiagnostics.mark(
++      TranslationRuntime.mark(
+           s.context,
+           "REBUILD_SOURCE_READY",
+           "words="
+@@ -974,14 +983,13 @@
+               + blocks.size()
+               + ";cache_hits="
+               + restored);
+-      TokenCostAudit.recordUnitCacheOutcome(Math.min(2,blocks.size()-focusIndex), restored);
+-      RawCaptionSource.publishSharedTimeline(s.owner, raw.document.cues());
++      TranslationAudit.recordUnitCacheOutcome(Math.min(2,blocks.size()-focusIndex), restored);
+       render(s);
+       kick(s);
+     } catch (Exception e) {
+       if (!current(s)) return;
+       SourceRecoveryPolicy.Failure f = SourceRecoveryPolicy.classify(e);
+-      String failureStatus = CaptionStrings.get(s.context,
++      String failureStatus = TranslationRuntime.message(s.context,
+           !f.retryable ? "source_unavailable" : "source_retry");
+       int failureCount;
+       synchronized (s) {
+@@ -996,7 +1004,7 @@
+         s.status = failureStatus;
+         failureCount = s.sourceFailures;
+       }
+-      CaptionDiagnostics.mark(
++      TranslationRuntime.mark(
+           s.context, "REBUILD_SOURCE_ERROR", f.category + ";attempt=" + failureCount);
+       render(s);
+     }
+@@ -1147,12 +1155,12 @@
+       }
+     }
+     if(!valid)return; // A departed scope must not publish cache outcomes or old-language UI.
+-    TokenCostAudit.recordUnitCacheOutcome(1,admitted?1:0);
+-    if(lookup.bootstrap) CaptionDiagnostics.mark(s.context,"REBUILD_BOOTSTRAP_CACHE",
++    TranslationAudit.recordUnitCacheOutcome(1,admitted?1:0);
++    if(lookup.bootstrap) TranslationRuntime.mark(s.context,"REBUILD_BOOTSTRAP_CACHE",
+         "session="+s.id+";block="+lookup.block.index+";outcome="+(admitted?"hit":"miss")
+         +";bootstrap_cache_hit="+s.bootstrapCacheHit+";bootstrap_cache_miss="+s.bootstrapCacheMiss
+          +";lane=source_io;elapsed_ms="+SystemClock.elapsedRealtime()+";video_ms="+s.position);
+-    if(admitted) CaptionDiagnostics.mark(s.context,"REBUILD_CACHE_RESTORED",
++    if(admitted) TranslationRuntime.mark(s.context,"REBUILD_CACHE_RESTORED",
+         "session="+s.id+";block="+lookup.block.index+";network_calls=0;path=memory_then_disk_before_network");
+   }
+ 
+@@ -1221,12 +1229,12 @@
+             String edge=s.generation+"|"+reused.priority+"|"+reused.dispatched+"|"+reused.sent;
+             if(!edge.equals(reused.reuseEdge)){
+               reused.reuseEdge=edge;
+-              CaptionDiagnostics.mark(s.context,"REBUILD_BLOCK_REUSED",
++              TranslationRuntime.mark(s.context,"REBUILD_BLOCK_REUSED",
+                   "session="+s.id+";block="+b.index+";generation="+s.generation
+                       +";reason="+(reused.priority?"in_flight_focus":"in_flight_prefetch")
+                       +";request="+reused.traceId+";dispatched="+reused.dispatched+";sent="+reused.sent
+                       +";repeated_observations="+reused.reuseRepeats,s.credential,"");
+-            }else{reused.reuseRepeats++;CaptionDiagnosticsWriter.noteReuseRepeat();}
++            }else{reused.reuseRepeats++;TranslationRuntime.noteReuseRepeat();}
+           }
+           continue;
+         }
+@@ -1271,7 +1279,7 @@
+     flush(s, notices);
+     for (Job j : start) {
+       RebuildPlanner.Block b = s.blocks.get(j.index);
+-      CaptionDiagnostics.mark(
++      TranslationRuntime.mark(
+           s.context,
+           "REBUILD_REQUEST",
+           "session="
+@@ -1320,7 +1328,7 @@
+     List<Notice> notices = new ArrayList<>();
+     try {
+       job.slotWaitMs = SystemClock.elapsedRealtime() - job.queuedAt;
+-      RawCaptionSource.checkActive(job);
++      TranslationSourceAccess.checkActive(job);
+       if(accepted==null) accepted =
+           RebuildApi.translate(
+               s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index],job.languageContext);
+@@ -1381,20 +1389,20 @@
+       permit.close();
+       permit = null;
+       if (RebuildReview.score(accepted.issues) == 0) {
+-        if (!durable) CaptionDiagnostics.mark(s.context, "REBUILD_CACHE_WRITE_FAILED",
++        if (!durable) TranslationRuntime.mark(s.context, "REBUILD_CACHE_WRITE_FAILED",
+             "session=" + s.id + ";block=" + b.index);
+         else RebuildCache.trim(s.context);
+       }
+       flush(s, notices);
+       for(RebuildReview.Issue issue:accepted.issues)
+-        CaptionDiagnostics.mark(s.context,"REBUILD_QUALITY_WARNING","session="+s.id+";request="+job.traceId+";block="+b.index+";advisory=true;repair_candidate="+issue.repair+";"+issue.describe());
+-      if(s.languageContext.renderSpec.legacy && DeepSeekConfig.displayTextDebugEnabled(s.context)) for(RebuildProtocol.Event event:accepted.events) {
++        TranslationRuntime.mark(s.context,"REBUILD_QUALITY_WARNING","session="+s.id+";request="+job.traceId+";block="+b.index+";advisory=true;repair_candidate="+issue.repair+";"+issue.describe());
++      if(s.languageContext.renderSpec.legacy && TranslationRuntime.debugEnabled(s.context)) for(RebuildProtocol.Event event:accepted.events) {
+         int count=(int)event.text.codePoints().filter(c->!Character.isWhitespace(c)).count();
+         double cps=count*1000.0/Math.max(1,event.end-event.start);
+-        if(count>48 || cps>12)CaptionDiagnostics.mark(s.context,"REBUILD_READABILITY_WARNING","block="+b.index+";range="+event.from+"-"+event.to+";duration="+(event.end-event.start)+";characters="+count+";cps="+String.format(Locale.ROOT,"%.2f",cps)+";advisory_only=true");
++        if(count>48 || cps>12)TranslationRuntime.mark(s.context,"REBUILD_READABILITY_WARNING","block="+b.index+";range="+event.from+"-"+event.to+";duration="+(event.end-event.start)+";characters="+count+";cps="+String.format(Locale.ROOT,"%.2f",cps)+";advisory_only=true");
+       }
+       if (!current(s)) return;
+-      CaptionDiagnostics.mark(
++      TranslationRuntime.mark(
+           s.context,
+           "REBUILD_EVENTS_ACCEPTED",
+           "block="
+@@ -1413,10 +1421,10 @@
+            : e.getClass().getSimpleName();
+       boolean fatal = e instanceof RebuildApi.Failure && ((RebuildApi.Failure) e).configuration;
+       String configurationStatus = fatal
+-          ? String.format(Locale.ROOT, CaptionStrings.settings(s.context, "api_config_error"), code) : "";
++          ? String.format(Locale.ROOT, TranslationRuntime.message(s.context, "api_config_error"), code) : "";
+       String rejectionReason = code + (e instanceof RebuildProtocol.Invalid
+           && !((RebuildProtocol.Invalid)e).detail.isEmpty() ? "; " + ((RebuildProtocol.Invalid)e).detail : "");
+-      String redactedReason = CaptionQualityTrace.redact(rejectionReason, s.config.apiKey, 400);
++      String redactedReason = TranslationRuntime.redact(rejectionReason, s.config.apiKey, 400);
+       notices.clear();
+       synchronized (s) {
+         if (!current(s) || s.jobs[job.index] != job) return;
+@@ -1510,7 +1518,7 @@
+ 
+   private static void startup(Session s, String phase, String detail) {
+     long now = SystemClock.elapsedRealtime();
+-    CaptionDiagnostics.mark(s.context, "REBUILD_STARTUP_PHASE",
++    TranslationRuntime.mark(s.context, "REBUILD_STARTUP_PHASE",
+         "session=" + s.id + ";phase=" + phase + ";elapsed_ms=" + now
+             + ";since_activation_ms=" + (now - s.activatedAtMs)
+             + (detail.isEmpty() ? "" : ";" + detail));
+@@ -1523,7 +1531,7 @@
+ 
+   private static void endFallback(Session s,long position,String cause,List<Notice> notices) {
+     if(!s.fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_END",
+-        "session="+s.id+";start="+s.fallbackStart+";end="+position+";cause="+cause+";reason="+CaptionQualityTrace.redact(s.fallbackReason,s.config.apiKey,400));
++        "session="+s.id+";start="+s.fallbackStart+";end="+position+";cause="+cause+";reason="+TranslationRuntime.redact(s.fallbackReason,s.config.apiKey,400));
+     s.fallbackReason="";s.fallbackStart=-1;
+   }
+ 
+@@ -1569,7 +1577,7 @@
+ 
+   private static void render(Session s) {
+     if (!current(s) || !s.visible) return;
+-    String translating = CaptionStrings.get(s.context, "caption_translating");
++    String translating = TranslationRuntime.message(s.context, "caption_translating");
+     List<Notice> notices = new ArrayList<>();
+     String text = "";
+     String fallbackReason = "", displayEmptyReason="";
+@@ -1654,7 +1662,7 @@
+         endFallback(s,s.position,"state_change",notices);
+         s.fallbackReason=fallbackReason;s.fallbackStart=s.position;
+         if(!fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_BEGIN",
+-            "session="+s.id+";position="+s.position+";reason="+CaptionQualityTrace.redact(fallbackReason,s.config.apiKey,400));
++            "session="+s.id+";position="+s.position+";reason="+TranslationRuntime.redact(fallbackReason,s.config.apiKey,400));
+       }
+       String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
+       if (signature.equals(s.lastShown) && s.appliedRenderRevision == s.renderRevision) {
+@@ -1676,7 +1684,7 @@
+     final String appliedReason=fallbackReason.equals("event_review") ? "semantic_blocked"
+         : fallbackReason.startsWith("failed:") ? "translation_failed"
+         : fallbackReason.isEmpty() ? (displayEmptyReason.isEmpty()?"source_gap":displayEmptyReason) : "pending_translation";
+-    CaptionOverlay.RenderGuard guard = new CaptionOverlay.RenderGuard() {
++    TranslationOutput.RenderGuard guard = new TranslationOutput.RenderGuard() {
+       public boolean isValid() {
+         return current(s) && s.generation == generation && s.renderRevision == revision
+             && s.renderSubmission == submission && s.visible;
+@@ -1690,17 +1698,17 @@
+       public long displayPosition(long supplied) { return RebuildController.displayPosition(s); }
+       public void onApplied() { if (isValid()) s.appliedRenderRevision = revision; }
+     };
+-    if (status) CaptionOverlay.showStatus(text, guard);
+-    else if (text.isEmpty() && fallbackReason.isEmpty()) CaptionOverlay.hide(guard);
++    if (status) TranslationOutput.showStatus(text, guard);
++    else if (text.isEmpty() && fallbackReason.isEmpty()) TranslationOutput.hide(guard);
+     else if (fallbackReason.equals("pending_engine") || fallbackReason.equals("pending_translation"))
+-      CaptionOverlay.showWaitingEvent(text, guard, s.id + ":" + generation + ":" + eventId,
++      TranslationOutput.showWaitingEvent(text, guard, s.id + ":" + generation + ":" + eventId,
+           eventStart, eventEnd, selectedAt);
+     else
+-      CaptionOverlay.showEvent(
++      TranslationOutput.showEvent(
+           text, guard, () -> "", s.id + ":" + generation + ":" + eventId,
+           eventStart, eventEnd, selectedAt,s.languageContext.renderSpec,displayCandidate);
+-    if (DeepSeekConfig.displayTextDebugEnabled(s.context))
+-      CaptionDiagnostics.mark(
++    if (TranslationRuntime.debugEnabled(s.context))
++      TranslationRuntime.mark(
+           s.context,
+           "REBUILD_SELECTED",
+           "id="
+@@ -1716,6 +1724,6 @@
+               + "-"
+               + eventEnd
+               + ";text="
+-              + CaptionQualityTrace.redact(text, s.config.apiKey, 500));
++              + TranslationRuntime.redact(text, s.config.apiKey, 500));
+   }
+ }
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java
+@@ -27,7 +27,7 @@
+     final long elapsedMs, remainingMs;
+     /** True when the connection was closed by our own stop/retire rather than by the network. */
+     final boolean cancelled;
+-    final TokenCostAudit.FailureCategory category;
++    final TranslationAudit.FailureCategory category;
+     TransportFailure(Exception cause, String phase, long start, long deadline) {
+       this(cause, phase, start, deadline, null, false);
+     }
+@@ -49,12 +49,12 @@
+    * consulted first, so a timer-fired disconnect is reported as an expiry instead of a socket error;
+    * remaining time is never used to guess which side failed first.
+    */
+-  static TokenCostAudit.FailureCategory transportCategory(Exception cause,String phase,NetworkDeadline guard,boolean cancelled){
+-    if(cancelled)return TokenCostAudit.FailureCategory.CANCELLED;
+-    if(guard!=null&&guard.timerFired())return TokenCostAudit.FailureCategory.DEADLINE_EXPIRED;
++  static TranslationAudit.FailureCategory transportCategory(Exception cause,String phase,NetworkDeadline guard,boolean cancelled){
++    if(cancelled)return TranslationAudit.FailureCategory.CANCELLED;
++    if(guard!=null&&guard.timerFired())return TranslationAudit.FailureCategory.DEADLINE_EXPIRED;
+     if(cause instanceof SocketTimeoutException)return "connect".equals(phase)
+-        ?TokenCostAudit.FailureCategory.CONNECT_TIMEOUT:TokenCostAudit.FailureCategory.READ_TIMEOUT;
+-    return TokenCostAudit.FailureCategory.NETWORK_IO;
++        ?TranslationAudit.FailureCategory.CONNECT_TIMEOUT:TranslationAudit.FailureCategory.READ_TIMEOUT;
++    return TranslationAudit.FailureCategory.NETWORK_IO;
+   }
+ 
+   static String transportReason(Exception error, String phase) {
+@@ -83,7 +83,7 @@
+     negotiated.clear();
+   }
+ 
+-  static String prompt(DeepSeekConfig.Snapshot cfg, String lang) {
++  static String prompt(TranslationSettings cfg, String lang) {
+     return RebuildProtocol.PROMPT
+         + RebuildProtocol.FIDELITY_PROMPT
+         + " Target language: "
+@@ -97,7 +97,7 @@
+   static final String ENGLISH_DEPENDENCY_PROMPT =
+       " The source is explicitly English. Keep modifier+noun, number+unit, verb+object and dependent phrases together; use context to understand a continuation without importing its words. Articles, auxiliaries and conjunctions are lexical hints, not proven sentence boundaries.";
+ 
+-  static String prompt(DeepSeekConfig.Snapshot cfg,String lang,CaptionLanguageContext context) {
++  static String prompt(TranslationSettings cfg,String lang,CaptionLanguageContext context) {
+     if(context.canApplyEnglishToChinese)return prompt(cfg,lang);
+     return NEUTRAL_PROMPT+(context.englishSource ? ENGLISH_DEPENDENCY_PROMPT : "")
+         +" Source language: "+context.sourceCode+". Target language: "+context.targetCode
+@@ -108,7 +108,7 @@
+   static RebuildProtocol.Plan translate(
+       RebuildSource s,
+       RebuildPlanner.Block b,
+-      DeepSeekConfig.Snapshot cfg,
++      TranslationSettings cfg,
+       String lang,
+       DeepSeekApiClient.RequestControl control,
+       boolean priority,
+@@ -118,10 +118,10 @@
+   }
+ 
+   static RebuildProtocol.Plan translate(RebuildSource s,RebuildPlanner.Block b,
+-      DeepSeekConfig.Snapshot cfg,String lang,DeepSeekApiClient.RequestControl control,
++      TranslationSettings cfg,String lang,DeepSeekApiClient.RequestControl control,
+       boolean priority,String repair,CaptionLanguageContext context) throws Exception {
+     JSONObject payload = RebuildProtocol.payload(s, b, lang, repair,context);
+-    CaptionOverlay.LayoutBudget layout = CaptionOverlay.budget();
++    TranslationBudget layout = TranslationOutput.budget();
+     if (layout != null && context.canApplyEnglishToChinese)
+       payload.put(
+           "display_hint",
+@@ -152,8 +152,8 @@
+     if (blocked.containsKey(identity)) throw new Failure(blocked.get(identity), true, 0);
+     if (portable.contains(identity)) ProviderRequestPolicy.removeOptional(request);
+     long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(priority ? 10000 : 16000);
+-    TokenCostAudit.Request audit =
+-        TokenCostAudit.beginUnitBatch(
++    TranslationAudit.Request audit =
++        TranslationAudit.beginUnitBatch(
+             cfg,
+             priority,
+             1,
+@@ -164,10 +164,10 @@
+                 + payload.optString("context_after").length(),
+             RebuildProtocol.VERSION);
+     for (int round = 0; round < 2; round++) {
+-      RawCaptionSource.checkActive(control);
++      TranslationSourceAccess.checkActive(control);
+       String body = request.toString();
+       int attempt =
+-          TokenCostAudit.beginAttempt(audit, body.getBytes(StandardCharsets.UTF_8).length);
++          TranslationAudit.beginAttempt(audit, body.getBytes(StandardCharsets.UTF_8).length);
+       trace(control,"REBUILD_HTTP_BEGIN","attempt="+attempt+";negotiation_round="+round);
+       try {
+         Response response = send(cfg, body, control, deadline);
+@@ -187,7 +187,7 @@
+             }
+           if (allowance && ProviderRequestPolicy.removeOptional(request, category)) {
+             portable.add(identity);
+-            TokenCostAudit.recordFailure(audit, attempt, "http_" + response.status);
++            TranslationAudit.recordFailure(audit, attempt, "http_" + response.status);
+             continue;
+           }
+           if (round == 0 && optional && portable.contains(identity))
+@@ -200,7 +200,7 @@
+               response.status == 401 || response.status == 403 || response.status == 404,
+               response.retryAfter);
+         JSONObject root = new JSONObject(response.body);
+-        TokenCostAudit.recordResponse(audit, attempt, root);
++        TranslationAudit.recordResponse(audit, attempt, root);
+         JSONObject choice = root.getJSONArray("choices").getJSONObject(0);
+         String finish = choice.optString("finish_reason");
+         String content = choice.getJSONObject("message").optString("content", "");
+@@ -220,27 +220,27 @@
+         if(plan.reboundEvents>0)trace(control,"REBUILD_SOURCE_REBOUND",
+             "block="+b.index+";events_rebound="+plan.reboundEvents+";rule=exact_owned_source_v1");
+         plan = RebuildReview.withLayoutReview(plan, layout,context);
+-        TokenCostAudit.recordUnitQualityOutcome(audit, 1, 0, 0);
+-        TokenCostAudit.recordUnitBatchOutcome(audit, 1);
++        TranslationAudit.recordUnitQualityOutcome(audit, 1, 0, 0);
++        TranslationAudit.recordUnitBatchOutcome(audit, 1);
+         return plan;
+       } catch (RebuildProtocol.Invalid invalid) {
+-        TokenCostAudit.recordUnitQualityOutcome(audit, 0, 1, 1);
++        TranslationAudit.recordUnitQualityOutcome(audit, 0, 1, 1);
+         throw invalid;
+       } catch (Exception error) {
+         trace(control,"REBUILD_HTTP_FAILURE","attempt="+attempt+";reason="+(error instanceof Failure ? ((Failure)error).code
+             : error instanceof TransportFailure ? ((TransportFailure)error).reason : error.getClass().getSimpleName())
+             +";category="+(error instanceof TransportFailure?((TransportFailure)error).category.name()
+-                :error instanceof Failure?"HTTP_CONFIG":TokenCostAudit.failureCategory(error.getClass().getSimpleName()).name())
++                :error instanceof Failure?"HTTP_CONFIG":TranslationAudit.failureCategory(error.getClass().getSimpleName()).name())
+             +(error instanceof TransportFailure ? ";phase="+((TransportFailure)error).phase
+               +";elapsed_ms="+((TransportFailure)error).elapsedMs+";remaining_deadline_ms="+((TransportFailure)error).remainingMs : ""));
+         if (error instanceof Failure && ((Failure) error).configuration) {
+           if (blocked.size() > 128) blocked.clear();
+           blocked.put(identity, ((Failure) error).code);
+         }
+-        TokenCostAudit.recordFailure(audit,attempt,
++        TranslationAudit.recordFailure(audit,attempt,
+             error instanceof TransportFailure?((TransportFailure)error).category
+-                :error instanceof Failure?TokenCostAudit.FailureCategory.HTTP_CONFIG
+-                :TokenCostAudit.failureCategory(error.getClass().getSimpleName()),
++                :error instanceof Failure?TranslationAudit.FailureCategory.HTTP_CONFIG
++                :TranslationAudit.failureCategory(error.getClass().getSimpleName()),
+             error instanceof Failure?((Failure)error).code
+                 :error instanceof TransportFailure?((TransportFailure)error).reason:error.getClass().getSimpleName());
+         throw error;
+@@ -266,7 +266,7 @@
+   }
+ 
+   private static Response send(
+-      DeepSeekConfig.Snapshot cfg,
++      TranslationSettings cfg,
+       String body,
+       DeepSeekApiClient.RequestControl control,
+       long deadline)
+@@ -279,13 +279,13 @@
+     NetworkDeadline guard = new NetworkDeadline(c, deadline);
+     try (NetworkDeadline armed = guard) {
+       if (control != null) control.onConnection(c);
+-      RawCaptionSource.checkActive(control);
++      TranslationSourceAccess.checkActive(control);
+       c.setRequestMethod("POST");
+       c.setDoOutput(true);
+       c.setUseCaches(false);
+       c.setInstanceFollowRedirects(false);
+-      c.setConnectTimeout(Math.min(4000, RawCaptionSource.remaining(deadline)));
+-      c.setReadTimeout(RawCaptionSource.remaining(deadline));
++      c.setConnectTimeout(Math.min(4000, TranslationSourceAccess.remaining(deadline)));
++      c.setReadTimeout(TranslationSourceAccess.remaining(deadline));
+       ProviderEndpoint.authenticate(c, cfg.baseUrl, cfg.apiKey);
+       c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+       c.setRequestProperty("Accept", "application/json");
+@@ -296,8 +296,8 @@
+       }
+       phase="read";
+       if (control != null) control.onRequestBodySent();
+-      RawCaptionSource.checkActive(control);
+-      c.setReadTimeout(RawCaptionSource.remaining(deadline));
++      TranslationSourceAccess.checkActive(control);
++      c.setReadTimeout(TranslationSourceAccess.remaining(deadline));
+       int code = c.getResponseCode();
+       ByteArrayOutputStream out = new ByteArrayOutputStream();
+       InputStream stream = code >= 400 ? c.getErrorStream() : c.getInputStream();
+@@ -305,8 +305,8 @@
+         try (InputStream in = stream) {
+           byte[] buf = new byte[4096];
+           while (true) {
+-            RawCaptionSource.checkActive(control);
+-            c.setReadTimeout(RawCaptionSource.remaining(deadline));
++            TranslationSourceAccess.checkActive(control);
++            c.setReadTimeout(TranslationSourceAccess.remaining(deadline));
+             int n = in.read(buf);
+             if (n < 0) break;
+             if (out.size() + n > 2 * 1024 * 1024) throw new IOException("response_too_large");
+@@ -324,7 +324,7 @@
+       // this controller itself stopped or retired is an intentional cancellation, not a wire fault;
+       // a real deadline expiry is reported from the deadline's own timer fact.
+       boolean intentional=false;
+-      try { RawCaptionSource.checkActive(control); }
++      try { TranslationSourceAccess.checkActive(control); }
+       catch(Exception cancelled){ intentional=true; }
+       throw new TransportFailure(failure,phase,started,deadline,guard,intentional);
+     } finally {
+@@ -333,7 +333,7 @@
+     }
+   }
+ 
+-  static String test(DeepSeekConfig.Snapshot cfg) throws Exception {
++  static String test(TranslationSettings cfg) throws Exception {
+     reset();
+     List<RebuildSource.Word> words = new ArrayList<>();
+     String[] text = {"This", "is", "a", "subtitle", "test."};
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java
+@@ -22,10 +22,10 @@
+   }
+ 
+   /** Historical English/Chinese cache identity for legacy fixtures only. */
+-  static String identity(RebuildSource s, DeepSeekConfig.Snapshot c, String target) {
++  static String identity(RebuildSource s, TranslationSettings c, String target) {
+     return identity(s,c,target,CaptionLanguageContext.LEGACY);
+   }
+-  static String identity(RebuildSource s,DeepSeekConfig.Snapshot c,String target,CaptionLanguageContext context) {
++  static String identity(RebuildSource s,TranslationSettings c,String target,CaptionLanguageContext context) {
+     StringBuilder b =
+         new StringBuilder(RebuildProtocol.VERSION)
+             .append('|')
+@@ -72,7 +72,7 @@
+       String raw = new String(java.nio.file.Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+       RebuildProtocol.Plan plan=RebuildProtocol.parseBound(raw,s,b,context);
+       if(!context.canApplyEnglishToChinese)
+-        plan=RebuildReview.withLayoutReview(plan,CaptionOverlay.budget(),context);
++        plan=RebuildReview.withLayoutReview(plan,TranslationOutput.budget(),context);
+       return RebuildReview.score(plan.issues)==0 ? plan : null;
+     } catch (Exception bad) {
+       f.delete();
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java
+@@ -7,7 +7,8 @@
+ 
+ /** Single source-owned event contract. No post-translation concatenation or hidden resplit. */
+ final class RebuildProtocol {
+-  static final String VERSION = app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION;
++  // Pinned upstream protocol identity, independent of the embedding UI or package version.
++  static final String VERSION = "1.4.0";
+   static final String PROMPT =
+       "You create faithful live subtitles. Read the complete source and read-only context before"
+           + " translating. Preserve all spoken meaning, negation and its scope, conditions,"
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java
+@@ -119,7 +119,7 @@
+       }
+     return all.size()==plan.issues.size() ? plan : new RebuildProtocol.Plan(plan.events,plan.json,all,plan.reboundEvents);
+   }
+-  static RebuildProtocol.Plan withLayoutReview(RebuildProtocol.Plan plan, CaptionOverlay.LayoutBudget budget) {
++  static RebuildProtocol.Plan withLayoutReview(RebuildProtocol.Plan plan, TranslationBudget budget) {
+     if (budget == null) return plan;
+     List<Issue> all = new ArrayList<>(plan.issues);
+     for (RebuildProtocol.Event e : plan.events)
+@@ -129,7 +129,7 @@
+     return all.size() == plan.issues.size() ? plan
+         : new RebuildProtocol.Plan(plan.events, plan.json, all, plan.reboundEvents);
+   }
+-  static RebuildProtocol.Plan withLayoutReview(RebuildProtocol.Plan plan, CaptionOverlay.LayoutBudget budget,
++  static RebuildProtocol.Plan withLayoutReview(RebuildProtocol.Plan plan, TranslationBudget budget,
+                                                CaptionLanguageContext context) {
+     if(context.canApplyEnglishToChinese)return withLayoutReview(plan,budget==null ? null : budget.withSpec(context.renderSpec));
+     if(budget==null)return plan;
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java
+@@ -4,7 +4,7 @@
+ import java.util.Locale;
+ /** Portable default request: vendor-specific thinking parameters are never inferred from model names. */
+ final class ProviderRequestPolicy {
+-    static JSONObject request(DeepSeekConfig.Snapshot config, String prompt, JSONObject payload, int limit) throws Exception {
++    static JSONObject request(TranslationSettings config, String prompt, JSONObject payload, int limit) throws Exception {
+         JSONObject r=new JSONObject().put("model",config.model).put("stream",false)
+             .put("max_tokens",Math.max(256,Math.min(3072,limit)))
+             .put("messages",new JSONArray()
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java
+@@ -6,7 +6,7 @@
+ 
+ /** Shared cancellable I/O contract; no legacy translator is shipped. */
+ final class DeepSeekApiClient {
+-  interface RequestControl {
++  interface RequestControl extends CaptionSourceControl {
+     boolean isCancelled();
+ 
+     void onConnection(HttpURLConnection c);
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java
+@@ -57,10 +57,10 @@
+   }
+ 
+   /** Target-aware entry: preserve valid legacy cuts; otherwise use soft-rate Unicode capacity. */
+-  static List<Page> plan(String text,long start,long end,CaptionOverlay.LayoutBudget budget,
++  static List<Page> plan(String text,long start,long end,TranslationBudget budget,
+       CaptionRenderSpec spec) {
+     if(budget==null || spec==null || text==null || text.isEmpty() || end<=start) return Collections.emptyList();
+-    CaptionOverlay.LayoutBudget measured=budget.withSpec(spec);
++    TranslationBudget measured=budget.withSpec(spec);
+     if(spec.legacy) {
+       // A complete event that fits the real two-line budget is one immutable page.
+       if(CaptionLanguagePager.wellFormed(text,spec) && spec.fits(text,measured.preferredPx,measured.width,2))
+@@ -82,7 +82,7 @@
+   }
+ 
+   private static boolean validPreferred(String text,long start,long end,List<Page> pages,
+-      CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
++      TranslationBudget budget,CaptionRenderSpec spec) {
+     if(pages.isEmpty() || !CaptionLanguagePager.wellFormed(text,spec)) return false;
+     int[] boundaries=CaptionUnicode.characterBoundaries(text,spec.locale);
+     boolean[] protectedCuts=CaptionLanguagePager.protectedOffsets(text);
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java
+@@ -8,7 +8,7 @@
+   static final long MIN_PAGE_MS = 1200;
+   private CaptionLanguagePager() {}
+   static List<RebuildPageLayout.Page> plan(String text,long start,long end,
+-      CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
++      TranslationBudget budget,CaptionRenderSpec spec) {
+     if(text==null || text.isEmpty() || end<=start || !wellFormed(text,spec))
+       return Collections.emptyList();
+     if (spec.fits(text,budget.preferredPx,budget.width,2))
+@@ -21,7 +21,7 @@
+     return spec.fits(text,budget.preferredPx,budget.width,2)
+         ? Collections.singletonList(new RebuildPageLayout.Page(text,start,end)) : Collections.emptyList();
+   }
+-  static String failureReason(String text,CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
++  static String failureReason(String text,TranslationBudget budget,CaptionRenderSpec spec) {
+     if(text==null || text.isEmpty() || !wellFormed(text,spec)) return "hard_geometry_unresolved";
+     int[] cuts=CaptionUnicode.characterBoundaries(text,spec.locale);
+     boolean[] reachable=new boolean[cuts.length];reachable[0]=true;
+@@ -129,7 +129,7 @@
+     if(",;:，；：、\u060c\u061b".indexOf(cp)>=0)return CLAUSE;
+     return WORD;
+   }
+-  static Seams seams(String text,CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
++  static Seams seams(String text,TranslationBudget budget,CaptionRenderSpec spec) {
+     int[] graphemes=CaptionUnicode.characterBoundaries(text,spec.locale);
+     int[] words=CaptionUnicode.wordBoundaries(text,spec.locale);
+     int[] lines=CaptionUnicode.lineBoundaries(text,spec.locale);
+@@ -164,7 +164,7 @@
+     return new Seams(cuts,kinds);
+   }
+   static String seamName(int kind) {return new String[]{"sentence","clause","weaker_word","emergency_grapheme"}[kind];}
+-  static String seamSummary(String text,List<RebuildPageLayout.Page> pages,CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
++  static String seamSummary(String text,List<RebuildPageLayout.Page> pages,TranslationBudget budget,CaptionRenderSpec spec) {
+     Seams s=seams(text,budget,spec);int at=0,weak=0,emergency=0;StringBuilder cuts=new StringBuilder();
+     for(int i=0;i<pages.size()-1;i++) {
+       at+=pages.get(i).text.length();int n=Arrays.binarySearch(s.cuts,at);int kind=n<0?EMERGENCY:s.kinds[n];
+@@ -175,7 +175,7 @@
+   }
+   private static final class Measured {
+     final int lines,units;final boolean fits;final double width,lineUnits;
+-    Measured(String part,android.text.StaticLayout layout,CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
++    Measured(String part,android.text.StaticLayout layout,TranslationBudget budget,CaptionRenderSpec spec) {
+       lines=layout.getLineCount();fits=spec.fits(part,layout,budget.width,spec.maxLines);
+       // Rejected geometry never participates in scoring; do not run extra ICU counters for it.
+       units=fits ? Math.max(1,spec.readingUnits(part)) : 0;
+@@ -193,7 +193,7 @@
+     }
+   }
+   private static List<RebuildPageLayout.Page> choose(String text,long start,long end,int[] cuts,int[] kinds,
+-      CaptionOverlay.LayoutBudget budget,CaptionRenderSpec spec) {
++      TranslationBudget budget,CaptionRenderSpec spec) {
+     int n=cuts.length;long duration=end-start;
+     int capacity=(int)Math.min(n-1,duration/MIN_PAGE_MS);
+     if(capacity<1)return Collections.emptyList();
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/WordTimingReference.java
++++ infrastructure/src/main/java/app/yydarlinker/deepseekcaptions/WordTimingReference.java
+@@ -1,33 +1,66 @@
+ package app.yydarlinker.deepseekcaptions;
++
+ import org.json.*;import java.net.URI;import java.net.URLDecoder;import java.nio.charset.StandardCharsets;
++
+ /** Only extracts this video's public ASR track; never executes page scripts. */
++
+ final class WordTimingReference {
++
+  static String find(String html,String videoId)throws Exception{java.util.List<String> all=findAll(html,videoId,"");return all.isEmpty()?"":all.get(0);}
++
+  static boolean sameLanguage(String a,String b){return a!=null&&b!=null&&!a.isEmpty()&&!b.isEmpty()&&a.split("-")[0].equalsIgnoreCase(b.split("-")[0]);}
++
+  static java.util.List<String> findAll(String html,String videoId,String language)throws Exception{
++
+   java.util.List<String> preferred=new java.util.ArrayList<>(),other=new java.util.ArrayList<>();
++
+   String marker="ytInitialPlayerResponse";int from=0;
++
+   while((from=html.indexOf(marker,from))>=0){int eq=html.indexOf('=',from+marker.length());if(eq<0)break;int start=eq+1;while(start<html.length()&&Character.isWhitespace(html.charAt(start)))start++;from=start;
++
+    if(start>=html.length()||html.charAt(start)!='{')continue;
++
+    boolean string=false,escape=false;int depth=0,end=-1;
++
+    for(int i=start;i<html.length();i++){char c=html.charAt(i);if(string){if(escape)escape=false;else if(c=='\\')escape=true;else if(c=='"')string=false;}
++
+     else if(c=='"')string=true;else if(c=='{')depth++;else if(c=='}'&&--depth==0){end=i+1;break;}}
++
+    if(end<0)continue;from=end;JSONObject root=new JSONObject(html.substring(start,end));JSONObject details=root.optJSONObject("videoDetails");if(details==null||!videoId.equals(details.optString("videoId")))continue;
++
+    JSONObject captions=root.optJSONObject("captions");if(captions==null)continue;JSONObject list=captions.optJSONObject("playerCaptionsTracklistRenderer");if(list==null)continue;JSONArray tracks=list.optJSONArray("captionTracks");if(tracks==null)continue;
++
+    for(int i=0;i<tracks.length();i++){JSONObject t=tracks.optJSONObject(i);if(t==null||!"asr".equals(t.optString("kind")))continue;String url=t.optString("baseUrl");if(safe(url,videoId)){
++
+     java.util.List<String> target=sameLanguage(language,t.optString("languageCode"))?preferred:other;
++
+     String formatted=SourceFormatPolicy.json3(url);if(!target.contains(formatted)&&target.size()<16)target.add(formatted);
++
+    }}
++
+   }for(String url:other)if(!preferred.contains(url))preferred.add(url);return preferred;
++
+  }
++
+  static boolean safe(String url,String video){try{
++
+   if(video==null||!video.matches("[A-Za-z0-9_-]{11}"))return false;
++
+   URI u=URI.create(url);String host=u.getHost();
++
+   if(!"https".equals(u.getScheme())||u.getUserInfo()!=null||(u.getPort()!=-1&&u.getPort()!=443)||!("www.youtube.com".equals(host)||"youtube.com".equals(host))||!"/api/timedtext".equals(u.getPath())||u.getRawQuery()==null)return false;
++
+   int videos=0;boolean same=false;
++
+   for(String part:u.getRawQuery().split("&")){String[] x=part.split("=",2);String key=URLDecoder.decode(x[0],"UTF-8");String value=x.length==2?URLDecoder.decode(x[1],"UTF-8"):"";
++
+    if("v".equals(key)){videos++;same=video.equals(value);}if("tlang".equals(key)&&!value.isEmpty())return false;}
++
+   return videos==1&&same;
++
+  }catch(Exception e){return false;}}
++
+  static boolean sameWords(CaptionDocument.Parsed a,CaptionDocument.Parsed b){StringBuilder x=new StringBuilder(),y=new StringBuilder();for(CaptionDocument.Cue c:a.cues())x.append(RebuildSource.key(c.text));for(CaptionDocument.Cue c:b.cues())y.append(RebuildSource.key(c.text));return x.length()>0&&x.toString().equals(y.toString());}
++
+ }
++

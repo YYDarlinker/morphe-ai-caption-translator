@@ -22,10 +22,10 @@ public class N37SnapshotBindingTest {
     CaptionDiagnostics.mark(a,"REQUEST","Authorization: Bearer fixture-sensitive-key;url=https://example.test/timedtext?signature=private",CaptionCredentialRef.of("fixture-sensitive-key"));
     DeepSeekDiagnosticsPreference pref=new DeepSeekDiagnosticsPreference(a);
     View row=pref.getView(null,parent);parent.addView(row);layout(row);
-    TextView body=row.findViewWithTag("ai_diagnostics_body");
-    assertEquals(CaptionStrings.settings(a,"diagnostics_loading"),body.getText().toString());
-    assertFalse(body.getText().toString().contains("private"));
+    assertNull("collapsed binding must not create a selectable body",row.findViewWithTag("ai_diagnostics_body"));
+    assertEquals(5,DiagnosticsLazyRowTest.nodes(row));
     for(int i=0;i<20;i++)assertSame(row,pref.getView(row,parent));
+    assertNull(row.findViewWithTag("ai_diagnostics_body"));
     assertEquals(1,release.getCount());assertEquals(0,Keys.mainReads.get());
     CaptionDiagnostics.clear(a);assertEquals(1,release.getCount());assertNull(CaptionDiagnosticSnapshot.peek(a));
     release.countDown();String report=N37DiagnosticsReports.read(a);

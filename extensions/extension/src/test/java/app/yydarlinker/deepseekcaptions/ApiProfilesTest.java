@@ -30,7 +30,7 @@ public class ApiProfilesTest {
  }
  @Test public void namesDoNotChangeIdentityOrGlobalEngineAndStyle(){
   DeepSeekConfig.saveEnabled(a,true);DeepSeekConfig.saveCaptionSizeTier(a,3);String b=ApiProfiles.create(a,"B","https://b.example/v1");ApiProfiles.rename(a,b,"Renamed");
-  ApiProfiles.select(a,b);assertEquals("Renamed",ApiProfiles.list(a).get(b));assertTrue(DeepSeekConfig.enabled(a));assertEquals(3,DeepSeekConfig.load(a).captionSizeTier);
+  ApiProfiles.select(a,b);assertEquals("Renamed",ApiProfiles.list(a).get(b));assertTrue(DeepSeekConfig.enabled(a));assertEquals(3,DeepSeekConfig.displayStyle(a).captionSizeTier);
   assertEquals(b,ApiProfiles.active(a.getApplicationContext()));assertEquals(2,ApiProfiles.list(a).size());
  }
  @Test public void pendingUrlEditsFlushToOldProfileAndDetachedEventsCannotWriteNewProfile(){
@@ -56,7 +56,7 @@ public class ApiProfilesTest {
   input.setText("stale-model");org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2));assertEquals("",DeepSeekConfig.load(a).model);
  }
  @Test public void immutableSnapshotsRetainOriginalEndpointAfterSwitch(){
-  DeepSeekConfig.saveBaseUrl(a,"https://original.example/v1");DeepSeekConfig.Snapshot request=DeepSeekConfig.load(a);
+  DeepSeekConfig.saveBaseUrl(a,"https://original.example/v1");DeepSeekConfig.ProviderSettings request=DeepSeekConfig.load(a);
   String b=ApiProfiles.create(a,"B","https://replacement.example/v1");ApiProfiles.select(a,b);assertEquals("https://original.example/v1",request.baseUrl);assertEquals("https://replacement.example/v1",DeepSeekConfig.load(a).baseUrl);
  }
 
@@ -67,15 +67,5 @@ public class ApiProfilesTest {
   DeepSeekConfig.saveBaseUrl(a,DeepSeekConfig.DEFAULT_BASE_URL);assertTrue(SecureApiKey.hasSavedValue(a));
  }
 
- @Test public void offscreenPromptRoundTripMustRebindAndRemainEditable(){
-  DeepSeekTextPreference p=new DeepSeekTextPreference(a);p.setKey(DeepSeekTextPreference.KEY_PROMPT);
-  LinearLayout parent=new LinearLayout(a);android.view.View old=p.getView(null,parent);
-  String initial=CaptionEditorIds.editorIn(old).getText().toString();assertFalse(initial.isEmpty());
-  String b=ApiProfiles.create(a,"B","https://b.example/v1");assertTrue(ApiProfiles.select(a,b));
-  // Row remains offscreen while B is active, so ListView never asks it to create a B view.
-  assertTrue(ApiProfiles.select(a,"default"));
-  android.view.View rebound=p.getView(old,parent);EditText input=CaptionEditorIds.editorIn(rebound);
-  assertEquals(initial,input.getText().toString());input.setText("editable after round trip");assertTrue(p.flushProfile());
-  assertEquals("editable after round trip",DeepSeekConfig.load(a).prompt);
- }
+ 
 }

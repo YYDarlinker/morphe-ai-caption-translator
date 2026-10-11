@@ -66,7 +66,7 @@ public class N25DiagnosticsLocalizationTest {
                 // locale whose own word for "Engine" is the English word cannot be distinguished this way,
                 // so the check is skipped only for that exact collision and always uses the joined line.
                 assertTrue(tag+" export must keep the raw engine heading",
-                        export.contains("Engine: Event rebuild / " + RebuildProtocol.VERSION));
+                        export.contains("Engine: Event rebuild / " + CaptionEngineIdentity.ID));
                 assertTrue(tag+" export must keep the raw stage heading",export.contains("Latest stage: "));
                 String localizedEngine=CaptionStrings.settings(c,"label_separator")
                         .replace("%1$s",CaptionStrings.settings(c,"engine"));
@@ -84,13 +84,13 @@ public class N25DiagnosticsLocalizationTest {
                 assertTrue(tag+" must not translate an event name",ui.contains("REBUILD_PRESENTED"));
                 record.add(new JSONObject().put("locale",tag)
                         .put("ui_engine_line",CaptionStrings.settings(c,"engine")
-                                +CaptionStrings.settings(c,"engine_event_rebuild")+" / "+RebuildProtocol.VERSION)
+                                +CaptionStrings.settings(c,"engine_event_rebuild")+" / "+CaptionEngineIdentity.ID)
                         .put("ui_mode_line",CaptionStrings.settings(c,"label_separator")
                                 .replace("%1$s",CaptionStrings.settings(c,"mode"))
                                 +CaptionStrings.settings(c,"mode_auto_translate"))
                         .put("ui_debug_line",String.format(java.util.Locale.ROOT,
                                 CaptionStrings.settings(c,"display_debug"),CaptionStrings.settings(c,"on")))
-                        .put("raw_engine_heading","Engine: Event rebuild / "+RebuildProtocol.VERSION));
+                        .put("raw_engine_heading","Engine: Event rebuild / "+CaptionEngineIdentity.ID));
             }
         }finally{activity.finish();}
         writeArtifact("n25-diagnostics-localization.json",record.toString());

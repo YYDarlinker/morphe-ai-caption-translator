@@ -1,3 +1,8 @@
+## [1.4.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.4.0...v1.4.1) (2026-10-11)
+
+- 移除提示词设置。
+- 修复阿拉伯语界面排版 bug。
+
 ## [1.4.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.3.5...v1.4.0) (2026-10-05)
 
 ### 🐛 Bug Fixes

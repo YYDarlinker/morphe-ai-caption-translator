@@ -1,9 +1,20 @@
 package app.yydarlinker.deepseekcaptions;
 import android.app.Activity;import android.content.Context;import android.graphics.drawable.Drawable;import android.view.View;
 import org.junit.*;import org.junit.runner.RunWith;import org.robolectric.*;import org.robolectric.annotation.*;
-import java.util.*;import static org.junit.Assert.*;
+import java.util.*;import app.yydarlinker.caption.contracts.CaptionContracts.*;import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class) @Config(sdk=28,shadows={QuickCaptionToggleTest.Flags.class,QuickCaptionToggleTest.TrackAccess.class,QuickCaptionToggleTest.Keys.class,QuickCaptionToggleTest.Menu.class,QuickCaptionToggleTest.Core.class})
 public class QuickCaptionToggleTest {
+    private static String currentVideo="";
+    static void setVideo(String value){currentVideo=value;NativeCaptionBridge.onVideoId(value);}
+    static void installFakePort(){
+        CaptionActions.install(new CaptionPort(){
+            public void command(Action action,String value){if(action==Action.VIDEO)setVideo(value);}
+            public boolean active(){return false;}public boolean ownsNativeTrack(){return false;}
+            public String restoreTarget(String url){return url;}public String videoId(){return currentVideo;}
+            public void playback(long time){}
+        },new CaptionActions.SettingsServices(){public String testApi(){return "fake";}public List<String> models(String endpoint){return Collections.emptyList();}});
+    }
+
     private static boolean installed,top,shorts,validKey;private static View.OnClickListener listener;private static int rows;private static final List<Object> selections=new ArrayList<>();
     enum Origin { PREFERRED_TRACK }
     static class Track {}
@@ -20,14 +31,14 @@ public class QuickCaptionToggleTest {
         @Implementation public static boolean shortsOpen(){return shorts;}
         @Implementation public static int addNativeRow(Object p,Drawable d,String label,View.OnClickListener click,int index){rows++;listener=click;assertEquals(3,index);assertFalse(label.isEmpty());return index+1;}
     }
-    @Implements(DynamicCaptionController.class) public static class Core {
+    @Implements(CaptionActions.class) public static class Core {
         @Implementation public static void activate(Context context,String url){} // No network in switch tests.
         @Implementation public static void refreshConfiguration(Context context){}
     }
-    @Before public void reset(){installed=true;top=false;shorts=false;validKey=true;rows=0;selections.clear();CaptionChoice.reset();RememberedCaptionSelection.reset();}
+    @Before public void reset(){installFakePort();setVideo("");installed=true;top=false;shorts=false;validKey=true;rows=0;selections.clear();CaptionChoice.reset();RememberedCaptionSelection.reset();}
     @Test public void switchesReselectSameTrackAndKeepLanguageMemory(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);DeepSeekConfig.saveEnabled(a,false);Track track=new Track();
-        PageCaptionController.onVideoId("abcdefghijk");Object manager=new Object();NativeCaptionBridge.onNativeSelectionWithReason(manager,track,Origin.PREFERRED_TRACK,17);assertTrue(CaptionChoice.translates());
+        setVideo("abcdefghijk");Object manager=new Object();NativeCaptionBridge.onNativeSelectionWithReason(manager,track,Origin.PREFERRED_TRACK,17);assertTrue(CaptionChoice.translates());
         assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));assertTrue(DeepSeekConfig.enabled(a));assertEquals(Arrays.asList(null,track),selections);
         assertEquals("fr",RememberedCaptionSelection.language());selections.clear();
         assertTrue(CaptionQuickToggle.setEngine(a,false));assertFalse(DeepSeekConfig.enabled(a));assertEquals(Arrays.asList(null,track),selections);assertEquals("fr",RememberedCaptionSelection.language());a.finish();

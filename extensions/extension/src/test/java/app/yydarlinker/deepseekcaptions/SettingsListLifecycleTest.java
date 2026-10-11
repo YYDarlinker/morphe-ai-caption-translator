@@ -18,9 +18,8 @@ public class SettingsListLifecycleTest {
             ListView list=new ListView(a);list.setItemsCanFocus(true);
             DeepSeekTextPreference address=new DeepSeekTextPreference(a);address.setKey(DeepSeekTextPreference.KEY_BASE_URL);
             ApiKeyPreference key=new ApiKeyPreference(a);key.setKey(DeepSeekTextPreference.KEY_API_KEY);
-            DeepSeekTextPreference prompt=new DeepSeekTextPreference(a);prompt.setKey(DeepSeekTextPreference.KEY_PROMPT);
             DeepSeekModelPreference model=new DeepSeekModelPreference(a);model.setKey(DeepSeekModelPreference.KEY_MODEL);
-            android.preference.Preference[] rows={address,key,model,prompt};
+            android.preference.Preference[] rows={address,key,model};
             BaseAdapter adapter=new BaseAdapter(){
                 public int getCount(){return rows.length;}
                 public Object getItem(int p){return rows[p];}
@@ -38,7 +37,7 @@ public class SettingsListLifecycleTest {
                 assertSame(editor,CaptionEditorIds.editorIn(address.getView(null,list)));
                 assertTrue(editor.hasFocus());
             }
-            list.setSelection(3);Shadows.shadowOf(Looper.getMainLooper()).idle();
+            list.setSelection(2);Shadows.shadowOf(Looper.getMainLooper()).idle();
             list.setSelection(0);Shadows.shadowOf(Looper.getMainLooper()).idle();
             assertEquals(DeepSeekConfig.DEFAULT_BASE_URL,((EditText)CaptionEditorIds.editorIn(address.getView(null,list))).getText().toString());
         } finally {a.finish();}

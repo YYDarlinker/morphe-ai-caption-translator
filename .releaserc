@@ -43,22 +43,22 @@
           "types": [
             {
               "type": "fix",
-              "section": "\ud83d\udc1b Bug Fixes",
+              "section": "🐛 Bug Fixes",
               "hidden": false
             },
             {
               "type": "feat",
-              "section": "\u2728 New Features",
+              "section": "✨ New Features",
               "hidden": false
             },
             {
               "type": "bump",
-              "section": "\ud83d\ude80 Updated App Support",
+              "section": "🚀 Updated App Support",
               "hidden": false
             },
             {
               "type": "perf",
-              "section": "\ud83d\udd27 Improvements",
+              "section": "🔧 Improvements",
               "hidden": false
             },
             {
@@ -83,7 +83,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "python3 .github/scripts/normalize_release_metadata.py \"${nextRelease.version}\" && ./gradlew :extensions:extension:testDebugUnitTest :patches:buildAndroid :patches:generatePatchesList --no-daemon && python3 .github/scripts/generate_patches_readme.py YYDarlinker/morphe-ai-caption-translator main patches-list.json README.md && python3 .github/scripts/validate_morphe_metadata.py \"${nextRelease.version}\" && python3 .github/scripts/verify_bundle.py \"${nextRelease.version}\""
+        "prepareCmd": "python3 .github/scripts/normalize_release_metadata.py \"${nextRelease.version}\" && ./gradlew :extensions:extension:testDebugUnitTest :patches:buildAndroid :patches:generatePatchesList --no-daemon && python3 .github/scripts/validate_morphe_metadata.py \"${nextRelease.version}\" && python3 .github/scripts/verify_bundle.py \"${nextRelease.version}\""
       }
     ],
     [
@@ -104,7 +104,7 @@
       {
         "assets": [
           {
-            "path": "patches/build/libs/patches-!(*sources*|*javadoc*).mpp?(.asc)"
+            "path": "build/n39/gradle/patches/libs/patches-!(*sources*|*javadoc*).mpp?(.asc)"
           }
         ],
         "successComment": false,

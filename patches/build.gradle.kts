@@ -33,7 +33,7 @@ dependencies {
 tasks {
     register<JavaExec>("generatePatchesList") {
         description = "Build patch with patch list"
-        dependsOn(build)
+        dependsOn("buildAndroid")
         classpath = sourceSets["main"].runtimeClasspath + patchListGeneratorClasspath
         mainClass.set("util.PatchListGeneratorKt")
     }
@@ -69,6 +69,7 @@ dependencies {
 tasks.named<org.gradle.api.tasks.testing.Test>("test") { failOnNoDiscoveredTests.set(false) }
 tasks.register<JavaExec>("verifyComposition") {
     dependsOn(tasks.named("testClasses"))
+    dependsOn(tasks.named("buildAndroid"))
     classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
     mainClass.set("validation.CompositionHarnessKt")
     maxHeapSize="6G"
@@ -78,6 +79,7 @@ tasks.register<JavaExec>("verifyComposition") {
 }
 tasks.register<JavaExec>("auditComposition") {
     dependsOn(tasks.named("testClasses"))
+    dependsOn(tasks.named("buildAndroid"))
     classpath=sourceSets["test"].runtimeClasspath-sourceSets["main"].output
     mainClass.set("validation.CompositionDexAuditKt")
     maxHeapSize="4G"

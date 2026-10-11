@@ -82,7 +82,7 @@
     <string name="cap_delete_key" formatted="false">"API キーを削除"</string>
     <string name="cap_diagnostic_hint" formatted="false">"展開して診断記録を確認・コピー"</string>
     <string name="cap_diagnostics" formatted="false">"字幕の診断"</string>
-    <string name="cap_diagnostics_hint" formatted="false">"長時間のテストではテキストのデバッグをオンにしてください。「完全な診断を保存」は直近 24 時間の記録を書き出します（上限 16 MiB）。下の概要は直近の記録のみです。"</string>
+    <string name="cap_diagnostics_hint" formatted="false">"長時間のテストではテキストのデバッグをオンにしてください。「完全な診断を保存」は直近 24 時間の記録を書き出します（上限 16 MiB）。下の概要は直近の記録のみです。 プレビューには長さの上限があります。コピーと保存では完全なレポートを保持します。"</string>
     <string name="cap_display_debug" formatted="false">"テキストのデバッグ: %1$s"</string>
     <string name="cap_enable_ai" formatted="false">"AI 字幕翻訳を有効にする"</string>
     <string name="cap_engine" formatted="false">"エンジン"</string>
@@ -165,7 +165,7 @@
     <string name="cap_profile_add" formatted="false">"プロファイルを追加"</string>
     <string name="cap_profile_add_failed" formatted="false">"追加できません。入力内容と 30 件の上限を確認してください。"</string>
     <string name="cap_profile_clear_key" formatted="false">"このプロファイルの API キーを消去"</string>
-    <string name="cap_profile_clear_key_summary" formatted="false">"このプロファイルの保存済みキーと未保存のキー入力のみ消去します。アドレス、モデル、翻訳指示、他のプロファイルは保持します。提供元でキーを失効させる操作ではありません。"</string>
+    <string name="cap_profile_clear_key_summary" formatted="false">"このプロファイルの保存済みキーと未保存のキー入力だけを消去します。アドレスとモデルは保持し、他のプロファイルには影響しません。提供元でのキーの失効は行いません。"</string>
     <string name="cap_profile_close" formatted="false">"閉じる"</string>
     <string name="cap_profile_collapse" formatted="false">"操作を折りたたむ"</string>
     <string name="cap_profile_confirm_delete" formatted="false">"削除を確定"</string>
@@ -173,7 +173,7 @@
     <string name="cap_profile_default" formatted="false">"既存の設定"</string>
     <string name="cap_profile_delete" formatted="false">"プロファイルを削除"</string>
     <string name="cap_profile_delete_inline" formatted="false">"このプロファイルと端末に保存されたキーを削除しますか？他のプロファイルは保持されます。元に戻せません。"</string>
-    <string name="cap_profile_delete_summary" formatted="false">"このプロファイルのアドレス、モデル、翻訳指示、暗号化キーを端末から削除します。他のプロファイルと字幕設定は保持します。使用中の場合は残った最初のプロファイルが有効になります。元に戻せません。"</string>
+    <string name="cap_profile_delete_summary" formatted="false">"この端末からプロファイルのアドレス、モデル、暗号化キーを削除します。他のプロファイルと字幕設定は保持します。使用中のプロファイルを削除すると、残った最初のものが有効になります。取り消せません。"</string>
     <string name="cap_profile_delete_switch" formatted="false">"削除後に有効にするプロファイル："</string>
     <string name="cap_profile_finish_name" formatted="false">"先に名前の変更を保存またはキャンセルしてください。"</string>
     <string name="cap_profile_invalid_edits" formatted="false">"切り替える前に未完了の入力を修正してください"</string>
@@ -184,12 +184,12 @@
     <string name="cap_profile_more" formatted="false">"プロファイルの操作"</string>
     <string name="cap_profile_name" formatted="false">"プロファイル名"</string>
     <string name="cap_profile_name_error" formatted="false">"1～60 文字の名前を入力してください"</string>
-    <string name="cap_profile_new_summary" formatted="false">"新規プロファイルには既定の翻訳指示が含まれます。キーやモデルはコピーしません。作成後に設定画面で入力してください。"</string>
+    <string name="cap_profile_new_summary" formatted="false">"新しいプロファイルにはキーとモデルをコピーしません。作成後に API 設定を入力してください。"</string>
     <string name="cap_profile_rename" formatted="false">"名前を変更"</string>
     <string name="cap_profile_save" formatted="false">"保存"</string>
     <string name="cap_profiles_summary" formatted="false">"現在のプロファイルを管理"</string>
     <string name="cap_profiles_title" formatted="false">"API プロファイル"</string>
-    <string name="cap_prompt_summary" formatted="false">"このプロファイルに保存します。空にすると既定の指示に戻ります。既定の文は画面言語に従い、独自の内容は変更しません。"</string>
+    <string name="cap_prompt_summary" formatted="false">"カスタム指定は言い回しと文体を調整します。原文への忠実性、翻訳先言語、原文との対応は固定です。このプロファイルに保存され、空にすると既定に戻ります。"</string>
     <string name="cap_quality_outcome" formatted="false">"ローカル検証：採用 / 拒否（品質）"</string>
     <string name="cap_recent_trace" formatted="false">"最近のイベント："</string>
     <string name="cap_refresh" formatted="false">"更新"</string>
@@ -241,4 +241,6 @@
     <string name="cap_value_retained" formatted="false">"%1$s。前回の有効な値を保持します"</string>
     <string name="cap_model_ids_empty" formatted="false">"選択できるモデル ID が返されませんでした"</string>
     <string name="cap_diagnostics_loading" formatted="false">"診断を読み込んでいます…"</string>
+    <string name="cap_planner_model" formatted="false">"原文の意味準備モデル（任意）"</string>
+    <string name="cap_planner_model_hint" formatted="false">"空欄なら翻訳モデルを使用します。同じAPI URLとキーだけを使い、別のモデルを自動選択しません。"</string>
 </resources>

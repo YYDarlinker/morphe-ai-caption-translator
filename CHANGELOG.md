@@ -1,18 +1,16 @@
 ## [1.5.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.4.1...v1.5.0) (2026-10-12)
 
-- Support YouTube **21.20.405** with official Morphe Patches **1.47.0**. Newer YouTube versions removed the log string previously used to locate the subtitle track selector, preventing the addon from installing its AI toggle, language-menu entries and caption hooks. The patch now falls back to structural matching and remains compatible with older versions such as 21.16.256. Verified on 21.20.405 with the real patcher and a full DEX audit.
-- Fix Shorts captions disappearing after a playback loop or after leaving and reopening the same video, and prevent an incorrectly reported paused state from repeatedly clearing captions.
-- Fix intermittent YouTube crashes when a translation provider, such as Alibaba Cloud Bailian, interrupts a streamed response with a content-inspection error. Retry that request without streaming; a failed block clears the caption overlay without terminating the host app.
-- Prevent repeated caption pages. Improve DeepSeek display pagination to avoid breaks in the middle of a sentence and short trailing fragments on separate pages. Keep the caption overlay visible between adjacent pages to prevent flicker.
-- Show captions sooner by streaming DeepSeek and Alibaba Cloud Bailian responses and displaying validated events as they arrive. Speed up startup block planning and request the next block alongside the landing block.
-- Display original manual or auto-generated subtitle tracks in the AI caption style when AI captions are enabled, without making translation API requests.
-- Report the patch version consistently as the engine version in exported diagnostics.
-- Preserve translation prompts, request blocks, protocol, validation, retries and cache identity. Existing translations and cached results remain valid.
+- Support YouTube 21.20.405 with official Morphe Patches 1.47.0.
+- Fix Shorts captions disappearing after looping or reopening a video.
+- Fix YouTube crashes caused by interrupted translation responses.
+- Improve caption pagination and prevent repeated pages and flicker.
+- Reduce caption startup latency with streaming responses and faster planning.
+- Display original subtitles in the AI caption overlay without translation requests.
 
 ## [1.4.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.4.0...v1.4.1) (2026-10-11)
 
-- 移除提示词设置。
-- 修复阿拉伯语界面排版 bug。
+- Remove prompt settings.
+- Fix Arabic interface layout issues.
 
 ## [1.4.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.3.5...v1.4.0) (2026-10-05)
 

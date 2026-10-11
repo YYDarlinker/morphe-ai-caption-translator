@@ -111,10 +111,13 @@ final class CaptionDiagnostics {
      * mode sentence and the debug state are never assembled from translated fragments here, and the
      * "On"/"Off" wording comes from the catalog so it stays grammatical in every language.
      */
+    /** The engine is the patch itself: the diagnostic names the same version as the package. */
+    static String engineVersion() { return app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION; }
+
     private static String localizedHeader(Context context) {
         String separator = CaptionStrings.settings(context, "label_separator");
         String engine = format(separator, CaptionStrings.settings(context, "engine"))
-                + CaptionStrings.settings(context, "engine_event_rebuild") + " / " + CaptionEngineIdentity.ID;
+                + CaptionStrings.settings(context, "engine_event_rebuild") + " / " + engineVersion();
         String mode = format(separator, CaptionStrings.settings(context, "mode"))
                 + CaptionStrings.settings(context, CaptionChoice.translates()
                         ? "mode_auto_translate" : "mode_original");
@@ -160,7 +163,7 @@ final class CaptionDiagnostics {
             String audit = TokenCostAudit.uiText(context, localized);
             String header = localized
                     ? localizedHeader(context)
-                    : "Engine: Event rebuild / " + CaptionEngineIdentity.ID + "\nMode: "
+                    : "Engine: Event rebuild / " + engineVersion() + "\nMode: "
                             + (CaptionChoice.translates() ? "automatic translation" : "original captions (no translation API)")
                             + "\nDisplay text debug: " + (DeepSeekConfig.displayTextDebugEnabled(context) ? "on" : "off");
             if (stage == null || stage.isEmpty()) {
@@ -226,7 +229,7 @@ final class CaptionDiagnostics {
         CaptionDiagnosticsWriter.drainNow(c);
         CaptionDiagnosticsWriter.flush(c);
         String history=CaptionDiagnosticArchive.read(c,"history"),quality=CaptionDiagnosticArchive.read(c,"quality"),timing=CaptionDiagnosticArchive.read(c,"timing");
-        return reportText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+CaptionEngineIdentity.ID+"; build="+app.yydarlinker.extension.BuildConfig.CAPTION_BUILD_ID+"; official=1.45.0; presentation=n29-presentation-v3; presentation_revision=n37-consistent-observation-v1"+"; exported_at="+System.currentTimeMillis()
+        return reportText(c,false) + "\n\n[Export manifest; ui="+app.yydarlinker.extension.BuildConfig.CAPTION_PATCH_VERSION+"; engine="+engineVersion()+"; core="+CaptionEngineIdentity.ID+"; build="+app.yydarlinker.extension.BuildConfig.CAPTION_BUILD_ID+"; official=1.45.0; presentation=n29-presentation-v3; presentation_revision=n37-consistent-observation-v1"+"; exported_at="+System.currentTimeMillis()
             +"; completeness=bounded_not_guaranteed; history_records="+records(history,false)+"; quality_records="+records(quality,true)+"; timing_records="+records(timing,true)
             +"; truncation_markers="+(occurrences(history,"record truncated")+occurrences(quality,"record truncated")+occurrences(timing,"record truncated"))
             +"; dropped_records="+CaptionDiagnosticsWriter.droppedCount()+"; merged_records="+CaptionDiagnosticsWriter.mergedCount()

@@ -96,6 +96,30 @@ final class CaptionOverlay {
     return Collections.emptyList();
   }
   private static void resetPresentation(){desiredLayout="";failedLayout="";measurementMismatch=0;}
+
+  /**
+   * Adjacent captions change text inside a box that stays up. A finished last page stays visible for
+   * a short media time while the engine's next unit (or its hide) arrives, and a shown caption stays
+   * while the next unit's pages are laid out off the main thread. Explicit hides, seeks, owner
+   * changes and longer pauses still clear the box at once.
+   */
+  private static final long END_HOLD_MS=300, LAYOUT_HOLD_MS=500;
+  private static long layoutHoldSince=-1;
+  private static final Runnable HOLD_EXPIRY=()->{dirty=true;render();};
+  private static boolean shownText(){TextView view=textRef.get();return anchorVisible()&&view!=null&&view.getText().length()>0;}
+  private static boolean holdingEnd(long at){
+    boolean held=currentGuard!=null&&currentGuard.isValid()&&pendingUnit!=null&&!pendingStatus&&!pendingWaiting
+        &&pendingEnd>pendingStart&&at>=pendingEnd&&at-pendingEnd<END_HOLD_MS
+        &&shownPage>=0&&shownPage==pendingPages.size()-1&&shownText();
+    if(held){MAIN.removeCallbacks(HOLD_EXPIRY);MAIN.postDelayed(HOLD_EXPIRY,END_HOLD_MS+20);}
+    return held;
+  }
+  private static boolean holdingLayout(){
+    if(!shownText())return false;
+    long now=SystemClock.uptimeMillis();
+    if(layoutHoldSince<0){layoutHoldSince=now;MAIN.removeCallbacks(HOLD_EXPIRY);MAIN.postDelayed(HOLD_EXPIRY,LAYOUT_HOLD_MS+20);}
+    return now-layoutHoldSince<LAYOUT_HOLD_MS;
+  }
   private static boolean previousShorts, previousFullScreen;
   private static float previousPlaybackSpeed=1;
   private static boolean pendingStatus, pendingWaiting;
@@ -210,6 +234,8 @@ final class CaptionOverlay {
     if(candidate!=null){LayoutBudget geometry=layoutBudget;
       if(geometry!=null&&spec.fits(candidate.text,geometry.preferredPx,geometry.width,2)){text=candidate.text;start=candidate.start;end=candidate.end;}
     }
+    // A failed or withheld event carries no text: it clears the box (the contract Unit rejects blanks).
+    if(text==null||text.trim().isEmpty()){hide(guard);return;}
     Unit unit=start>=0&&end>start?new Unit(id,0,1,text,Collections.singletonList(new Window(start,end)),Basis.ESTIMATED,0):null;
     show(text,false,guard,fallback,id,start,end,at,false,spec,unit,app.yydarlinker.caption.contracts.CaptionContracts.hash(text));
   }
@@ -217,9 +243,12 @@ final class CaptionOverlay {
   /** Advance an already prepared page on paint entry, using the same clock as frame selection. */
   static void advancePreparedPage() {
     if(currentGuard==null||!currentGuard.isValid()||pendingUnit==null||!anchorVisible())return;
+    // Pages still being laid out: render() owns that state, including the held previous text.
+    if(pendingPages.isEmpty())return;
     long at=currentGuard.displayPosition(pendingPosition);int next=CaptionPageLayout.indexAt(pendingPages,at);
     pendingPosition=at;TextView text=textRef.get();
     if(next<0||!ownsDisplayPosition(at)){
+      if(holdingEnd(at))return;
 
       if(text!=null)text.setText("");hideView();shownPage=-1;return;
     }
@@ -488,6 +517,7 @@ final class CaptionOverlay {
   }
 
   private static void hideView() {
+    layoutHoldSince=-1;
     if(currentGuard!=null)currentGuard.onPresentationInvalidated(System.nanoTime());
     if(horizontalPlacement!=null)horizontalPlacement.cancel();
     lastBlankIdentity = null;
@@ -556,7 +586,8 @@ final class CaptionOverlay {
         }
         long paintStart=System.nanoTime();
         if(guard!=null&&(!guard.isValid()||pendingUnit!=null&&(!ownsDisplayPosition(paintAt)
-            ||shownPage<0||shownPage>=pendingPages.size()||!pendingPages.get(shownPage).contains(paintAt)))){
+            ||shownPage<0||shownPage>=pendingPages.size()||!pendingPages.get(shownPage).contains(paintAt))
+            &&layoutHoldSince<0&&!holdingEnd(paintAt))){
           setText("");hideView();guard.onDrawObservation(paintStart,paintAt,false,-1,-1);return;
         }
         super.onDraw(canvas);
@@ -621,6 +652,7 @@ final class CaptionOverlay {
     if(pendingStart>=0 && pendingEnd>pendingStart
         && (pendingPosition<pendingStart || pendingPosition>=pendingEnd)) {
       if(reselectPreparedSupply())return;
+      if(holdingEnd(pendingPosition))return;
       TextView stale=textRef.get();if(stale!=null)stale.setText("");
       shownPage=-1;hideView();dirty=true;
       displayResult(a,"empty","outside_owned_window",false,0,0,"",applyStarted);return;
@@ -730,6 +762,10 @@ final class CaptionOverlay {
       while(size>minimum && linesPx(shown,size,inner,measuredSpec)>2)size=Math.max(minimum,size-.5f);
     }
     String reason=shown.isEmpty() && currentGuard!=null ? currentGuard.blankReason() : "";
+    if(ownedCaption && shownPage<0 && pendingPages.isEmpty() && !failedLayout.equals(desiredLayout)
+        && holdingLayout()) {
+      displayResult(a,"caption_hold","preparing_layout",true,inner,size,"",applyStarted);return;
+    }
     if(ownedCaption && shownPage<0) {
       shown="";mode="overflow_status";
       reason=pendingPages.isEmpty() ? (failedLayout.equals(desiredLayout)?"unprojectable_pixel_width":"preparing_layout")
@@ -833,6 +869,7 @@ final class CaptionOverlay {
     if(ownedCaption)presentationDiagnostics(a,shown,size,compact-text.getPaddingLeft()-text.getPaddingRight(),
         pendingPages.get(shownPage).end-pendingPages.get(shownPage).start,"");
     placeVisibleText(a,host,anchor,text,b,width);
+    layoutHoldSince=-1;
     if(anchor.getVisibility() != View.VISIBLE) {
       anchor.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
       anchor.setVisibility(View.VISIBLE);

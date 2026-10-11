@@ -269,7 +269,8 @@ final class CaptionPlayerAuthority {
         }
         // A verified Shorts surface keeps its own isolation rule and is never treated as the compact
         // miniplayer state, exactly as the pre-N36 guard did.
-        boolean compact=!CaptionSurface.isShorts()&&isCompactType(playerType);
+        boolean compact=isCompactType(playerType)&&!CaptionSurface.isShorts()
+                &&!("NONE".equals(playerType)&&CaptionSurface.shortsSurfaceNow());
         int next;
         if(compact)next=COMPACT;
         else if(state==COMPACT||state==TRANSITIONING_TO_REGULAR)next=TRANSITIONING_TO_REGULAR;
@@ -288,6 +289,16 @@ final class CaptionPlayerAuthority {
         state=REGULAR;stateWrites++;
         typeAuthoritative=true;
         if(previous!=state)notifyListeners();
+    }
+
+    /**
+     * A Short that looped or was entered again can leave the authority compact (type NONE with a
+     * stale surface). Nothing renders or refreshes while compact, so the engine tick asks here.
+     */
+    static boolean recoverShorts(){
+        if(state!=COMPACT||!"NONE".equals(playerType)||!CaptionSurface.shortsSurfaceNow())return false;
+        noteShortsSurface();
+        return state==REGULAR;
     }
 
     /** Called by the transition coordinator once real geometry settled on a valid, non-compact surface. */

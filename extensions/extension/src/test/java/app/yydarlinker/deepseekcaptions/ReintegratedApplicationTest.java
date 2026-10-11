@@ -48,7 +48,7 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
         }});server.start();
         Field engine=DeepSeekCaptionHook.class.getDeclaredField("youtubeCronetEngine");engine.setAccessible(true);previousCronet=engine.get(null);engine.set(null,new Cronet(server));
         DeepSeekConfig.saveEnabled(a,true);DeepSeekConfig.saveBaseUrl(a,server.url("/v1").toString());DeepSeekConfig.saveModel(a,"fixture-model");
-        SourceCaptionCache.clear(a);RebuildCache.clear(a);RebuildApi.reset();TokenCostAudit.clear(a);
+        EngineResume.reset();SourceCaptionCache.clear(a);RebuildCache.clear(a);RebuildApi.reset();TokenCostAudit.clear(a);
         DeepSeekCaptionHookV2.setMainActivity(a);DeepSeekCaptionHookV2.onVideoId("abcdefghijk");CaptionChoice.select("zh-Hans",true);CaptionActions.onVideoTime(0);
     }
     @After public void finish() throws Exception {
@@ -61,6 +61,7 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
         while(!condition.getAsBoolean()&&System.nanoTime()<deadline){Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(80));Thread.sleep(15);}
         assertTrue("application/display did not reach expected state",condition.getAsBoolean());
     }
+    boolean showsOriginal(){try{TextView view=text();return CaptionOverlay.anchorVisible()&&view!=null&&view.getText().toString().contains("Hello world.");}catch(Exception e){return false;}}
     boolean translated(){try{TextView view=text();return CaptionOverlay.anchorVisible()&&view!=null&&view.getText().toString().contains("你好，世界。");}catch(Exception e){return false;}}
     @Test public void localUiCommandUsesPinnedCoreAndDisplaysInTheActualRetainedView() throws Exception {
         CaptionActions.activate(a,url);await(this::translated);assertEquals(1,posts.get());assertTrue(CaptionActions.ownsNativeTrack());
@@ -83,13 +84,50 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
         JSONObject snapshot=new JSONObject(usage.get(null).toString());
         assertEquals(1,snapshot.getJSONObject("session").getJSONObject("buckets").getJSONObject("core_event_rebuild_r2").getInt("logical_requests"));
     }
-    @Test public void nativeSourceSelectionDoesNotStartAnEngineOrDuplicateTheNativeRenderer() throws Exception {
+    @Test public void nativeSourceSelectionShowsTheOriginalCaptionInTheOverlayWithoutTranslating() throws Exception {
         CaptionActions.activate(a,url);await(this::translated);
-        CaptionChoice.select("en",false);CaptionActions.deactivateFromNativeCaptionState();
+        CaptionChoice.select("en",false);
+        // YouTube received an empty track for this selection, so the overlay shows the original text.
         CaptionActions.activateSource(a,url.replace("&tlang=zh-Hans",""));
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
-        assertFalse(CaptionActions.isVisibleActive());assertFalse(CaptionActions.ownsNativeTrack());
-        assertFalse(translated());assertEquals("",field("pendingText"));assertEquals(1,posts.get());
+        await(this::showsOriginal);
+        assertTrue(CaptionActions.isVisibleActive());assertTrue("the native renderer stays masked",CaptionActions.ownsNativeTrack());
+        assertFalse(translated());assertEquals("no translation request for source captions",1,posts.get());
+    }
+    /** A Short that was left and entered again is not announced to the track selector: the session returns. */
+    @Test public void aVideoShownAgainAfterItsDepartureGetsItsCaptionsBack() throws Exception {
+        CaptionActions.activate(a,url);await(this::translated);
+        CaptionActions.onVideoId("");
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300));
+        assertFalse(CaptionActions.isVisibleActive());
+        CaptionActions.onVideoId("abcdefghijk");
+        await(this::translated);assertTrue(CaptionActions.isVisibleActive());assertEquals("served from the cache",1,posts.get());
+        assertTrue(CaptionDiagnostics.history(a).contains("ENGINE_REENTRY_RESUMED"));
+    }
+    @Test public void playerTicksAfterAnAutomaticCaptionResetBringTheSessionBack() throws Exception {
+        CaptionActions.activate(a,url);await(this::translated);
+        // YouTube resets its caption model on its own as the Short is left.
+        EngineResume.automaticReset();CaptionActions.deactivateFromNativeCaptionState();
+        CaptionActions.onVideoTime(2000);Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300));
+        assertFalse(CaptionActions.isVisibleActive());
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));
+        CaptionActions.onVideoTime(100);
+        await(this::translated);assertTrue(CaptionActions.isVisibleActive());
+    }
+    @Test public void captionsTheUserTurnedOffStayOffWhenTheVideoIsShownAgain() throws Exception {
+        CaptionActions.activate(a,url);await(this::translated);
+        CaptionActions.deactivateFromCaptionButton();
+        CaptionActions.onVideoId("");CaptionActions.onVideoId("abcdefghijk");
+        CaptionActions.onVideoTime(2000);Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));CaptionActions.onVideoTime(100);
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));Thread.sleep(200);
+        assertFalse(CaptionActions.isVisibleActive());assertFalse(translated());
+    }
+    @Test public void aNativeMenuOffIsNotUndoneEither() throws Exception {
+        CaptionActions.activate(a,url);await(this::translated);
+        CaptionActions.deactivateFromNativeCaptionState();
+        CaptionActions.onVideoId("");CaptionActions.onVideoId("abcdefghijk");
+        CaptionActions.onVideoTime(2000);Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));CaptionActions.onVideoTime(100);
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));Thread.sleep(200);
+        assertFalse(CaptionActions.isVisibleActive());
     }
     @Test public void configurationChangeUsesTheNewModelAndRetiresTheOutstandingRequest() throws Exception {
         delayFirst=true;CaptionActions.activate(a,url);assertTrue(received.await(3,TimeUnit.SECONDS));

@@ -7,7 +7,18 @@
  import android.content.Context;
  import android.media.session.*;
  import android.os.*;
-@@ -49,7 +48,7 @@
+@@ -24,6 +23,10 @@
+   /** Client translation budget: at most four translation requests in flight in total. */
+   static final int MAX_TRANSLATION_CONCURRENCY = MAX_FOCUS_CONCURRENCY + MAX_PREFETCH_CONCURRENCY;
+   static final long SEEK_STORM_WINDOW_MS = 3000, SEEK_STORM_PAUSE_MS = 5000;
++  /** A storm pause ends early once the landing block is ready and no seek arrived for this long. */
++  static final long SEEK_SETTLED_MS = 1500;
++  /** Before the first acceptance, only a next block starting this soon is requested alongside it. */
++  static final long BOOTSTRAP_NEXT_MS = 20000;
+   private static final ExecutorService SOURCE_IO = lane("CaptionSourceIO", 1);
+   private static final ExecutorService PRIORITY_IO = lane("CaptionPriorityIO", MAX_FOCUS_CONCURRENCY);
+   private static final ExecutorService PREFETCH_IO = lane("CaptionPrefetchIO", MAX_PREFETCH_CONCURRENCY);
+@@ -49,7 +52,7 @@
    private static volatile Session active;
    private static volatile String video = "";
    private static volatile long publicationEpoch;
@@ -16,7 +27,7 @@
    private static boolean tickPosted;
    private static volatile boolean compact;
    private static long restoreUntil;
-@@ -64,7 +63,7 @@
+@@ -64,7 +67,7 @@
      final long id = IDS.incrementAndGet();
      final Context context;
      final String owner, identity, target;
@@ -25,16 +36,24 @@
      /** Credential identity of this immutable session config; a hash, never the key itself. */
      final CaptionCredentialRef credential;
      final boolean sourceOnly;
-@@ -97,7 +96,7 @@
+@@ -97,10 +100,15 @@
      int bootstrapCacheHit, bootstrapCacheMiss;
      String bootstrapMark=""; // Diagnostic deduplication only; never an installation/runtime permission.
      String displayedEvent = "", withheldEvent = "";
 -    RawCaptionSource.Source raw;
++    /** What reached the screen in this generation; reset with displayedEvent on every seek. */
++    final RebuildDisplayGroups.Cursor display = new RebuildDisplayGroups.Cursor();
++    DisplayLayout[] displayLayouts;
 +    TranslationSourceAccess.Source raw;
      RebuildSource source;
      List<RebuildPlanner.Block> blocks;
      RebuildProtocol.Plan[] plans, pendingPlans;
-@@ -121,12 +120,12 @@
++    /** Leading events of a reply still streaming in; shown only while the block has no plan. */
++    RebuildProtocol.Plan[] provisional;
+     int[] states, attempts;
+     long[] retryAt;
+     String[] reasons;
+@@ -121,12 +129,12 @@
          String o,
          String key,
          String target,
@@ -49,7 +68,7 @@
              boolean original,boolean show,CaptionLanguageContext context) {
        this.context = c;
        url = u;
-@@ -216,7 +215,7 @@
+@@ -216,7 +224,7 @@
          List<Notice> notices;
          synchronized (this) { notices = retirementNotices; retirementNotices = Collections.emptyList(); }
          flush(this, notices);
@@ -58,7 +77,7 @@
              "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
        } catch (RuntimeException failure) {
          success = false;
-@@ -252,7 +251,7 @@
+@@ -252,7 +260,7 @@
          retirementFailure = failure.getMessage();
          boolean interrupted = Thread.currentThread().isInterrupted();
          try {
@@ -67,7 +86,39 @@
                "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
          } finally { if (interrupted) Thread.currentThread().interrupt(); }
          throw failure;
-@@ -335,12 +334,12 @@
+@@ -275,7 +283,7 @@
+     }
+   }
+ 
+-  static final class Job implements DeepSeekApiClient.RequestControl {
++  static final class Job implements DeepSeekApiClient.RequestControl, RebuildStream.Early {
+     final long traceId = IDS.incrementAndGet();
+     final Session session;
+     final CaptionLanguageContext languageContext;
+@@ -327,6 +335,22 @@
+           +";focus_accepted_at="+session.focusAcceptedAt+";first_prefetch_sent_at="+session.firstPrefetchSentAt);
+     }
+ 
++    /** A longer validated prefix of this job's streaming reply. Display only; never cached. */
++    public void onProvisional(RebuildProtocol.Plan prefix) {
++      Session s = session;
++      boolean first;
++      synchronized (s) {
++        if (!current(s) || cancelled || s.jobs == null || s.jobs[index] != this
++            || s.plans[index] != null || s.provisional == null) return;
++        first = s.provisional[index] == null;
++        s.provisional[index] = prefix;
++      }
++      if (first) trace("REBUILD_STREAM_FIRST_EVENTS", "events=" + prefix.events.size()
++          + ";since_http_begin_ms=" + (SystemClock.elapsedRealtime() - httpStartedAt)
++          + ";purpose=" + (priority ? "focus" : "prefetch"));
++      render(s);
++    }
++
+     void trace(String stage,String detail) {
+       long now = SystemClock.elapsedRealtime();
+       if (stage.equals("REBUILD_HTTP_BEGIN")) { httpStartedAt = now; httpRounds++; }
+@@ -335,12 +359,12 @@
          networkMs += roundTrip;
          detail += ";network_round_trip_ms=" + roundTrip;
        }
@@ -82,7 +133,7 @@
        org.json.JSONObject evidence = source;
        try {
          evidence = new org.json.JSONObject(source.toString());
-@@ -362,7 +361,7 @@
+@@ -362,7 +386,7 @@
          }
        } catch (Exception ignored) {
        }
@@ -91,7 +142,7 @@
            session.context,
            session.config.apiKey,
            traceId,
-@@ -393,9 +392,8 @@
+@@ -393,9 +417,8 @@
      return current(s) ? s.url : "";
    }
  
@@ -102,7 +153,7 @@
      tick();
    }
  
-@@ -419,16 +417,15 @@
+@@ -419,16 +442,15 @@
      if (previous != null) {
        clear(epoch);
        previous.cancel();
@@ -122,7 +173,7 @@
    }
  
    /** Main: revocation/old UI invalidation only. Off-main: also the fixed five-second physical barrier. */
-@@ -444,16 +441,38 @@
+@@ -444,16 +466,38 @@
      clear(epoch);
      // A stopped engine has no display owner. The authority returns to the safe UNKNOWN state instead
      // of leaving the previous owner's permission in place for a queued off-main notification.
@@ -164,7 +215,7 @@
    }
  
    private static final class Notice {
-@@ -466,14 +485,14 @@
+@@ -466,14 +510,14 @@
    }
  
    private static void flush(Session s, List<Notice> notices) {
@@ -181,7 +232,7 @@
      if (compact && !small) restoreUntil = SystemClock.elapsedRealtime() + 3000;
      compact = small;
    }
-@@ -483,12 +502,12 @@
+@@ -483,12 +527,12 @@
      if (!current(s)
          || s.sourceOnly
          || !s.visible
@@ -198,7 +249,7 @@
              && (owner.isEmpty() || owner.equals(s.owner))
          ? TargetLanguage.withCode(url, s.target)
          : url;
-@@ -504,35 +523,35 @@
+@@ -504,35 +548,35 @@
      boolean show = s.visible, original = s.sourceOnly;
      String url = s.url;
      stop();
@@ -244,7 +295,7 @@
                      .replaceAll("([?&])(?:expire|signature|sig)=[^&]*", "$1")
                  + "|"
                  + languageContext.fingerprint(cfg)
-@@ -545,7 +564,7 @@
+@@ -545,7 +589,7 @@
      // Track identity uses cache identity, not an expiring signature. All preparation is lock-free.
      try {
        key =
@@ -253,7 +304,7 @@
                  + "|"
                  + languageContext.fingerprint(cfg)
                  + "|"
-@@ -560,7 +579,7 @@
+@@ -560,7 +604,7 @@
      Session candidate = new Session(c.getApplicationContext(), url, owner, key, target, cfg,
          original, show, languageContext);
      boolean unavailable = !original && !cfg.ready();
@@ -262,7 +313,7 @@
      Session s, previous = null;
      long epoch;
      synchronized (RebuildController.class) {
-@@ -597,17 +616,17 @@
+@@ -597,17 +641,17 @@
      if (s == candidate) {
        // A new engine session re-opens the player authority as unproven rather than inheriting a
        // closed or quarantined state from the previous session on the same Activity.
@@ -284,7 +335,7 @@
      kick(s);
      scheduleTick();
    }
-@@ -616,7 +635,7 @@
+@@ -616,7 +660,7 @@
      long now = SystemClock.elapsedRealtime();
      Session s = active;
      if (!current(s)) { CLOCK.updateHook(ms,now); return; }
@@ -293,7 +344,16 @@
      RebuildClock.Update nativeUpdate=nativeSample.available
          ? CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,now,nativeSample.state,nativeSample.speed)
          : new RebuildClock.Update(false,0,"unavailable");
-@@ -661,8 +680,8 @@
+@@ -648,7 +692,7 @@
+         s.noteSeek(now, notices);
+         s.generation++;
+         s.lastShown = "";
+-        s.displayedEvent=""; s.withheldEvent="";
++        s.displayedEvent=""; s.withheldEvent=""; s.display.reset();
+         if (s.jobs != null)
+           for (Job j : s.jobs)
+             if (j != null && !j.sent && s.blocks != null && !covers(s.blocks.get(j.index), presentation)) {
+@@ -661,8 +705,8 @@
      }
      flush(s, notices);
      for (HttpURLConnection c : disconnect) c.disconnect();
@@ -304,7 +364,7 @@
        private final int epoch=s.generation;
        public boolean isValid(){return current(s) && s.generation==epoch;}
        public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
-@@ -672,16 +691,7 @@
+@@ -672,16 +716,7 @@
      scheduleTick();
    }
  
@@ -322,7 +382,7 @@
  
    private static long position() {
      return position(null);
-@@ -689,7 +699,7 @@
+@@ -689,7 +724,7 @@
  
    private static long position(Session s) {
      long now = SystemClock.elapsedRealtime();
@@ -331,16 +391,19 @@
      if(nativeSample.available)CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,
          nativeSample.readElapsed,nativeSample.state,nativeSample.speed);
      PlaybackState state=playbackState();
-@@ -711,7 +721,7 @@
+@@ -709,9 +744,9 @@
+   private static void observeSeek(Session s,RebuildClock.Observation selected,long now){
+     long serial=CLOCK.seekSerial();
      if(s.observedSeekSerial>=0&&s.observedSeekSerial!=serial&&current(s)){
-       s.noteSeek(now);s.generation++;s.lastShown="";s.displayedEvent="";s.withheldEvent="";
+-      s.noteSeek(now);s.generation++;s.lastShown="";s.displayedEvent="";s.withheldEvent="";
++      s.noteSeek(now);s.generation++;s.lastShown="";s.displayedEvent="";s.withheldEvent="";s.display.reset();
        s.position=selected.position;
 -      CaptionDiagnostics.mark(s.context,"REBUILD_SEEK","session="+s.id+";generation="+s.generation
 +      TranslationRuntime.mark(s.context,"REBUILD_SEEK","session="+s.id+";generation="+s.generation
            +";to="+selected.position+";clock_source="+selected.source+";clock_seek_serial="+serial,s.credential);
      }
      s.observedSeekSerial=serial;
-@@ -721,7 +731,7 @@
+@@ -721,7 +756,7 @@
    private static void freeze(Session s,RebuildClock.Observation selected,PlaybackState raw,
        boolean hook,long hookPosition){
      s.observation=selected;
@@ -349,7 +412,7 @@
      if(!selected.paused()){
        s.pausedDisplayPosition=-1;s.pausedHookState=null;s.pauseSource="";
        s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;
-@@ -754,7 +764,7 @@
+@@ -754,7 +789,7 @@
            || !s.pauseSource.equals(selected.source);
        s.pausedDisplayPosition=donor;
        s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;s.pauseSource=selected.source;
@@ -358,7 +421,7 @@
            "session="+s.id+";generation="+s.generation+";position="+donor
            +";selected_position="+selected.position+";selected_state="+selected.state
            +";clock_source="+selected.source+";sample_at="+selected.sampleAt
-@@ -765,7 +775,7 @@
+@@ -765,7 +800,7 @@
    private static long displayPosition(Session s) {
      // A current native query can expose a real paused seek after layout. Without it, project only
      // the already-selected clock; never reintroduce raw MediaSession as a second display donor.
@@ -367,7 +430,7 @@
      if(sample.available){
        CLOCK.acceptNative(sample.videoId,sample.position,sample.readElapsed,sample.state,sample.speed);
        synchronized(s){
-@@ -801,19 +811,18 @@
+@@ -801,19 +836,18 @@
      if (!current(s)) return;
      // A player transition owns the surface. No geometry scan, no overlay render and no session kick
      // may run while the transition coordinator is still observing, so the animation never reflows.
@@ -390,7 +453,7 @@
        private final int epoch=s.generation;
        public boolean isValid(){return current(s) && s.generation==epoch;}
        public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
-@@ -825,7 +834,7 @@
+@@ -825,7 +859,7 @@
  
    private static void kick(Session s) {
      if (!current(s)) return;
@@ -399,7 +462,7 @@
      boolean load = false;
      synchronized (s) {
        if (!current(s)) return;
-@@ -854,8 +863,8 @@
+@@ -854,8 +888,8 @@
      }
      try {
        startup(s, "source_load_start", "");
@@ -410,7 +473,7 @@
        if (!current(s)) return;
        long availablePosition = position(s);
        synchronized (s) {
-@@ -869,33 +878,33 @@
+@@ -869,33 +903,33 @@
        render(s);
        long phase=SystemClock.elapsedRealtime();
        RebuildSource source = RebuildSource.read(raw.body, raw.document);
@@ -455,7 +518,7 @@
        phase=SystemClock.elapsedRealtime();
        String key = RebuildCache.identity(source, s.config, s.target,s.languageContext);
        RebuildProtocol.Plan[] plans = new RebuildProtocol.Plan[blocks.size()];
-@@ -915,7 +924,7 @@
+@@ -915,7 +949,7 @@
            restored++;
          }
        }
@@ -464,7 +527,16 @@
        long readyPosition = position(s);
        RebuildProtocol.Plan[] pending = new RebuildProtocol.Plan[plans.length];
        int[] attempts = new int[blocks.size()];
-@@ -951,13 +960,13 @@
+@@ -935,6 +969,8 @@
+         s.cacheKey = key;
+         s.plans = plans;
+         s.pendingPlans = pending;
++        s.displayLayouts = new DisplayLayout[plans.length];
++        s.provisional = new RebuildProtocol.Plan[plans.length];
+         s.states = states;
+         s.attempts = attempts;
+         s.retryAt = retryAt;
+@@ -951,13 +987,13 @@
        }
        startup(s, "engine_ready", "position_ms=" + s.position);
        if (!blocks.isEmpty() && s.position >= blocks.get(0).end)
@@ -480,7 +552,7 @@
            s.context,
            "REBUILD_SOURCE_READY",
            "words="
-@@ -974,14 +983,13 @@
+@@ -974,14 +1010,13 @@
                + blocks.size()
                + ";cache_hits="
                + restored);
@@ -497,7 +569,7 @@
            !f.retryable ? "source_unavailable" : "source_retry");
        int failureCount;
        synchronized (s) {
-@@ -996,7 +1004,7 @@
+@@ -996,7 +1031,7 @@
          s.status = failureStatus;
          failureCount = s.sourceFailures;
        }
@@ -506,7 +578,29 @@
            s.context, "REBUILD_SOURCE_ERROR", f.category + ";attempt=" + failureCount);
        render(s);
      }
-@@ -1147,12 +1155,12 @@
+@@ -1085,6 +1120,12 @@
+     }
+   }
+ 
++  /** A seek storm pauses look-ahead until scrubbing stops and the landing block is ready. */
++  private static boolean prefetchPaused(Session s, int index, long now) {
++    return now < s.prefetchPausedUntil
++        && !(s.plans[index] != null && s.lastSeekAt >= 0 && now - s.lastSeekAt >= SEEK_SETTLED_MS);
++  }
++
+   private static void restoreCandidates(Session s, long now, boolean playbackAhead) {
+     List<CacheLookup> lookups = new ArrayList<>();
+     synchronized (s) {
+@@ -1093,7 +1134,7 @@
+       if (s.cacheReading == null) s.cacheReading = new boolean[s.blocks.size()];
+       int index = currentIndex(s);
+       if(!s.everReady && s.plans[index]!=null && s.states[index]==READY) {s.everReady=true;if(s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();}
+-      boolean ahead = playbackAhead && now >= s.prefetchPausedUntil
++      boolean ahead = playbackAhead && !prefetchPaused(s, index, now)
+           && (s.plans[index] != null || s.states[index] == FAILED
+               || s.jobs[index] != null && s.jobs[index].sent);
+       boolean bootstrap=!s.everReady && s.source!=null && !s.sourceOnly
+@@ -1147,12 +1188,12 @@
        }
      }
      if(!valid)return; // A departed scope must not publish cache outcomes or old-language UI.
@@ -522,7 +616,44 @@
          "session="+s.id+";block="+lookup.block.index+";network_calls=0;path=memory_then_disk_before_network");
    }
  
-@@ -1221,12 +1229,12 @@
+@@ -1168,13 +1209,13 @@
+       if(!s.everReady && s.plans[index]!=null && s.states[index]==READY) {s.everReady=true;if(s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();}
+       if(!s.everReady) {
+         String reason=s.sourceOnly?"source_only":!playbackAhead?"paused_or_clock_stale"
+-            :now<s.prefetchPausedUntil?"seek_storm":s.source==null?"source_not_ready"
++            :prefetchPaused(s,index,now)?"seek_storm":s.source==null?"source_not_ready"
+             :s.jobs[index]==null || !s.jobs[index].sent?"focus_not_sent":"focus_not_accepted";
+         String mark=index+":"+reason;
+         if(!mark.equals(s.bootstrapMark)) {
+           s.bootstrapMark=mark;
+           notice(notices,"REBUILD_BOOTSTRAP_ELIGIBILITY","session="+s.id+";block="+(index+1)
+-              +";reason="+reason+";bootstrap_remote_suppressed=true;focus_accepted_at="+s.focusAcceptedAt
++              +";reason="+reason+";bootstrap_remote=next_block_only;focus_accepted_at="+s.focusAcceptedAt
+                +";first_prefetch_sent_at="+s.firstPrefetchSentAt+";elapsed_ms="+now+";video_ms="+s.position);
+         }
+       }
+@@ -1204,7 +1245,7 @@
+       // D4: the prefetch budget, not the mere existence of another in-flight job, bounds look-ahead.
+       boolean allowAhead =
+           focusUnderWay
+-              && now >= s.prefetchPausedUntil
++              && !prefetchPaused(s, index, now)
+               && playbackAhead;
+       for (int i = index; i < s.blocks.size(); i++) {
+         RebuildPlanner.Block b = s.blocks.get(i);
+@@ -1212,8 +1253,9 @@
+         if (i > index && !allowAhead) break;
+         if (i > index && prefetchDispatched >= MAX_PREFETCH_CONCURRENCY) break;
+         boolean focus = i == index;
+-        // N30: cache-only bootstrap. No speculative translation before focus acceptance.
+-        if (!focus && !s.everReady) break;
++        // Before the first acceptance only the imminent next block is requested, alongside the
++        // already sent landing block: a slow provider then has both ready when playback needs them.
++        if (!focus && !s.everReady && (i != index + 1 || b.start > s.position + BOOTSTRAP_NEXT_MS)) break;
+         if (s.states[i] != WAITING || s.retryAt[i] > now) {
+           // D3: an existing job for this block is reused, whichever lane it came from.
+           if(s.jobs[i]!=null&&s.plans[i]==null&&s.states[i]==RUNNING){
+@@ -1221,12 +1263,12 @@
              String edge=s.generation+"|"+reused.priority+"|"+reused.dispatched+"|"+reused.sent;
              if(!edge.equals(reused.reuseEdge)){
                reused.reuseEdge=edge;
@@ -537,7 +668,7 @@
            }
            continue;
          }
-@@ -1271,7 +1279,7 @@
+@@ -1271,7 +1313,7 @@
      flush(s, notices);
      for (Job j : start) {
        RebuildPlanner.Block b = s.blocks.get(j.index);
@@ -546,7 +677,15 @@
            s.context,
            "REBUILD_REQUEST",
            "session="
-@@ -1320,7 +1328,7 @@
+@@ -1303,6 +1345,7 @@
+    */
+   private static void finishCancelled(Session s, Job job) {
+     s.jobs[job.index] = null;
++    if (s.provisional != null) s.provisional[job.index] = null;
+     if (!job.sent) {
+       if (s.attempts[job.index] > 1) s.repairCount = Math.max(0, s.repairCount - 1);
+       s.attempts[job.index] = Math.max(0, s.attempts[job.index] - 1);
+@@ -1320,7 +1363,7 @@
      List<Notice> notices = new ArrayList<>();
      try {
        job.slotWaitMs = SystemClock.elapsedRealtime() - job.queuedAt;
@@ -555,7 +694,23 @@
        if(accepted==null) accepted =
            RebuildApi.translate(
                s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index],job.languageContext);
-@@ -1381,20 +1389,20 @@
+@@ -1363,11 +1406,12 @@
+         if(old!=null && accepted==old && candidate!=old && RebuildReview.score(old.issues)>0)
+           notice(notices,"REBUILD_REPAIR_NO_PROGRESS",
+               "session="+s.id+";request="+job.traceId+";block="+b.index+";old_risks="+RebuildReview.score(old.issues)+";candidate_risks="+RebuildReview.score(candidate.issues));
+-        RebuildProtocol.Event onScreen=old==null?null:old.at(s.position);
+-        String onScreenId=onScreen==null?"":job.index+":"+onScreen.from+"-"+onScreen.to;
+-        if(old!=null && accepted!=old && onScreen!=null && onScreenId.equals(s.displayedEvent) && !RebuildReview.semanticBlocked(old,onScreen))
++        // Once text of this block reached the screen, a differently segmented repair waits until
++        // render reaches a boundary it shares with what was shown, so no text is shown twice.
++        if(old!=null && accepted!=old && s.display.shownIn(job.index))
+           s.pendingPlans[job.index]=accepted;
+         else s.plans[job.index] = accepted;
++        if(s.provisional!=null) s.provisional[job.index]=null;
+         boolean review=RebuildReview.shouldRepair(accepted,s.attempts[job.index],s.repairCount,s.position,b.end);
+         s.states[job.index] = review ? WAITING : READY;
+         if(review) {
+@@ -1381,20 +1425,20 @@
        permit.close();
        permit = null;
        if (RebuildReview.score(accepted.issues) == 0) {
@@ -581,7 +736,7 @@
            s.context,
            "REBUILD_EVENTS_ACCEPTED",
            "block="
-@@ -1413,10 +1421,10 @@
+@@ -1413,10 +1457,10 @@
             : e.getClass().getSimpleName();
        boolean fatal = e instanceof RebuildApi.Failure && ((RebuildApi.Failure) e).configuration;
        String configurationStatus = fatal
@@ -594,7 +749,15 @@
        notices.clear();
        synchronized (s) {
          if (!current(s) || s.jobs[job.index] != job) return;
-@@ -1510,7 +1518,7 @@
+@@ -1424,6 +1468,7 @@
+           finishCancelled(s, job);
+         } else {
+           s.jobs[job.index] = null;
++          if (s.provisional != null) s.provisional[job.index] = null;
+           s.reasons[job.index] = rejectionReason;
+           if (fatal) {
+             s.terminal = true;
+@@ -1510,54 +1555,75 @@
  
    private static void startup(Session s, String phase, String detail) {
      long now = SystemClock.elapsedRealtime();
@@ -603,7 +766,25 @@
          "session=" + s.id + ";phase=" + phase + ";elapsed_ms=" + now
              + ";since_activation_ms=" + (now - s.activatedAtMs)
              + (detail.isEmpty() ? "" : ";" + detail));
-@@ -1523,7 +1531,7 @@
+   }
+ 
+-  private static String original(Session s, long time) {
++  /** Source-only display: a cue is held through a short pause until the next cue starts. */
++  private static CaptionDocument.Cue sourceCue(Session s, long time) {
+     CaptionDocument.Cue cue = originalCue(s, time);
+-    return cue == null ? "" : cue.text;
++    if (cue != null || s.source == null) return cue;
++    RebuildSource.TimedWindow before = null;
++    for (RebuildSource.TimedWindow window : s.source.windows()) {
++      if (window.start > time) {
++        return before != null && window.start - before.end < RebuildDisplayGroups.HOLD_MS
++            ? new CaptionDocument.Cue(before.start, before.end, s.source.text(before.from, before.to))
++            : null;
++      }
++      before = window;
++    }
++    return null;
+   }
  
    private static void endFallback(Session s,long position,String cause,List<Notice> notices) {
      if(!s.fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_END",
@@ -612,7 +793,81 @@
      s.fallbackReason="";s.fallbackStart=-1;
    }
  
-@@ -1569,7 +1577,7 @@
+   static boolean lateUnreadable(RebuildProtocol.Event e,long position) {
+-    return position-e.start>1000 && e.end-position<1000 && e.text.codePointCount(0,e.text.length())>12;
+-  }
+-  private static RebuildProtocol.Event adjacentEvent(Session s, RebuildProtocol.Event event,
+-      boolean next) {
+-    if (s.plans == null || event == null) return null;
+-    RebuildProtocol.Event found = null;
+-    int sourceId = next ? event.to + 1 : event.from - 1;
+-    for (RebuildProtocol.Plan plan : s.plans) {
+-      if (plan == null) continue;
+-      for (RebuildProtocol.Event candidate : plan.events) {
+-        if (next ? candidate.from != sourceId : candidate.to != sourceId) continue;
+-        if (next && candidate.start < event.end || !next && candidate.end > event.start) continue;
+-        if (found == null || (next ? candidate.from < found.from : candidate.to > found.to))
+-          found = candidate;
+-      }
+-    }
+-    return found;
+-  }
+-
+-  private static RebuildDisplayMerge.Merged displayMergeForCurrent(Session s,
+-      RebuildProtocol.Event event, long position) {
+-    if (!s.languageContext.renderSpec.legacy || s.source == null || event == null) return null;
+-    RebuildProtocol.Event previous = adjacentEvent(s, event, false);
+-    if (previous != null && position>=event.start && (RebuildDisplayMerge.isLead(previous)
+-        || RebuildDisplayMerge.isShort(event))) {
+-      for(RebuildProtocol.Plan plan:s.plans)
+-        if(plan!=null && plan.events.contains(previous) && RebuildReview.semanticBlocked(plan,previous))return null;
+-      return RebuildDisplayMerge.merge(s.source, previous, event);
+-    }
+-    return null;
++    return lateUnreadable(e.start,e.end,e.text,position);
++  }
++  static boolean lateUnreadable(long start,long end,String text,long position) {
++    return position-start>1000 && end-position<1000 && text.codePointCount(0,text.length())>12;
++  }
++
++  /** Display units of one plan at the current measured geometry; recomputed only when either changes. */
++  private static final class DisplayLayout {
++    final RebuildProtocol.Plan plan;
++    final String geometry;
++    final List<RebuildDisplayGroups.Unit> units;
++    DisplayLayout(RebuildProtocol.Plan plan,String geometry,List<RebuildDisplayGroups.Unit> units) {
++      this.plan=plan;this.geometry=geometry;this.units=units;
++    }
++  }
++
++  private static List<RebuildDisplayGroups.Unit> displayUnits(Session s,int index,RebuildProtocol.Plan plan) {
++    CaptionRenderSpec spec=s.languageContext.renderSpec;
++    TranslationBudget budget=TranslationOutput.budget();
++    CaptionRenderSpec measured=budget!=null && budget.renderSpec!=null
++        && budget.renderSpec.targetCode.equals(spec.targetCode) ? budget.renderSpec : spec;
++    String geometry=budget==null ? "" : budget.width+":"+Float.floatToIntBits(budget.preferredPx)+":"+measured.measurementKey();
++    DisplayLayout cached=s.displayLayouts[index];
++    if(cached!=null && cached.plan==plan && cached.geometry.equals(geometry)) return cached.units;
++    java.util.function.Predicate<String> fits=budget==null ? null
++        : value -> measured.fits(value,budget.preferredPx,budget.width,2);
++    List<RebuildDisplayGroups.Unit> units=RebuildDisplayGroups.partition(index,plan.events,s.source,s.languageContext,
++        fits,event -> RebuildReview.semanticBlocked(plan,event));
++    s.displayLayouts[index]=new DisplayLayout(plan,geometry,units);
++    return units;
++  }
++
++  /** A repaired plan replaces the shown one only where it continues exactly after the shown text. */
++  private static void adoptPendingPlan(Session s,int index,long position) {
++    RebuildProtocol.Plan pending=s.pendingPlans==null ? null : s.pendingPlans[index];
++    if(pending==null) return;
++    boolean visible=s.display.onScreen(index,position) && !s.display.keepsShown(index,pending);
++    if(visible || !s.display.continues(index,pending)) return;
++    s.plans[index]=pending;
++    s.pendingPlans[index]=null;
+   }
+ 
+   // A retry is still the same unresolved caption, not a new fallback phase.
+@@ -1569,7 +1635,7 @@
  
    private static void render(Session s) {
      if (!current(s) || !s.visible) return;
@@ -621,7 +876,98 @@
      List<Notice> notices = new ArrayList<>();
      String text = "";
      String fallbackReason = "", displayEmptyReason="";
-@@ -1654,7 +1662,7 @@
+@@ -1578,7 +1644,7 @@
+     long revision, submission, selectedAt, observedAt;
+     String eventId = "none";
+     long eventStart = -1, eventEnd = -1;
+-    RebuildDisplayMerge.Merged displayCandidate = null;
++    int unitEvents = 0;
+     synchronized (s) {
+       if (!current(s) || !s.visible) return;
+       generation = s.generation;
+@@ -1587,7 +1653,13 @@
+       if (s.source == null && !s.status.isEmpty()) {
+         text = s.status;
+         status = true;
+-      } else if (s.source == null && s.raw != null && !s.sourceOnly && !s.terminal) {
++      } else if (s.sourceOnly) {
++        CaptionDocument.Cue cue = sourceCue(s, selectedAt);
++        if (cue != null) {
++          text = cue.text;
++          eventId = "source:" + cue.startMs + "_" + cue.endMs;
++        }
++      } else if (s.source == null && s.raw != null && !s.terminal) {
+         CaptionDocument.Cue cue = originalCue(s, selectedAt);
+         if (cue != null) {
+           text = translating;
+@@ -1599,41 +1671,43 @@
+       } else if (s.source == null) {
+         text = s.status.isEmpty() ? translating : s.status;
+         status = true;
+-      } else if (s.sourceOnly) text = original(s, selectedAt);
+-      else if (s.terminal) {
++      } else if (s.terminal) {
+         text = s.status;
+         status = true;
+       } else {
+         int i = blockAt(s, selectedAt);
+-        if (i >= 0 && covers(s.blocks.get(i), selectedAt)) {
+-          if(s.pendingPlans!=null && s.pendingPlans[i]!=null) {
+-            RebuildProtocol.Event previous=s.plans[i]==null?null:s.plans[i].at(selectedAt);
+-            String previousId=previous==null?"":i+":"+previous.from+"-"+previous.to;
+-            if(previous==null || !previousId.equals(s.displayedEvent)) {s.plans[i]=s.pendingPlans[i];s.pendingPlans[i]=null;}
+-          }
++        // A page held across the short pause after its block stays until the next block speaks.
++        if (i >= 0 && (covers(s.blocks.get(i), selectedAt) || s.display.onScreen(i, selectedAt))) {
++          adoptPendingPlan(s,i,selectedAt);
+           RebuildProtocol.Plan p = s.plans[i];
+-          RebuildProtocol.Event e = p == null ? null : p.at(selectedAt);
+-          if (e != null) {
+-            eventId = i + ":" + e.from + "-" + e.to;
+-            eventStart = e.start;
+-            eventEnd = e.end;
+-            text = e.text;
++          // Until the reply is complete, its validated leading events are shown as they arrive.
++          boolean provisional = p == null && s.provisional != null && s.provisional[i] != null;
++          if (provisional) p = s.provisional[i];
++          RebuildDisplayGroups.Unit unit = p == null ? null : s.display.select(i,p.events,
++              displayUnits(s,i,p),selectedAt);
++          if (unit != null) {
++            eventId = unit.id();
++            eventStart = unit.start;
++            eventEnd = unit.end;
++            text = unit.text;
++            unitEvents = unit.events.size();
+             if(text.isEmpty())displayEmptyReason="non_speech";
+-            boolean blocked = RebuildReview.semanticBlocked(p,e);
+-            if(RebuildReview.uncertainNumbers(p,e)) notice(notices,"REBUILD_DISPLAY_OBSERVATION",
+-                "session="+s.id+";generation="+generation+";event="+eventId+";reason=source_number_ambiguity");
+-            if(blocked) {
++            for(RebuildProtocol.Event e:unit.events) if(RebuildReview.uncertainNumbers(p,e)) {
++              notice(notices,"REBUILD_DISPLAY_OBSERVATION",
++                  "session="+s.id+";generation="+generation+";event="+eventId+";reason=source_number_ambiguity");
++              break;
++            }
++            if(unit.blocked) {
+               text="";eventId="source:"+eventId;fallbackReason="event_review";
+             } else {
+-              // Only immutable candidate metadata is extracted under the Session lock.
+-              displayCandidate=displayMergeForCurrent(s,e,selectedAt);
+               if(!eventId.equals(s.displayedEvent) && s.languageContext.renderSpec.legacy
+-                  && lateUnreadable(e,selectedAt)) notice(notices,"REBUILD_LATE_ARRIVAL_WATCH",
++                  && lateUnreadable(unit.start,unit.end,unit.text,selectedAt)) notice(notices,"REBUILD_LATE_ARRIVAL_WATCH",
+                       "session="+s.id+";generation="+generation+";event="+eventId
+-                      +";remaining="+(e.end-selectedAt)+";reason=late_arrival_watch");
++                      +";remaining="+(unit.end-selectedAt)+";reason=late_arrival_watch");
++              if(!text.isEmpty())s.display.shown(unit);
+               s.displayedEvent=eventId;
+             }
+-          } else if (p == null) {
++          } else if (p == null || provisional) {
+             fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
+             // Waiting and blank failure displays retain each source cue's own window.
+             // A block-wide display must not announce a later cue before its onset.
+@@ -1654,7 +1728,7 @@
          endFallback(s,s.position,"state_change",notices);
          s.fallbackReason=fallbackReason;s.fallbackStart=s.position;
          if(!fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_BEGIN",
@@ -630,7 +976,7 @@
        }
        String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
        if (signature.equals(s.lastShown) && s.appliedRenderRevision == s.renderRevision) {
-@@ -1676,7 +1684,7 @@
+@@ -1676,7 +1750,7 @@
      final String appliedReason=fallbackReason.equals("event_review") ? "semantic_blocked"
          : fallbackReason.startsWith("failed:") ? "translation_failed"
          : fallbackReason.isEmpty() ? (displayEmptyReason.isEmpty()?"source_gap":displayEmptyReason) : "pending_translation";
@@ -639,14 +985,14 @@
        public boolean isValid() {
          return current(s) && s.generation == generation && s.renderRevision == revision
              && s.renderSubmission == submission && s.visible;
-@@ -1690,17 +1698,17 @@
+@@ -1690,17 +1764,17 @@
        public long displayPosition(long supplied) { return RebuildController.displayPosition(s); }
        public void onApplied() { if (isValid()) s.appliedRenderRevision = revision; }
      };
 -    if (status) CaptionOverlay.showStatus(text, guard);
 -    else if (text.isEmpty() && fallbackReason.isEmpty()) CaptionOverlay.hide(guard);
 +    if (status) TranslationOutput.showStatus(text, guard);
-+    else if (text.isEmpty() && fallbackReason.isEmpty()) TranslationOutput.hide(guard);
++    else if (text.isEmpty()) TranslationOutput.hide(guard);
      else if (fallbackReason.equals("pending_engine") || fallbackReason.equals("pending_translation"))
 -      CaptionOverlay.showWaitingEvent(text, guard, s.id + ":" + generation + ":" + eventId,
 +      TranslationOutput.showWaitingEvent(text, guard, s.id + ":" + generation + ":" + eventId,
@@ -655,17 +1001,21 @@
 -      CaptionOverlay.showEvent(
 +      TranslationOutput.showEvent(
            text, guard, () -> "", s.id + ":" + generation + ":" + eventId,
-           eventStart, eventEnd, selectedAt,s.languageContext.renderSpec,displayCandidate);
+-          eventStart, eventEnd, selectedAt,s.languageContext.renderSpec,displayCandidate);
 -    if (DeepSeekConfig.displayTextDebugEnabled(s.context))
 -      CaptionDiagnostics.mark(
++          eventStart, eventEnd, selectedAt,s.languageContext.renderSpec,null);
 +    if (TranslationRuntime.debugEnabled(s.context))
 +      TranslationRuntime.mark(
            s.context,
            "REBUILD_SELECTED",
            "id="
-@@ -1716,6 +1724,6 @@
+@@ -1715,7 +1789,9 @@
+               + eventStart
                + "-"
                + eventEnd
++              + ";unit_events="
++              + unitEvents
                + ";text="
 -              + CaptionQualityTrace.redact(text, s.config.apiKey, 500));
 +              + TranslationRuntime.redact(text, s.config.apiKey, 500));
@@ -700,7 +1050,13 @@
    }
  
    static String transportReason(Exception error, String phase) {
-@@ -83,7 +83,7 @@
+@@ -78,12 +78,13 @@
+   private static final Map<String, String> blocked = new ConcurrentHashMap<>();
+ 
+   static void reset() {
++    RebuildStream.reset();
+     blocked.clear();
+     portable.clear();
      negotiated.clear();
    }
  
@@ -709,7 +1065,7 @@
      return RebuildProtocol.PROMPT
          + RebuildProtocol.FIDELITY_PROMPT
          + " Target language: "
-@@ -97,7 +97,7 @@
+@@ -97,7 +98,7 @@
    static final String ENGLISH_DEPENDENCY_PROMPT =
        " The source is explicitly English. Keep modifier+noun, number+unit, verb+object and dependent phrases together; use context to understand a continuation without importing its words. Articles, auxiliaries and conjunctions are lexical hints, not proven sentence boundaries.";
  
@@ -718,7 +1074,7 @@
      if(context.canApplyEnglishToChinese)return prompt(cfg,lang);
      return NEUTRAL_PROMPT+(context.englishSource ? ENGLISH_DEPENDENCY_PROMPT : "")
          +" Source language: "+context.sourceCode+". Target language: "+context.targetCode
-@@ -108,7 +108,7 @@
+@@ -108,7 +109,7 @@
    static RebuildProtocol.Plan translate(
        RebuildSource s,
        RebuildPlanner.Block b,
@@ -727,7 +1083,7 @@
        String lang,
        DeepSeekApiClient.RequestControl control,
        boolean priority,
-@@ -118,10 +118,10 @@
+@@ -118,10 +119,10 @@
    }
  
    static RebuildProtocol.Plan translate(RebuildSource s,RebuildPlanner.Block b,
@@ -740,9 +1096,13 @@
      if (layout != null && context.canApplyEnglishToChinese)
        payload.put(
            "display_hint",
-@@ -152,8 +152,8 @@
+@@ -151,9 +152,12 @@
+     String identity = RebuildCache.hash(cfg.baseUrl + "\n" + cfg.model + "\n" + cfg.apiKey);
      if (blocked.containsKey(identity)) throw new Failure(blocked.get(identity), true, 0);
      if (portable.contains(identity)) ProviderRequestPolicy.removeOptional(request);
++    // Streamed replies are rebuilt into the same response; leading events may be shown early.
++    boolean streaming = RebuildStream.wanted(cfg, identity);
++    if (streaming) RebuildStream.enable(request);
      long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(priority ? 10000 : 16000);
 -    TokenCostAudit.Request audit =
 -        TokenCostAudit.beginUnitBatch(
@@ -751,7 +1111,7 @@
              cfg,
              priority,
              1,
-@@ -164,10 +164,10 @@
+@@ -164,15 +168,36 @@
                  + payload.optString("context_after").length(),
              RebuildProtocol.VERSION);
      for (int round = 0; round < 2; round++) {
@@ -762,9 +1122,36 @@
 -          TokenCostAudit.beginAttempt(audit, body.getBytes(StandardCharsets.UTF_8).length);
 +          TranslationAudit.beginAttempt(audit, body.getBytes(StandardCharsets.UTF_8).length);
        trace(control,"REBUILD_HTTP_BEGIN","attempt="+attempt+";negotiation_round="+round);
++      RebuildStream.Reader reader = streaming
++          ? new RebuildStream.Reader(RebuildStream.provisional(control, s, b, context)) : null;
        try {
-         Response response = send(cfg, body, control, deadline);
-@@ -187,7 +187,7 @@
+-        Response response = send(cfg, body, control, deadline);
++        Response response = send(cfg, body, control, deadline, reader);
+         trace(control,"REBUILD_POLICY_REQUEST",context.diagnosticFields()+";prompt_hash="+RebuildCache.hash(prompt));
+         trace(control,"REBUILD_HTTP_RESPONSE","attempt="+attempt+";status="+response.status);
++        if ((response.status == 400 || response.status == 422) && ProviderRequestPolicy.inspected(response.body))
++          // Provider-side content inspection of this block's text: not a configuration problem, so
++          // neither streaming nor later blocks are affected.
++          throw new Failure(ProviderRequestPolicy.INSPECTION_CODE, false, 0);
++        if (streaming && (response.status == 400 || response.status == 422)) {
++          // A refused streamed form falls back once without spending a negotiation round.
++          streaming = false;
++          RebuildStream.reject(request, identity);
++          TranslationAudit.recordFailure(audit, attempt, RebuildStream.httpCode(response.status));
++          round--;
++          continue;
++        }
++        if (streaming && RebuildStream.cut(reader, request, audit, attempt)) {
++          // The provider cut the stream with an error event; the same request without streaming
++          // returns the complete reply, so ask once that way and keep streaming for later blocks.
++          streaming = false;
++          round--;
++          continue;
++        }
+         if (response.status == 400 || response.status == 422) {
+           String category = ProviderRequestPolicy.reason(response.body);
+           boolean optional = category.contains("unsupported");
+@@ -187,7 +212,7 @@
              }
            if (allowance && ProviderRequestPolicy.removeOptional(request, category)) {
              portable.add(identity);
@@ -773,16 +1160,18 @@
              continue;
            }
            if (round == 0 && optional && portable.contains(identity))
-@@ -200,7 +200,7 @@
+@@ -199,8 +224,8 @@
+               "http_" + response.status,
                response.status == 401 || response.status == 403 || response.status == 404,
                response.retryAfter);
-         JSONObject root = new JSONObject(response.body);
+-        JSONObject root = new JSONObject(response.body);
 -        TokenCostAudit.recordResponse(audit, attempt, root);
++        JSONObject root = reader != null && reader.streamed() ? reader.response() : new JSONObject(response.body);
 +        TranslationAudit.recordResponse(audit, attempt, root);
          JSONObject choice = root.getJSONArray("choices").getJSONObject(0);
          String finish = choice.optString("finish_reason");
          String content = choice.getJSONObject("message").optString("content", "");
-@@ -220,27 +220,27 @@
+@@ -220,27 +245,27 @@
          if(plan.reboundEvents>0)trace(control,"REBUILD_SOURCE_REBOUND",
              "block="+b.index+";events_rebound="+plan.reboundEvents+";rule=exact_owned_source_v1");
          plan = RebuildReview.withLayoutReview(plan, layout,context);
@@ -817,7 +1206,7 @@
              error instanceof Failure?((Failure)error).code
                  :error instanceof TransportFailure?((TransportFailure)error).reason:error.getClass().getSimpleName());
          throw error;
-@@ -266,7 +266,7 @@
+@@ -266,10 +291,11 @@
    }
  
    private static Response send(
@@ -825,8 +1214,13 @@
 +      TranslationSettings cfg,
        String body,
        DeepSeekApiClient.RequestControl control,
-       long deadline)
-@@ -279,13 +279,13 @@
+-      long deadline)
++      long deadline,
++      RebuildStream.Reader reader)
+       throws Exception {
+     long started=System.nanoTime();
+     String phase="connect";
+@@ -279,13 +305,13 @@
      NetworkDeadline guard = new NetworkDeadline(c, deadline);
      try (NetworkDeadline armed = guard) {
        if (control != null) control.onConnection(c);
@@ -843,7 +1237,7 @@
        ProviderEndpoint.authenticate(c, cfg.baseUrl, cfg.apiKey);
        c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
        c.setRequestProperty("Accept", "application/json");
-@@ -296,8 +296,8 @@
+@@ -296,8 +322,8 @@
        }
        phase="read";
        if (control != null) control.onRequestBodySent();
@@ -854,7 +1248,7 @@
        int code = c.getResponseCode();
        ByteArrayOutputStream out = new ByteArrayOutputStream();
        InputStream stream = code >= 400 ? c.getErrorStream() : c.getInputStream();
-@@ -305,8 +305,8 @@
+@@ -305,12 +331,13 @@
          try (InputStream in = stream) {
            byte[] buf = new byte[4096];
            while (true) {
@@ -865,7 +1259,12 @@
              int n = in.read(buf);
              if (n < 0) break;
              if (out.size() + n > 2 * 1024 * 1024) throw new IOException("response_too_large");
-@@ -324,7 +324,7 @@
+             out.write(buf, 0, n);
++            if (reader != null && code < 400) reader.feed(buf, 0, n);
+           }
+         }
+       long retry = 0;
+@@ -324,7 +351,7 @@
        // this controller itself stopped or retired is an intentional cancellation, not a wire fault;
        // a real deadline expiry is reported from the deadline's own timer fact.
        boolean intentional=false;
@@ -874,7 +1273,7 @@
        catch(Exception cancelled){ intentional=true; }
        throw new TransportFailure(failure,phase,started,deadline,guard,intentional);
      } finally {
-@@ -333,7 +333,7 @@
+@@ -333,7 +360,7 @@
      }
    }
  
@@ -907,6 +1306,194 @@
        return RebuildReview.score(plan.issues)==0 ? plan : null;
      } catch (Exception bad) {
        f.delete();
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java
+@@ -125,11 +125,25 @@
+ 
+   private static final Pattern KEY_EDGE=Pattern.compile("^[^\\p{L}\\p{N}+\\-]+|[^\\p{L}\\p{N}%]+$");
+   static String key(String s) {
++    String ascii = asciiKey(s);
++    if (ascii != null) return ascii;
+     return KEY_EDGE.matcher(Normalizer.normalize(s, Normalizer.Form.NFKC)
+         .toLowerCase(Locale.ROOT)
+         .replace('’', '\'')
+         .replace('−', '-')
+         ).replaceAll("");
++  }
++
++  /** Printable ASCII with alphanumeric edges: NFKC, both replacements and KEY_EDGE are no-ops. */
++  private static String asciiKey(String s) {
++    int n = s.length();
++    if (n == 0) return null;
++    for (int i = 0; i < n; i++) if (s.charAt(i) < 0x20 || s.charAt(i) > 0x7e) return null;
++    String lower = s.toLowerCase(Locale.ROOT);
++    char first = lower.charAt(0), last = lower.charAt(n - 1);
++    boolean head = first >= 'a' && first <= 'z' || first >= '0' && first <= '9' || first == '+' || first == '-';
++    boolean tail = last >= 'a' && last <= 'z' || last >= '0' && last <= '9' || last == '%';
++    return head && tail ? lower : null;
+   }
+ 
+   static boolean cjk(int c) {
+@@ -207,15 +221,22 @@
+     }return null;
+   }
+ 
++  // Compiled once: terminal() runs for every source word while request blocks are planned.
++  private static final Pattern TERMINAL = Pattern.compile("(?s).*[.!?。！？][\\\"'”’）)]*$"),
++      ABBREVIATION = Pattern.compile("(?i).*(?:\\bMr|\\bMrs|\\bDr|\\bProf|\\bvs|\\betc)\\."),
++      MUSIC = Pattern.compile("[♪♫\\s]+"),
++      NON_SPEECH = Pattern.compile("[\\[（(【]\\s*(music|applause|laughter|音乐|掌声|笑声)\\s*[\\]）)】]");
++
+   static boolean terminal(String s) {
+-    return s.matches("(?s).*[.!?。！？][\\\"'”’）)]*$")
+-        && !s.matches("(?i).*(?:\\bMr|\\bMrs|\\bDr|\\bProf|\\bvs|\\betc)\\.");
++    // Necessary condition for TERMINAL; unpunctuated ASR words never reach the pattern.
++    boolean candidate = false;
++    for (int i = 0; i < s.length() && !candidate; i++) candidate = ".!?。！？".indexOf(s.charAt(i)) >= 0;
++    return candidate && TERMINAL.matcher(s).matches() && !ABBREVIATION.matcher(s).matches();
+   }
+ 
+   static boolean nonSpeech(String s) {
+     String t = s.trim().toLowerCase(Locale.ROOT);
+-    return t.matches("[♪♫\\s]+")
+-        || t.matches("[\\[（(【]\\s*(music|applause|laughter|音乐|掌声|笑声)\\s*[\\]）)】]");
++    return MUSIC.matcher(t).matches() || NON_SPEECH.matcher(t).matches();
+   }
+ 
+   static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed) throws Exception {
+--- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java
++++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java
+@@ -75,21 +75,65 @@
+     return Collections.unmodifiableList(out);
+   }
+ 
++  // Word keys are already lower case, so these exact sets equal the former whole-word alternations.
++  // Planning evaluates them for most source words; on Android each regex match is a native call.
++  private static Set<String> words(String alternation) {
++    return Collections.unmodifiableSet(new HashSet<>(Arrays.asList(alternation.split("\\|"))));
++  }
++  private static final Set<String> COME = words("come|comes|coming|came"),
++      CONTRAST = words("and|but|however"), ORDINAL = words("firstly|secondly|thirdly|finally|then"),
++      JOINER = words("and|but|or"),
++      DEPENDENT = words("if|because|although|though|while|which|that|so|as|than|and|or|but|to|of|with|without|for|from|in|on|at|by|about|including|into|between|like|rather|whether|unless|until|before|after|where|when|what|who|how|more|less|not|no|its|their|his|her|this|that|a|an|the|every|each|any|some|another|firstly|secondly|thirdly"),
++      STRONG_DEPENDENT = words("if|because|although|unless|whether|including|the|an"),
++      PROTECTED_PAIR = words("modernization picture|out past|range out|ballistic missile|ballistic missiles|cruise missile|cruise missiles|surface-to-air missile|surface-to-air missiles|aircraft carrier|aircraft carriers|fifth generation|5th generation|generation fighter|generation fighters|generation aircraft|korean peninsula|purchasing power|power parity"),
++      COMPARATIVE = words("than|then"), PHASE = words("phased|replaced|adopted"),
++      NOT_SUBJECT = words("and|or|but|then|also|was|were|is|are|be|been|being|has|have|had|can|could|will|would|not|never|that|which|who"),
++      REPORTING = words("reduced|increased|announced|decided|said|argued|explained|aims|plans"),
++      WEAK_END = words("a|an|the|of|to|with|without|and|or|not|no|very|particularly|more|less|than|as");
++  private static final String[] PIVOT = {"if","because","although","unless","but","while","however","whereas","instead","secondly","thirdly","finally"},
++      PRONOUN_VERB = {"it ","this ","that ","they ","we ","he ","she ","i "},
++      ARTICLE = {"the ","a ","an "};
++
++  /** Same result as {@code [a-z][a-z<extra>]+} with matches(). */
++  private static boolean lowerWord(String value, String extra) {
++    if (value.length() < 2 || value.charAt(0) < 'a' || value.charAt(0) > 'z') return false;
++    for (int i = 1; i < value.length(); i++) {
++      char c = value.charAt(i);
++      if ((c < 'a' || c > 'z') && extra.indexOf(c) < 0) return false;
++    }
++    return true;
++  }
++
++  /** Same result as {@code [+-]?[0-9].*} with matches(): '.' excludes Java line terminators. */
++  private static boolean numeric(String value) {
++    int at = !value.isEmpty() && (value.charAt(0) == '+' || value.charAt(0) == '-') ? 1 : 0;
++    if (at >= value.length() || value.charAt(at) < '0' || value.charAt(at) > '9') return false;
++    for (int i = at + 1; i < value.length(); i++)
++      if ("\n\r\u0085\u2028\u2029".indexOf(value.charAt(i)) >= 0) return false;
++    return true;
++  }
++
++  /** Necessary condition only: callers still run the original pattern after it passes. */
++  private static boolean startsWithAny(String value, String... prefixes) {
++    for (String prefix : prefixes) if (value.startsWith(prefix)) return true;
++    return false;
++  }
++
+   static boolean dependentEnding(RebuildSource s, int i) {
+     if (i < 0 || i >= s.words.size()) return false;
+     if (RebuildSource.terminal(s.words.get(i).text)) return false;
+     String x = s.words.get(i).key;
+     String previous=i>0?s.words.get(i-1).key:"";
+     // A stranded preposition can complete a question; do not forbid "where ... coming from / and yet".
+-    if(x.equals("from")&&matches(previous,"come|comes|coming|came")&&i+1<s.words.size()
+-        &&s.words.get(i+1).key.matches("and|but|however"))return false;
+-    if(matches(x,"firstly|secondly|thirdly|finally|then")&&matches(previous,"and|but|or"))return true;
+-    return matches(x,"(?i)(if|because|although|though|while|which|that|so|as|than|and|or|but|to|of|with|without|for|from|in|on|at|by|about|including|into|between|like|rather|whether|unless|until|before|after|where|when|what|who|how|more|less|not|no|its|their|his|her|this|that|a|an|the|every|each|any|some|another|firstly|secondly|thirdly)");
++    if(x.equals("from")&&COME.contains(previous)&&i+1<s.words.size()
++        &&CONTRAST.contains(s.words.get(i+1).key))return false;
++    if(ORDINAL.contains(x)&&JOINER.contains(previous))return true;
++    return DEPENDENT.contains(x);
+   }
+ 
+   static boolean strongDependentEnding(RebuildSource s,int i) {
+     if (boundary(s,i))return false;
+-    return s.words.get(i).key.matches("(?i)(if|because|although|unless|whether|including|the|an)");
++    return STRONG_DEPENDENT.contains(s.words.get(i).key);
+   }
+ 
+   static boolean safeCut(RebuildSource s, int i) {
+@@ -101,14 +145,21 @@
+     String left=s.words.get(i).key, right=s.words.get(i+1).key;
+     String pair=left+" "+right;
+     // A direction particle belongs with its verb even when the time ceiling is near.
+-    if(matches(pair,"(?i)(modernization picture|out past|range out|ballistic missiles?|cruise missiles?|surface-to-air missiles?|aircraft carriers?|fifth generation|5th generation|generation (fighters?|aircraft)|korean peninsula|purchasing power|power parity)"))return true;
++    if(PROTECTED_PAIR.contains(pair))return true;
+     // ASR 'then' is left unchanged. Comparative context is a dependency hint, not a correction.
+-    if(matches(left,"than|then")&&s.text(Math.max(0,i-35),i).matches("(?s).*\\b(more|less|rather)\\b.*"))return true;
+-    if(left.equals("past") && matches(right,"[a-z][a-z-]+"))return true;
+-    if(left.equals("universally")&&matches(right,"phased|replaced|adopted"))return true;
++    if(COMPARATIVE.contains(left)&&matches(s.text(Math.max(0,i-35),i),"(?s).*\\b(more|less|rather)\\b.*"))return true;
++    if(left.equals("past") && lowerWord(right,"-"))return true;
++    if(left.equals("universally")&&PHASE.contains(right))return true;
+     // A finite verb after a lexical subject is a weak syntactic signal; do not hard-reject it.
+-    return matches(left,"[a-z][a-z'-]+")&&!matches(left,"and|or|but|then|also|was|were|is|are|be|been|being|has|have|had|can|could|will|would|not|never|that|which|who")
+-        && matches(right,"reduced|increased|announced|decided|said|argued|explained|aims|plans");
++    return REPORTING.contains(right)&&lowerWord(left,"'-")&&!NOT_SUBJECT.contains(left);
++  }
++
++  /** Whether the second space-delimited word of {@code next} begins with a reporting verb. */
++  private static boolean reportingSecond(String next) {
++    int space = next.indexOf(' ');
++    if (space <= 0) return false;
++    for (String verb : REPORTING) if (next.startsWith(verb, space + 1)) return true;
++    return false;
+   }
+ 
+   static int resourceScore(RebuildSource s, int i) {
+@@ -116,21 +167,21 @@
+ 
+     // Protect visibly dependent endings. This only chooses among request cuts; never edits text.
+     if (dependentEnding(s, i) || protectedCut(s,i)
+-        || matches(left,"(?i)(a|an|the|of|to|with|without|and|or|not|no|very|particularly|more|less|than|as)")
+-        || matches(left,"[+-]?[0-9].*")) return -100;
++        || WEAK_END.contains(left)
++        || numeric(left)) return -100;
+     String next = s.text(i + 1, Math.min(s.words.size() - 1, i + 7)).toLowerCase(Locale.ROOT);
+     // A contrast pivot or dated proposition can start the next request without stranding
+     // the preceding conditional or verb phrase in the previous request.
+-    if (matches(next,"^(if|because|although|unless|but|while|however|whereas|instead|secondly|thirdly|finally)\\b.*")
+-        || matches(next,"^and (then|so|finally|critically|yet|i|we|it|this|that|while)\\b.*")
+-        || matches(next,"^come [12][0-9]{3}\\b.*")) return 60;
+-    if (next.matches(
++    if (startsWithAny(next,PIVOT)&&matches(next,"^(if|because|although|unless|but|while|however|whereas|instead|secondly|thirdly|finally)\\b.*")
++        || next.startsWith("and ")&&matches(next,"^and (then|so|finally|critically|yet|i|we|it|this|that|while)\\b.*")
++        || next.startsWith("come ")&&matches(next,"^come [12][0-9]{3}\\b.*")) return 60;
++    if (startsWithAny(next,PRONOUN_VERB)&&matches(next,
+             "^(it|this|that|they|we|he|she|i)"
+                 + " (is|was|were|are|has|have|had|will|would|can|could|do|did)\\b.*")
+-        || matches(next,"^(the|a|an) [a-z]+(?: [a-z]+)? (is|was|were|are|has|have|had|will|would|can|could)\\b.*")
+-        || matches(next,"^[a-z][a-z'-]+ (reduced|increased|announced|decided|said|argued|explained|aims|plans)\\b.*")
+-        || matches(next,"^in [12][0-9]{3} (?:[a-z]+ ){1,2}(?:could|can|had|has|was|were|is|are)\\b.*")
+-        || matches(next,"^the (reality|creation|question|point|goal|reason|problem|result|argument)\\b.*")
++        || startsWithAny(next,ARTICLE)&&matches(next,"^(the|a|an) [a-z]+(?: [a-z]+)? (is|was|were|are|has|have|had|will|would|can|could)\\b.*")
++        || reportingSecond(next)&&matches(next,"^[a-z][a-z'-]+ (reduced|increased|announced|decided|said|argued|explained|aims|plans)\\b.*")
++        || next.startsWith("in ")&&matches(next,"^in [12][0-9]{3} (?:[a-z]+ ){1,2}(?:could|can|had|has|was|were|is|are)\\b.*")
++        || next.startsWith("the ")&&matches(next,"^the (reality|creation|question|point|goal|reason|problem|result|argument)\\b.*")
+         || next.startsWith("i'm ")
+         || next.startsWith("let's ")) return 50;
+     if (left.endsWith(",") || s.words.get(i).text.endsWith(",")) return 30;
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java
 @@ -7,7 +7,8 @@
@@ -919,6 +1506,49 @@
    static final String PROMPT =
        "You create faithful live subtitles. Read the complete source and read-only context before"
            + " translating. Preserve all spoken meaning, negation and its scope, conditions,"
+@@ -152,7 +153,21 @@
+   }
+   static Plan parseBound(String content,RebuildSource s,RebuildPlanner.Block b,CaptionLanguageContext context)
+       throws Exception {
+-    Plan plan=parseInternal(content,s,b,context.canApplyEnglishToChinese,0,context);
++    return parseBound(content,s,b,context,false);
++  }
++
++  /**
++   * The leading events of a reply still streaming in: every check of the full parse except complete
++   * block coverage, and no ID rebinding. The complete reply is parsed again before acceptance.
++   */
++  static Plan parsePrefix(String content,RebuildSource s,RebuildPlanner.Block b,CaptionLanguageContext context)
++      throws Exception {
++    return parseBound(content,s,b,context,true);
++  }
++
++  private static Plan parseBound(String content,RebuildSource s,RebuildPlanner.Block b,
++      CaptionLanguageContext context,boolean prefix) throws Exception {
++    Plan plan=parseInternal(content,s,b,!prefix && context.canApplyEnglishToChinese,0,context,prefix);
+     JSONArray rows=new JSONObject(plan.json).getJSONArray("events");
+     for(int i=0;i<rows.length();i++)if(!(rows.getJSONObject(i).opt("source") instanceof String))
+       throw new Invalid("source_quote_required", "Each event must copy its exact source range BEFORE translating it. Return source, from, to, text.");
+@@ -164,6 +179,10 @@
+   }
+ 
+   private static Plan parseInternal(String content, RebuildSource s, RebuildPlanner.Block b,boolean mayRebind,int reboundEvents,CaptionLanguageContext context) throws Exception {
++    return parseInternal(content,s,b,mayRebind,reboundEvents,context,false);
++  }
++
++  private static Plan parseInternal(String content, RebuildSource s, RebuildPlanner.Block b,boolean mayRebind,int reboundEvents,CaptionLanguageContext context,boolean prefix) throws Exception {
+     String raw = content == null ? "" : content.trim();
+     if (raw.startsWith("```json\n") && raw.endsWith("```"))
+       raw = raw.substring(8, raw.length() - 3).trim();
+@@ -242,7 +261,7 @@
+       out.add(new Event(from, to, a, z, text));
+       next = to + 1;
+     }
+-    if (next != b.to + 1) throw new Invalid("missing_source");
++    if (!prefix && next != b.to + 1) throw new Invalid("missing_source");
+     RebuildSemantics.validatePlan(s,b,out,context);
+     presentation.addAll(RebuildReview.inspect(s,b,out,context));
+     return new Plan(out, root.toString(), Collections.unmodifiableList(presentation),reboundEvents);
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java
 @@ -119,7 +119,7 @@
@@ -950,6 +1580,19 @@
          JSONObject r=new JSONObject().put("model",config.model).put("stream",false)
              .put("max_tokens",Math.max(256,Math.min(3072,limit)))
              .put("messages",new JSONArray()
+@@ -29,6 +29,12 @@
+             r.put("thinking",new JSONObject().put("type","disabled"));
+         // Unknown gateways keep the portable request. Never infer vendor fields from model IDs.
+         return r;
++    }
++    /** The provider refused this request's text, not its form (Bailian: data_inspection_failed). */
++    static final String INSPECTION_CODE="content_filter";
++    static boolean inspected(String body) {
++        String text=body==null ? "" : body.toLowerCase(Locale.ROOT);
++        return text.contains("data_inspection_failed") || text.contains("inappropriate content");
+     }
+     static String reason(String body) {
+         String text=body==null ? "" : body.toLowerCase(Locale.ROOT);
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java
 @@ -6,7 +6,7 @@

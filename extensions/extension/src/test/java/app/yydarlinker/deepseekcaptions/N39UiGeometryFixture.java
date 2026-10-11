@@ -27,6 +27,11 @@ class N39UiGeometryFixture {
     }
 
     @Implementation
+    public static boolean shortsSurfaceNow() {
+      return shorts;
+    }
+
+    @Implementation
     public static View refresh() {
       return null;
     }
@@ -58,7 +63,8 @@ class N39UiGeometryFixture {
     long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(4);
     while(System.nanoTime()<deadline){
       org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(20));
-      try{TextView view=text();FrameLayout box=anchor();if(view!=null&&view.getText().length()>0&&box!=null&&box.getVisibility()==View.VISIBLE)return;}catch(Exception ignored){}
+      try{TextView view=text();FrameLayout box=anchor();if(view!=null&&view.getText().length()>0&&box!=null&&box.getVisibility()==View.VISIBLE
+          &&((Long)field("layoutHoldSince"))<0)return;}catch(Exception ignored){} // not the previous caption held during layout
       try{Thread.sleep(2);}catch(InterruptedException stopped){Thread.currentThread().interrupt();throw new AssertionError(stopped);}
     }
     throw new AssertionError("Upstream page never became visible: "+presentationHistory());

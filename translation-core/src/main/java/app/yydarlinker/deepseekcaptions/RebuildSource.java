@@ -125,11 +125,25 @@ final class RebuildSource {
 
   private static final Pattern KEY_EDGE=Pattern.compile("^[^\\p{L}\\p{N}+\\-]+|[^\\p{L}\\p{N}%]+$");
   static String key(String s) {
+    String ascii = asciiKey(s);
+    if (ascii != null) return ascii;
     return KEY_EDGE.matcher(Normalizer.normalize(s, Normalizer.Form.NFKC)
         .toLowerCase(Locale.ROOT)
         .replace('’', '\'')
         .replace('−', '-')
         ).replaceAll("");
+  }
+
+  /** Printable ASCII with alphanumeric edges: NFKC, both replacements and KEY_EDGE are no-ops. */
+  private static String asciiKey(String s) {
+    int n = s.length();
+    if (n == 0) return null;
+    for (int i = 0; i < n; i++) if (s.charAt(i) < 0x20 || s.charAt(i) > 0x7e) return null;
+    String lower = s.toLowerCase(Locale.ROOT);
+    char first = lower.charAt(0), last = lower.charAt(n - 1);
+    boolean head = first >= 'a' && first <= 'z' || first >= '0' && first <= '9' || first == '+' || first == '-';
+    boolean tail = last >= 'a' && last <= 'z' || last >= '0' && last <= '9' || last == '%';
+    return head && tail ? lower : null;
   }
 
   static boolean cjk(int c) {
@@ -207,15 +221,22 @@ final class RebuildSource {
     }return null;
   }
 
+  // Compiled once: terminal() runs for every source word while request blocks are planned.
+  private static final Pattern TERMINAL = Pattern.compile("(?s).*[.!?。！？][\\\"'”’）)]*$"),
+      ABBREVIATION = Pattern.compile("(?i).*(?:\\bMr|\\bMrs|\\bDr|\\bProf|\\bvs|\\betc)\\."),
+      MUSIC = Pattern.compile("[♪♫\\s]+"),
+      NON_SPEECH = Pattern.compile("[\\[（(【]\\s*(music|applause|laughter|音乐|掌声|笑声)\\s*[\\]）)】]");
+
   static boolean terminal(String s) {
-    return s.matches("(?s).*[.!?。！？][\\\"'”’）)]*$")
-        && !s.matches("(?i).*(?:\\bMr|\\bMrs|\\bDr|\\bProf|\\bvs|\\betc)\\.");
+    // Necessary condition for TERMINAL; unpunctuated ASR words never reach the pattern.
+    boolean candidate = false;
+    for (int i = 0; i < s.length() && !candidate; i++) candidate = ".!?。！？".indexOf(s.charAt(i)) >= 0;
+    return candidate && TERMINAL.matcher(s).matches() && !ABBREVIATION.matcher(s).matches();
   }
 
   static boolean nonSpeech(String s) {
     String t = s.trim().toLowerCase(Locale.ROOT);
-    return t.matches("[♪♫\\s]+")
-        || t.matches("[\\[（(【]\\s*(music|applause|laughter|音乐|掌声|笑声)\\s*[\\]）)】]");
+    return MUSIC.matcher(t).matches() || NON_SPEECH.matcher(t).matches();
   }
 
   static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed) throws Exception {

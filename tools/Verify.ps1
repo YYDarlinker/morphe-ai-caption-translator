@@ -11,11 +11,12 @@ try {
     try{$taskOwned=$taskMutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$taskOwned=$true}
     if(-not $taskOwned){throw 'Another Gradle operation owns the build tree.'}
     if($Offline){& (Join-Path $PSScriptRoot 'Prepare-OfflineTests.ps1')}
-    & $taskEnvironment.Python -X utf8 tools/check_localization.py *> (Join-Path $taskRun 'localization.log')
+    # Native tools report through exit codes. Windows PowerShell 5.1 would otherwise stop on redirected stderr.
+    & {$ErrorActionPreference='Continue';& $taskEnvironment.Python -X utf8 tools/check_localization.py *> (Join-Path $taskRun 'localization.log')}
     if($LASTEXITCODE -ne 0){throw "Localization checks failed: $taskRun"}
     $taskArguments=@(':translation-core:testDebugUnitTest',':extensions:extension:testDebugUnitTest',':ui-preview:assembleDebug',':patches:buildAndroid','--no-parallel','--console=plain',('-Pscheduler.output='+$taskRun))
     if($Offline){$taskArguments+='--offline'}
-    & .\gradlew.bat @taskArguments *> (Join-Path $taskRun 'gradle.log')
+    & {$ErrorActionPreference='Continue';& .\gradlew.bat @taskArguments *> (Join-Path $taskRun 'gradle.log')}
     $taskBuildExit=$LASTEXITCODE
     foreach($taskModule in @('translation-core','extensions\extension')){
         $taskResults=Join-Path $taskEnvironment.Repository ('build\n39\gradle\'+$taskModule+'\test-results\testDebugUnitTest')
@@ -24,16 +25,16 @@ try {
     if($taskBuildExit -ne 0){Get-Content -LiteralPath (Join-Path $taskRun 'gradle.log') -Tail 28;throw "Build/tests failed: $taskRun"}
     New-Item -ItemType Directory -Path build\delivery -Force | Out-Null
     Copy-Item -LiteralPath build\n39\gradle\extensions\extension\morphe\extensions\extension.mpe -Destination build\delivery\extension.mpe
-    & $taskEnvironment.Python -X utf8 tools/verify_integration.py --output (Join-Path $taskRun 'boundaries.json') *> (Join-Path $taskRun 'boundaries.log')
+    & {$ErrorActionPreference='Continue';& $taskEnvironment.Python -X utf8 tools/verify_integration.py --output (Join-Path $taskRun 'boundaries.json') *> (Join-Path $taskRun 'boundaries.log')}
     if($LASTEXITCODE -ne 0){throw "Boundary/package checks failed: $taskRun"}
     if($Live){
         $taskLive=@(':translation-core:testDebugUnitTest','-Ptranslation.live=true','--tests','*PinnedCoreLiveTest','--console=plain',('-Plive.maxRequests='+$MaxRequests),('-Plive.maxTokens='+$MaxTotalTokens),('-Plive.elapsedSeconds='+$ElapsedBudgetSeconds),('-Plive.output='+(Join-Path $taskRun 'live-translation.json')))
         if($Offline){$taskLive+='--offline'}
-        & .\gradlew.bat @taskLive *> (Join-Path $taskRun 'live.log')
+        & {$ErrorActionPreference='Continue';& .\gradlew.bat @taskLive *> (Join-Path $taskRun 'live.log')}
         if($LASTEXITCODE -ne 0){throw "Bounded Live smoke failed: $taskRun"}
     }
     $taskBoundary=Get-Content -Raw -LiteralPath (Join-Path $taskRun 'boundaries.json') | ConvertFrom-Json
-    & $taskEnvironment.Python -X utf8 tools/scan_delivery_credentials.py --path $taskRun --path $taskBoundary.android_patch.path --path build/delivery/extension.mpe --output (Join-Path $taskRun 'credential-scan.json') *> (Join-Path $taskRun 'credential-scan.log')
+    & {$ErrorActionPreference='Continue';& $taskEnvironment.Python -X utf8 tools/scan_delivery_credentials.py --path $taskRun --path $taskBoundary.android_patch.path --path build/delivery/extension.mpe --output (Join-Path $taskRun 'credential-scan.json') *> (Join-Path $taskRun 'credential-scan.log')}
     if($LASTEXITCODE -ne 0){throw "Credential scan failed: $taskRun"}
     $taskRun | Set-Content -Encoding utf8 -LiteralPath work\last-verify.txt
     Get-Content -LiteralPath (Join-Path $taskRun 'gradle.log') -Tail 8

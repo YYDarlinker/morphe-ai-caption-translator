@@ -221,6 +221,8 @@ public final class NativeCaptionBridge {
                 if(off)RememberedCaptionSelection.off();
                 else if(!code.endsWith("_OPTION"))RememberedCaptionSelection.select(code,value.translated,value.asr);
             }
+            // An explicit Off is the user's; an automatic reset of the caption model is a departure.
+            if(off){if(explicit)EngineResume.declined();else EngineResume.automaticReset();}
             applySelection(track,off||explicit||!CaptionChoice.known()||!CaptionChoice.isOn());
         }
     }

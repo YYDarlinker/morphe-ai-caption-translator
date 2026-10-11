@@ -28,17 +28,23 @@ final class CaptionApplication extends TranslationRuntime.Host implements Captio
     @Override public void command(Action action,String value){
         Context c=context;if(c==null)return;
         switch(action){
-            case ACTIVATE:RebuildController.activate(c,value,false,true);break;
+            case ACTIVATE:remember(value,false);RebuildController.activate(c,value,false,true);break;
             case PREWARM:RebuildController.activate(c,value,false,false);break;
-            case DEACTIVATE:RebuildController.stop();break;
+            case DEACTIVATE:
+                // Only a reset YouTube made on its own may come back; every other off is the user's.
+                if(!"native_selection".equals(value)||!EngineResume.takeAutomatic())EngineResume.declined();
+                RebuildController.stop();break;
             case VIDEO:
                 video=value==null?"":value.trim();
-                if(video.isEmpty())RebuildController.stop();else RebuildController.video(video);
+                if(video.isEmpty()){EngineResume.departed();RebuildController.stop();}
+                else{EngineResume.video(video);RebuildController.video(video);resume(c,"video");}
                 break;
             case SOURCE:
                 if(CaptionUrls.isTimedText(value))NativeAsrTrackReference.remember(RawCaptionSource.sourceLanguage(value,null),NativeCaptionBridge.simplifiedVss(""),value);
-                // Native source selection keeps the local host renderer; it must not create an AI overlay.
-                RebuildController.observe(value);
+                // The hook already gave YouTube an empty track for this selection (as upstream does), so
+                // the chosen original/auto-generated captions are shown by the AI overlay, untranslated.
+                remember(value,true);
+                RebuildController.activate(c,value,true,true);
                 break;
             case PLAYER_TYPE:CaptionOverlay.setPlayerType(value);RebuildController.player(value);break;
             case CONFIGURATION:RebuildController.refresh(c);CaptionOverlay.refreshStyle(c);break;
@@ -51,10 +57,36 @@ final class CaptionApplication extends TranslationRuntime.Host implements Captio
         }
     }
     @Override public boolean active(){return RebuildController.visible();}
-    @Override public boolean ownsNativeTrack(){return RebuildController.ownsNativeTrack();}
+    // A visible source-only session also owns the screen: the native renderer stays masked.
+    @Override public boolean ownsNativeTrack(){return RebuildController.ownsNativeTrack()||RebuildController.visible();}
     @Override public String videoId(){return video;}
     @Override public String restoreTarget(String url){return CaptionLifecycleRestore.restoreAfterLifecycle(RebuildController.restore(url));}
-    @Override public void playback(long at){RebuildController.time(at);}
+    @Override public void playback(long at){
+        if(EngineResume.reappeared(android.os.SystemClock.elapsedRealtime())){
+            Context c=context;
+            // The player ticks again after a silence: the video was shown anew. Bring the session back
+            // if it was lost with the departure, else make sure the box is laid out on the new surface.
+            if(c!=null&&!resume(c,"playback"))CaptionOverlay.refreshSurface();
+        }
+        RebuildController.time(at);
+    }
+    private static void remember(String url,boolean original){
+        if(CaptionUrls.isTimedText(url))EngineResume.started(CaptionUrls.videoId(url),url,original);
+    }
+    /**
+     * A Short that was left and entered again is not announced to the caption track selector, so the
+     * session that stopped with the departure is restarted from what it was showing.
+     */
+    private static boolean resume(Context c,String via){
+        if(!RebuildController.activeUrl().isEmpty())return false;
+        String[] again=EngineResume.take(video);
+        if(again==null)return false;
+        if(video.isEmpty()){video=again[2];RebuildController.video(video);}
+        CaptionChoice.toggle(true);
+        CaptionDiagnostics.mark(c,"ENGINE_REENTRY_RESUMED","video="+video+";source_only="+again[1]+";via="+via);
+        RebuildController.activate(c,again[0],"1".equals(again[1]),true);
+        return true;
+    }
     @Override TranslationSettings settings(Context c){
         synchronized(ApiProfiles.LOCK){DeepSeekConfig.ProviderSettings p=DeepSeekConfig.load(c);
             return new TranslationSettings(p.enabled,p.baseUrl,p.model,p.prompt,SecureApiKey.load(c),p.preferenceProvenance);}
@@ -70,7 +102,9 @@ final class CaptionApplication extends TranslationRuntime.Host implements Captio
     @Override boolean isShorts(){return CaptionSurface.isShorts();}
     @Override boolean isCompactType(String type){return CaptionPlayerAuthority.isCompactType(type);}
     @Override boolean authoritativeType(){return CaptionPlayerAuthority.hasAuthoritativeType();}
-    @Override boolean transitioning(){return CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT||CaptionPlayerAuthority.state()==CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR;}
+    @Override boolean transitioning(){
+        if(CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT)CaptionPlayerAuthority.recoverShorts();
+        return CaptionPlayerAuthority.state()==CaptionPlayerAuthority.COMPACT||CaptionPlayerAuthority.state()==CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR;}
     @Override long ownerEpoch(){return CaptionPlayerAuthority.ownerEpoch();}
     @Override void sessionOpened(){CaptionPlayerAuthority.setOwner(activity.get());}
     @Override void stopped(){CaptionPlayerAuthority.close();}
@@ -104,14 +138,17 @@ final class CaptionApplication extends TranslationRuntime.Host implements Captio
         };
     }
     @Override public void clear(TranslationOutput.RenderGuard g){CaptionOverlay.clear(guard(g));}
-    @Override public void hide(TranslationOutput.RenderGuard g){CaptionOverlay.hide(guard(g));}
+    @Override public void hide(TranslationOutput.RenderGuard g){display(()->CaptionOverlay.hide(guard(g)));}
     @Override public void refreshSurface(){CaptionOverlay.refreshSurface();}
     @Override public void position(long at,TranslationOutput.RenderGuard g){CaptionOverlay.position(at,guard(g));}
-    @Override public void showStatus(String text,TranslationOutput.RenderGuard g){CaptionOverlay.showStatus(text,guard(g));}
-    @Override public void showWaitingEvent(String text,TranslationOutput.RenderGuard g,String id,long start,long end,long at){CaptionOverlay.showWaitingEvent(text,guard(g),id,start,end,at);}
+    @Override public void showStatus(String text,TranslationOutput.RenderGuard g){display(()->CaptionOverlay.showStatus(text,guard(g)));}
+    @Override public void showWaitingEvent(String text,TranslationOutput.RenderGuard g,String id,long start,long end,long at){display(()->CaptionOverlay.showWaitingEvent(text,guard(g),id,start,end,at));}
     @Override public void showEvent(String text,TranslationOutput.RenderGuard g,Supplier<String> fallback,String id,long start,long end,long at,CaptionRenderSpec spec,CaptionDisplayCandidate candidate){
-        CaptionOverlay.showEvent(text,guard(g),fallback,id,start,end,at,spec,candidate);
-
+        display(()->CaptionOverlay.showEvent(text,guard(g),fallback,id,start,end,at,spec,candidate));
+    }
+    /** A display fault must never take the host app down: the next tick draws the caption again. */
+    private static void display(Runnable draw){
+        try{draw.run();}catch(RuntimeException fault){android.util.Log.w("MorpheCaption","caption display fault: "+fault);}
     }
     @Override public List<CaptionDisplayPage> displayPages(String text,long start,long end,CaptionPresentationBudget geometry,CaptionRenderSpec spec){return TranslationPresentation.pages(text,start,end,geometry,spec);}
     @Override public List<String> models(String endpoint) throws Exception {

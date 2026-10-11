@@ -53,6 +53,28 @@ final class CaptionSurface {
     return visible(shorts.get());
   }
 
+  private static long shortsProbeAt;
+
+  /**
+   * Shorts reports the inner player type NONE, which looks like a closed miniplayer, so the surface
+   * decides. The cached Short view goes stale when the Short loops or is entered again, so look for
+   * the visible Shorts container once more (at most every 250 ms, a bounded tree walk).
+   */
+  static boolean shortsSurfaceNow() {
+    if (isShorts()) return true;
+    long now = android.os.SystemClock.uptimeMillis();
+    if (now - shortsProbeAt < 250) return false;
+    shortsProbeAt = now;
+    Activity a = activity.get();
+    if (a == null || a.getWindow() == null) return false;
+    Set<Integer> ids = new HashSet<>();
+    for (String name : SHORTS) {
+      int id = a.getResources().getIdentifier(name, "id", a.getPackageName());
+      if (id != 0) ids.add(id);
+    }
+    return !ids.isEmpty() && discover(a.getWindow().getDecorView(), ids) != null;
+  }
+
   static View refresh() {
     Activity a = activity.get();
     if (a == null || a.getWindow() == null) return null;

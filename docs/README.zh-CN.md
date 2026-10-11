@@ -18,17 +18,17 @@
 
 | 项目 | 推荐 | 历史兼容范围 |
 | --- | --- | --- |
-| 官方 Morphe Patches | **1.45.0**（本次检查的最新稳定版） | 从 **1.42.0** 起，须与所选 YouTube APK 匹配 |
-| 原版 YouTube APK | **21.16.256** | **21.13.164、21.07.247** |
+| 官方 Morphe Patches | **1.47.0**（本次检查的最新稳定版） | 从 **1.42.0** 起，须与所选 YouTube APK 匹配 |
+| 原版 YouTube APK | **21.20.405** | **21.16.256、21.13.164、21.07.247** |
 | Android | **9 及以上** | minSdk 28 |
 
-推荐使用官方 **1.45.0＋YouTube 21.16.256**。21.07.247 对应较早的官方1.42.0／1.43.0；当前官方稳定列表已不含它，不能认为任意官方版本都能与任意历史APK组合。实验版 YouTube 不列为本补丁的稳定支持范围。详见[兼容与验证边界](COMPATIBILITY.md)。
+推荐使用官方 **1.47.0＋YouTube 21.20.405**。21.16.256 仍是官方1.44.0至1.47.0的稳定目标；21.13.164 已不在官方1.47.0中，21.07.247 仅对应较早的官方1.42.0／1.43.0；当前官方稳定列表已不含它们，不能认为任意官方版本都能与任意历史APK组合。实验版 YouTube 不列为本补丁的稳定支持范围。详见[兼容与验证边界](COMPATIBILITY.md)。
 
 ## 安装
 
 1. 安装 [Morphe Manager](https://github.com/MorpheApp/morphe-manager/releases/latest)，在设置中启用「专家模式」。
 2. 点击[添加到 Morphe](https://morphe.software/add-source?github=YYDarlinker/morphe-ai-caption-translator)，或在「补丁源→添加→远程」粘贴 `https://github.com/YYDarlinker/morphe-ai-caption-translator`。
-3. 加载上表中的**原始、未打补丁 YouTube APK**，优先21.16.256。
+3. 加载上表中的**原始、未打补丁 YouTube APK**，优先21.20.405。
 4. 保留对应官方默认补丁组合，包含其字幕、设置、播放器接缝支持。在本项目源内选择 **AI caption translator**；需要记忆字幕选择时，再选 **Remember caption selection**。
 5. 由 Morphe 完成补丁、签名与安装；若官方补丁要求 GmsCore，按其指引设置。
 

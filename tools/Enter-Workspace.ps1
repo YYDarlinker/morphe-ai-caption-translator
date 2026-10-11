@@ -6,7 +6,8 @@ $taskJdkCandidates=@($env:JAVA_HOME,(Join-Path $taskRepository 'work\toolchain\j
 $taskJdk=$null
 foreach($candidate in $taskJdkCandidates){
     if($candidate -and (Test-Path -LiteralPath (Join-Path $candidate 'bin\javac.exe'))){
-        $version=& (Join-Path $candidate 'bin\java.exe') -version 2>&1 | Out-String
+        # Windows PowerShell 5.1 turns redirected native stderr into a terminating error under Stop.
+        $version=& {$ErrorActionPreference='Continue';& (Join-Path $candidate 'bin\java.exe') -version 2>&1 | Out-String}
         if($version -match 'version "21\.'){$taskJdk=$candidate;break}
     }
 }

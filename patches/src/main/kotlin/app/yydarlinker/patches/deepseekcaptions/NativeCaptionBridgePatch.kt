@@ -97,9 +97,26 @@ internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplif
     val languageSetter=setter(language); val urlSetter=setter(url); val vssSetter=setter(vss)
     val builderDisplay=builderField(display)
     val build=builder.methods.filter { it.parameterTypes.isEmpty() && it.returnType==track.type }.unique("build track")
-    val selector=getAllClassesWithString("setSubtitleTrack name:%s languageCode:%s languageName:%s format:%d trackName:%s vssid:%s videoid:%s")
-        .flatMap { classDefBy(it.type).methods.toList() }.filter { it.hasText("setSubtitleTrack name:%s languageCode:%s languageName:%s format:%d trackName:%s vssid:%s videoid:%s") }
-        .unique("all-menu track selection")
+    val selectorLog="setSubtitleTrack name:%s languageCode:%s languageName:%s format:%d trackName:%s vssid:%s videoid:%s"
+    val logged=getAllClassesWithString(selectorLog)
+        .flatMap { classDefBy(it.type).methods.toList() }.filter { it.hasText(selectorLog) }
+    // YouTube 21.20 removed the log string but kept the method: it is the manager's only instance
+    // method (track, origin, reason) that builds the caption event (track, origin, reason, id).
+    val selector=if(logged.isNotEmpty()) logged.unique("all-menu track selection") else {
+        val found=mutableListOf<Method>()
+        classDefForEach { candidate ->
+            if(candidate.methods.none { it.parameterTypes.isEmpty() && it.returnType==track.type }) return@classDefForEach
+            for(m in candidate.methods) {
+                val types=m.parameterTypes.map { it.toString() }
+                if(AccessFlags.STATIC.isSet(m.accessFlags) || m.returnType!="V" || types.size!=3 ||
+                    types[0]!=track.type || types[2]!="I" || !types[1].startsWith("L")) continue
+                if(m.code().any { ins -> ins.opcode==Opcode.INVOKE_DIRECT && ins.call()?.let { c ->
+                        c.name=="<init>" && c.parameterTypes.map { it.toString() }==listOf(track.type,types[1],"I",STRING) } == true })
+                    found.add(m)
+            }
+        }
+        found.unique("all-menu track selection")
+    }
     if(selector.parameterTypes.firstOrNull()!=track.type || AccessFlags.STATIC.isSet(selector.accessFlags))
         throw PatchException("AI captions: unexpected native track selector")
     for(m in listOf(copy,languageSetter,urlSetter,vssSetter,build))

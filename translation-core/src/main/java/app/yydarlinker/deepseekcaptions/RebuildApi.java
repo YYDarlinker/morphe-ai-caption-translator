@@ -78,6 +78,7 @@ final class RebuildApi {
   private static final Map<String, String> blocked = new ConcurrentHashMap<>();
 
   static void reset() {
+    RebuildStream.reset();
     blocked.clear();
     portable.clear();
     negotiated.clear();
@@ -151,6 +152,9 @@ final class RebuildApi {
     String identity = RebuildCache.hash(cfg.baseUrl + "\n" + cfg.model + "\n" + cfg.apiKey);
     if (blocked.containsKey(identity)) throw new Failure(blocked.get(identity), true, 0);
     if (portable.contains(identity)) ProviderRequestPolicy.removeOptional(request);
+    // Streamed replies are rebuilt into the same response; leading events may be shown early.
+    boolean streaming = RebuildStream.wanted(cfg, identity);
+    if (streaming) RebuildStream.enable(request);
     long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(priority ? 10000 : 16000);
     TranslationAudit.Request audit =
         TranslationAudit.beginUnitBatch(
@@ -169,10 +173,31 @@ final class RebuildApi {
       int attempt =
           TranslationAudit.beginAttempt(audit, body.getBytes(StandardCharsets.UTF_8).length);
       trace(control,"REBUILD_HTTP_BEGIN","attempt="+attempt+";negotiation_round="+round);
+      RebuildStream.Reader reader = streaming
+          ? new RebuildStream.Reader(RebuildStream.provisional(control, s, b, context)) : null;
       try {
-        Response response = send(cfg, body, control, deadline);
+        Response response = send(cfg, body, control, deadline, reader);
         trace(control,"REBUILD_POLICY_REQUEST",context.diagnosticFields()+";prompt_hash="+RebuildCache.hash(prompt));
         trace(control,"REBUILD_HTTP_RESPONSE","attempt="+attempt+";status="+response.status);
+        if ((response.status == 400 || response.status == 422) && ProviderRequestPolicy.inspected(response.body))
+          // Provider-side content inspection of this block's text: not a configuration problem, so
+          // neither streaming nor later blocks are affected.
+          throw new Failure(ProviderRequestPolicy.INSPECTION_CODE, false, 0);
+        if (streaming && (response.status == 400 || response.status == 422)) {
+          // A refused streamed form falls back once without spending a negotiation round.
+          streaming = false;
+          RebuildStream.reject(request, identity);
+          TranslationAudit.recordFailure(audit, attempt, RebuildStream.httpCode(response.status));
+          round--;
+          continue;
+        }
+        if (streaming && RebuildStream.cut(reader, request, audit, attempt)) {
+          // The provider cut the stream with an error event; the same request without streaming
+          // returns the complete reply, so ask once that way and keep streaming for later blocks.
+          streaming = false;
+          round--;
+          continue;
+        }
         if (response.status == 400 || response.status == 422) {
           String category = ProviderRequestPolicy.reason(response.body);
           boolean optional = category.contains("unsupported");
@@ -199,7 +224,7 @@ final class RebuildApi {
               "http_" + response.status,
               response.status == 401 || response.status == 403 || response.status == 404,
               response.retryAfter);
-        JSONObject root = new JSONObject(response.body);
+        JSONObject root = reader != null && reader.streamed() ? reader.response() : new JSONObject(response.body);
         TranslationAudit.recordResponse(audit, attempt, root);
         JSONObject choice = root.getJSONArray("choices").getJSONObject(0);
         String finish = choice.optString("finish_reason");
@@ -269,7 +294,8 @@ final class RebuildApi {
       TranslationSettings cfg,
       String body,
       DeepSeekApiClient.RequestControl control,
-      long deadline)
+      long deadline,
+      RebuildStream.Reader reader)
       throws Exception {
     long started=System.nanoTime();
     String phase="connect";
@@ -311,6 +337,7 @@ final class RebuildApi {
             if (n < 0) break;
             if (out.size() + n > 2 * 1024 * 1024) throw new IOException("response_too_large");
             out.write(buf, 0, n);
+            if (reader != null && code < 400) reader.feed(buf, 0, n);
           }
         }
       long retry = 0;

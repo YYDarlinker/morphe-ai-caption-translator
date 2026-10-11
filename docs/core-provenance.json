@@ -2,12 +2,13 @@
   "repository": "https://github.com/YYDarlinker/morphe-ai-caption-translator",
   "branch": "main",
   "commit": "ac65fe803ec2b11821b1131040f807922a2b8505",
+  "local_head": "682875288c4875fdc0454609ed064b8296e73392",
   "files": [
     {
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "upstream_sha256": "bc5ba7aab1c61dc785742e8cb63b3d69a5d11142aaf817d66d280bc415a4a1e3",
-      "sha256": "52295d81f3e5d712efe21873dfb5bbbbdb42824cc9724fb0d264d50892c677e0",
+      "sha256": "fe6892d9a460c7711bb4383d4e785d9944241adec774cbdb5fd8daf8fd7b1ef6",
       "snapshot": "translation-core/upstream/RebuildController.java.txt",
       "upstream_git_blob": "814922f06c539681e1471379faf61cb7c6651548"
     },
@@ -15,7 +16,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java",
       "upstream_sha256": "674b53e2bf49ddf887be0f4a973a8f9eacde6cdf273c815e468e29b378eecfac",
-      "sha256": "dce1163445fd5d411ecdd15755bd21616d1142e77565d3307f3c15327d017bc4",
+      "sha256": "056d7aa5ca8e6df9fc324a7955e9c569fb0d27bfb59d00edef776c77d7ef3553",
       "snapshot": "translation-core/upstream/RebuildApi.java.txt",
       "upstream_git_blob": "bb5d3dca2d84602d004b4f7956cb1385aeb5495a"
     },
@@ -39,7 +40,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
       "upstream_sha256": "429f9f059f44113f171f0c7574dabd1b3b8fc589fc2f56489e86a978bc53866e",
-      "sha256": "429f9f059f44113f171f0c7574dabd1b3b8fc589fc2f56489e86a978bc53866e",
+      "sha256": "ef879612478e96f1b6cd1bd36766946719aecc53e02dc839f530c7889ceddd69",
       "snapshot": "translation-core/upstream/RebuildSource.java.txt",
       "upstream_git_blob": "7f1c52768fb09e675c687a8232db3eabb521fd68"
     },
@@ -47,7 +48,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java",
       "upstream_sha256": "d63d4606f30ae9f4d33085dedf92c585fed9024d3a37ee213af720617dfea6bc",
-      "sha256": "d63d4606f30ae9f4d33085dedf92c585fed9024d3a37ee213af720617dfea6bc",
+      "sha256": "5238a740492471e018202ddc00516cf0a718e8c9e1416dc0096f943981f1e718",
       "snapshot": "translation-core/upstream/RebuildPlanner.java.txt",
       "upstream_git_blob": "8712b04d8920d6e16632fe7ee558fb87b35b402e"
     },
@@ -55,7 +56,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "upstream_sha256": "02b60c2313df406b91d2e97b449414954427ae57fb98e3c9a57dc9a86b35cb3b",
-      "sha256": "754468e37e56fefce412c47f6da8f1138bb15753c82e5dd607c638e5867585ca",
+      "sha256": "b2002ab7028ceee58d93ebde88336ba2bf98548b190c06fa55592b1a59b4eabd",
       "snapshot": "translation-core/upstream/RebuildProtocol.java.txt",
       "upstream_git_blob": "d5dc8cc59c7db9b9411dbd90cfdfa4d725ec3f4c"
     },
@@ -95,7 +96,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java",
       "upstream_sha256": "e83578f627bf628347fd0d19281ba3bbd11189358dab60ad99228d8e076b4140",
-      "sha256": "525342d538c977ab1dbdd975640dc5c7a86c58e428692ba2145bc6b5107c3efc",
+      "sha256": "84aa403cf8fab64a39d1bb00c3f162ce2d81cd84991af426efaba36cdb20bb90",
       "snapshot": "translation-core/upstream/ProviderRequestPolicy.java.txt",
       "upstream_git_blob": "0121dfb9e4f3d3942549e9827a2d7de66135c2d6"
     },
@@ -133,12 +134,23 @@
     }
   ],
   "snapshot_representation": "Exact Windows checkout bytes; .gitattributes disables conversion. upstream_git_blob identifies the canonical blob in the fixed Git commit.",
+  "integration": "upstream-ac65fe8-latest-ui-r1",
   "adaptation_scope": "platform, output and accounting port extraction; upstream event algorithm and literal protocol preserved",
   "new_files": [
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/TranslationPresentation.java",
       "sha256": "242da010efbffa0d72cc96ed661fbd680868a0d6c50e0ccf02b6169fc41ed673",
       "purpose": "immutable pure upstream page output adapter"
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayGroups.java",
+      "sha256": "16d13a1ae0c11f9d47e9278ec0e610e608b694575ae83a6f6cf2d68584197fb7",
+      "purpose": "display-only partition of accepted events into non-repeating caption units"
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildStream.java",
+      "sha256": "1839c219f1adf85e4857eaded21e4f04a71963a41aac52f34dd28611ba4632e9",
+      "purpose": "streamed transport for verified providers; rebuilds the non-streamed response and offers validated leading events"
     }
   ],
   "protected_abi": [

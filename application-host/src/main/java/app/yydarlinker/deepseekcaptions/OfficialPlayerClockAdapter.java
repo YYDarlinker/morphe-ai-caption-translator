@@ -37,11 +37,34 @@ final class OfficialPlayerClockAdapter {
       String name="";int state=PlaybackState.STATE_PLAYING;
       if(getCurrent!=null){Object current=getCurrent.invoke(null);if(current!=null){name=String.valueOf(current);state=mapState(name);}}
       if(!Float.isFinite(speed)||speed<=0||speed>4)return Sample.unavailable("invalid_speed",at);
+      state=observedState(id,position,at,speed,state);
       return new Sample(true,id,position,speed,state,name,"",at);
     } catch(Throwable failure){return Sample.unavailable("getter_failed",at);}
   }
 
-  static void resetForTests(){resolved=false;getVideoTime=null;getVideoId=null;getPlaybackSpeed=null;getCurrent=null;}
+  static synchronized void resetForTests(){resolved=false;getVideoTime=null;getVideoId=null;getPlaybackSpeed=null;getCurrent=null;
+    movedVideo="";movedPosition=0;movedAt=0;advancing=false;}
+
+  private static final long STILL_MS=500;
+  private static String movedVideo="";
+  private static long movedPosition,movedAt;
+  private static boolean advancing;
+  /**
+   * VideoState follows the regular watch player. In Shorts it can stay PAUSED while the Short plays,
+   * which made every sample look like a paused seek. A "paused" time that keeps advancing at the
+   * playback rate is playing; a paused jump (real seek) or a time that stops moving stays paused.
+   * The reference is the last sample whose time moved, so a coarse getter repeating one value
+   * between updates is neither a pause nor a seek.
+   */
+  static synchronized int observedState(String video,long position,long at,float speed,int state){
+    long elapsed=at-movedAt,moved=position-movedPosition;
+    boolean same=video.equals(movedVideo)&&elapsed>=0&&elapsed<=1500;
+    if(!same||moved!=0){
+      advancing=same&&moved>0&&Math.abs(moved-elapsed*speed)<=Math.max(120,elapsed*speed/2);
+      movedVideo=video;movedPosition=position;movedAt=at;
+    }else if(elapsed>STILL_MS)advancing=false;
+    return state==PlaybackState.STATE_PAUSED&&advancing?PlaybackState.STATE_PLAYING:state;
+  }
   private static int mapState(String value){
     String name=value==null?"":value.toUpperCase(java.util.Locale.ROOT);
     if(name.contains("PAUSED"))return PlaybackState.STATE_PAUSED;

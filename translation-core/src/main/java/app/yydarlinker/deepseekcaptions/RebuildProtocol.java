@@ -153,7 +153,21 @@ final class RebuildProtocol {
   }
   static Plan parseBound(String content,RebuildSource s,RebuildPlanner.Block b,CaptionLanguageContext context)
       throws Exception {
-    Plan plan=parseInternal(content,s,b,context.canApplyEnglishToChinese,0,context);
+    return parseBound(content,s,b,context,false);
+  }
+
+  /**
+   * The leading events of a reply still streaming in: every check of the full parse except complete
+   * block coverage, and no ID rebinding. The complete reply is parsed again before acceptance.
+   */
+  static Plan parsePrefix(String content,RebuildSource s,RebuildPlanner.Block b,CaptionLanguageContext context)
+      throws Exception {
+    return parseBound(content,s,b,context,true);
+  }
+
+  private static Plan parseBound(String content,RebuildSource s,RebuildPlanner.Block b,
+      CaptionLanguageContext context,boolean prefix) throws Exception {
+    Plan plan=parseInternal(content,s,b,!prefix && context.canApplyEnglishToChinese,0,context,prefix);
     JSONArray rows=new JSONObject(plan.json).getJSONArray("events");
     for(int i=0;i<rows.length();i++)if(!(rows.getJSONObject(i).opt("source") instanceof String))
       throw new Invalid("source_quote_required", "Each event must copy its exact source range BEFORE translating it. Return source, from, to, text.");
@@ -165,6 +179,10 @@ final class RebuildProtocol {
   }
 
   private static Plan parseInternal(String content, RebuildSource s, RebuildPlanner.Block b,boolean mayRebind,int reboundEvents,CaptionLanguageContext context) throws Exception {
+    return parseInternal(content,s,b,mayRebind,reboundEvents,context,false);
+  }
+
+  private static Plan parseInternal(String content, RebuildSource s, RebuildPlanner.Block b,boolean mayRebind,int reboundEvents,CaptionLanguageContext context,boolean prefix) throws Exception {
     String raw = content == null ? "" : content.trim();
     if (raw.startsWith("```json\n") && raw.endsWith("```"))
       raw = raw.substring(8, raw.length() - 3).trim();
@@ -243,7 +261,7 @@ final class RebuildProtocol {
       out.add(new Event(from, to, a, z, text));
       next = to + 1;
     }
-    if (next != b.to + 1) throw new Invalid("missing_source");
+    if (!prefix && next != b.to + 1) throw new Invalid("missing_source");
     RebuildSemantics.validatePlan(s,b,out,context);
     presentation.addAll(RebuildReview.inspect(s,b,out,context));
     return new Plan(out, root.toString(), Collections.unmodifiableList(presentation),reboundEvents);

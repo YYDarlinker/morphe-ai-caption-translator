@@ -30,6 +30,12 @@ final class ProviderRequestPolicy {
         // Unknown gateways keep the portable request. Never infer vendor fields from model IDs.
         return r;
     }
+    /** The provider refused this request's text, not its form (Bailian: data_inspection_failed). */
+    static final String INSPECTION_CODE="content_filter";
+    static boolean inspected(String body) {
+        String text=body==null ? "" : body.toLowerCase(Locale.ROOT);
+        return text.contains("data_inspection_failed") || text.contains("inappropriate content");
+    }
     static String reason(String body) {
         String text=body==null ? "" : body.toLowerCase(Locale.ROOT);
         if(text.contains("json") && (text.contains("messages") || text.contains("prompt"))) return "json_prompt_required";

@@ -36,7 +36,7 @@
      /** Credential identity of this immutable session config; a hash, never the key itself. */
      final CaptionCredentialRef credential;
      final boolean sourceOnly;
-@@ -97,10 +100,15 @@
+@@ -97,10 +100,18 @@
      int bootstrapCacheHit, bootstrapCacheMiss;
      String bootstrapMark=""; // Diagnostic deduplication only; never an installation/runtime permission.
      String displayedEvent = "", withheldEvent = "";
@@ -46,6 +46,9 @@
 +    DisplayLayout[] displayLayouts;
 +    TranslationSourceAccess.Source raw;
      RebuildSource source;
++    /** Local reading pages of the video's own captions (source-only display); rebuilt per source. */
++    List<RebuildSource.TimedWindow> readingPages;
++    RebuildSource readingFor;
      List<RebuildPlanner.Block> blocks;
      RebuildProtocol.Plan[] plans, pendingPlans;
 +    /** Leading events of a reply still streaming in; shown only while the block has no plan. */
@@ -53,7 +56,7 @@
      int[] states, attempts;
      long[] retryAt;
      String[] reasons;
-@@ -121,12 +129,12 @@
+@@ -121,12 +132,12 @@
          String o,
          String key,
          String target,
@@ -68,7 +71,7 @@
              boolean original,boolean show,CaptionLanguageContext context) {
        this.context = c;
        url = u;
-@@ -216,7 +224,7 @@
+@@ -216,7 +227,7 @@
          List<Notice> notices;
          synchronized (this) { notices = retirementNotices; retirementNotices = Collections.emptyList(); }
          flush(this, notices);
@@ -77,7 +80,7 @@
              "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
        } catch (RuntimeException failure) {
          success = false;
-@@ -252,7 +260,7 @@
+@@ -252,7 +263,7 @@
          retirementFailure = failure.getMessage();
          boolean interrupted = Thread.currentThread().isInterrupted();
          try {
@@ -86,7 +89,7 @@
                "session=" + id + ";reason=" + retirementFailure + ";publication_revoked=true");
          } finally { if (interrupted) Thread.currentThread().interrupt(); }
          throw failure;
-@@ -275,7 +283,7 @@
+@@ -275,7 +286,7 @@
      }
    }
  
@@ -95,7 +98,7 @@
      final long traceId = IDS.incrementAndGet();
      final Session session;
      final CaptionLanguageContext languageContext;
-@@ -327,6 +335,22 @@
+@@ -327,6 +338,22 @@
            +";focus_accepted_at="+session.focusAcceptedAt+";first_prefetch_sent_at="+session.firstPrefetchSentAt);
      }
  
@@ -118,7 +121,7 @@
      void trace(String stage,String detail) {
        long now = SystemClock.elapsedRealtime();
        if (stage.equals("REBUILD_HTTP_BEGIN")) { httpStartedAt = now; httpRounds++; }
-@@ -335,12 +359,12 @@
+@@ -335,12 +362,12 @@
          networkMs += roundTrip;
          detail += ";network_round_trip_ms=" + roundTrip;
        }
@@ -133,7 +136,7 @@
        org.json.JSONObject evidence = source;
        try {
          evidence = new org.json.JSONObject(source.toString());
-@@ -362,7 +386,7 @@
+@@ -362,7 +389,7 @@
          }
        } catch (Exception ignored) {
        }
@@ -142,7 +145,7 @@
            session.context,
            session.config.apiKey,
            traceId,
-@@ -393,9 +417,8 @@
+@@ -393,9 +420,8 @@
      return current(s) ? s.url : "";
    }
  
@@ -153,7 +156,7 @@
      tick();
    }
  
-@@ -419,16 +442,15 @@
+@@ -419,16 +445,15 @@
      if (previous != null) {
        clear(epoch);
        previous.cancel();
@@ -173,7 +176,7 @@
    }
  
    /** Main: revocation/old UI invalidation only. Off-main: also the fixed five-second physical barrier. */
-@@ -444,16 +466,38 @@
+@@ -444,16 +469,38 @@
      clear(epoch);
      // A stopped engine has no display owner. The authority returns to the safe UNKNOWN state instead
      // of leaving the previous owner's permission in place for a queued off-main notification.
@@ -215,7 +218,7 @@
    }
  
    private static final class Notice {
-@@ -466,14 +510,14 @@
+@@ -466,14 +513,14 @@
    }
  
    private static void flush(Session s, List<Notice> notices) {
@@ -232,7 +235,7 @@
      if (compact && !small) restoreUntil = SystemClock.elapsedRealtime() + 3000;
      compact = small;
    }
-@@ -483,12 +527,12 @@
+@@ -483,12 +530,12 @@
      if (!current(s)
          || s.sourceOnly
          || !s.visible
@@ -249,7 +252,7 @@
              && (owner.isEmpty() || owner.equals(s.owner))
          ? TargetLanguage.withCode(url, s.target)
          : url;
-@@ -504,35 +548,35 @@
+@@ -504,35 +551,35 @@
      boolean show = s.visible, original = s.sourceOnly;
      String url = s.url;
      stop();
@@ -295,7 +298,7 @@
                      .replaceAll("([?&])(?:expire|signature|sig)=[^&]*", "$1")
                  + "|"
                  + languageContext.fingerprint(cfg)
-@@ -545,7 +589,7 @@
+@@ -545,7 +592,7 @@
      // Track identity uses cache identity, not an expiring signature. All preparation is lock-free.
      try {
        key =
@@ -304,7 +307,7 @@
                  + "|"
                  + languageContext.fingerprint(cfg)
                  + "|"
-@@ -560,7 +604,7 @@
+@@ -560,7 +607,7 @@
      Session candidate = new Session(c.getApplicationContext(), url, owner, key, target, cfg,
          original, show, languageContext);
      boolean unavailable = !original && !cfg.ready();
@@ -313,7 +316,7 @@
      Session s, previous = null;
      long epoch;
      synchronized (RebuildController.class) {
-@@ -597,17 +641,17 @@
+@@ -597,17 +644,17 @@
      if (s == candidate) {
        // A new engine session re-opens the player authority as unproven rather than inheriting a
        // closed or quarantined state from the previous session on the same Activity.
@@ -335,7 +338,7 @@
      kick(s);
      scheduleTick();
    }
-@@ -616,7 +660,7 @@
+@@ -616,7 +663,7 @@
      long now = SystemClock.elapsedRealtime();
      Session s = active;
      if (!current(s)) { CLOCK.updateHook(ms,now); return; }
@@ -344,7 +347,7 @@
      RebuildClock.Update nativeUpdate=nativeSample.available
          ? CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,now,nativeSample.state,nativeSample.speed)
          : new RebuildClock.Update(false,0,"unavailable");
-@@ -648,7 +692,7 @@
+@@ -648,7 +695,7 @@
          s.noteSeek(now, notices);
          s.generation++;
          s.lastShown = "";
@@ -353,7 +356,7 @@
          if (s.jobs != null)
            for (Job j : s.jobs)
              if (j != null && !j.sent && s.blocks != null && !covers(s.blocks.get(j.index), presentation)) {
-@@ -661,8 +705,8 @@
+@@ -661,8 +708,8 @@
      }
      flush(s, notices);
      for (HttpURLConnection c : disconnect) c.disconnect();
@@ -364,7 +367,7 @@
        private final int epoch=s.generation;
        public boolean isValid(){return current(s) && s.generation==epoch;}
        public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
-@@ -672,16 +716,7 @@
+@@ -672,16 +719,7 @@
      scheduleTick();
    }
  
@@ -382,7 +385,7 @@
  
    private static long position() {
      return position(null);
-@@ -689,7 +724,7 @@
+@@ -689,7 +727,7 @@
  
    private static long position(Session s) {
      long now = SystemClock.elapsedRealtime();
@@ -391,7 +394,7 @@
      if(nativeSample.available)CLOCK.acceptNative(nativeSample.videoId,nativeSample.position,
          nativeSample.readElapsed,nativeSample.state,nativeSample.speed);
      PlaybackState state=playbackState();
-@@ -709,9 +744,9 @@
+@@ -709,9 +747,9 @@
    private static void observeSeek(Session s,RebuildClock.Observation selected,long now){
      long serial=CLOCK.seekSerial();
      if(s.observedSeekSerial>=0&&s.observedSeekSerial!=serial&&current(s)){
@@ -403,7 +406,7 @@
            +";to="+selected.position+";clock_source="+selected.source+";clock_seek_serial="+serial,s.credential);
      }
      s.observedSeekSerial=serial;
-@@ -721,7 +756,7 @@
+@@ -721,7 +759,7 @@
    private static void freeze(Session s,RebuildClock.Observation selected,PlaybackState raw,
        boolean hook,long hookPosition){
      s.observation=selected;
@@ -412,7 +415,7 @@
      if(!selected.paused()){
        s.pausedDisplayPosition=-1;s.pausedHookState=null;s.pauseSource="";
        s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;
-@@ -754,7 +789,7 @@
+@@ -754,7 +792,7 @@
            || !s.pauseSource.equals(selected.source);
        s.pausedDisplayPosition=donor;
        s.pauseOwnerEpoch=owner;s.pauseClockEpoch=selected.epoch;s.pauseSource=selected.source;
@@ -421,7 +424,7 @@
            "session="+s.id+";generation="+s.generation+";position="+donor
            +";selected_position="+selected.position+";selected_state="+selected.state
            +";clock_source="+selected.source+";sample_at="+selected.sampleAt
-@@ -765,7 +800,7 @@
+@@ -765,7 +803,7 @@
    private static long displayPosition(Session s) {
      // A current native query can expose a real paused seek after layout. Without it, project only
      // the already-selected clock; never reintroduce raw MediaSession as a second display donor.
@@ -430,7 +433,7 @@
      if(sample.available){
        CLOCK.acceptNative(sample.videoId,sample.position,sample.readElapsed,sample.state,sample.speed);
        synchronized(s){
-@@ -801,19 +836,18 @@
+@@ -801,19 +839,18 @@
      if (!current(s)) return;
      // A player transition owns the surface. No geometry scan, no overlay render and no session kick
      // may run while the transition coordinator is still observing, so the animation never reflows.
@@ -453,7 +456,7 @@
        private final int epoch=s.generation;
        public boolean isValid(){return current(s) && s.generation==epoch;}
        public long displayPosition(long supplied){return RebuildController.displayPosition(s);}
-@@ -825,7 +859,7 @@
+@@ -825,7 +862,7 @@
  
    private static void kick(Session s) {
      if (!current(s)) return;
@@ -462,7 +465,7 @@
      boolean load = false;
      synchronized (s) {
        if (!current(s)) return;
-@@ -854,8 +888,8 @@
+@@ -854,8 +891,8 @@
      }
      try {
        startup(s, "source_load_start", "");
@@ -473,7 +476,7 @@
        if (!current(s)) return;
        long availablePosition = position(s);
        synchronized (s) {
-@@ -869,33 +903,33 @@
+@@ -869,33 +906,33 @@
        render(s);
        long phase=SystemClock.elapsedRealtime();
        RebuildSource source = RebuildSource.read(raw.body, raw.document);
@@ -518,7 +521,7 @@
        phase=SystemClock.elapsedRealtime();
        String key = RebuildCache.identity(source, s.config, s.target,s.languageContext);
        RebuildProtocol.Plan[] plans = new RebuildProtocol.Plan[blocks.size()];
-@@ -915,7 +949,7 @@
+@@ -915,7 +952,7 @@
            restored++;
          }
        }
@@ -527,7 +530,7 @@
        long readyPosition = position(s);
        RebuildProtocol.Plan[] pending = new RebuildProtocol.Plan[plans.length];
        int[] attempts = new int[blocks.size()];
-@@ -935,6 +969,8 @@
+@@ -935,6 +972,8 @@
          s.cacheKey = key;
          s.plans = plans;
          s.pendingPlans = pending;
@@ -536,7 +539,7 @@
          s.states = states;
          s.attempts = attempts;
          s.retryAt = retryAt;
-@@ -951,13 +987,13 @@
+@@ -951,13 +990,13 @@
        }
        startup(s, "engine_ready", "position_ms=" + s.position);
        if (!blocks.isEmpty() && s.position >= blocks.get(0).end)
@@ -552,7 +555,7 @@
            s.context,
            "REBUILD_SOURCE_READY",
            "words="
-@@ -974,14 +1010,13 @@
+@@ -974,14 +1013,13 @@
                + blocks.size()
                + ";cache_hits="
                + restored);
@@ -569,7 +572,7 @@
            !f.retryable ? "source_unavailable" : "source_retry");
        int failureCount;
        synchronized (s) {
-@@ -996,7 +1031,7 @@
+@@ -996,7 +1034,7 @@
          s.status = failureStatus;
          failureCount = s.sourceFailures;
        }
@@ -578,7 +581,7 @@
            s.context, "REBUILD_SOURCE_ERROR", f.category + ";attempt=" + failureCount);
        render(s);
      }
-@@ -1085,6 +1120,12 @@
+@@ -1085,6 +1123,12 @@
      }
    }
  
@@ -591,7 +594,7 @@
    private static void restoreCandidates(Session s, long now, boolean playbackAhead) {
      List<CacheLookup> lookups = new ArrayList<>();
      synchronized (s) {
-@@ -1093,7 +1134,7 @@
+@@ -1093,7 +1137,7 @@
        if (s.cacheReading == null) s.cacheReading = new boolean[s.blocks.size()];
        int index = currentIndex(s);
        if(!s.everReady && s.plans[index]!=null && s.states[index]==READY) {s.everReady=true;if(s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();}
@@ -600,7 +603,7 @@
            && (s.plans[index] != null || s.states[index] == FAILED
                || s.jobs[index] != null && s.jobs[index].sent);
        boolean bootstrap=!s.everReady && s.source!=null && !s.sourceOnly
-@@ -1147,12 +1188,12 @@
+@@ -1147,12 +1191,12 @@
        }
      }
      if(!valid)return; // A departed scope must not publish cache outcomes or old-language UI.
@@ -616,7 +619,7 @@
          "session="+s.id+";block="+lookup.block.index+";network_calls=0;path=memory_then_disk_before_network");
    }
  
-@@ -1168,13 +1209,13 @@
+@@ -1168,13 +1212,13 @@
        if(!s.everReady && s.plans[index]!=null && s.states[index]==READY) {s.everReady=true;if(s.focusAcceptedAt<0)s.focusAcceptedAt=SystemClock.elapsedRealtime();}
        if(!s.everReady) {
          String reason=s.sourceOnly?"source_only":!playbackAhead?"paused_or_clock_stale"
@@ -632,7 +635,7 @@
                 +";first_prefetch_sent_at="+s.firstPrefetchSentAt+";elapsed_ms="+now+";video_ms="+s.position);
          }
        }
-@@ -1204,7 +1245,7 @@
+@@ -1204,7 +1248,7 @@
        // D4: the prefetch budget, not the mere existence of another in-flight job, bounds look-ahead.
        boolean allowAhead =
            focusUnderWay
@@ -641,7 +644,7 @@
                && playbackAhead;
        for (int i = index; i < s.blocks.size(); i++) {
          RebuildPlanner.Block b = s.blocks.get(i);
-@@ -1212,8 +1253,9 @@
+@@ -1212,8 +1256,9 @@
          if (i > index && !allowAhead) break;
          if (i > index && prefetchDispatched >= MAX_PREFETCH_CONCURRENCY) break;
          boolean focus = i == index;
@@ -653,7 +656,7 @@
          if (s.states[i] != WAITING || s.retryAt[i] > now) {
            // D3: an existing job for this block is reused, whichever lane it came from.
            if(s.jobs[i]!=null&&s.plans[i]==null&&s.states[i]==RUNNING){
-@@ -1221,12 +1263,12 @@
+@@ -1221,12 +1266,12 @@
              String edge=s.generation+"|"+reused.priority+"|"+reused.dispatched+"|"+reused.sent;
              if(!edge.equals(reused.reuseEdge)){
                reused.reuseEdge=edge;
@@ -668,7 +671,7 @@
            }
            continue;
          }
-@@ -1271,7 +1313,7 @@
+@@ -1271,7 +1316,7 @@
      flush(s, notices);
      for (Job j : start) {
        RebuildPlanner.Block b = s.blocks.get(j.index);
@@ -677,7 +680,7 @@
            s.context,
            "REBUILD_REQUEST",
            "session="
-@@ -1303,6 +1345,7 @@
+@@ -1303,6 +1348,7 @@
     */
    private static void finishCancelled(Session s, Job job) {
      s.jobs[job.index] = null;
@@ -685,7 +688,7 @@
      if (!job.sent) {
        if (s.attempts[job.index] > 1) s.repairCount = Math.max(0, s.repairCount - 1);
        s.attempts[job.index] = Math.max(0, s.attempts[job.index] - 1);
-@@ -1320,7 +1363,7 @@
+@@ -1320,7 +1366,7 @@
      List<Notice> notices = new ArrayList<>();
      try {
        job.slotWaitMs = SystemClock.elapsedRealtime() - job.queuedAt;
@@ -694,7 +697,7 @@
        if(accepted==null) accepted =
            RebuildApi.translate(
                s.source, b, s.config, s.target, job, job.priority, s.reasons[job.index],job.languageContext);
-@@ -1363,11 +1406,12 @@
+@@ -1363,11 +1409,12 @@
          if(old!=null && accepted==old && candidate!=old && RebuildReview.score(old.issues)>0)
            notice(notices,"REBUILD_REPAIR_NO_PROGRESS",
                "session="+s.id+";request="+job.traceId+";block="+b.index+";old_risks="+RebuildReview.score(old.issues)+";candidate_risks="+RebuildReview.score(candidate.issues));
@@ -710,7 +713,7 @@
          boolean review=RebuildReview.shouldRepair(accepted,s.attempts[job.index],s.repairCount,s.position,b.end);
          s.states[job.index] = review ? WAITING : READY;
          if(review) {
-@@ -1381,20 +1425,20 @@
+@@ -1381,20 +1428,20 @@
        permit.close();
        permit = null;
        if (RebuildReview.score(accepted.issues) == 0) {
@@ -736,7 +739,7 @@
            s.context,
            "REBUILD_EVENTS_ACCEPTED",
            "block="
-@@ -1413,10 +1457,10 @@
+@@ -1413,10 +1460,10 @@
             : e.getClass().getSimpleName();
        boolean fatal = e instanceof RebuildApi.Failure && ((RebuildApi.Failure) e).configuration;
        String configurationStatus = fatal
@@ -749,7 +752,7 @@
        notices.clear();
        synchronized (s) {
          if (!current(s) || s.jobs[job.index] != job) return;
-@@ -1424,6 +1468,7 @@
+@@ -1424,6 +1471,7 @@
            finishCancelled(s, job);
          } else {
            s.jobs[job.index] = null;
@@ -757,7 +760,7 @@
            s.reasons[job.index] = rejectionReason;
            if (fatal) {
              s.terminal = true;
-@@ -1510,54 +1555,75 @@
+@@ -1510,54 +1558,75 @@
  
    private static void startup(Session s, String phase, String detail) {
      long now = SystemClock.elapsedRealtime();
@@ -769,21 +772,22 @@
    }
  
 -  private static String original(Session s, long time) {
+-    CaptionDocument.Cue cue = originalCue(s, time);
+-    return cue == null ? "" : cue.text;
 +  /** Source-only display: a cue is held through a short pause until the next cue starts. */
 +  private static CaptionDocument.Cue sourceCue(Session s, long time) {
-     CaptionDocument.Cue cue = originalCue(s, time);
--    return cue == null ? "" : cue.text;
-+    if (cue != null || s.source == null) return cue;
-+    RebuildSource.TimedWindow before = null;
-+    for (RebuildSource.TimedWindow window : s.source.windows()) {
-+      if (window.start > time) {
-+        return before != null && window.start - before.end < RebuildDisplayGroups.HOLD_MS
-+            ? new CaptionDocument.Cue(before.start, before.end, s.source.text(before.from, before.to))
-+            : null;
-+      }
-+      before = window;
++    if (s.source == null) return originalCue(s, time);
++    if (s.readingPages == null || s.readingFor != s.source) {
++      s.readingPages = SourceReadingWindows.build(s.source, s.languageContext.renderSpec, s.languageContext);
++      s.readingFor = s.source;
 +    }
-+    return null;
++    RebuildSource.TimedWindow page = SourceReadingWindows.at(s.readingPages, time);
++    if (page == null) {
++      RebuildSource.TimedWindow before = SourceReadingWindows.before(s.readingPages, time),
++          next = SourceReadingWindows.after(s.readingPages, time);
++      if (before != null && next != null && next.start - before.end < RebuildDisplayGroups.HOLD_MS) page = before;
++    }
++    return page == null ? null : new CaptionDocument.Cue(page.start, page.end, s.source.text(page.from, page.to));
    }
  
    private static void endFallback(Session s,long position,String cause,List<Notice> notices) {
@@ -867,7 +871,7 @@
    }
  
    // A retry is still the same unresolved caption, not a new fallback phase.
-@@ -1569,7 +1635,7 @@
+@@ -1569,7 +1638,7 @@
  
    private static void render(Session s) {
      if (!current(s) || !s.visible) return;
@@ -876,7 +880,7 @@
      List<Notice> notices = new ArrayList<>();
      String text = "";
      String fallbackReason = "", displayEmptyReason="";
-@@ -1578,7 +1644,7 @@
+@@ -1578,7 +1647,7 @@
      long revision, submission, selectedAt, observedAt;
      String eventId = "none";
      long eventStart = -1, eventEnd = -1;
@@ -885,7 +889,7 @@
      synchronized (s) {
        if (!current(s) || !s.visible) return;
        generation = s.generation;
-@@ -1587,7 +1653,13 @@
+@@ -1587,7 +1656,13 @@
        if (s.source == null && !s.status.isEmpty()) {
          text = s.status;
          status = true;
@@ -900,7 +904,7 @@
          CaptionDocument.Cue cue = originalCue(s, selectedAt);
          if (cue != null) {
            text = translating;
-@@ -1599,41 +1671,43 @@
+@@ -1599,41 +1674,43 @@
        } else if (s.source == null) {
          text = s.status.isEmpty() ? translating : s.status;
          status = true;
@@ -967,7 +971,7 @@
              fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
              // Waiting and blank failure displays retain each source cue's own window.
              // A block-wide display must not announce a later cue before its onset.
-@@ -1654,7 +1728,7 @@
+@@ -1654,7 +1731,7 @@
          endFallback(s,s.position,"state_change",notices);
          s.fallbackReason=fallbackReason;s.fallbackStart=s.position;
          if(!fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_BEGIN",
@@ -976,7 +980,7 @@
        }
        String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
        if (signature.equals(s.lastShown) && s.appliedRenderRevision == s.renderRevision) {
-@@ -1676,7 +1750,7 @@
+@@ -1676,7 +1753,7 @@
      final String appliedReason=fallbackReason.equals("event_review") ? "semantic_blocked"
          : fallbackReason.startsWith("failed:") ? "translation_failed"
          : fallbackReason.isEmpty() ? (displayEmptyReason.isEmpty()?"source_gap":displayEmptyReason) : "pending_translation";
@@ -985,7 +989,7 @@
        public boolean isValid() {
          return current(s) && s.generation == generation && s.renderRevision == revision
              && s.renderSubmission == submission && s.visible;
-@@ -1690,17 +1764,17 @@
+@@ -1690,17 +1767,17 @@
        public long displayPosition(long supplied) { return RebuildController.displayPosition(s); }
        public void onApplied() { if (isValid()) s.appliedRenderRevision = revision; }
      };
@@ -1010,7 +1014,7 @@
            s.context,
            "REBUILD_SELECTED",
            "id="
-@@ -1715,7 +1789,9 @@
+@@ -1715,7 +1792,9 @@
                + eventStart
                + "-"
                + eventEnd
@@ -1334,7 +1338,7 @@
    }
  
    static boolean cjk(int c) {
-@@ -207,15 +221,22 @@
+@@ -207,15 +221,107 @@
      }return null;
    }
  
@@ -1358,9 +1362,102 @@
 -    return t.matches("[♪♫\\s]+")
 -        || t.matches("[\\[（(【]\\s*(music|applause|laughter|音乐|掌声|笑声)\\s*[\\]）)】]");
 +    return MUSIC.matcher(t).matches() || NON_SPEECH.matcher(t).matches();
++  }
++
++  /**
++   * Zero-width spaces (U+200B, U+2060, U+FEFF) pad the cues of some tracks. They are not speech,
++   * but each one becomes a token whose exact count a model cannot reproduce when it must quote
++   * the source, so every such block was rejected. Cues without them are returned unchanged.
++   */
++  private static final Pattern ZERO_WIDTH_SPACES = Pattern.compile("[\u200B\u2060\uFEFF]");
++
++  private static List<Span> withoutZeroWidthSpaces(List<Span> spans) {
++    List<Span> out = null;
++    for (int i = 0; i < spans.size(); i++) {
++      Span span = spans.get(i);
++      if (!span.speakerOffsets.isEmpty() || !ZERO_WIDTH_SPACES.matcher(span.text).find()) {
++        if (out != null) out.add(span);
++        continue;
++      }
++      if (out == null) out = new ArrayList<>(spans.subList(0, i));
++      out.add(new Span(ZERO_WIDTH_SPACES.matcher(span.text).replaceAll(""), span.start, span.end,
++          span.cue, span.nativeOffset, span.speakerBreak, span.speakerOffsets));
++    }
++    return out == null ? spans : out;
++  }
++
++  /**
++   * Some tracks carry every coarse cue twice (an overlapping second display window, or a pop-on
++   * line shown again as it moves up). Repetition alone is not evidence, so this applies only when
++   * the repetition is systematic over the whole track: an isolated repeated sentence is real
++   * speech and stays. The second copy only extends the first copy's display time.
++   */
++  private static final long DOUBLED_CUE_GAP_MS = 600;
++  private static final int DOUBLED_CUE_MIN_REPEATS = 6;
++
++  private static boolean sameCoarseText(Span a, Span b) {
++    if (a.nativeOffset || b.nativeOffset) return false;
++    // Zero-width padding around a cue is not text: the copy may carry different padding.
++    List<String> x = tokens(visibleText(a.text)), y = tokens(visibleText(b.text));
++    if (x.isEmpty() || x.size() != y.size()) return false;
++    for (int i = 0; i < x.size(); i++) if (!key(x.get(i)).equals(key(y.get(i)))) return false;
++    return true;
++  }
++
++  private static String visibleText(String text) {
++    return text == null ? "" : text.replaceAll("[\u200B-\u200F\u2060\uFEFF]", "");
++  }
++
++  private static boolean repeatedBlock(List<Span> spans, int at, int size) {
++    // The copy begins right after the block it repeats (or while it is still shown).
++    if (spans.get(at + size).start > spans.get(at + size - 1).end + DOUBLED_CUE_GAP_MS) return false;
++    for (int j = 0; j < size; j++) {
++      Span first = spans.get(at + j), copy = spans.get(at + size + j);
++      if (copy.start < first.start || !sameCoarseText(first, copy)) return false;
++    }
++    return true;
++  }
++
++  static List<Span> collapseDoubledCues(List<Span> spans) {
++    int n = spans.size();
++    List<int[]> blocks = new ArrayList<>();
++    int repeated = 0;
++    for (int i = 0; i < n; ) {
++      int advance = 1;
++      for (int size = 1; size <= 3 && i + 2 * size <= n; size++) {
++        if (!repeatedBlock(spans, i, size)) continue;
++        blocks.add(new int[] {i, size});
++        repeated += size;
++        advance = 2 * size;
++        break;
++      }
++      i += advance;
++    }
++    if (repeated < DOUBLED_CUE_MIN_REPEATS || repeated * 5 < n) return spans;
++    Span[] result = spans.toArray(new Span[0]);
++    boolean[] dropped = new boolean[n];
++    for (int[] block : blocks)
++      for (int j = 0; j < block[1]; j++) {
++        Span first = result[block[0] + j], copy = spans.get(block[0] + block[1] + j);
++        if (copy.end > first.end)
++          result[block[0] + j] = new Span(first.text, first.start, copy.end, first.cue,
++              first.nativeOffset, first.speakerBreak, first.speakerOffsets);
++        dropped[block[0] + block[1] + j] = true;
++      }
++    List<Span> out = new ArrayList<>(n - repeated);
++    for (int i = 0; i < n; i++) if (!dropped[i]) out.add(result[i]);
++    return out;
    }
  
    static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed) throws Exception {
+@@ -309,6 +415,7 @@
+     // Ordering comes from real cue/segment onsets. A multiword coarse span remains indivisible
+     // during ordering. Equal real native onsets may be repeated by an overlapping JSON3 window.
+     spans.sort(Comparator.comparingLong((Span v) -> v.start));
++    spans = collapseDoubledCues(withoutZeroWidthSpaces(spans));
+     List<Span> ordered = new ArrayList<>();
+     Set<String> nativeSeen = new HashSet<>();
+     for (Span span : spans) {
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java
 @@ -75,21 +75,65 @@

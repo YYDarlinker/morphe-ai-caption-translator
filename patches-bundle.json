@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-12T01:32:53",
-  "description": "## [1.5.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.4.1...v1.5.0) (2026-10-12)\n\n- Support YouTube 21.20.405 with official Morphe Patches 1.47.0.\n- Fix Shorts captions disappearing after looping or reopening a video.\n- Fix YouTube crashes caused by interrupted translation responses.\n- Improve caption pagination and prevent repeated pages and flicker.\n- Reduce caption startup latency with streaming responses and faster planning.\n- Display original subtitles in the AI caption overlay without translation requests.\n",
-  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.5.0/patches-1.5.0.mpp",
+  "created_at": "2026-10-12T11:30:00",
+  "description": "## [1.5.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.0...v1.5.1) (2026-10-12)\n\n- Fix captions that were missing or shown twice on videos whose subtitle tracks repeat every cue.\n- Choose the source subtitle track by the video's spoken language, preferring human-made tracks.\n- Show the video's own subtitles in the selected language directly, without translation requests, with sentence breaks and page turns optimized locally.\n",
+  "download_url": "https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/download/v1.5.1/patches-1.5.1.mpp",
   "signature_download_url": "",
-  "version": "1.5.0"
+  "version": "1.5.1"
 }

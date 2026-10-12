@@ -11,6 +11,8 @@
 - Displays captions with adjustable size, background opacity and vertical position. Caption placement uses the video’s physical center, independently of the app’s LTR/RTL interface direction.
 - Supports multiple API profiles, model selection, custom translation requirements, translation caching and exportable diagnostics. Its settings are localized into 14 languages.
 - Optionally remembers your caption selection across videos for the current app session, with or without AI translation.
+- When the video already has its own subtitles in the language you select, shows them directly in the AI caption style without a translation request, and re-flows their sentence breaks and page turns locally for easier reading.
+- When a video has several subtitle tracks, translates the one in the spoken language first (human-made before automatic, then human-made English) rather than whichever track YouTube preselects.
 
 You need a video with an available subtitle track and an API service that supports the project’s chat-completion protocol. **This is not an audio transcription service.** Original subtitle selections do not make translation API calls.
 
@@ -42,7 +44,7 @@ Do not select the old AI-caption addon or another overlapping caption-memory pat
 4. Enable AI captions. In a video’s subtitle menu, choose **Auto-translate → your target language**. That selection uses your configured AI service to translate the available source subtitles.
 5. Adjust caption size and background using the live preview if needed. You can customize translation requirements; your custom text is preserved when the interface language changes.
 
-Turning AI off returns translation to YouTube’s native behavior. Selecting an original/manual/auto-generated source track displays its original text without translation API requests. The menu toggle visibility settings for regular videos and Shorts are independent of the engine switch.
+Turning AI off returns translation to YouTube’s native behavior. Selecting an original/manual/auto-generated source track displays its original text without translation API requests; its sentence breaks and page turns are optimized locally, without a network call or model. The menu toggle visibility settings for regular videos and Shorts are independent of the engine switch.
 
 ## Costs, privacy and limits
 
@@ -61,7 +63,7 @@ Turning AI off returns translation to YouTube’s native behavior. Selecting an 
 ## Available patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.5.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
+> **[v1.5.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
 <details open>
 <summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>

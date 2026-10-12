@@ -105,6 +105,9 @@ final class RebuildController {
     DisplayLayout[] displayLayouts;
     TranslationSourceAccess.Source raw;
     RebuildSource source;
+    /** Local reading pages of the video's own captions (source-only display); rebuilt per source. */
+    List<RebuildSource.TimedWindow> readingPages;
+    RebuildSource readingFor;
     List<RebuildPlanner.Block> blocks;
     RebuildProtocol.Plan[] plans, pendingPlans;
     /** Leading events of a reply still streaming in; shown only while the block has no plan. */
@@ -1563,18 +1566,18 @@ final class RebuildController {
 
   /** Source-only display: a cue is held through a short pause until the next cue starts. */
   private static CaptionDocument.Cue sourceCue(Session s, long time) {
-    CaptionDocument.Cue cue = originalCue(s, time);
-    if (cue != null || s.source == null) return cue;
-    RebuildSource.TimedWindow before = null;
-    for (RebuildSource.TimedWindow window : s.source.windows()) {
-      if (window.start > time) {
-        return before != null && window.start - before.end < RebuildDisplayGroups.HOLD_MS
-            ? new CaptionDocument.Cue(before.start, before.end, s.source.text(before.from, before.to))
-            : null;
-      }
-      before = window;
+    if (s.source == null) return originalCue(s, time);
+    if (s.readingPages == null || s.readingFor != s.source) {
+      s.readingPages = SourceReadingWindows.build(s.source, s.languageContext.renderSpec, s.languageContext);
+      s.readingFor = s.source;
     }
-    return null;
+    RebuildSource.TimedWindow page = SourceReadingWindows.at(s.readingPages, time);
+    if (page == null) {
+      RebuildSource.TimedWindow before = SourceReadingWindows.before(s.readingPages, time),
+          next = SourceReadingWindows.after(s.readingPages, time);
+      if (before != null && next != null && next.start - before.end < RebuildDisplayGroups.HOLD_MS) page = before;
+    }
+    return page == null ? null : new CaptionDocument.Cue(page.start, page.end, s.source.text(page.from, page.to));
   }
 
   private static void endFallback(Session s,long position,String cause,List<Notice> notices) {

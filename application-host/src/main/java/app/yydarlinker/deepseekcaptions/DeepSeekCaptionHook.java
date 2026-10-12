@@ -141,6 +141,8 @@ public final class DeepSeekCaptionHook {
 
         if (aiEnabled) {
             selectedUrl = CaptionButtonController.rewriteDefaultTarget(initialContext, selectedUrl);
+            // The source YouTube names is its own automatic pick; translate the video's best track.
+            selectedUrl = SourceTrackPolicy.apply(initialContext, selectedUrl);
         }
 
         TargetLanguage targetLanguage = TargetLanguage.fromUrl(selectedUrl);
@@ -177,6 +179,13 @@ public final class DeepSeekCaptionHook {
                 return selectedUrl;
             }
 
+            SourceSelection own = SourceTrackPolicy.ownTargetTrack(initialContext, selectedUrl);
+            if (own != null) {
+                // The video already has captions in the selected language: show them, no API call.
+                CaptionButtonController.noteAiTrackSelected();
+                CaptionActions.activateSource(initialContext, own.url);
+                return LoopbackCaptionServer.get(initialContext).urlFor(own.url);
+            }
             CaptionButtonController.noteAiTrackSelected();
             CaptionLifecycleRestore.noteAiTarget(selectedUrl);
             String rewritten = LoopbackCaptionServer.get(initialContext).urlFor(selectedUrl);

@@ -134,9 +134,12 @@ public final class NativeCaptionBridge {
             if(remember) CaptionChoice.select(code,translate,vss(track).startsWith("a."));
             if(!enabled())return;
             CaptionButtonController.noteAiTrackSelected();
-            if(translate) {
-                CaptionLifecycleRestore.noteAiTarget(selected);
-                CaptionActions.activate(context,selected);
+            SourceSelection own=translate?SourceTrackPolicy.ownTargetTrack(context,selected):null;
+            if(own!=null) CaptionActions.activateSource(context,own.url);
+            else if(translate) {
+                String source=SourceTrackPolicy.apply(context,selected);
+                CaptionLifecycleRestore.noteAiTarget(source);
+                CaptionActions.activate(context,source);
             } else CaptionActions.activateSource(context,selected);
             CaptionMusicSuppressor.kick();
         } catch(Exception failed) {
@@ -203,6 +206,8 @@ public final class NativeCaptionBridge {
                 CaptionDiagnostics.mark(context,"NATIVE_TRACK_APPLIED",
                         "owner=caption_model;foreground="+video.equals(current)+";off="+off
                                 +";translated="+value.translated+";reason="+reason
+                                +";origin="+(origin instanceof Enum<?> ? ((Enum<?>)origin).name() : "")
+                                +";track="+(off ? "" : code+"/"+(value.asr ? "asr" : "manual"))
                                 +";elapsed_realtime_ms="+SystemClock.elapsedRealtime());
                 if(video.equals(current) && !off)
                     CaptionDiagnostics.mark(context,"NATIVE_OWNER_ESTABLISHED",
@@ -295,7 +300,9 @@ public final class NativeCaptionBridge {
         Object fresh=currentTrack(value);
         String selected=fresh==null?value.selectedUrl:url(fresh);
         CaptionButtonController.noteAiTrackSelected();
-        if(value.translated){CaptionLifecycleRestore.noteAiTarget(selected);CaptionActions.activate(context,selected);}
+        SourceSelection own=value.translated?SourceTrackPolicy.ownTargetTrack(context,selected):null;
+        if(own!=null)CaptionActions.activateSource(context,own.url);
+        else if(value.translated){String source=SourceTrackPolicy.apply(context,selected);CaptionLifecycleRestore.noteAiTarget(source);CaptionActions.activate(context,source);}
         else CaptionActions.activateSource(context,selected);
         CaptionMusicSuppressor.forceNativeRendererScan();CaptionMusicSuppressor.kick();
         CaptionDiagnostics.mark(context,"ENGINE_SNAPSHOT_ACTIVATED","same_video=true;source_only="+!value.translated);

@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.0...v1.5.1) (2026-10-12)
+
+- Fix captions that were missing or shown twice on videos whose subtitle tracks repeat every cue.
+- Choose the source subtitle track by the video's spoken language, preferring human-made tracks.
+- Show the video's own subtitles in the selected language directly, without translation requests, with sentence breaks and page turns optimized locally.
+
 ## [1.5.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.4.1...v1.5.0) (2026-10-12)
 
 - Support YouTube 21.20.405 with official Morphe Patches 1.47.0.

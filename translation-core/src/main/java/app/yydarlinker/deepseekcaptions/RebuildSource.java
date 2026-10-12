@@ -239,6 +239,91 @@ final class RebuildSource {
     return MUSIC.matcher(t).matches() || NON_SPEECH.matcher(t).matches();
   }
 
+  /**
+   * Zero-width spaces (U+200B, U+2060, U+FEFF) pad the cues of some tracks. They are not speech,
+   * but each one becomes a token whose exact count a model cannot reproduce when it must quote
+   * the source, so every such block was rejected. Cues without them are returned unchanged.
+   */
+  private static final Pattern ZERO_WIDTH_SPACES = Pattern.compile("[\u200B\u2060\uFEFF]");
+
+  private static List<Span> withoutZeroWidthSpaces(List<Span> spans) {
+    List<Span> out = null;
+    for (int i = 0; i < spans.size(); i++) {
+      Span span = spans.get(i);
+      if (!span.speakerOffsets.isEmpty() || !ZERO_WIDTH_SPACES.matcher(span.text).find()) {
+        if (out != null) out.add(span);
+        continue;
+      }
+      if (out == null) out = new ArrayList<>(spans.subList(0, i));
+      out.add(new Span(ZERO_WIDTH_SPACES.matcher(span.text).replaceAll(""), span.start, span.end,
+          span.cue, span.nativeOffset, span.speakerBreak, span.speakerOffsets));
+    }
+    return out == null ? spans : out;
+  }
+
+  /**
+   * Some tracks carry every coarse cue twice (an overlapping second display window, or a pop-on
+   * line shown again as it moves up). Repetition alone is not evidence, so this applies only when
+   * the repetition is systematic over the whole track: an isolated repeated sentence is real
+   * speech and stays. The second copy only extends the first copy's display time.
+   */
+  private static final long DOUBLED_CUE_GAP_MS = 600;
+  private static final int DOUBLED_CUE_MIN_REPEATS = 6;
+
+  private static boolean sameCoarseText(Span a, Span b) {
+    if (a.nativeOffset || b.nativeOffset) return false;
+    // Zero-width padding around a cue is not text: the copy may carry different padding.
+    List<String> x = tokens(visibleText(a.text)), y = tokens(visibleText(b.text));
+    if (x.isEmpty() || x.size() != y.size()) return false;
+    for (int i = 0; i < x.size(); i++) if (!key(x.get(i)).equals(key(y.get(i)))) return false;
+    return true;
+  }
+
+  private static String visibleText(String text) {
+    return text == null ? "" : text.replaceAll("[\u200B-\u200F\u2060\uFEFF]", "");
+  }
+
+  private static boolean repeatedBlock(List<Span> spans, int at, int size) {
+    // The copy begins right after the block it repeats (or while it is still shown).
+    if (spans.get(at + size).start > spans.get(at + size - 1).end + DOUBLED_CUE_GAP_MS) return false;
+    for (int j = 0; j < size; j++) {
+      Span first = spans.get(at + j), copy = spans.get(at + size + j);
+      if (copy.start < first.start || !sameCoarseText(first, copy)) return false;
+    }
+    return true;
+  }
+
+  static List<Span> collapseDoubledCues(List<Span> spans) {
+    int n = spans.size();
+    List<int[]> blocks = new ArrayList<>();
+    int repeated = 0;
+    for (int i = 0; i < n; ) {
+      int advance = 1;
+      for (int size = 1; size <= 3 && i + 2 * size <= n; size++) {
+        if (!repeatedBlock(spans, i, size)) continue;
+        blocks.add(new int[] {i, size});
+        repeated += size;
+        advance = 2 * size;
+        break;
+      }
+      i += advance;
+    }
+    if (repeated < DOUBLED_CUE_MIN_REPEATS || repeated * 5 < n) return spans;
+    Span[] result = spans.toArray(new Span[0]);
+    boolean[] dropped = new boolean[n];
+    for (int[] block : blocks)
+      for (int j = 0; j < block[1]; j++) {
+        Span first = result[block[0] + j], copy = spans.get(block[0] + block[1] + j);
+        if (copy.end > first.end)
+          result[block[0] + j] = new Span(first.text, first.start, copy.end, first.cue,
+              first.nativeOffset, first.speakerBreak, first.speakerOffsets);
+        dropped[block[0] + block[1] + j] = true;
+      }
+    List<Span> out = new ArrayList<>(n - repeated);
+    for (int i = 0; i < n; i++) if (!dropped[i]) out.add(result[i]);
+    return out;
+  }
+
   static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed) throws Exception {
     List<Span> spans = new ArrayList<>();
     Map<Integer, CoarseFrame> frames = new HashMap<>();
@@ -330,6 +415,7 @@ final class RebuildSource {
     // Ordering comes from real cue/segment onsets. A multiword coarse span remains indivisible
     // during ordering. Equal real native onsets may be repeated by an overlapping JSON3 window.
     spans.sort(Comparator.comparingLong((Span v) -> v.start));
+    spans = collapseDoubledCues(withoutZeroWidthSpaces(spans));
     List<Span> ordered = new ArrayList<>();
     Set<String> nativeSeen = new HashSet<>();
     for (Span span : spans) {

@@ -1,6 +1,20 @@
 # Architecture
 
-This document describes the retained N37R2 product used for the 1.4.0 release. Historical N-card reports preserve their original claims and failures; they are not current contracts.
+This section describes the 1.5.2 module boundaries and caption paths. The N37R2 notes below describe the historical 1.4.0 baseline and do not define the current translation or pagination contracts.
+
+## Current module boundaries and caption paths
+
+The production direction is `ui` -> `CaptionActions` -> `application-host` -> `translation-core`. `caption-contracts` and `caption-shared` define shared interfaces and display values; `infrastructure` provides configuration, source transport, caching and diagnostics; `presentation` schedules display work. Kotlin `patches` binds the addon to the target YouTube app. `ui-preview` is an independent fixture.
+
+`SourceTrackPolicy` prefers human-made subtitles in the spoken language, then human-made English and the automatic speech track. When the video already supplies the selected target language, its subtitles are displayed without translation requests. Uploaded subtitles preserve authored line breaks, including two-row subtitles; only automatic tracks use `SourceReadingWindows` for local reading pages. Text sent for translation omits bracketed furigana readings.
+
+Translation uses the pinned upstream protocol with streamed, validated events where supported. `RebuildDisplayGroups` forms display pages without repeating accepted events, while the controller retains plan validation, repair and cache ownership. Host adapters handle Shorts playback evidence, surface recovery and re-entry. A failed or empty caption clears the overlay rather than terminating the host app.
+
+See the current [release history](../CHANGELOG.md) and [compatibility evidence](COMPATIBILITY.md).
+
+## Historical N37R2 / 1.4.0 baseline
+
+The following notes preserve the earlier implementation context.
 
 ## Patch-time boundaries
 

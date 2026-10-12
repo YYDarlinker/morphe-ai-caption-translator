@@ -24,9 +24,11 @@ final class SourceReadingWindows {
     List<RebuildSource.Word> words = source.words;
     int n = words.size();
     if (n == 0) return Collections.emptyList();
-    int cpl = spec.profile.referenceCpl;
-    int maxUnits = Math.max(8, spec.compactScript ? cpl * 5 / 2 : cpl * 2);
-    int minUnits = Math.max(4, cpl / 2);
+    // Sized by the script of the captions themselves (Chinese, Japanese, Korean read in far
+    // fewer characters per line than spaced scripts), not by the target language.
+    boolean wide = wideScript(words);
+    int maxUnits = wide ? 40 : 84;
+    int minUnits = wide ? 10 : 21;
     int[] prefix = new int[n + 1];
     for (int i = 0; i < n; i++) prefix[i + 1] = prefix[i] + units(words.get(i).text);
     List<RebuildSource.TimedWindow> pages = new ArrayList<>();
@@ -107,6 +109,24 @@ final class SourceReadingWindows {
       out.add(page);
     }
     return out;
+  }
+
+  private static boolean wideScript(List<RebuildSource.Word> words) {
+    int wide = 0, all = 0;
+    for (int i = 0; i < words.size() && all < 400; i++) {
+      String text = words.get(i).text;
+      for (int k = 0; k < text.length(); ) {
+        int cp = text.codePointAt(k);
+        k += Character.charCount(cp);
+        if (!Character.isLetter(cp)) continue;
+        all++;
+        Character.UnicodeScript script = Character.UnicodeScript.of(cp);
+        if (script == Character.UnicodeScript.HAN || script == Character.UnicodeScript.HIRAGANA
+            || script == Character.UnicodeScript.KATAKANA || script == Character.UnicodeScript.HANGUL
+            || script == Character.UnicodeScript.THAI) wide++;
+      }
+    }
+    return all > 0 && wide * 2 > all;
   }
 
   /** Visible characters of a word: what the reader counts, without a text-break library. */

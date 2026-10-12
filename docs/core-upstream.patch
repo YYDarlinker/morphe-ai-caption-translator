@@ -476,11 +476,13 @@
        if (!current(s)) return;
        long availablePosition = position(s);
        synchronized (s) {
-@@ -869,33 +906,33 @@
+@@ -868,34 +905,34 @@
+       // rebuilding/planning runs; translation requests still wait for the full plan.
        render(s);
        long phase=SystemClock.elapsedRealtime();
-       RebuildSource source = RebuildSource.read(raw.body, raw.document);
+-      RebuildSource source = RebuildSource.read(raw.body, raw.document);
 -      CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_PHASE","phase=rebuild;ms="+(SystemClock.elapsedRealtime()-phase));
++      RebuildSource source = RebuildSource.read(raw.body, raw.document, !s.sourceOnly);
 +      TranslationRuntime.mark(s.context,"REBUILD_SOURCE_PHASE","phase=rebuild;ms="+(SystemClock.elapsedRealtime()-phase));
        phase=SystemClock.elapsedRealtime();
        if (!s.sourceOnly && (source.hasPartialTiming() || source.nativeWordCount() < source.words.size())) {
@@ -489,7 +491,8 @@
 +          TranslationSourceAccess.Source ref = TranslationSourceAccess.reference(s.context, s.url, source, control);
            if (ref != null) {
              RebuildSource referenceEvidence = ref.timingEvidence != null
-                 ? ref.timingEvidence : RebuildSource.read(ref.body, ref.document);
+-                ? ref.timingEvidence : RebuildSource.read(ref.body, ref.document);
++                ? ref.timingEvidence : RebuildSource.read(ref.body, ref.document, !s.sourceOnly);
              RebuildSource beforeReference = source;
              source = source.align(referenceEvidence,
 -                detail->CaptionDiagnostics.mark(s.context,"REBUILD_SOURCE_ALIGNMENT",
@@ -760,7 +763,7 @@
            s.reasons[job.index] = rejectionReason;
            if (fatal) {
              s.terminal = true;
-@@ -1510,54 +1558,75 @@
+@@ -1510,54 +1558,109 @@
  
    private static void startup(Session s, String phase, String detail) {
      long now = SystemClock.elapsedRealtime();
@@ -775,8 +778,42 @@
 -    CaptionDocument.Cue cue = originalCue(s, time);
 -    return cue == null ? "" : cue.text;
 +  /** Source-only display: a cue is held through a short pause until the next cue starts. */
++  /**
++   * The authored cue exactly as uploaded: its own line breaks (a romanisation row above a
++   * translation row, a speaker line) and its own pages, held through a short pause.
++   */
++  private static CaptionDocument.Cue authoredCue(Session s, long time) {
++    if (s.raw == null) return originalCue(s, time);
++    CaptionDocument.Cue current = null, next = null;
++    for (CaptionDocument.Cue c : s.raw.document.cues()) {
++      if (time >= c.startMs && time < c.endMs) {
++        if (current == null || c.startMs >= current.startMs) current = c;
++      } else if (c.startMs > time && (next == null || c.startMs < next.startMs)) next = c;
++    }
++    CaptionDocument.Cue shown = current;
++    if (shown == null && next != null) {
++      CaptionDocument.Cue before = null;
++      for (CaptionDocument.Cue c : s.raw.document.cues())
++        if (c.endMs <= time && (before == null || c.endMs > before.endMs)) before = c;
++      if (before != null && next.startMs - before.endMs < RebuildDisplayGroups.HOLD_MS) shown = before;
++    }
++    if (shown == null) return null;
++    String text = shown.text.replaceAll("[​⁠﻿]", "").trim();
++    return text.isEmpty() ? null : new CaptionDocument.Cue(shown.startMs, shown.endMs, text);
++  }
++
++  /** Only machine-made (kind=asr) captions are re-paged; a person's own cues are kept as authored. */
++  private static boolean machineMade(Session s) {
++    try {
++      return "asr".equals(android.net.Uri.parse(s.url).getQueryParameter("kind"));
++    } catch (RuntimeException unavailable) {
++      return false;
++    }
++  }
++
 +  private static CaptionDocument.Cue sourceCue(Session s, long time) {
 +    if (s.source == null) return originalCue(s, time);
++    if (!machineMade(s)) return authoredCue(s, time);
 +    if (s.readingPages == null || s.readingFor != s.source) {
 +      s.readingPages = SourceReadingWindows.build(s.source, s.languageContext.renderSpec, s.languageContext);
 +      s.readingFor = s.source;
@@ -871,7 +908,7 @@
    }
  
    // A retry is still the same unresolved caption, not a new fallback phase.
-@@ -1569,7 +1638,7 @@
+@@ -1569,7 +1672,7 @@
  
    private static void render(Session s) {
      if (!current(s) || !s.visible) return;
@@ -880,7 +917,7 @@
      List<Notice> notices = new ArrayList<>();
      String text = "";
      String fallbackReason = "", displayEmptyReason="";
-@@ -1578,7 +1647,7 @@
+@@ -1578,7 +1681,7 @@
      long revision, submission, selectedAt, observedAt;
      String eventId = "none";
      long eventStart = -1, eventEnd = -1;
@@ -889,7 +926,7 @@
      synchronized (s) {
        if (!current(s) || !s.visible) return;
        generation = s.generation;
-@@ -1587,7 +1656,13 @@
+@@ -1587,7 +1690,13 @@
        if (s.source == null && !s.status.isEmpty()) {
          text = s.status;
          status = true;
@@ -904,7 +941,7 @@
          CaptionDocument.Cue cue = originalCue(s, selectedAt);
          if (cue != null) {
            text = translating;
-@@ -1599,41 +1674,43 @@
+@@ -1599,41 +1708,43 @@
        } else if (s.source == null) {
          text = s.status.isEmpty() ? translating : s.status;
          status = true;
@@ -971,7 +1008,7 @@
              fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
              // Waiting and blank failure displays retain each source cue's own window.
              // A block-wide display must not announce a later cue before its onset.
-@@ -1654,7 +1731,7 @@
+@@ -1654,7 +1765,7 @@
          endFallback(s,s.position,"state_change",notices);
          s.fallbackReason=fallbackReason;s.fallbackStart=s.position;
          if(!fallbackReason.isEmpty())notice(notices,"REBUILD_FALLBACK_BEGIN",
@@ -980,7 +1017,7 @@
        }
        String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
        if (signature.equals(s.lastShown) && s.appliedRenderRevision == s.renderRevision) {
-@@ -1676,7 +1753,7 @@
+@@ -1676,7 +1787,7 @@
      final String appliedReason=fallbackReason.equals("event_review") ? "semantic_blocked"
          : fallbackReason.startsWith("failed:") ? "translation_failed"
          : fallbackReason.isEmpty() ? (displayEmptyReason.isEmpty()?"source_gap":displayEmptyReason) : "pending_translation";
@@ -989,7 +1026,7 @@
        public boolean isValid() {
          return current(s) && s.generation == generation && s.renderRevision == revision
              && s.renderSubmission == submission && s.visible;
-@@ -1690,17 +1767,17 @@
+@@ -1690,17 +1801,17 @@
        public long displayPosition(long supplied) { return RebuildController.displayPosition(s); }
        public void onApplied() { if (isValid()) s.appliedRenderRevision = revision; }
      };
@@ -1014,7 +1051,7 @@
            s.context,
            "REBUILD_SELECTED",
            "id="
-@@ -1715,7 +1792,9 @@
+@@ -1715,7 +1826,9 @@
                + eventStart
                + "-"
                + eventEnd
@@ -1338,7 +1375,7 @@
    }
  
    static boolean cjk(int c) {
-@@ -207,15 +221,107 @@
+@@ -207,18 +221,140 @@
      }return null;
    }
  
@@ -1450,11 +1487,45 @@
    }
  
    static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed) throws Exception {
-@@ -309,6 +415,7 @@
++    return read(body, parsed, false);
++  }
++
++  /**
++   * Uploaders write ruby (furigana) into YouTube's own format as base text followed by the
++   * reading in brackets: 漢字(かんじ). YouTube draws the reading above the text; read as plain
++   * text it is a second copy of the sentence that translations would then repeat. A track that
++   * does this systematically is read as its base text; one stray bracket is real text.
++   */
++  private static final Pattern RUBY = Pattern.compile(
++      "([㐀-鿿々〆ヶ]+)[（(]([぀-ゟ゠-ヿー]+)[）)]");
++
++  static List<Span> withoutRuby(List<Span> spans) {
++    int found = 0;
++    for (Span span : spans) {
++      if (span.nativeOffset) continue;
++      Matcher m = RUBY.matcher(span.text);
++      while (m.find()) found++;
++    }
++    if (found < 3) return spans;
++    List<Span> out = new ArrayList<>(spans.size());
++    for (Span span : spans) {
++      if (span.nativeOffset || !RUBY.matcher(span.text).find()) { out.add(span); continue; }
++      out.add(new Span(RUBY.matcher(span.text).replaceAll("$1"), span.start, span.end, span.cue,
++          span.nativeOffset, span.speakerBreak, span.speakerOffsets));
++    }
++    return out;
++  }
++
++  static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed, boolean translating) throws Exception {
+     List<Span> spans = new ArrayList<>();
+     Map<Integer, CoarseFrame> frames = new HashMap<>();
+     String raw = new String(body, StandardCharsets.UTF_8).trim();
+@@ -309,6 +445,8 @@
      // Ordering comes from real cue/segment onsets. A multiword coarse span remains indivisible
      // during ordering. Equal real native onsets may be repeated by an overlapping JSON3 window.
      spans.sort(Comparator.comparingLong((Span v) -> v.start));
 +    spans = collapseDoubledCues(withoutZeroWidthSpaces(spans));
++    if (translating) spans = withoutRuby(spans);
      List<Span> ordered = new ArrayList<>();
      Set<String> nativeSeen = new HashSet<>();
      for (Span span : spans) {

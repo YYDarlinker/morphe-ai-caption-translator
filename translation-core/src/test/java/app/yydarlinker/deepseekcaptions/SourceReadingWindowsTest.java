@@ -123,4 +123,29 @@ public class SourceReadingWindowsTest {
       assertTrue(page.end - page.start <= SourceReadingWindows.MAX_PAGE_MS * 3 / 2);
     }
   }
+
+  /** Unpunctuated Japanese automatic captions are cut at pauses and a readable size. */
+  @Test public void japaneseAutomaticCaptionsWithoutPunctuationArePagedByPauseAndSize() throws Exception {
+    JSONArray events = new JSONArray();
+    String[] parts = {"今日はこの", "スーパーを丸ごと", "買い取りました", "皆さんには", "ここにある食べ物を", "全部食べて", "もらいます"};
+    long at = 0;
+    for (int i = 0; i < parts.length; i++) {
+      events.put(cue(at, at + 700, parts[i]));
+      at += 700 + (i == 2 ? 900 : 0);
+    }
+    RebuildSource s = source(events);
+    List<RebuildSource.TimedWindow> pages = SourceReadingWindows.build(s, CONTEXT.renderSpec, CONTEXT);
+    assertPartition(s, pages);
+    assertEquals(2, pages.size());
+    assertEquals("今日はこのスーパーを丸ごと買い取りました", s.text(pages.get(0).from, pages.get(0).to).replace(" ", ""));
+  }
+
+  /** A two-row authored cue (romanisation above translation) reaches the display with its break. */
+  @Test public void authoredTwoRowCuesKeepTheirLineBreak() throws Exception {
+    JSONArray events = new JSONArray().put(cue(0, 1300, "Ima wa mukashi\n很久很久以前")).put(cue(1376, 2669, "Dare mo ga shiru\n有一个我和你"));
+    byte[] body = new JSONObject().put("events", events).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    CaptionDocument.Parsed parsed = CaptionDocument.parse(body, "json3");
+    assertEquals(2, parsed.cues().size());
+    assertEquals("Ima wa mukashi\n很久很久以前", parsed.cues().get(0).text);
+  }
 }

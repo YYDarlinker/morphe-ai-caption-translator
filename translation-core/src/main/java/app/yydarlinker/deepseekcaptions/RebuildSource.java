@@ -325,6 +325,36 @@ final class RebuildSource {
   }
 
   static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed) throws Exception {
+    return read(body, parsed, false);
+  }
+
+  /**
+   * Uploaders write ruby (furigana) into YouTube's own format as base text followed by the
+   * reading in brackets: 漢字(かんじ). YouTube draws the reading above the text; read as plain
+   * text it is a second copy of the sentence that translations would then repeat. A track that
+   * does this systematically is read as its base text; one stray bracket is real text.
+   */
+  private static final Pattern RUBY = Pattern.compile(
+      "([㐀-鿿々〆ヶ]+)[（(]([぀-ゟ゠-ヿー]+)[）)]");
+
+  static List<Span> withoutRuby(List<Span> spans) {
+    int found = 0;
+    for (Span span : spans) {
+      if (span.nativeOffset) continue;
+      Matcher m = RUBY.matcher(span.text);
+      while (m.find()) found++;
+    }
+    if (found < 3) return spans;
+    List<Span> out = new ArrayList<>(spans.size());
+    for (Span span : spans) {
+      if (span.nativeOffset || !RUBY.matcher(span.text).find()) { out.add(span); continue; }
+      out.add(new Span(RUBY.matcher(span.text).replaceAll("$1"), span.start, span.end, span.cue,
+          span.nativeOffset, span.speakerBreak, span.speakerOffsets));
+    }
+    return out;
+  }
+
+  static RebuildSource read(byte[] body, CaptionDocument.Parsed parsed, boolean translating) throws Exception {
     List<Span> spans = new ArrayList<>();
     Map<Integer, CoarseFrame> frames = new HashMap<>();
     String raw = new String(body, StandardCharsets.UTF_8).trim();
@@ -416,6 +446,7 @@ final class RebuildSource {
     // during ordering. Equal real native onsets may be repeated by an overlapping JSON3 window.
     spans.sort(Comparator.comparingLong((Span v) -> v.start));
     spans = collapseDoubledCues(withoutZeroWidthSpaces(spans));
+    if (translating) spans = withoutRuby(spans);
     List<Span> ordered = new ArrayList<>();
     Set<String> nativeSeen = new HashSet<>();
     for (Span span : spans) {

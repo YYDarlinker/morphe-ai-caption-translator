@@ -1,3 +1,8 @@
+## [1.5.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.1...v1.5.2) (2026-10-12)
+
+- Keep uploaded subtitles exactly as authored, including two-row subtitles such as romanization above a translation; only auto-generated subtitles get locally optimized sentence breaks and page turns, tuned for Japanese and other unpunctuated languages.
+- Remove bracketed furigana readings from the text sent for translation, so the translation does not repeat them.
+
 ## [1.5.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.0...v1.5.1) (2026-10-12)
 
 - Fix captions that were missing or shown twice on videos whose subtitle tracks repeat every cue.

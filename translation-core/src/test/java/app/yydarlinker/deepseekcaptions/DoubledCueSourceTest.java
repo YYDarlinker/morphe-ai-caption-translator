@@ -106,6 +106,24 @@ public class DoubledCueSourceTest {
     }
   }
 
+  /** Ruby written as base(reading) is translated from its base text; a stray bracket stays. */
+  @Test public void rubyReadingsAreDroppedForTranslationOnlyWhenTheTrackIsRuby() throws Exception {
+    String[] lines = {"君(きみ)といた時(とき)は見(み)えた", "今(いま)は見(み)えなくなった", "透明(とうめい)な彗星(すいせい)を", "探(さが)している"};
+    JSONArray events = new JSONArray();
+    long at = 0;
+    for (String line : lines) { events.put(cue(at, at + 1800, line)); at += 2000; }
+    byte[] body = new JSONObject().put("events", events).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    RebuildSource shown = RebuildSource.read(body, CaptionDocument.parse(body, "json3"), false);
+    RebuildSource translated = RebuildSource.read(body, CaptionDocument.parse(body, "json3"), true);
+    assertTrue(shown.text(0, shown.words.size() - 1).contains("(きみ)"));
+    String text = translated.text(0, translated.words.size() - 1).replace(" ", "");
+    assertEquals("君といた時は見えた今は見えなくなった透明な彗星を探している", text);
+    JSONArray one = new JSONArray().put(cue(0, 1800, "面白い(笑)")).put(cue(2000, 3800, "彼(かれ)は来た"));
+    byte[] few = new JSONObject().put("events", one).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    RebuildSource kept = RebuildSource.read(few, CaptionDocument.parse(few, "json3"), true);
+    assertTrue(kept.text(0, kept.words.size() - 1).contains("(かれ)"));
+  }
+
   static int count(String text, String part) {
     int n = 0;
     for (int i = text.indexOf(part); i >= 0; i = text.indexOf(part, i + part.length())) n++;

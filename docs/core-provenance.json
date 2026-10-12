@@ -8,7 +8,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "upstream_sha256": "bc5ba7aab1c61dc785742e8cb63b3d69a5d11142aaf817d66d280bc415a4a1e3",
-      "sha256": "2f30bc8657f82f8efd96b32c12ef1bd7d4aab1d8510d83a901960463d956a38a",
+      "sha256": "f6c21d095ced694bab260fda0f249a4f00c588534d772b9fc7936aaf7b5d9d12",
       "snapshot": "translation-core/upstream/RebuildController.java.txt",
       "upstream_git_blob": "814922f06c539681e1471379faf61cb7c6651548"
     },
@@ -40,7 +40,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
       "upstream_sha256": "429f9f059f44113f171f0c7574dabd1b3b8fc589fc2f56489e86a978bc53866e",
-      "sha256": "3a1c25f5ad64e5b5d6a6d66efdf9934fe36b0ae2ca322397998251e05a5b0463",
+      "sha256": "9fae7ad2c7ca0df97bd12390d61c632cef81fb74808da641e5386f94c6c67fb7",
       "snapshot": "translation-core/upstream/RebuildSource.java.txt",
       "upstream_git_blob": "7f1c52768fb09e675c687a8232db3eabb521fd68"
     },

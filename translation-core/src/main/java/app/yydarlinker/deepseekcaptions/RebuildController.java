@@ -905,7 +905,7 @@ final class RebuildController {
       // rebuilding/planning runs; translation requests still wait for the full plan.
       render(s);
       long phase=SystemClock.elapsedRealtime();
-      RebuildSource source = RebuildSource.read(raw.body, raw.document);
+      RebuildSource source = RebuildSource.read(raw.body, raw.document, !s.sourceOnly);
       TranslationRuntime.mark(s.context,"REBUILD_SOURCE_PHASE","phase=rebuild;ms="+(SystemClock.elapsedRealtime()-phase));
       phase=SystemClock.elapsedRealtime();
       if (!s.sourceOnly && (source.hasPartialTiming() || source.nativeWordCount() < source.words.size())) {
@@ -913,7 +913,7 @@ final class RebuildController {
           TranslationSourceAccess.Source ref = TranslationSourceAccess.reference(s.context, s.url, source, control);
           if (ref != null) {
             RebuildSource referenceEvidence = ref.timingEvidence != null
-                ? ref.timingEvidence : RebuildSource.read(ref.body, ref.document);
+                ? ref.timingEvidence : RebuildSource.read(ref.body, ref.document, !s.sourceOnly);
             RebuildSource beforeReference = source;
             source = source.align(referenceEvidence,
                 detail->TranslationRuntime.mark(s.context,"REBUILD_SOURCE_ALIGNMENT",
@@ -1565,8 +1565,42 @@ final class RebuildController {
   }
 
   /** Source-only display: a cue is held through a short pause until the next cue starts. */
+  /**
+   * The authored cue exactly as uploaded: its own line breaks (a romanisation row above a
+   * translation row, a speaker line) and its own pages, held through a short pause.
+   */
+  private static CaptionDocument.Cue authoredCue(Session s, long time) {
+    if (s.raw == null) return originalCue(s, time);
+    CaptionDocument.Cue current = null, next = null;
+    for (CaptionDocument.Cue c : s.raw.document.cues()) {
+      if (time >= c.startMs && time < c.endMs) {
+        if (current == null || c.startMs >= current.startMs) current = c;
+      } else if (c.startMs > time && (next == null || c.startMs < next.startMs)) next = c;
+    }
+    CaptionDocument.Cue shown = current;
+    if (shown == null && next != null) {
+      CaptionDocument.Cue before = null;
+      for (CaptionDocument.Cue c : s.raw.document.cues())
+        if (c.endMs <= time && (before == null || c.endMs > before.endMs)) before = c;
+      if (before != null && next.startMs - before.endMs < RebuildDisplayGroups.HOLD_MS) shown = before;
+    }
+    if (shown == null) return null;
+    String text = shown.text.replaceAll("[​⁠﻿]", "").trim();
+    return text.isEmpty() ? null : new CaptionDocument.Cue(shown.startMs, shown.endMs, text);
+  }
+
+  /** Only machine-made (kind=asr) captions are re-paged; a person's own cues are kept as authored. */
+  private static boolean machineMade(Session s) {
+    try {
+      return "asr".equals(android.net.Uri.parse(s.url).getQueryParameter("kind"));
+    } catch (RuntimeException unavailable) {
+      return false;
+    }
+  }
+
   private static CaptionDocument.Cue sourceCue(Session s, long time) {
     if (s.source == null) return originalCue(s, time);
+    if (!machineMade(s)) return authoredCue(s, time);
     if (s.readingPages == null || s.readingFor != s.source) {
       s.readingPages = SourceReadingWindows.build(s.source, s.languageContext.renderSpec, s.languageContext);
       s.readingFor = s.source;

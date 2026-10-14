@@ -1,191 +1,243 @@
 package app.yydarlinker.deepseekcaptions;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Bounded, credential-bound diagnostics writer.
+ * The queue between the code that marks a diagnostic record and the journal on disk.
  *
- * <p>N36 moves redaction, keystore access, SharedPreferences updates and file appends off every
- * playback, animation and preview path. A hot-path caller supplies only an already-known
- * {@link CaptionCredentialRef}; the writer keeps at most two short-lived credential snapshots, keyed
- * by that fingerprint, so a record produced under one profile is redacted with that profile's own key
- * and never with a newer one. Nothing is written unredacted and no plaintext is ever persisted.</p>
+ * <p>A caller on the playback, animation or preview path only hands over the record with the
+ * reference of its credential; nothing else happens there. Redaction, keystore access and file
+ * appends run later on the writer thread. A record is redacted with the key of its own credential
+ * (a snapshot of at most two keys is kept for that), and when that key cannot be resolved it still
+ * goes through the pattern redactor, so no raw secret is ever written.
  */
 final class CaptionDiagnosticsWriter {
-    /** At most this many short-lived credential snapshots, each bounded by the retention window. */
     private static final int MAX_SNAPSHOTS = 2;
-    /** A resolving snapshot is refreshed only for a record older than this. */
     private static final long SNAPSHOT_MAX_AGE_MS = 5 * 60_000L;
     private static final int MAX_BATCH = 64;
-    /** Per-lane bound; both lanes are bounded, so a burst cannot grow memory without limit. */
     private static final int MAX_QUEUE = 512;
+    private static final int MAX_DECISION_TAIL = 12_000;
+    private static final int MAX_BATCH_CHARS = 60_000;
 
     private static final Object LOCK = new Object();
+    private static final Object DRAIN_LOCK = new Object();
     private static final ArrayDeque<Record> QUEUE = new ArrayDeque<>();
-    /** Bounded lane for records that carry real lifecycle evidence; never starved by display noise. */
+
+    /** Records of real lifecycle evidence; a burst of display noise never evicts them. */
     private static final ArrayDeque<Record> DECISIONS_QUEUE = new ArrayDeque<>();
-    private static final Map<String,String> SNAPSHOTS = new LinkedHashMap<>(4, 0.75f, true);
+
+    private static final Map<String, String> SNAPSHOTS =
+            new LinkedHashMap<String, String>(4, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                    return size() > MAX_SNAPSHOTS;
+                }
+            };
+
     private static volatile Thread worker;
-    private static final Object DRAIN_LOCK=new Object();
-    private static final java.util.concurrent.ThreadPoolExecutor WRITER=new java.util.concurrent.ThreadPoolExecutor(
-        1,1,30,java.util.concurrent.TimeUnit.SECONDS,new java.util.concurrent.ArrayBlockingQueue<>(64),
-        r->{Thread thread=new Thread(r,"caption-diagnostics-writer");thread.setDaemon(true);worker=thread;return thread;});
+    private static final ThreadPoolExecutor WRITER =
+            new ThreadPoolExecutor(
+                    1,
+                    1,
+                    30,
+                    TimeUnit.SECONDS,
+                    new ArrayBlockingQueue<>(64),
+                    runnable -> {
+                        Thread thread = new Thread(runnable, "caption-diagnostics-writer");
+                        thread.setDaemon(true);
+                        worker = thread;
+                        return thread;
+                    });
+
     private static boolean drainPosted;
-    private static long dropped, merged, written, redactions, seedOnlyRedactions, reusedRepeats;
+    private static long dropped, merged, written, seedOnlyRedactions;
     private static long epoch, lastResolvedAt;
-    private static String decisionTail="";
+    private static String decisionTail = "";
     private static boolean decisionsLoaded;
 
     private CaptionDiagnosticsWriter() {}
 
-    static final class Record {
-        final String stage, detail;
+    private static final class Record {
+        final String stage, detail, mergeKey;
         final CaptionCredentialRef credential;
-        final long at;
-        final String mergeKey;
+        final long at = System.currentTimeMillis();
         int repeats;
+
         Record(String stage, String detail, CaptionCredentialRef credential, String mergeKey) {
             this.stage = stage;
             this.detail = detail;
             this.credential = credential == null ? CaptionCredentialRef.NONE : credential;
             this.mergeKey = mergeKey == null ? "" : mergeKey;
-            this.at = System.currentTimeMillis();
         }
     }
 
-    static void enqueue(Context context, String stage, String detail, CaptionCredentialRef credential,
+    /**
+     * Queues a record. Records with the same stage and merge key that follow each other are merged
+     * into one that counts its repeats.
+     */
+    static void enqueue(
+            Context context,
+            String stage,
+            String detail,
+            CaptionCredentialRef credential,
             String mergeKey) {
         if (context == null || stage == null || stage.isEmpty()) return;
-        final Context app = context.getApplicationContext();
+        Context app = context.getApplicationContext();
         Record record = new Record(stage, detail, credential, mergeKey);
-        boolean post;
-        boolean mandatory = CaptionDiagnostics.isDecision(stage);
         synchronized (LOCK) {
-            ArrayDeque<Record> lane = mandatory ? DECISIONS_QUEUE : QUEUE;
-            if (!record.mergeKey.isEmpty()) {
-                Record last = lane.peekLast();
-                if (last != null && last.mergeKey.equals(record.mergeKey) && last.stage.equals(stage)) {
-                    last.repeats++;
-                    merged++;
-                    return;
-                }
+            ArrayDeque<Record> lane =
+                    CaptionDiagnostics.isDecision(stage) ? DECISIONS_QUEUE : QUEUE;
+            Record last = lane.peekLast();
+            if (!record.mergeKey.isEmpty()
+                    && last != null
+                    && last.mergeKey.equals(record.mergeKey)
+                    && last.stage.equals(stage)) {
+                last.repeats++;
+                merged++;
+                return;
             }
-            // Two bounded lanes. A decision record is only ever dropped when its own lane is full, so a
-            // burst of repeated display observations can never evict real lifecycle evidence.
             if (lane.size() >= MAX_QUEUE) {
                 dropped++;
                 return;
             }
             lane.addLast(record);
-            post = !drainPosted;
-            if (post) drainPosted = true;
+            if (drainPosted) return;
+            drainPosted = true;
         }
-        if (post) WRITER.execute(() -> drain(app));
+        WRITER.execute(() -> drain(app));
     }
 
-    /**
-     * Resolves and releases credential snapshots on the main thread, then hands the batch to the
-     * archive lane. A snapshot for a credential the hot path cannot resolve is taken here, off the
-     * playback path, only after everything the user can see has already been applied.
-     */
+    private static boolean idle() {
+        synchronized (LOCK) {
+            return QUEUE.isEmpty() && DECISIONS_QUEUE.isEmpty();
+        }
+    }
+
+    /** Writes the queued records to the journal, a batch at a time. */
     private static void drain(Context context) {
-        synchronized(DRAIN_LOCK){
-            for(int n=0;n<16;n++){
-                synchronized(LOCK){if(QUEUE.isEmpty()&&DECISIONS_QUEUE.isEmpty())break;}
-                drainBatch(context);
-            }
-            synchronized(LOCK){
-                if(QUEUE.isEmpty()&&DECISIONS_QUEUE.isEmpty())drainPosted=false;
-                else {drainPosted=true;WRITER.execute(()->drain(context));}
+        synchronized (DRAIN_LOCK) {
+            for (int n = 0; n < 16 && !idle(); n++) drainBatch(context);
+            synchronized (LOCK) {
+                drainPosted = !idle();
+                if (drainPosted) WRITER.execute(() -> drain(context));
             }
         }
     }
+
     private static void drainBatch(Context context) {
-        Record[] batch;
-        int batchSize;
+        ArrayList<Record> batch = new ArrayList<>(MAX_BATCH);
         long batchEpoch;
         synchronized (LOCK) {
-            batchEpoch=epoch;
-            java.util.ArrayList<Record> selected = new java.util.ArrayList<>(MAX_BATCH);
-            // Both bounded lanes are represented in every batch, with the decision lane first, so a
-            // flood of ordinary display observations can never starve the records that carry the real
-            // request, cancellation, repair, owner-recovery and first-display evidence.
-            int half = MAX_BATCH / 2;
-            for (int i = 0; i < half && !DECISIONS_QUEUE.isEmpty(); i++) selected.add(DECISIONS_QUEUE.pollFirst());
-            for (int i = 0; i < MAX_BATCH - selected.size() && !QUEUE.isEmpty(); i++) selected.add(QUEUE.pollFirst());
-            for (int i = 0; i < MAX_BATCH - selected.size() && !DECISIONS_QUEUE.isEmpty(); i++) selected.add(DECISIONS_QUEUE.pollFirst());
-            batchSize = selected.size();
-            batch = selected.toArray(new Record[0]);
+            batchEpoch = epoch;
+            // Both lanes are in every batch, decisions first, so a flood of display observations
+            // cannot starve the request, cancellation, repair and first-display evidence.
+            for (int i = 0; i < MAX_BATCH / 2 && !DECISIONS_QUEUE.isEmpty(); i++)
+                batch.add(DECISIONS_QUEUE.pollFirst());
+            while (batch.size() < MAX_BATCH && !QUEUE.isEmpty()) batch.add(QUEUE.pollFirst());
+            while (batch.size() < MAX_BATCH && !DECISIONS_QUEUE.isEmpty())
+                batch.add(DECISIONS_QUEUE.pollFirst());
         }
-        StringBuilder archive = new StringBuilder();
+        StringBuilder archive = new StringBuilder(), decisions = new StringBuilder();
         String latestStage = "", latestDetail = "";
         long latestAt = 0;
-        StringBuilder decisions = new StringBuilder();
-        for (int i = 0; i < batchSize; i++) {
-            Record record = batch[i];
+        for (Record record : batch) {
+            String stage = CaptionDiagnostics.sanitize(record.stage, 80);
             String detail = redact(context, record);
-            String line = record.at + " | " + sanitize(record.stage, 80)
-                    + (detail.isEmpty() ? "" : " | " + detail);
+            String line = record.at + " | " + stage + (detail.isEmpty() ? "" : " | " + detail);
             archive.append(line).append('\n');
-            if (record.repeats > 0) archive.append("  (repeated ").append(record.repeats)
-                    .append(" times; repeated observation merged; total_count=")
-                    .append(record.repeats + 1).append(")\n");
-            latestStage = sanitize(record.stage, 80);
+            if (record.repeats > 0)
+                archive.append("  (repeated ")
+                        .append(record.repeats)
+                        .append(" times; repeated observation merged; total_count=")
+                        .append(record.repeats + 1)
+                        .append(")\n");
+            if (CaptionDiagnostics.isDecision(record.stage)) decisions.append(line).append('\n');
+            latestStage = stage;
             latestDetail = detail;
             latestAt = record.at;
-            if (CaptionDiagnostics.isDecision(record.stage)) decisions.append(line).append('\n');
         }
-        boolean restore;
-        synchronized(LOCK){restore=!decisionsLoaded;if(restore)decisionsLoaded=true;}
-        if(restore)CaptionDiagnosticArchive.readSummaryAsync(context,batchEpoch,previous->{
-            if(previous==null)return;
-            String[] parts=previous.split("\u0001",-1);if(parts.length<5)return;
-            synchronized(LOCK){
-                if(batchEpoch!=epoch)return;
-                decisionTail=parts[4]+decisionTail;
-                if(decisionTail.length()>12000)decisionTail=decisionTail.substring(decisionTail.length()-12000);
+        restoreDecisionTail(context, batchEpoch);
+        synchronized (LOCK) {
+            if (batchEpoch != epoch) return;
+            addDecisions(decisions.toString(), false);
+            if (archive.length() > 0) {
+                String text = archive.toString();
+                if (text.length() > MAX_BATCH_CHARS)
+                    text = text.substring(0, MAX_BATCH_CHARS) + " [batch truncated]";
+                CaptionDiagnosticArchive.append(context, "history", text);
+                written += batch.size();
             }
-        });
-        synchronized(LOCK){
-            if(batchEpoch!=epoch)return;
-            if(decisions.length()>0){decisionTail+=decisions.toString();if(decisionTail.length()>12000)decisionTail=decisionTail.substring(decisionTail.length()-12000);}
-            if(archive.length()>0){CaptionDiagnosticArchive.append(context,"history",trim(archive.toString()));written+=batchSize;}
-            if(latestAt>0)CaptionDiagnosticArchive.appendSummary(context,latestStage,latestDetail,latestAt,
-                ()->{synchronized(LOCK){return batchEpoch==epoch?decisionTail:"";}},batchEpoch);
+            if (latestAt > 0)
+                CaptionDiagnosticArchive.appendSummary(
+                        context,
+                        latestStage,
+                        latestDetail,
+                        latestAt,
+                        () -> {
+                            synchronized (LOCK) {
+                                return batchEpoch == epoch ? decisionTail : "";
+                            }
+                        },
+                        batchEpoch);
         }
     }
 
-    /**
-     * Plaintext is used only for a record whose own credential fingerprint has a resolving snapshot.
-     * If the key cannot be resolved, the record is written through the pattern redactor and marked, so
-     * an unknown credential can never leak a raw value into the archive.
-     */
-    private static String redact(Context context, Record record) {
-        String key = record.credential.known() ? snapshotFor(context, record.credential) : "";
-        String value = CaptionQualityTrace.redact(record.detail, key, 1600);
-        String clean = sanitize(value, 1700);
+    /** Adds decision lines to the tail kept for the report, at its end or at its start. */
+    private static void addDecisions(String lines, boolean before) {
+        if (lines.isEmpty()) return;
+        String tail = before ? lines + decisionTail : decisionTail + lines;
+        decisionTail =
+                tail.length() > MAX_DECISION_TAIL
+                        ? tail.substring(tail.length() - MAX_DECISION_TAIL)
+                        : tail;
+    }
+
+    /** After a restart, the decisions the previous run kept come back in front of the new ones. */
+    private static void restoreDecisionTail(Context context, long batchEpoch) {
         synchronized (LOCK) {
-            if (!record.credential.known()) return clean;
-            if (key.isEmpty()) {
+            if (decisionsLoaded) return;
+            decisionsLoaded = true;
+        }
+        CaptionDiagnosticArchive.readSummaryAsync(
+                context,
+                batchEpoch,
+                previous -> {
+                    if (previous == null) return;
+                    String[] parts = previous.split("\u0001", -1);
+                    if (parts.length < 5) return;
+                    synchronized (LOCK) {
+                        if (batchEpoch == epoch) addDecisions(parts[4], true);
+                    }
+                });
+    }
+
+    /** The detail of a record, redacted with the key of the credential it was made under. */
+    private static String redact(Context context, Record record) {
+        boolean known = record.credential.known();
+        String key = known ? snapshotFor(context, record.credential) : "";
+        String clean =
+                CaptionDiagnostics.sanitize(
+                        CaptionQualityTrace.redact(record.detail, key, 1600), 1700);
+        if (known && key.isEmpty()) {
+            synchronized (LOCK) {
                 seedOnlyRedactions++;
-                clean = clean + ";redaction=credential_unavailable";
-            } else {
-                redactions++;
             }
+            return clean + ";redaction=credential_unavailable";
         }
         return clean;
     }
 
     /**
-     * Returns the plaintext for a credential fingerprint, resolving it at most once per snapshot and
-     * refreshing a stale entry. Retention is bounded by entry count, so the extension holds no more
-     * than two profile secrets for at most the retention window.
+     * The plaintext key of a credential reference, resolved at most once per five minutes. The
+     * extension holds no more than two keys, for no longer than that.
      */
     private static String snapshotFor(Context context, CaptionCredentialRef reference) {
         long now = System.currentTimeMillis();
@@ -194,47 +246,51 @@ final class CaptionDiagnosticsWriter {
             if (cached != null && now - lastResolvedAt <= SNAPSHOT_MAX_AGE_MS) return cached;
         }
         String plaintext = SecureApiKey.load(context);
-        CaptionCredentialRef resolved = CaptionCredentialRef.of(plaintext);
+        boolean same = CaptionCredentialRef.of(plaintext).fingerprint.equals(reference.fingerprint);
         synchronized (LOCK) {
             lastResolvedAt = now;
-            if (!resolved.fingerprint.equals(reference.fingerprint)) return "";
+            if (!same) return "";
             SNAPSHOTS.put(reference.fingerprint, plaintext);
-            while (SNAPSHOTS.size() > MAX_SNAPSHOTS) {
-                String oldest = SNAPSHOTS.keySet().iterator().next();
-                SNAPSHOTS.remove(oldest);
-            }
             return plaintext;
         }
     }
 
-    /** Bounded export barrier: waits for records produced before it started, never longer than 400 ms. */
+    /** Waits, at most 400 ms, for the records queued before the call to be written. */
     static void flush(Context context) {
         if (context == null) return;
         for (int attempt = 0; attempt < 40; attempt++) {
             synchronized (LOCK) {
-                if (QUEUE.isEmpty() && DECISIONS_QUEUE.isEmpty() && !drainPosted) return;
+                if (idle() && !drainPosted) return;
             }
-            try { Thread.sleep(10L); } catch (InterruptedException interrupted) {
+            try {
+                Thread.sleep(10L);
+            } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return;
             }
         }
     }
 
-    /**
-     * Verification entry: drains every queued record on the calling thread. Production reaches the
-     * same writer through the main-thread drain; tests use this so a record is observable immediately.
-     */
-    static void background(Runnable task){WRITER.execute(task);}
+    static void background(Runnable task) {
+        WRITER.execute(task);
+    }
+
+    /** Writes every queued record on the writer thread and waits for it. */
     static void drainNow(Context context) {
-        if(context==null)return;
-        Runnable task=()->{for(int n=0;n<64;n++){
-            synchronized(LOCK){if(QUEUE.isEmpty()&&DECISIONS_QUEUE.isEmpty())return;}
-            drain(context);
-        }};
-        if(Thread.currentThread()==worker){task.run();return;}
-        try{WRITER.submit(task).get(5,java.util.concurrent.TimeUnit.SECONDS);}
-        catch(Exception failed){throw new IllegalStateException("diagnostics writer barrier",failed);}
+        if (context == null) return;
+        Runnable task =
+                () -> {
+                    for (int n = 0; n < 64 && !idle(); n++) drain(context);
+                };
+        if (Thread.currentThread() == worker) {
+            task.run();
+            return;
+        }
+        try {
+            WRITER.submit(task).get(5, TimeUnit.SECONDS);
+        } catch (Exception failed) {
+            throw new IllegalStateException("diagnostics writer barrier", failed);
+        }
     }
 
     static void clear(Context context) {
@@ -243,79 +299,49 @@ final class CaptionDiagnosticsWriter {
             DECISIONS_QUEUE.clear();
             SNAPSHOTS.clear();
             lastResolvedAt = 0;
-            decisionTail="";decisionsLoaded=false;
+            decisionTail = "";
+            decisionsLoaded = false;
             epoch++;
         }
     }
 
-    /** Immutable identity of the current clearing epoch; records from an older epoch are not revived. */
-    static long epoch() { synchronized (LOCK) { return epoch; } }
-
-    static void noteReuseRepeat(){synchronized(LOCK){reusedRepeats++;}}
-    static long reusedRepeatCount(){synchronized(LOCK){return reusedRepeats;}}
-    static long droppedCount() { synchronized (LOCK) { return dropped; } }
-    static long mergedCount() { synchronized (LOCK) { return merged; } }
-    static long writtenCount() { synchronized (LOCK) { return written; } }
-    static long redactedCount() { synchronized (LOCK) { return redactions; } }
-    static long credentialUnavailableCount() { synchronized (LOCK) { return seedOnlyRedactions; } }
-    static int pendingCount() { synchronized (LOCK) { return QUEUE.size() + DECISIONS_QUEUE.size(); } }
-
-    /**
-     * Latest queued stage/detail before a drain, as a bounded in-memory fallback for a report read in
-     * the same instant as its drain. It never blocks and never performs credential work.
-     */
-    static String[] pendingSummary() {
+    /** The clearing generation: a record of an older one is never revived. */
+    static long epoch() {
         synchronized (LOCK) {
-            Record last = QUEUE.peekLast();
-            if (last == null) return null;
-            StringBuilder decisions = new StringBuilder();
-            if (CaptionDiagnostics.isDecision(last.stage)) {
-                decisions.append(last.at).append(" | ").append(last.stage);
-                if (!last.detail.isEmpty()) decisions.append(" | ").append(last.detail);
-            }
-            return new String[]{last.stage, last.detail, String.valueOf(last.at), decisions.toString()};
+            return epoch;
         }
     }
 
-    /** Bounded one-line queue accounting, appended to the report so drops and merges are auditable. */
+
+    static long droppedCount() {
+        synchronized (LOCK) {
+            return dropped;
+        }
+    }
+
+    static long mergedCount() {
+        synchronized (LOCK) {
+            return merged;
+        }
+    }
+
+    /** One line of queue accounting for the report, so that drops and merges can be audited. */
     static String stats(String label) {
-        long droppedNow, mergedNow, writtenNow, unavailableNow;
-        int pending;
         synchronized (LOCK) {
-            droppedNow = dropped; mergedNow = merged; writtenNow = written;
-            unavailableNow = seedOnlyRedactions; pending = QUEUE.size();
+            if (written == 0 && dropped == 0 && merged == 0) return "";
+            return "\n\n["
+                    + label
+                    + ": written="
+                    + written
+                    + "; merged_repeats="
+                    + merged
+                    + "; dropped="
+                    + dropped
+                    + "; pending="
+                    + QUEUE.size()
+                    + "; credential_unavailable="
+                    + seedOnlyRedactions
+                    + "]\n";
         }
-        if (writtenNow == 0 && droppedNow == 0 && mergedNow == 0) return "";
-        return "\n\n[" + label + ": written=" + writtenNow + "; merged_repeats=" + mergedNow
-                + "; dropped=" + droppedNow + "; pending=" + pending
-                + "; reused_repeats="+reusedRepeatCount()+"; credential_unavailable=" + unavailableNow + "]\n";
-    }
-
-    static void resetForTests() {
-        synchronized (LOCK) {
-            QUEUE.clear();
-            DECISIONS_QUEUE.clear();
-            SNAPSHOTS.clear();
-            drainPosted = false;
-            reusedRepeats=0;
-            dropped = 0;
-            merged = 0;
-            written = 0;
-            redactions = 0;
-            seedOnlyRedactions = 0;
-            lastResolvedAt = 0;
-            decisionTail="";decisionsLoaded=false;
-            epoch++;
-        }
-    }
-
-    private static String sanitize(String value, int max) {
-        if (value == null) return "";
-        String clean = value.replace('\r', ' ').replace('\n', ' ').trim();
-        return clean.length() <= max ? clean : clean.substring(0, max);
-    }
-
-    private static String trim(String value) {
-        return value.length() <= 60_000 ? value : value.substring(0, 60_000) + " [batch truncated]";
     }
 }

@@ -18,11 +18,11 @@ val stageUi = tasks.register<Sync>("stageIndependentUi") {
     from(rootProject.file("ui/src/main/java"))
     from(rootProject.file("presentation/src/main/java"))
     from(rootProject.file("infrastructure/src/main/java")) {
-        include("**/ApiProfiles.java", "**/DeepSeekConfig.java", "**/SecureApiKey.java", "**/TokenCostAudit.java",
+        include("**/ApiProfiles.java", "**/DeepSeekConfig.java", "**/SecureApiKey.java", "**/TokenCostAudit.java", "**/TokenCostReport.java",
             "**/CaptionDiagnostic*.java", "**/CaptionQualityTrace.java", "**/CaptionSourceIdentity.java", "**/SourceFormatPolicy.java", "**/SourceCaptionCache.java")
     }
     from(rootProject.file("application-host/src/main/java")) {
-        exclude("**/CaptionApplication.java", "**/TranslationSourceSelector.java", "**/DeepSeekCaptionHook.java", "**/DeepSeekCaptionHookV2.java")
+        exclude("**/CaptionApplication.java", "**/OfficialPlayerClockAdapter.java", "**/TranslationSourceSelector.java", "**/DeepSeekCaptionHook.java", "**/DeepSeekCaptionHookV2.java")
     }
 }
 tasks.named("preBuild") { dependsOn(stageUi) }

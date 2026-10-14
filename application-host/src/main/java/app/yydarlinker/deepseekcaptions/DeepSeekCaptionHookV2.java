@@ -3,132 +3,158 @@ package app.yydarlinker.deepseekcaptions;
 import android.app.Activity;
 import android.content.Context;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Base64;
 import android.widget.ImageView;
 
 import java.nio.charset.StandardCharsets;
 
-/** Adds a one-shot new-video default target handoff around the stable caption hook. */
+/**
+ * The callbacks the patch inserts into YouTube. They add the native-renderer masking and the
+ * cross-video default handoff around {@link DeepSeekCaptionHook}.
+ */
 public final class DeepSeekCaptionHookV2 {
-    private static volatile Context appContext;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static final Object PLAYER_LOCK = new Object();
+
+    /** The newest player type reported off the main thread, until the main thread takes it. */
+    private static Enum<?> queuedPlayerType;
+
+    private static boolean playerNotificationPosted;
+    private static long queuedOwnerEpoch;
 
     private DeepSeekCaptionHookV2() {}
 
     public static void setMainActivity(Activity activity) {
-        if (activity != null) {
-            appContext = activity.getApplicationContext();
-
-        }
-
         CaptionMusicSuppressor.setActivity(activity);
         DeepSeekCaptionHook.setMainActivity(activity);
         CaptionMusicSuppressor.kick();
     }
 
     public static void onVideoId(String videoId) {
-
-
-        // Observe the old video's ON/OFF intent before the stable controller tears down its session.
+        // The old video's ON/OFF intent is observed before the controller tears its session down.
         CaptionVideoHandoffV2.onVideoId(videoId);
         DeepSeekCaptionHook.onVideoId(videoId);
         CaptionMusicSuppressor.forceNativeRendererScan();
     }
 
     public static void onPlayerType(Enum<?> playerType) {
-        if(DeepSeekCaptionHook.deferPlayerNotification(playerType,true))return;
-        boolean outer=DeepSeekCaptionHook.deliveringOuterPlayerNotification;
-        DeepSeekCaptionHook.deliveringOuterPlayerNotification=true;
-        try { DeepSeekCaptionHook.onPlayerType(playerType); }
-        finally { DeepSeekCaptionHook.deliveringOuterPlayerNotification=outer; }
-        // YouTube can rebuild subtitle windows during fullscreen/miniplayer transitions while the
-        // previous renderer View remains attached. Force one player-local recheck; the existing
-        // transition guard still owns the visual animation and this adds no independent timer.
+        if (deferToMainThread(playerType)) return;
+        if (playerType != null) DeepSeekCaptionHook.onPlayerType(playerType.name());
+        // YouTube can rebuild subtitle windows during fullscreen and miniplayer transitions while
+        // the previous renderer view stays attached: force one player-local recheck. The
+        // transition guard still owns the animation; this adds no timer of its own.
         CaptionMusicSuppressor.requestNativeRendererScanAfterTransition();
         CaptionMusicSuppressor.kick();
     }
 
     /**
-     * Exact YouTube player-CC controller callback supplied by the Morphe-stable fingerprint.
-     * Defer extension binding until the controller method has returned so YouTube gets the last word
-     * on this update's own listener/state setup; our observer then reads only the final settled View.
+     * Off-main player notifications are coalesced to the newest type and merged on the main thread.
+     * They are guarded by the player <em>owner</em> epoch, not a caption render identity: a caption
+     * clear, an AI toggle or a style change must not discard a valid player callback, while a real
+     * Activity or video change still rejects a stale one.
+     */
+    private static boolean deferToMainThread(Enum<?> type) {
+        if (Looper.myLooper() == Looper.getMainLooper()) return false;
+        synchronized (PLAYER_LOCK) {
+            queuedPlayerType = type;
+            queuedOwnerEpoch = CaptionPlayerAuthority.ownerEpoch();
+            if (!playerNotificationPosted) {
+                playerNotificationPosted = true;
+                MAIN.post(DeepSeekCaptionHookV2::deliverQueuedPlayerType);
+            }
+        }
+        return true;
+    }
+
+    private static void deliverQueuedPlayerType() {
+        Enum<?> type;
+        long epoch;
+        synchronized (PLAYER_LOCK) {
+            type = queuedPlayerType;
+            epoch = queuedOwnerEpoch;
+            queuedPlayerType = null;
+            playerNotificationPosted = false;
+        }
+        if (epoch == CaptionPlayerAuthority.ownerEpoch()) onPlayerType(type);
+    }
+
+    /**
+     * The player's caption button controller. Binding waits until the controller method has
+     * returned, so YouTube has the last word on its own listener and state setup and the observer
+     * reads only the final, settled view.
      */
     public static void onNativeCaptionButtonController(ImageView button) {
-        if (button == null) return;
-        button.post(() -> CaptionButtonController.onNativeCaptionButtonController(button));
+        if (button != null)
+            button.post(() -> CaptionButtonController.onNativeCaptionButtonController(button));
     }
 
     public static void onVideoTime(long timeMs) {
-
-
-        long presentationTimeMs = Math.max(0L,timeMs);
-        DeepSeekCaptionHook.onVideoTime(presentationTimeMs);
+        DeepSeekCaptionHook.onVideoTime(Math.max(0L, timeMs));
         CaptionMusicSuppressor.kick();
     }
 
     public static String rewriteUrl(Object cronetEngine, String originalUrl) {
-        Context context = appContext;
-        boolean aiEnabled = context != null && DeepSeekConfig.load(context).enabled;
+        Context context = DeepSeekCaptionHook.context();
+        boolean aiEnabled = context != null && DeepSeekConfig.enabled(context);
 
-        String selectedUrl = originalUrl;
-        if (aiEnabled) {
-            // The outer wrapper only owns cross-video default restoration. Native/source-track
-            // authority is decided exactly once inside DeepSeekCaptionHook, after this handoff gate.
-            // A long-press menu makes mayActivateAiTarget() false, so the handoff yields cleanly.
-            selectedUrl = CaptionVideoHandoffV2.restoreForNextVideo(context, originalUrl);
-        }
-
-        String rewritten = DeepSeekCaptionHook.rewriteUrl(cronetEngine, selectedUrl);
-        // DeepSeekCaptionHook activates the visible AI session synchronously before returning the
-        // loopback URL. Recheck the native renderer immediately so it is masked before FIRST_AI_READY
-        // rather than waiting for the next ~1-second player-time callback.
+        // Only the cross-video default restoration is decided here; the native and source track
+        // authority is decided once, inside the hook. A long-press menu makes mayActivateAiTarget()
+        // false, so the handoff yields cleanly.
+        String selected =
+                aiEnabled
+                        ? CaptionVideoHandoffV2.restoreForNextVideo(context, originalUrl)
+                        : originalUrl;
+        String rewritten = DeepSeekCaptionHook.rewriteUrl(cronetEngine, selected);
+        // The hook activates the visible session before it returns the loopback url, so the native
+        // renderer is masked before FIRST_AI_READY instead of at the next player-time callback.
         CaptionMusicSuppressor.forceNativeRendererScan();
         CaptionMusicSuppressor.kick();
 
         if (aiEnabled) {
-            String concreteAiUrl = concreteAiUrl(selectedUrl, rewritten);
-            if (!concreteAiUrl.isEmpty()) CaptionVideoHandoffV2.noteAiTarget(concreteAiUrl);
-
-            if (originalUrl != null && !originalUrl.equals(selectedUrl)) {
-                TargetLanguage target = TargetLanguage.fromUrl(selectedUrl);
+            String target = concreteAiUrl(selected, rewritten);
+            if (!target.isEmpty()) CaptionVideoHandoffV2.noteAiTarget(target);
+            if (originalUrl != null && !originalUrl.equals(selected)) {
+                TargetLanguage language = TargetLanguage.fromUrl(selected);
                 CaptionDiagnostics.mark(
                         context,
                         "VIDEO_DEFAULT_AI_RESTORED",
-                        "Default AI captions restored after switching videos" +
-                                (target == null ? "" : ";target=" + target.promptLabel())
-                );
+                        "Default AI captions restored after switching videos"
+                                + (language == null ? "" : ";target=" + language.promptLabel()));
             }
         }
         return rewritten;
     }
 
-    private static String concreteAiUrl(String selectedUrl, String rewrittenUrl) {
-        String decoded = decodeLoopbackTarget(rewrittenUrl);
+    /** The translated timed-text url that the rewritten url stands for; empty if there is none. */
+    private static String concreteAiUrl(String selected, String rewritten) {
+        String decoded = loopbackTarget(rewritten);
         if (!decoded.isEmpty()) return decoded;
-        if (DeepSeekCaptionHook.isYouTubeTimedTextUrl(selectedUrl) &&
-                TargetLanguage.fromUrl(selectedUrl) != null) {
-            return selectedUrl;
-        }
-        return "";
+        return DeepSeekCaptionHook.isYouTubeTimedTextUrl(selected)
+                        && TargetLanguage.fromUrl(selected) != null
+                ? selected
+                : "";
     }
 
-    private static String decodeLoopbackTarget(String value) {
+    /** The translated timed-text url inside a loopback server url, or empty. */
+    private static String loopbackTarget(String value) {
         if (value == null || value.isEmpty()) return "";
         try {
             Uri uri = Uri.parse(value);
-            if (!"127.0.0.1".equals(uri.getHost())) return "";
             String encoded = uri.getQueryParameter("u");
-            if (encoded == null || encoded.isEmpty()) return "";
-            byte[] bytes = Base64.decode(
-                    encoded,
-                    Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING
-            );
-            String decoded = new String(bytes, StandardCharsets.UTF_8);
-            if (!DeepSeekCaptionHook.isYouTubeTimedTextUrl(decoded) ||
-                    TargetLanguage.fromUrl(decoded) == null) {
+            if (!"127.0.0.1".equals(uri.getHost()) || encoded == null || encoded.isEmpty())
                 return "";
-            }
-            return decoded;
-        } catch (Throwable ignored) {
+            String decoded =
+                    new String(
+                            Base64.decode(
+                                    encoded, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING),
+                            StandardCharsets.UTF_8);
+            return DeepSeekCaptionHook.isYouTubeTimedTextUrl(decoded)
+                            && TargetLanguage.fromUrl(decoded) != null
+                    ? decoded
+                    : "";
+        } catch (Throwable malformed) {
             return "";
         }
     }

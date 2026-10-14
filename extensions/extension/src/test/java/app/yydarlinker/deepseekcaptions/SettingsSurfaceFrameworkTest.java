@@ -48,10 +48,10 @@ public class SettingsSurfaceFrameworkTest {
     assertTrue(root.getChildAt(1) instanceof TextView);assertFalse(root.getChildAt(1) instanceof Button);
     for(int i=0;i<root.getChildCount();i++){
       String text=root.getChildAt(i) instanceof TextView?((TextView)root.getChildAt(i)).getText().toString():"";
-      assertFalse("no extra caption title may be rendered",text.equals(CaptionStrings.settings(a,"preview")));
+      assertFalse("no extra caption title may be rendered",text.equals(CaptionStrings.get(a,"preview")));
     }
     assertFalse(preview.isClickable());assertFalse(preview.hasOnClickListeners());
-    assertEquals(CaptionStrings.settings(a,"preview"),preview.getContentDescription().toString());
+    assertEquals(CaptionStrings.get(a,"preview"),preview.getContentDescription().toString());
     SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_TEXT_SIZE,1);
     SubtitleStylePreview.update(DeepSeekSliderPreference.KEY_OPACITY,35);
     assertEquals(1,preview.sizeTier);assertEquals(35,preview.opacity);

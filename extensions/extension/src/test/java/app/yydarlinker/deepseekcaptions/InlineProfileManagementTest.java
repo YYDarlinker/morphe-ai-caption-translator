@@ -24,7 +24,7 @@ public class InlineProfileManagementTest {
     }
     @After public void done(){a.finish();}
     private void idle(){Shadows.shadowOf(Looper.getMainLooper()).idle();}
-    private String text(String key){return CaptionStrings.settings(a,key);}
+    private String text(String key){return CaptionStrings.get(a,key);}
     private Dialog dialog(){return ShadowDialog.getLatestDialog();}
     private View tree(){return dialog().getWindow().getDecorView();}
     private Dialog open(){new ApiProfilesPreference(a).showProfiles();idle();return dialog();}

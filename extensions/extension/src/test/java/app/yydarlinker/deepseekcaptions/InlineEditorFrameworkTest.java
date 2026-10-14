@@ -62,7 +62,7 @@ public class InlineEditorFrameworkTest {
         assertEquals(3,preview.sizeTier);assertEquals(35,preview.opacity);
         preview.measure(View.MeasureSpec.makeMeasureSpec(preview.getWidth(),View.MeasureSpec.EXACTLY),0);
         assertEquals(Math.round(preview.getWidth()*9f/16f),preview.getMeasuredHeight());
-        assertEquals(CaptionStrings.settings(activity,"preview"),preview.getContentDescription().toString());
+        assertEquals(CaptionStrings.get(activity,"preview"),preview.getContentDescription().toString());
         assertEquals(3,preview.sizeTier);assertEquals(35,preview.opacity);
         activity.finish();
     }

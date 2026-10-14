@@ -23,6 +23,8 @@ dependencies {
 }
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     maxHeapSize = "2g"
+    // -Pgolden.write=<file> writes the expected text of the golden tests again instead of comparing.
+    providers.gradleProperty("golden.write").orNull?.let { systemProperty("golden.write", it) }
     systemProperty("n39.root", rootProject.projectDir.absolutePath)
     systemProperty("scheduler.output", providers.gradleProperty("scheduler.output").getOrElse(rootProject.file("validation/integration/test-evidence").absolutePath))
     if (gradle.startParameter.isOffline) {

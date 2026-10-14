@@ -8,7 +8,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "upstream_sha256": "bc5ba7aab1c61dc785742e8cb63b3d69a5d11142aaf817d66d280bc415a4a1e3",
-      "sha256": "f6c21d095ced694bab260fda0f249a4f00c588534d772b9fc7936aaf7b5d9d12",
+      "sha256": "0e1b223efc2c33d9e4152655d457a1f9b96d726d5a6cbca9fea6bdfb84d02d9e",
       "snapshot": "translation-core/upstream/RebuildController.java.txt",
       "upstream_git_blob": "814922f06c539681e1471379faf61cb7c6651548"
     },
@@ -16,7 +16,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java",
       "upstream_sha256": "674b53e2bf49ddf887be0f4a973a8f9eacde6cdf273c815e468e29b378eecfac",
-      "sha256": "056d7aa5ca8e6df9fc324a7955e9c569fb0d27bfb59d00edef776c77d7ef3553",
+      "sha256": "41983ba9b076331cb60d8af93e3098c7196e9428002bfe4483f580c27dcad841",
       "snapshot": "translation-core/upstream/RebuildApi.java.txt",
       "upstream_git_blob": "bb5d3dca2d84602d004b4f7956cb1385aeb5495a"
     },
@@ -24,7 +24,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java",
       "upstream_sha256": "666003c97ceb810e9221389e5fa1ffea21bbb35e62a925f065dd00c7c9f9a5bd",
-      "sha256": "cf689017948ce0dbe6e6e59f832989af060ea2249317148881637153f50514bb",
+      "sha256": "0df26029ea3a89e1e3dd59504edc83b7753c5baea6c680426074871fe26b1628",
       "snapshot": "translation-core/upstream/RebuildCache.java.txt",
       "upstream_git_blob": "91c68c7b87d4bc6241088c55b6608dd38dfa3fd2"
     },
@@ -32,7 +32,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildClock.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildClock.java",
       "upstream_sha256": "2c8d6f67216a8da85843c741c64b2badae4b49a3b28b5678292002c8811250f4",
-      "sha256": "2c8d6f67216a8da85843c741c64b2badae4b49a3b28b5678292002c8811250f4",
+      "sha256": "142a71d2a96f57f9f3d6e4e13030af3500a0cae26611826a9371b654c07b2bd3",
       "snapshot": "translation-core/upstream/RebuildClock.java.txt",
       "upstream_git_blob": "37c538ddefa39bb7a3b8e5fafd094dffdfa03807"
     },
@@ -40,7 +40,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java",
       "upstream_sha256": "429f9f059f44113f171f0c7574dabd1b3b8fc589fc2f56489e86a978bc53866e",
-      "sha256": "9fae7ad2c7ca0df97bd12390d61c632cef81fb74808da641e5386f94c6c67fb7",
+      "sha256": "c57bcee3ee5752d1bd97074288ccc7a0edcef65118b8bbdaf6d9d965eeb38d07",
       "snapshot": "translation-core/upstream/RebuildSource.java.txt",
       "upstream_git_blob": "7f1c52768fb09e675c687a8232db3eabb521fd68"
     },
@@ -48,7 +48,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java",
       "upstream_sha256": "d63d4606f30ae9f4d33085dedf92c585fed9024d3a37ee213af720617dfea6bc",
-      "sha256": "5238a740492471e018202ddc00516cf0a718e8c9e1416dc0096f943981f1e718",
+      "sha256": "870b2cda48876be9bdb16badef032c95977f245c9ac72d7f48173339b3f07be4",
       "snapshot": "translation-core/upstream/RebuildPlanner.java.txt",
       "upstream_git_blob": "8712b04d8920d6e16632fe7ee558fb87b35b402e"
     },
@@ -56,7 +56,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "upstream_sha256": "02b60c2313df406b91d2e97b449414954427ae57fb98e3c9a57dc9a86b35cb3b",
-      "sha256": "b2002ab7028ceee58d93ebde88336ba2bf98548b190c06fa55592b1a59b4eabd",
+      "sha256": "8f97c140ffe89207c12f371a561f41e00df960ee20880811d1ea0e5c4fb009b6",
       "snapshot": "translation-core/upstream/RebuildProtocol.java.txt",
       "upstream_git_blob": "d5dc8cc59c7db9b9411dbd90cfdfa4d725ec3f4c"
     },
@@ -64,7 +64,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
       "upstream_sha256": "1df47bbb596cb6cd6642cc5bb7825a71cad9258f848f1d3bbae1cc0b6a1af74d",
-      "sha256": "1b2654b0c604c8d5258d5295bff3af9faa0d20210df2b10ec93b8c7d3c1acded",
+      "sha256": "6e58b53abb93272d8bf5f17004d927223171176158e427c4333be86b4a4ce35c",
       "snapshot": "translation-core/upstream/RebuildReview.java.txt",
       "upstream_git_blob": "2081df9674521637c84641d26e2a813478274745"
     },
@@ -72,7 +72,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java",
       "upstream_sha256": "72618633fe3af40cc698e8190efac5808dd383e624db57af45fabc2659c8996f",
-      "sha256": "72618633fe3af40cc698e8190efac5808dd383e624db57af45fabc2659c8996f",
+      "sha256": "410258a7702fb27f8f3440ea9edebd0a524e3ea9eaabdaea3b689b39ac26b218",
       "snapshot": "translation-core/upstream/RebuildSemantics.java.txt",
       "upstream_git_blob": "93a38c3242ca8656ef7cba00bd3ba346438f06ef"
     },
@@ -80,23 +80,15 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildNumbers.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildNumbers.java",
       "upstream_sha256": "303073f46f5c4b0ae1d47fede95084742321d62bfce19c6ca5a9ab321b63b925",
-      "sha256": "303073f46f5c4b0ae1d47fede95084742321d62bfce19c6ca5a9ab321b63b925",
+      "sha256": "0faae89bcfae59aab9beb582109285fcb0f5482ee9cc6d47b0aaf6d022cf19f6",
       "snapshot": "translation-core/upstream/RebuildNumbers.java.txt",
       "upstream_git_blob": "76f7e49cb27f3666a8c70ae666ac850ce824ad04"
-    },
-    {
-      "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayMerge.java",
-      "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayMerge.java",
-      "upstream_sha256": "26b79e52ad166c9087ed02e12efe8f50c99f5e4634392538f113fa5ae190a523",
-      "sha256": "26b79e52ad166c9087ed02e12efe8f50c99f5e4634392538f113fa5ae190a523",
-      "snapshot": "translation-core/upstream/RebuildDisplayMerge.java.txt",
-      "upstream_git_blob": "966f77ed1c983f0dd8206566eedabc0af7c1dccc"
     },
     {
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java",
       "upstream_sha256": "e83578f627bf628347fd0d19281ba3bbd11189358dab60ad99228d8e076b4140",
-      "sha256": "84aa403cf8fab64a39d1bb00c3f162ce2d81cd84991af426efaba36cdb20bb90",
+      "sha256": "daf3b0f2e9dcf31473ec653f1f5bd8a864f27a72efe55cb498023b89bd3235d4",
       "snapshot": "translation-core/upstream/ProviderRequestPolicy.java.txt",
       "upstream_git_blob": "0121dfb9e4f3d3942549e9827a2d7de66135c2d6"
     },
@@ -104,7 +96,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java",
       "upstream_sha256": "36254c73f2ea10a4f2771a09a03b682f67d67509dd3c713ed6ffc8e6fe694e73",
-      "sha256": "a8272e074b3e7846af540855d799e230dcde85d16291072e0da372faf61281e0",
+      "sha256": "2014b6f45757716481075f37917d2e32be5de7f070b1b1441213e12b88603fdc",
       "snapshot": "translation-core/upstream/DeepSeekApiClient.java.txt",
       "upstream_git_blob": "56820ce6380ac6b58ec73643fdcd1260dab7d974"
     },
@@ -112,7 +104,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java",
       "upstream_sha256": "f32c42b4c04254b37c9185177fcbc3e516bad8baf0765115f83c0f8ba20e692b",
-      "sha256": "984c68c9cbc94e59f039b3282afa32b06d3d308408e96786cef36c0a83abed68",
+      "sha256": "c73c7bfaa987487fa9728cc9b01cd094331aa5328079fe742f5d4b9f17f1073b",
       "snapshot": "translation-core/upstream/RebuildPageLayout.java.txt",
       "upstream_git_blob": "87f2365217ffc87af117c75021c7b310145c221b"
     },
@@ -120,7 +112,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java",
       "upstream_sha256": "74e1239b01957620538c687b446ddd17ede17fb902078cffc0629ab681d2bf7f",
-      "sha256": "1526516680465b9d397e03caeda675d5f68d7f11c964f2d6c880281b99563389",
+      "sha256": "7004cd126bba523876fde3792b95cf2fae6d13b30ef89a519dfbe68e77ea084a",
       "snapshot": "translation-core/upstream/CaptionLanguagePager.java.txt",
       "upstream_git_blob": "52f1c42b4ac2f809341ac57bf56e8eecc6442232"
     },
@@ -139,31 +131,21 @@
   "new_files": [
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/TranslationPresentation.java",
-      "sha256": "242da010efbffa0d72cc96ed661fbd680868a0d6c50e0ccf02b6169fc41ed673",
+      "sha256": "93b18d2a420975550472e9fb3e4f08ffa4a3859944de38b0b7287662dd0cd719",
       "purpose": "immutable pure upstream page output adapter"
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayGroups.java",
-      "sha256": "16d13a1ae0c11f9d47e9278ec0e610e608b694575ae83a6f6cf2d68584197fb7",
+      "sha256": "a39c4ea79122de7b11502848889c834f5063aec07b189f7483e9fb97d7c4d7f7",
       "purpose": "display-only partition of accepted events into non-repeating caption units"
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildStream.java",
-      "sha256": "1839c219f1adf85e4857eaded21e4f04a71963a41aac52f34dd28611ba4632e9",
+      "sha256": "1edd846de647fc608bb365c10248fed834e167fa2a9595f65e113b5a65679dd1",
       "purpose": "streamed transport for verified providers; rebuilds the non-streamed response and offers validated leading events"
     }
   ],
   "protected_abi": [
-    {
-      "path": "application-host/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekCaptionHook.java",
-      "signatures": [
-        "public static String rewriteUrl(Object cronetEngine, String originalUrl)",
-        "public static void onPlayerType(Enum<?> playerType)",
-        "public static void onVideoId(String videoId)",
-        "public static void onVideoTime(long timeMs)",
-        "public static void setMainActivity(Activity activity)"
-      ]
-    },
     {
       "path": "application-host/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekCaptionHookV2.java",
       "signatures": [
@@ -183,28 +165,25 @@
         "public static List<?> nativeTracks(Object manager)",
         "public static List<?> translatedTracks(Object manager)",
         "public static Object augmentMetadata(Object metadata)",
-        "public static Object cloneSimplified(Object track)",
-        "public static Object cloneTranslation(Object track,String code)",
+        "public static Object cloneTranslation(Object track, String code)",
         "public static Object resolveRemembered(Object manager)",
         "public static String language(Object track)",
         "public static String nativeModelVideo(Object manager)",
-        "public static String simplifiedUrl(String value)",
         "public static String simplifiedVss(String value)",
         "public static String translationLabel(String code)",
-        "public static String translationUrl(String url,String code)",
-        "public static String translationVss(String value,String code)",
+        "public static String translationUrl(String url, String code)",
+        "public static String translationVss(String value, String code)",
         "public static String url(Object track)",
         "public static String vss(Object track)",
         "public static boolean suppressNativeDraw()",
         "public static int restoreDecision()",
-        "public static void onNativeAppliedEvent(Object manager,Object committed,Object requested,Object origin,int reason,String modelOwner)",
-        "public static void onNativeSelection(Object manager,Object track,Object origin)",
-        "public static void onNativeSelectionApplied(Object manager,Object track,Object origin,int reason,String modelOwner)",
-        "public static void onNativeSelectionWithReason(Object manager,Object track,Object origin,int reason)",
-        "public static void onNativeTrackApplied(Object manager,Object event)",
+        "public static void onNativeAppliedEvent( Object manager, Object committed, Object requested, Object origin, int reason, String modelOwner)",
+        "public static void onNativeSelection(Object manager, Object track, Object origin)",
+        "public static void onNativeSelectionApplied( Object manager, Object track, Object origin, int reason, String modelOwner)",
+        "public static void onNativeSelectionWithReason( Object manager, Object track, Object origin, int reason)",
+        "public static void onNativeTrackApplied(Object manager, Object event)",
         "public static void onOriginalTrackList(List<?> tracks)",
-        "public static void onSelection(Object track)",
-        "public static void selectNative(Object manager,Object track,Object origin,int reason)"
+        "public static void selectNative(Object manager, Object track, Object origin, int reason)"
       ]
     }
   ]

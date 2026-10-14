@@ -20,7 +20,7 @@ public class ProfileUiRegressionTest {
     @Before public void setup(){a=Robolectric.buildActivity(Activity.class).setup().visible().get();}
     @After public void done(){a.finish();}
     private void idle(){Shadows.shadowOf(Looper.getMainLooper()).idle();}
-    private String text(String key){return CaptionStrings.settings(a,key);}
+    private String text(String key){return CaptionStrings.get(a,key);}
     private View tree(){return ShadowDialog.getLatestDialog().getWindow().getDecorView();}
     private <T extends View> T first(View v,Class<T> type){
         if(type.isInstance(v))return type.cast(v);
@@ -127,7 +127,7 @@ public class ProfileUiRegressionTest {
         Set<String> defaults=new HashSet<>();
         for(String lang:locales){
             Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.forLanguageTag(lang)));
-            Context c=a.createConfigurationContext(config);String expected=CaptionStrings.settings(c,"default_prompt");
+            Context c=a.createConfigurationContext(config);String expected=CaptionStrings.get(c,"default_prompt");
             assertEquals(expected,DeepSeekConfig.load(c).prompt);defaults.add(expected);
         }
         assertEquals(14,defaults.size());assertFalse(ApiProfiles.values(a).contains("prompt"));

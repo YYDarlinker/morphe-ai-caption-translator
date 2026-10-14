@@ -133,6 +133,6 @@ public class N36PreviewCacheContractTest {
                 SubtitleStylePreview.sample(a).isEmpty());
         assertNotEquals("a missing catalog entry must not leak the raw key",
                 SubtitleStylePreview.SAMPLE_KEY,SubtitleStylePreview.sample(a));
-        assertEquals(CaptionStrings.settings(a,SubtitleStylePreview.SAMPLE_KEY),SubtitleStylePreview.sample(a));
+        assertEquals(CaptionStrings.get(a,SubtitleStylePreview.SAMPLE_KEY),SubtitleStylePreview.sample(a));
     }
 }

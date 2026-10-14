@@ -8,64 +8,70 @@ import java.util.Map;
 
 /** Target language selected from YouTube's Auto-translate menu. */
 final class TargetLanguage {
-    static final TargetLanguage SIMPLIFIED_CHINESE =
-            new TargetLanguage("zh-Hans", "简体中文");
+    static final TargetLanguage SIMPLIFIED_CHINESE = new TargetLanguage("zh-Hans", "简体中文");
 
+    /** Chinese names shown to the model, by lower-case language code. */
     private static final Map<String, String> CHINESE_NAMES = new HashMap<>();
 
     static {
-        CHINESE_NAMES.put("af", "南非荷兰语");
-        CHINESE_NAMES.put("ar", "阿拉伯语");
-        CHINESE_NAMES.put("bg", "保加利亚语");
-        CHINESE_NAMES.put("bn", "孟加拉语");
-        CHINESE_NAMES.put("ca", "加泰罗尼亚语");
-        CHINESE_NAMES.put("cs", "捷克语");
-        CHINESE_NAMES.put("da", "丹麦语");
-        CHINESE_NAMES.put("de", "德语");
-        CHINESE_NAMES.put("el", "希腊语");
-        CHINESE_NAMES.put("en", "英语");
-        CHINESE_NAMES.put("es", "西班牙语");
-        CHINESE_NAMES.put("et", "爱沙尼亚语");
-        CHINESE_NAMES.put("fa", "波斯语");
-        CHINESE_NAMES.put("fi", "芬兰语");
-        CHINESE_NAMES.put("fil", "菲律宾语");
-        CHINESE_NAMES.put("fr", "法语");
-        CHINESE_NAMES.put("he", "希伯来语");
-        CHINESE_NAMES.put("hi", "印地语");
-        CHINESE_NAMES.put("hr", "克罗地亚语");
-        CHINESE_NAMES.put("hu", "匈牙利语");
-        CHINESE_NAMES.put("id", "印度尼西亚语");
-        CHINESE_NAMES.put("it", "意大利语");
-        CHINESE_NAMES.put("ja", "日语");
-        CHINESE_NAMES.put("ko", "韩语");
-        CHINESE_NAMES.put("lt", "立陶宛语");
-        CHINESE_NAMES.put("lv", "拉脱维亚语");
-        CHINESE_NAMES.put("ms", "马来语");
-        CHINESE_NAMES.put("nl", "荷兰语");
-        CHINESE_NAMES.put("no", "挪威语");
-        CHINESE_NAMES.put("pl", "波兰语");
-        CHINESE_NAMES.put("pt", "葡萄牙语");
-        CHINESE_NAMES.put("ro", "罗马尼亚语");
-        CHINESE_NAMES.put("ru", "俄语");
-        CHINESE_NAMES.put("sk", "斯洛伐克语");
-        CHINESE_NAMES.put("sl", "斯洛文尼亚语");
-        CHINESE_NAMES.put("sr", "塞尔维亚语");
-        CHINESE_NAMES.put("sv", "瑞典语");
-        CHINESE_NAMES.put("sw", "斯瓦希里语");
-        CHINESE_NAMES.put("ta", "泰米尔语");
-        CHINESE_NAMES.put("te", "泰卢固语");
-        CHINESE_NAMES.put("th", "泰语");
-        CHINESE_NAMES.put("tr", "土耳其语");
-        CHINESE_NAMES.put("uk", "乌克兰语");
-        CHINESE_NAMES.put("ur", "乌尔都语");
-        CHINESE_NAMES.put("vi", "越南语");
-        CHINESE_NAMES.put("zh", "中文");
-        CHINESE_NAMES.put("zh-hans", "简体中文");
-        CHINESE_NAMES.put("zh-cn", "简体中文");
-        CHINESE_NAMES.put("zh-sg", "简体中文");
-        CHINESE_NAMES.put("zh-hant", "繁体中文");
-        CHINESE_NAMES.put("zh-tw", "繁体中文");
-        CHINESE_NAMES.put("zh-hk", "繁体中文");
+        for (String entry :
+                new String[] {
+                    "af=南非荷兰语",
+                    "ar=阿拉伯语",
+                    "bg=保加利亚语",
+                    "bn=孟加拉语",
+                    "ca=加泰罗尼亚语",
+                    "cs=捷克语",
+                    "da=丹麦语",
+                    "de=德语",
+                    "el=希腊语",
+                    "en=英语",
+                    "es=西班牙语",
+                    "et=爱沙尼亚语",
+                    "fa=波斯语",
+                    "fi=芬兰语",
+                    "fil=菲律宾语",
+                    "fr=法语",
+                    "he=希伯来语",
+                    "hi=印地语",
+                    "hr=克罗地亚语",
+                    "hu=匈牙利语",
+                    "id=印度尼西亚语",
+                    "it=意大利语",
+                    "ja=日语",
+                    "ko=韩语",
+                    "lt=立陶宛语",
+                    "lv=拉脱维亚语",
+                    "ms=马来语",
+                    "nl=荷兰语",
+                    "no=挪威语",
+                    "pl=波兰语",
+                    "pt=葡萄牙语",
+                    "ro=罗马尼亚语",
+                    "ru=俄语",
+                    "sk=斯洛伐克语",
+                    "sl=斯洛文尼亚语",
+                    "sr=塞尔维亚语",
+                    "sv=瑞典语",
+                    "sw=斯瓦希里语",
+                    "ta=泰米尔语",
+                    "te=泰卢固语",
+                    "th=泰语",
+                    "tr=土耳其语",
+                    "uk=乌克兰语",
+                    "ur=乌尔都语",
+                    "vi=越南语",
+                    "zh=中文",
+                    "zh-hans=简体中文",
+                    "zh-cn=简体中文",
+                    "zh-sg=简体中文",
+                    "zh-hant=繁体中文",
+                    "zh-tw=繁体中文",
+                    "zh-hk=繁体中文"
+                }) {
+            int eq = entry.indexOf('=');
+            CHINESE_NAMES.put(entry.substring(0, eq), entry.substring(eq + 1));
+        }
     }
 
     final String code;
@@ -82,6 +88,7 @@ final class TargetLanguage {
         try {
             target = Uri.parse(url).getQueryParameter("tlang");
         } catch (Throwable ignored) {
+            // A URL Uri cannot parse names no target.
         }
         if (target == null || target.trim().isEmpty()) return null;
         return fromCode(target);
@@ -93,16 +100,9 @@ final class TargetLanguage {
         String lower = code.toLowerCase(Locale.ROOT);
         String name = CHINESE_NAMES.get(lower);
         if (name == null) name = CHINESE_NAMES.get(primary(lower));
-        if (name == null || name.trim().isEmpty()) {
-            try {
-                Locale locale = Locale.forLanguageTag(toModernTag(code));
-                name = locale.getDisplayName(Locale.SIMPLIFIED_CHINESE);
-            } catch (Throwable ignored) {
-                name = "";
-            }
-        }
-        if (name == null || name.trim().isEmpty()) name = code;
-        return new TargetLanguage(code, name.trim());
+        if (name == null)
+            name = Locale.forLanguageTag(code).getDisplayName(Locale.SIMPLIFIED_CHINESE).trim();
+        return new TargetLanguage(code, name.isEmpty() ? code : name);
     }
 
     String promptLabel() {
@@ -156,24 +156,15 @@ final class TargetLanguage {
         if ("iw".equals(lower)) return "he";
         if ("in".equals(lower)) return "id";
         if ("ji".equals(lower)) return "yi";
-        if ("zh-hans".equals(lower) || "zh-cn".equals(lower) || "zh-sg".equals(lower)) {
+        if (lower.equals("zh-hans") || lower.equals("zh-cn") || lower.equals("zh-sg"))
             return "zh-Hans";
-        }
-        if ("zh-hant".equals(lower) || "zh-tw".equals(lower) || "zh-hk".equals(lower)) {
+        if (lower.equals("zh-hant") || lower.equals("zh-tw") || lower.equals("zh-hk"))
             return "zh-Hant";
-        }
         return trimmed;
     }
 
     private static String primary(String code) {
         int separator = code.indexOf('-');
         return separator < 0 ? code : code.substring(0, separator);
-    }
-
-    private static String toModernTag(String code) {
-        if ("iw".equalsIgnoreCase(code)) return "he";
-        if ("in".equalsIgnoreCase(code)) return "id";
-        if ("ji".equalsIgnoreCase(code)) return "yi";
-        return code;
     }
 }

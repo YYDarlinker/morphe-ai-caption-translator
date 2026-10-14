@@ -60,7 +60,7 @@ public class N25TierRailTest {
     private DeepSeekSliderPreference sizePreference(Context c){
         DeepSeekSliderPreference preference=new DeepSeekSliderPreference(c);
         preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);
-        preference.setTitle(CaptionStrings.settings(c,"size"));
+        preference.setTitle(CaptionStrings.get(c,"size"));
         return preference;
     }
 
@@ -100,7 +100,7 @@ public class N25TierRailTest {
         for(int width:widths)largest=Math.max(largest,width);
         for(int tier=0;tier<5;tier++){
             TextView view=(TextView)names.getChildAt(tier);
-            String expected=CaptionStrings.settings(c,TIER_KEYS[tier]);
+            String expected=CaptionStrings.get(c,TIER_KEYS[tier]);
             assertEquals(label+" tier "+tier+" text",expected,view.getText().toString());
             assertNull(label+" tier "+tier+" must not be ellipsized",view.getEllipsize());
             if(view.getLayout()!=null){
@@ -200,7 +200,7 @@ public class N25TierRailTest {
         View sizeRoot=row(c,sizePreference);
         DeepSeekSliderPreference opacityPreference=new DeepSeekSliderPreference(c);
         opacityPreference.setKey(DeepSeekSliderPreference.KEY_OPACITY);
-        opacityPreference.setTitle(CaptionStrings.settings(c,"opacity"));
+        opacityPreference.setTitle(CaptionStrings.get(c,"opacity"));
         View opacityRoot=row(c,opacityPreference);
         root.addView(sizeRoot,new LinearLayout.LayoutParams(-1,-2));
         root.addView(opacityRoot,new LinearLayout.LayoutParams(-1,-2));
@@ -251,9 +251,9 @@ public class N25TierRailTest {
                 JSONObject entry=new JSONObject()
                         .put("locale",tag)
                         .put("labels",new JSONArray(Arrays.asList(
-                                CaptionStrings.settings(c,TIER_KEYS[0]),CaptionStrings.settings(c,TIER_KEYS[1]),
-                                CaptionStrings.settings(c,TIER_KEYS[2]),CaptionStrings.settings(c,TIER_KEYS[3]),
-                                CaptionStrings.settings(c,TIER_KEYS[4]))))
+                                CaptionStrings.get(c,TIER_KEYS[0]),CaptionStrings.get(c,TIER_KEYS[1]),
+                                CaptionStrings.get(c,TIER_KEYS[2]),CaptionStrings.get(c,TIER_KEYS[3]),
+                                CaptionStrings.get(c,TIER_KEYS[4]))))
                         .put("widest_bold_label_px",slider.largestTierLabelPx())
                         .put("label_ceiling_px",slider.tierLabelCeilingPx())
                         .put("rail_inset_px",slider.railInsetPx())
@@ -379,7 +379,7 @@ public class N25TierRailTest {
                 DeepSeekSliderPreference sizeRow=sizePreference(context);
                 DeepSeekSliderPreference opacityRow=new DeepSeekSliderPreference(context);
                 opacityRow.setKey(DeepSeekSliderPreference.KEY_OPACITY);
-                opacityRow.setTitle(CaptionStrings.settings(context,"opacity"));
+                opacityRow.setTitle(CaptionStrings.get(context,"opacity"));
                 LinearLayout column=new LinearLayout(context);
                 column.setOrientation(LinearLayout.VERTICAL);
                 CaptionSettingsStyle.row(column);

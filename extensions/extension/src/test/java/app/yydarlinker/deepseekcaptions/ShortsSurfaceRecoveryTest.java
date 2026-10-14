@@ -23,7 +23,7 @@ public class ShortsSurfaceRecoveryTest {
   }
   @After public void done(){h.done();CaptionPlayerAuthority.resetForTests();}
 
-  void type(String value){CaptionPlayerAuthority.onNotification(value,false);Shadows.shadowOf(Looper.getMainLooper()).idle();}
+  void type(String value){CaptionPlayerAuthority.onNotification(value);Shadows.shadowOf(Looper.getMainLooper()).idle();}
 
   @Test public void aShortWhoseSurfaceWentStaleComesBackWhenItIsFoundAgain(){
     N39UiGeometryFixture.shorts=true;type("NONE");

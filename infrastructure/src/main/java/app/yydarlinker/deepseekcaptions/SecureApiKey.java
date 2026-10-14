@@ -6,130 +6,169 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
 
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.util.Locale;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
-/** Stores the API key encrypted with a non-exportable Android Keystore key. */
+/**
+ * The API keys of the profiles, encrypted with one non-exportable key of the Android Keystore.
+ *
+ * <p>A saved key is bound to the origin of the endpoint it was saved for: if the endpoint of the
+ * profile later points elsewhere, the key is not handed out.
+ */
 final class SecureApiKey {
     private static final String STORE = "deepseek_caption_secret";
     private static final String VALUE = "api_key_ciphertext";
+    private static final String ORIGIN = "_origin";
     private static final String ALIAS = "yydarlinker.deepseek.caption.api.key.v1";
-    private static final String ANDROID_KEY_STORE = "AndroidKeyStore";
+    private static final String KEY_STORE = "AndroidKeyStore";
+    private static final String CIPHER = "AES/GCM/NoPadding";
 
     private SecureApiKey() {}
 
+    private static SharedPreferences prefs(Context context) {
+        return context.getSharedPreferences(STORE, Context.MODE_PRIVATE);
+    }
+
+    private static String valueKey(String profile) {
+        return ApiProfiles.LEGACY.equals(profile) ? VALUE : VALUE + "_" + profile;
+    }
+
+    private static String valueKey(Context context) {
+        return valueKey(ApiProfiles.active(context));
+    }
+
+    /** The scheme and authority of the endpoint of the active profile. */
+    private static String origin(Context context) {
+        URI uri =
+                URI.create(
+                        ApiProfiles.values(context)
+                                .getString("base_url", DeepSeekConfig.DEFAULT_BASE_URL));
+        return uri.getScheme().toLowerCase(Locale.ROOT)
+                + "://"
+                + uri.getRawAuthority().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean originMatches(Context context) {
+        String saved = prefs(context).getString(valueKey(context) + ORIGIN, "");
+        return saved.isEmpty() || saved.equals(origin(context));
+    }
+
     static void save(Context context, String apiKey) throws Exception {
-        synchronized(ApiProfiles.LOCK) {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
+        if (apiKey == null || apiKey.trim().isEmpty())
             throw new IllegalArgumentException("API Key 不能为空");
-        }
-        SecretKey key = getOrCreateKey();
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, key);
-        byte[] ciphertext = cipher.doFinal(apiKey.trim().getBytes(StandardCharsets.UTF_8));
-        byte[] iv = cipher.getIV();
-
-        ByteBuffer packed = ByteBuffer.allocate(1 + iv.length + ciphertext.length);
-        packed.put((byte) iv.length);
-        packed.put(iv);
-        packed.put(ciphertext);
-        String encoded = Base64.encodeToString(packed.array(), Base64.NO_WRAP);
-        prefs(context).edit().putString(valueKey(context), encoded).putString(valueKey(context)+"_origin",origin(context)).apply();
+        synchronized (ApiProfiles.LOCK) {
+            Cipher cipher = Cipher.getInstance(CIPHER);
+            cipher.init(Cipher.ENCRYPT_MODE, keyOrNew());
+            byte[] iv = cipher.getIV();
+            byte[] ciphertext = cipher.doFinal(apiKey.trim().getBytes(StandardCharsets.UTF_8));
+            byte[] packed =
+                    ByteBuffer.allocate(1 + iv.length + ciphertext.length)
+                            .put((byte) iv.length)
+                            .put(iv)
+                            .put(ciphertext)
+                            .array();
+            String valueKey = valueKey(context);
+            prefs(context)
+                    .edit()
+                    .putString(valueKey, Base64.encodeToString(packed, Base64.NO_WRAP))
+                    .putString(valueKey + ORIGIN, origin(context))
+                    .apply();
         }
     }
 
+    /** The key of the active profile; empty if none is saved or it cannot be read. */
     static String load(Context context) {
-        synchronized(ApiProfiles.LOCK) {
-        if(!originMatches(context))return "";
-        String encoded = prefs(context).getString(valueKey(context), "");
-        if (encoded == null || encoded.isEmpty()) return "";
-        try {
-            byte[] packed = Base64.decode(encoded, Base64.DEFAULT);
-            ByteBuffer buffer = ByteBuffer.wrap(packed);
-            int ivLength = buffer.get() & 0xFF;
-            if (ivLength < 12 || ivLength > 32 || buffer.remaining() <= ivLength) return "";
-            byte[] iv = new byte[ivLength];
-            buffer.get(iv);
-            byte[] ciphertext = new byte[buffer.remaining()];
-            buffer.get(ciphertext);
-
-            KeyStore store = KeyStore.getInstance(ANDROID_KEY_STORE);
-            store.load(null);
-            SecretKey key = (SecretKey) store.getKey(ALIAS, null);
-            if (key == null) return "";
-
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
-            return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
-        } catch (Throwable ignored) {
-            return "";
+        synchronized (ApiProfiles.LOCK) {
+            String encoded = prefs(context).getString(valueKey(context), "");
+            if (encoded.isEmpty() || !originMatches(context)) return "";
+            try {
+                ByteBuffer packed = ByteBuffer.wrap(Base64.decode(encoded, Base64.DEFAULT));
+                int ivLength = packed.get() & 0xFF;
+                if (ivLength < 12 || ivLength > 32 || packed.remaining() <= ivLength) return "";
+                byte[] iv = new byte[ivLength];
+                packed.get(iv);
+                byte[] ciphertext = new byte[packed.remaining()];
+                packed.get(ciphertext);
+                SecretKey key = existingKey();
+                if (key == null) return "";
+                Cipher cipher = Cipher.getInstance(CIPHER);
+                cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
+                return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
+            } catch (GeneralSecurityException | RuntimeException unreadable) {
+                return "";
+            }
         }
     }
 
+    /** Keys saved before the origin was recorded are bound to the current origin. */
+    static void bindLegacyOrigin(Context context) {
+        synchronized (ApiProfiles.LOCK) {
+            String valueKey = valueKey(context);
+            SharedPreferences prefs = prefs(context);
+            if (prefs.contains(valueKey) && !prefs.contains(valueKey + ORIGIN))
+                prefs.edit().putString(valueKey + ORIGIN, origin(context)).apply();
+        }
     }
 
-    private static String valueKey(Context c){return valueKey(ApiProfiles.active(c));}
-    private static String valueKey(String id){return ApiProfiles.LEGACY.equals(id)?VALUE:VALUE+"_"+id;}
-
-    private static String origin(Context c){
-        java.net.URI u=java.net.URI.create(ApiProfiles.values(c).getString("base_url",DeepSeekConfig.DEFAULT_BASE_URL));
-        return u.getScheme().toLowerCase(java.util.Locale.ROOT)+"://"+u.getRawAuthority().toLowerCase(java.util.Locale.ROOT);
-    }
-    private static boolean originMatches(Context c){String saved=prefs(c).getString(valueKey(c)+"_origin","");return saved.isEmpty()||saved.equals(origin(c));}
-    static void bindLegacyOrigin(Context c){synchronized(ApiProfiles.LOCK){
-        if(prefs(c).contains(valueKey(c))&&!prefs(c).contains(valueKey(c)+"_origin"))prefs(c).edit().putString(valueKey(c)+"_origin",origin(c)).apply();
-    }}
-    static boolean hasSavedValue(Context context){synchronized(ApiProfiles.LOCK){return prefs(context).contains(valueKey(context))&&originMatches(context);}}
-    static boolean hasKey(Context context) {
-        return !load(context).isEmpty();
+    static boolean hasSavedValue(Context context) {
+        synchronized (ApiProfiles.LOCK) {
+            return prefs(context).contains(valueKey(context)) && originMatches(context);
+        }
     }
 
     static void clear(Context context) {
-        // All profile ciphertexts share the non-exportable key. Clearing ONE must not delete it.
-        synchronized(ApiProfiles.LOCK){clear(context, ApiProfiles.active(context));}
+        clear(context, ApiProfiles.active(context));
+    }
+
+    /** Forgets the key of one profile. The keystore key stays: the other profiles use it too. */
+    static void clear(Context context, String profile) {
+        synchronized (ApiProfiles.LOCK) {
+            String valueKey = valueKey(profile);
+            prefs(context).edit().remove(valueKey).remove(valueKey + ORIGIN).apply();
+        }
     }
 
     /**
-     * Opaque credential reference for the diagnostics writer. It never returns the key itself and is
-     * only used to decide whether a queued record may be redacted with the currently readable key.
+     * An opaque reference to the key for the diagnostics: it decides whether a record may be
+     * redacted with the key that can be read now, and never reveals the key.
      */
     static CaptionCredentialRef credentialRef(Context context) {
         String key = load(context);
         return key.isEmpty() ? CaptionCredentialRef.NONE : CaptionCredentialRef.of(key);
     }
 
-    static void clear(Context context, String id) {
-        synchronized (ApiProfiles.LOCK) {
-            prefs(context).edit().remove(valueKey(id)).remove(valueKey(id)+"_origin").apply();
+    private static SecretKey existingKey() throws GeneralSecurityException {
+        try {
+            KeyStore store = KeyStore.getInstance(KEY_STORE);
+            store.load(null);
+            return (SecretKey) store.getKey(ALIAS, null);
+        } catch (java.io.IOException unavailable) {
+            throw new java.security.KeyStoreException(unavailable);
         }
     }
 
-    private static SharedPreferences prefs(Context context) {
-        return context.getSharedPreferences(STORE, Context.MODE_PRIVATE);
-    }
-
-    private static SecretKey getOrCreateKey() throws Exception {
-        KeyStore store = KeyStore.getInstance(ANDROID_KEY_STORE);
-        store.load(null);
-        SecretKey existing = (SecretKey) store.getKey(ALIAS, null);
+    private static SecretKey keyOrNew() throws GeneralSecurityException {
+        SecretKey existing = existingKey();
         if (existing != null) return existing;
-
-        KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
-        KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
-                ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
-        )
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setRandomizedEncryptionRequired(true)
-                .build();
-        generator.init(spec);
+        KeyGenerator generator =
+                KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEY_STORE);
+        generator.init(
+                new KeyGenParameterSpec.Builder(
+                                ALIAS,
+                                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                        .setRandomizedEncryptionRequired(true)
+                        .build());
         return generator.generateKey();
     }
 }

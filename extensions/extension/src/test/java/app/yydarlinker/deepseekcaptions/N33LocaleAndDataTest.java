@@ -40,19 +40,12 @@ public class N33LocaleAndDataTest {
         for(AppLanguage language:AppLanguage.values())if(language!=AppLanguage.DEFAULT){choose(language);
             diagnostics.refreshCaptionText();assertEquals(toggle.getText(),toggle.getContentDescription());
             IllegalStateException empty=new IllegalStateException("接口没有返回可选择的模型 ID");empty.setStackTrace(new StackTraceElement[]{new StackTraceElement(DeepSeekModelCatalog.class.getName(),"fetch","DeepSeekModelCatalog.java",1)});
-            assertEquals(CaptionStrings.settings(activity,"model_ids_empty"),DeepSeekModelPreference.failureText(activity,empty));
-            String locale=CaptionTextResolver.catalogLocale(language.getLocale());
-            assertEquals(CaptionTranslationCatalog.text(locale,"ai_summary"),CaptionStrings.settings(activity,"ai_summary"));
-            assertEquals(CaptionTranslationCatalog.text(locale,"preview_sample"),CaptionStrings.get(activity,"preview_sample"));
-            assertEquals(CaptionTranslationCatalog.text(locale,"default_prompt"),DeepSeekConfig.displayDefaultPrompt(activity));
+            assertEquals(CaptionStrings.get(activity,"model_ids_empty"),DeepSeekModelPreference.failureText(activity,empty));
+            assertEquals(CaptionTextResolver.string(activity,language.getLocale(),"ai_summary"),CaptionStrings.get(activity,"ai_summary"));
+            assertEquals(CaptionTextResolver.string(activity,language.getLocale(),"preview_sample"),CaptionStrings.get(activity,"preview_sample"));
+            assertEquals(CaptionTextResolver.string(activity,language.getLocale(),"default_prompt"),CaptionStrings.get(activity,"default_prompt"));
             assertEquals("忠实、自然、简洁；优先符合目标语言的母语表达习惯；保留人名、专有名词、数字、语气和必要的标点；不要增加原文没有的解释。",DeepSeekConfig.defaultPrompt(activity));
         }
-    }
-    @Test public void defaultUsesCallerLocaleAndNormalizationHandlesScriptsRegionsAliasesAndFallback(){
-        choose(AppLanguage.DEFAULT);assertEquals("zh-rCN",CaptionTextResolver.catalogLocale(CaptionTextResolver.locale(activity)));
-        for(String tag:new String[]{"zh-Hant","zh-HK","zh-MO","zh-TW"})assertEquals("zh-rTW",CaptionTextResolver.catalogLocale(Locale.forLanguageTag(tag)));
-        for(String tag:new String[]{"zh-Hans-TW","zh-CN"})assertEquals("zh-rCN",CaptionTextResolver.catalogLocale(Locale.forLanguageTag(tag)));
-        assertEquals("id",CaptionTextResolver.catalogLocale(new Locale("in")));assertEquals("en",CaptionTextResolver.catalogLocale(Locale.forLanguageTag("tr")));
     }
     @Test public void uiLocaleDoesNotChangeSnapshotsPromptsFingerprintsOrCacheIdentity()throws Exception {
         RebuildSource source=new RebuildSource(Arrays.asList(new RebuildSource.Word("This",0,600,0,RebuildSource.Precision.NATIVE),new RebuildSource.Word("test.",600,1800,0,RebuildSource.Precision.NATIVE)));
@@ -82,14 +75,14 @@ public class N33LocaleAndDataTest {
         CaptionLanguagesPreference languages=new CaptionLanguagesPreference(activity);languages.setKey("deepseek_caption_languages");root.addPreference(languages);
         CaptionLocaleSubscription subscription=CaptionLocaleSubscription.attach(enabled);assertNotNull(subscription);
         SharedPreferences values=ApiProfiles.values(activity);Map<String,?> before=new TreeMap<>(values.getAll());
-        BaseSettings.MORPHE_LANGUAGE.save(AppLanguage.JA);assertNotEquals(CaptionTranslationCatalog.text("ja","ai_title"),root.getTitle());
-        Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(CaptionTranslationCatalog.text("ja","ai_title"),root.getTitle());
-        assertEquals(CaptionTranslationCatalog.text("ja","languages_summary"),languages.getSummary());assertEquals(before,values.getAll());subscription.close();
+        BaseSettings.MORPHE_LANGUAGE.save(AppLanguage.JA);assertNotEquals(CaptionTextResolver.string(activity,Locale.JAPANESE,"ai_title"),root.getTitle());
+        Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(CaptionTextResolver.string(activity,Locale.JAPANESE,"ai_title"),root.getTitle());
+        assertEquals(CaptionTextResolver.string(activity,Locale.JAPANESE,"languages_summary"),languages.getSummary());assertEquals(before,values.getAll());subscription.close();
     }
     @Test public void exactConstantMigrationDoesNotRewriteProviderOrUserSubstrings(){
         choose(AppLanguage.JA);String original="provider 原文：API 地址必须以 https:// 或 http:// 开头 / 用户翻译要求";
         assertEquals(original,CaptionStrings.localize(activity,original));
-        assertEquals(CaptionTranslationCatalog.text("ja","message_bafa7b1ca6cb"),CaptionStrings.localize(activity,"API 地址必须以 https:// 或 http:// 开头"));
+        assertEquals(CaptionTextResolver.string(activity,Locale.JAPANESE,"message_bafa7b1ca6cb"),CaptionStrings.localize(activity,"API 地址必须以 https:// 或 http:// 开头"));
         IllegalStateException provider=new IllegalStateException("模型列表 HTTP 503：原文 模型列表 HTTP 200");
         assertEquals(provider.getMessage(),DeepSeekModelPreference.failureText(activity,provider));
         provider.setStackTrace(new StackTraceElement[]{new StackTraceElement(DeepSeekModelCatalog.class.getName(),"fetch","DeepSeekModelCatalog.java",1)});

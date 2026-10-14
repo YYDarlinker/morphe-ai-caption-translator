@@ -115,6 +115,6 @@ public class CoreSessionIntegrationTest {
         final AtomicInteger waits=new AtomicInteger();volatile TranslationOutput.RenderGuard last;
         public void showWaitingEvent(String text,TranslationOutput.RenderGuard g,String id,long start,long end,long at){if(g.isValid()){last=g;waits.incrementAndGet();}}
         public void showStatus(String text,TranslationOutput.RenderGuard g){if(g.isValid()){last=g;errors.add(text);}}
-        public void showEvent(String text,TranslationOutput.RenderGuard g,Supplier<String> f,String id,long start,long end,long at,CaptionRenderSpec spec,CaptionDisplayCandidate candidate){if(g.isValid()){last=g;results.add(text);g.onApplied();}}
+        public void showEvent(String text,TranslationOutput.RenderGuard g,String id,long start,long end,long at,CaptionRenderSpec spec){if(g.isValid()){last=g;results.add(text);g.onApplied();}}
     }
 }

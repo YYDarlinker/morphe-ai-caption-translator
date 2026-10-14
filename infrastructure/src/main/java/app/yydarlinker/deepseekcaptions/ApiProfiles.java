@@ -1,117 +1,289 @@
 package app.yydarlinker.deepseekcaptions;
+
+import android.app.Activity;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.SharedPreferences;
-import java.util.*;
+import android.preference.Preference;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.lang.ref.WeakReference;
-import org.json.*;
-/** Profile identity is a stable UUID, never a user label or a server hostname. */
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * The API profiles: each has its own endpoint, model, prompt and key. A profile is known by a
+ * random id, never by its name or by the host of its endpoint. The first profile is the one the
+ * settings of older releases live in; it keeps its store and the id {@link #LEGACY}.
+ */
 final class ApiProfiles {
-    static final Object LOCK=new Object();
-    static final String LEGACY="default";
+    static final Object LOCK = new Object();
+    static final String LEGACY = "default";
+    private static final String INDEX = "caption_api_profiles";
+    private static final String NAMES = "names";
+    private static final String ACTIVE = "active";
+    private static final String LEGACY_DELETED = "legacy_deleted";
+    private static final String LEGACY_STORE = "deepseek_caption_translator";
+    private static final int MAX_PROFILES = 30, MAX_NAME = 60;
+
+    private static final List<WeakReference<Editor>> editors = new ArrayList<>();
     private static boolean flushing;
     private static volatile long revision;
-    static long revision(){return revision;}
-    static boolean flushing(){return flushing;}
-    interface Editor { boolean flushProfile(); void profileChanged(); }
-    private static final List<WeakReference<Editor>> editors=new ArrayList<>();
-    static void register(Editor editor){synchronized(LOCK){editors.removeIf(r->r.get()==null || r.get()==editor);editors.add(new WeakReference<>(editor));}}
-    static void unregister(Editor editor){synchronized(LOCK){editors.removeIf(r->r.get()==null || r.get()==editor);}}
-    private static boolean usable(Editor editor){
-        if(!(editor instanceof android.preference.Preference))return true;
-        Context c=((android.preference.Preference)editor).getContext();
-        while(c instanceof android.content.ContextWrapper){
-            if(c instanceof android.app.Activity){android.app.Activity a=(android.app.Activity)c;return !a.isFinishing()&&!a.isDestroyed();}
-            Context base=((android.content.ContextWrapper)c).getBaseContext();if(base==c)break;c=base;
-        }
-        return true;
-    }
-    private static SharedPreferences index(Context c){return c.getSharedPreferences("caption_api_profiles",Context.MODE_PRIVATE);}
-    static String active(Context c){synchronized(LOCK){return index(c).getString("active",LEGACY);}}
-    static SharedPreferences values(Context c,String id){return c.getSharedPreferences(LEGACY.equals(id)?"deepseek_caption_translator":"caption_profile_"+id,Context.MODE_PRIVATE);}
-    static SharedPreferences values(Context c){return values(c,active(c));}
-    static LinkedHashMap<String,String> list(Context c){synchronized(LOCK){
-        LinkedHashMap<String,String> result=new LinkedHashMap<>();if(!index(c).getBoolean("legacy_deleted",false))result.put(LEGACY,CaptionStrings.settings(c,"profile_default"));
-        String data=index(c).getString("names","{}");
-        try{JSONObject o=new JSONObject(data);Iterator<String> keys=o.keys();while(keys.hasNext()){String id=keys.next();result.put(id,o.getString(id));}}
-        catch(JSONException invalid){throw new IllegalStateException("Invalid saved API profiles",invalid);}
-        return result;
-    }}
-    static void rename(Context c,String id,String name){synchronized(LOCK){
-        String n=name==null?"":name.trim();if(n.isEmpty()||n.length()>60)throw new IllegalArgumentException(CaptionStrings.settings(c,"profile_name_error"));
-        if(!list(c).containsKey(id))throw new IllegalArgumentException("Unknown API profile");
-        try{JSONObject names=new JSONObject(index(c).getString("names","{}"));names.put(id,n);index(c).edit().putString("names",names.toString()).apply();}
-        catch(JSONException invalid){throw new IllegalStateException("Invalid API profiles",invalid);}
-    }}
-    static String create(Context c,String name,String base){synchronized(LOCK){
-        String n=name==null?"":name.trim();if(n.isEmpty()||n.length()>60)throw new IllegalArgumentException(CaptionStrings.settings(c,"profile_name_error"));
-        if(list(c).size()>=30)throw new IllegalStateException(CaptionStrings.settings(c,"profile_limit"));
-        String endpoint=ProviderEndpoint.validate(base);String id=UUID.randomUUID().toString();
-        // New profiles deliberately do NOT copy the active API key or model.
-        values(c,id).edit().putString("base_url",endpoint).putString("model","").apply();
-        try{JSONObject names=new JSONObject(index(c).getString("names","{}"));names.put(id,n);index(c).edit().putString("names",names.toString()).apply();}
-        catch(JSONException invalid){throw new IllegalStateException("Invalid API profiles",invalid);}
-        return id;
-    }}
-    private static List<Editor> liveEditors(){
-        List<Editor> live=new ArrayList<>();synchronized(LOCK){for(WeakReference<Editor> ref:editors){Editor e=ref.get();if(e!=null && usable(e))live.add(e);}}return live;
-    }
-    static boolean flushCurrent(){return flushCurrent(false);}
-    static boolean flushExceptKey(){return flushCurrent(true);}
-    private static boolean flushCurrent(boolean skipKey){
-        flushing=true;
-        try{for(Editor e:liveEditors()){
-            if(skipKey && e instanceof android.preference.Preference && DeepSeekTextPreference.KEY_API_KEY.equals(((android.preference.Preference)e).getKey()))continue;
-            if(!e.flushProfile())return false;
-        }return true;}finally{flushing=false;}
-    }
-    static boolean select(Context c,String id){
-        synchronized(LOCK){if(!list(c).containsKey(id))throw new IllegalArgumentException("Unknown API profile");if(id.equals(active(c)))return true;}
-        // UI caller flushes edits while the old profile is still active; reject invalid input.
-        if(!flushCurrent())return false;
-        synchronized(LOCK){index(c).edit().putString("active",id).apply();}
-        changed(c);
-        return true;
-    }
-    static void changed(Context c) {
-        synchronized(LOCK){revision++;}
-        for(Editor e:liveEditors())e.profileChanged();
-        DeepSeekModelPreference.onCredentialsChanged(c);
-        // N39 configuration identity is routed through the UI port; no global rejection state.
-        CaptionActions.refreshConfiguration(c);
+
+    private ApiProfiles() {}
+
+    /** A part of the UI that edits the active profile and can write its edits back. */
+    interface Editor {
+        /** Writes the edits; false if they are invalid and the profile must not change. */
+        boolean flushProfile();
+
+        void profileChanged();
     }
 
-    /** Confirmation is handled by the UI. Delete only this profile, never global caption settings. */
-    static void delete(Context c, String id) {
-        boolean activeDeleted;
+    /** Counts every change of the active profile or of its credentials. */
+    static long revision() {
+        return revision;
+    }
+
+    static boolean flushing() {
+        return flushing;
+    }
+
+    static void register(Editor editor) {
         synchronized (LOCK) {
-            LinkedHashMap<String,String> saved = list(c);
-            if (!saved.containsKey(id)) throw new IllegalArgumentException("Unknown API profile");
-            if (saved.size() <= 1) throw new IllegalStateException(CaptionStrings.settings(c,"profile_keep_one"));
-            activeDeleted = id.equals(active(c));
-            saved.remove(id);
+            editors.removeIf(ref -> ref.get() == null || ref.get() == editor);
+            editors.add(new WeakReference<>(editor));
+        }
+    }
+
+    static void unregister(Editor editor) {
+        synchronized (LOCK) {
+            editors.removeIf(ref -> ref.get() == null || ref.get() == editor);
+        }
+    }
+
+    /** The editors that are alive and not in a finished activity. */
+    private static List<Editor> liveEditors() {
+        List<Editor> live = new ArrayList<>();
+        synchronized (LOCK) {
+            for (WeakReference<Editor> ref : editors) {
+                Editor editor = ref.get();
+                if (editor != null && !inFinishedActivity(editor)) live.add(editor);
+            }
+        }
+        return live;
+    }
+
+    private static boolean inFinishedActivity(Editor editor) {
+        if (!(editor instanceof Preference)) return false;
+        Context context = ((Preference) editor).getContext();
+        while (context instanceof ContextWrapper) {
+            if (context instanceof Activity) {
+                Activity activity = (Activity) context;
+                return activity.isFinishing() || activity.isDestroyed();
+            }
+            Context base = ((ContextWrapper) context).getBaseContext();
+            if (base == context) break;
+            context = base;
+        }
+        return false;
+    }
+
+    // ---- Index and stores ----
+
+    private static SharedPreferences index(Context context) {
+        return context.getSharedPreferences(INDEX, Context.MODE_PRIVATE);
+    }
+
+    static String active(Context context) {
+        synchronized (LOCK) {
+            return index(context).getString(ACTIVE, LEGACY);
+        }
+    }
+
+    /** The store of one profile. */
+    static SharedPreferences values(Context context, String id) {
+        return context.getSharedPreferences(
+                LEGACY.equals(id) ? LEGACY_STORE : "caption_profile_" + id, Context.MODE_PRIVATE);
+    }
+
+    static SharedPreferences values(Context context) {
+        return values(context, active(context));
+    }
+
+    /** The names of the profiles other than the first, by id. */
+    private static JSONObject names(Context context) {
+        try {
+            return new JSONObject(index(context).getString(NAMES, "{}"));
+        } catch (JSONException invalid) {
+            throw new IllegalStateException("Invalid saved API profiles", invalid);
+        }
+    }
+
+    private static void saveNames(
+            Context context, JSONObject names, boolean legacyDeleted, String active) {
+        SharedPreferences.Editor edit = index(context).edit().putString(NAMES, names.toString());
+        if (legacyDeleted) edit.putBoolean(LEGACY_DELETED, true);
+        if (active != null) edit.putString(ACTIVE, active);
+        edit.apply();
+    }
+
+    /** The profiles by id, in order, with their names. */
+    static LinkedHashMap<String, String> list(Context context) {
+        synchronized (LOCK) {
+            LinkedHashMap<String, String> result = new LinkedHashMap<>();
+            if (!index(context).getBoolean(LEGACY_DELETED, false))
+                result.put(LEGACY, CaptionStrings.get(context, "profile_default"));
+            JSONObject names = names(context);
+            for (Iterator<String> ids = names.keys(); ids.hasNext(); ) {
+                String id = ids.next();
+                result.put(id, names.optString(id));
+            }
+            return result;
+        }
+    }
+
+    private static String checkedName(Context context, String name) {
+        String clean = name == null ? "" : name.trim();
+        if (clean.isEmpty() || clean.length() > MAX_NAME)
+            throw new IllegalArgumentException(CaptionStrings.get(context, "profile_name_error"));
+        return clean;
+    }
+
+    private static IllegalArgumentException unknown() {
+        return new IllegalArgumentException("Unknown API profile");
+    }
+
+    static void rename(Context context, String id, String name) {
+        synchronized (LOCK) {
+            String clean = checkedName(context, name);
+            if (!list(context).containsKey(id)) throw unknown();
             try {
-                JSONObject names = new JSONObject(index(c).getString("names","{}"));
-                names.remove(id);
-                SharedPreferences.Editor edit = index(c).edit().putString("names",names.toString());
-                if (LEGACY.equals(id)) edit.putBoolean("legacy_deleted",true);
-                if (activeDeleted) edit.putString("active",saved.keySet().iterator().next());
-                edit.apply();
-            } catch (JSONException invalid) { throw new IllegalStateException("Invalid API profiles",invalid); }
-            SecureApiKey.clear(c,id);
-            if (LEGACY.equals(id)) {
-                // Legacy profile shares a store with engine, style and caption-menu preferences.
-                values(c,id).edit().remove("base_url").remove("model").remove("prompt").remove("planner_model").apply();
-            } else values(c,id).edit().clear().apply();
+                saveNames(context, names(context).put(id, clean), false, null);
+            } catch (JSONException invalid) {
+                throw new IllegalStateException("Invalid API profiles", invalid);
+            }
         }
-        // Invalid/unsaved edits in a deleted profile must not be flushed back into it.
-        if (activeDeleted) changed(c);
     }
 
-    static void clearKey(Context c, String id) {
+    /** A new profile with the endpoint [base]; it copies neither the key nor the model. */
+    static String create(Context context, String name, String base) {
         synchronized (LOCK) {
-            if (!list(c).containsKey(id)) return; // A stale confirmation must not touch another profile.
-            SecureApiKey.clear(c,id);
+            String clean = checkedName(context, name);
+            if (list(context).size() >= MAX_PROFILES)
+                throw new IllegalStateException(CaptionStrings.get(context, "profile_limit"));
+            String endpoint = ProviderEndpoint.validate(base);
+            String id = UUID.randomUUID().toString();
+            values(context, id)
+                    .edit()
+                    .putString("base_url", endpoint)
+                    .putString("model", "")
+                    .apply();
+            try {
+                saveNames(context, names(context).put(id, clean), false, null);
+            } catch (JSONException invalid) {
+                throw new IllegalStateException("Invalid API profiles", invalid);
+            }
+            return id;
         }
-        if (id.equals(active(c))) changed(c);
+    }
+
+    // ---- Switching ----
+
+    static boolean flushCurrent() {
+        return flush(false);
+    }
+
+    static boolean flushExceptKey() {
+        return flush(true);
+    }
+
+    /** Asks the editors to write their edits; stops at the first that refuses. */
+    private static boolean flush(boolean skipKey) {
+        flushing = true;
+        try {
+            for (Editor editor : liveEditors()) {
+                boolean keyField =
+                        editor instanceof Preference
+                                && DeepSeekTextPreference.KEY_API_KEY.equals(
+                                        ((Preference) editor).getKey());
+                if (!(skipKey && keyField) && !editor.flushProfile()) return false;
+            }
+            return true;
+        } finally {
+            flushing = false;
+        }
+    }
+
+    /** Makes [id] the active profile, once the edits of the old one are saved. */
+    static boolean select(Context context, String id) {
+        synchronized (LOCK) {
+            if (!list(context).containsKey(id)) throw unknown();
+            if (id.equals(active(context))) return true;
+        }
+        // The edits are written while the old profile is still active.
+        if (!flushCurrent()) return false;
+        synchronized (LOCK) {
+            index(context).edit().putString(ACTIVE, id).apply();
+        }
+        changed(context);
+        return true;
+    }
+
+    static void changed(Context context) {
+        synchronized (LOCK) {
+            revision++;
+        }
+        for (Editor editor : liveEditors()) editor.profileChanged();
+        DeepSeekModelPreference.onCredentialsChanged(context);
+        CaptionActions.refreshConfiguration(context);
+    }
+
+    // ---- Removing ----
+
+    /**
+     * Deletes one profile and its key, never the global settings. The first profile shares its
+     * store with them, so only its own entries are removed.
+     */
+    static void delete(Context context, String id) {
+        boolean wasActive;
+        synchronized (LOCK) {
+            LinkedHashMap<String, String> saved = list(context);
+            if (!saved.containsKey(id)) throw unknown();
+            if (saved.size() <= 1)
+                throw new IllegalStateException(CaptionStrings.get(context, "profile_keep_one"));
+            wasActive = id.equals(active(context));
+            saved.remove(id);
+            JSONObject names = names(context);
+            names.remove(id);
+            saveNames(
+                    context,
+                    names,
+                    LEGACY.equals(id),
+                    wasActive ? saved.keySet().iterator().next() : null);
+            SecureApiKey.clear(context, id);
+            SharedPreferences.Editor store = values(context, id).edit();
+            if (LEGACY.equals(id))
+                store.remove("base_url").remove("model").remove("prompt").remove("planner_model");
+            else store.clear();
+            store.apply();
+        }
+        // The edits of a deleted profile must not be written back into it.
+        if (wasActive) changed(context);
+    }
+
+    /** Forgets the key of one profile. */
+    static void clearKey(Context context, String id) {
+        synchronized (LOCK) {
+            // A confirmation that is out of date must not touch another profile.
+            if (!list(context).containsKey(id)) return;
+            SecureApiKey.clear(context, id);
+        }
+        if (id.equals(active(context))) changed(context);
     }
 }

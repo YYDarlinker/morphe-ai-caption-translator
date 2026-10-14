@@ -1,5 +1,8 @@
 allprojects {
-    layout.buildDirectory.set(rootProject.layout.projectDirectory.dir("build/n39/gradle/" + if (path == ":") "root" else path.trimStart(':').replace(':', '/')))
+    // The extension keeps the default build directory: R8 looks up its default rules file there.
+    if (path != ":extensions:extension") {
+        layout.buildDirectory.set(rootProject.layout.projectDirectory.dir("build/n39/gradle/" + if (path == ":") "root" else path.trimStart(':').replace(':', '/')))
+    }
 }
 
 // Enforce the integration boundary on the actual Android delivery entrance.

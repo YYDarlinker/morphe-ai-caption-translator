@@ -21,10 +21,10 @@ You need a video with an available subtitle track and an API service that suppor
 | Component | Recommendation | Historical compatibility |
 | --- | --- | --- |
 | Official Morphe Patches | **1.47.0**, the latest stable release checked for this release | Compatibility scope starts at **1.42.0**; use an official version that supports your chosen YouTube APK |
-| Original YouTube APK | **21.20.405** | **21.16.256**, **21.13.164**, **21.07.247** |
+| Original YouTube APK | **21.20.405** | **21.16.256**; experimental: **21.40.161**, **21.39.522**, **21.38.130**, **21.28.208**, **21.23.492** |
 | Android | **9 or later** | minSdk 28 |
 
-The recommended combination is **official 1.47.0 + YouTube 21.20.405**. YouTube 21.16.256 remains a stable target of official 1.44.0 through 1.47.0. YouTube 21.13.164 is absent from official 1.47.0, and 21.07.247 is only a historical target of official 1.42.0/1.43.0; neither is in the current official stable list. Do not combine an older APK with an official bundle that no longer supports it. Experimental YouTube versions are not stable compatibility claims for this addon. See [compatibility and verification boundaries](docs/COMPATIBILITY.md).
+The recommended combination is **official 1.47.0 + YouTube 21.20.405**; 21.16.256 is also stable. The experimental versions follow the experimental targets of official 1.47.0 and were checked with the real patcher (every patch applied and all caption hooks bound); they are not stable compatibility claims. YouTube 21.13.164 and 21.07.247 are no longer in the official stable list and are no longer declared. See [compatibility and verification boundaries](docs/COMPATIBILITY.md).
 
 ## Install
 
@@ -63,15 +63,15 @@ Turning AI off returns translation to YouTube’s native behavior. Selecting an 
 ## Available patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.5.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
+> **[v1.5.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
 <details open>
 <summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **🎯 Supported versions:**
 
-| 21.20.405 | 21.16.256 | 21.13.164 | 21.07.247 |
-| :---: | :---: | :---: | :---: |
+| 21.40.161 | 21.39.522 | 21.38.130 | 21.28.208 | 21.23.492 | 21.20.405 | 21.16.256 |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|

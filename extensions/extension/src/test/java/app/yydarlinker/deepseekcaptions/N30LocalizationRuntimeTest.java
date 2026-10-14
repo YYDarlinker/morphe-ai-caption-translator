@@ -13,12 +13,12 @@ public class N30LocalizationRuntimeTest {
   RuntimeEnvironment.getApplication().getApplicationInfo().flags |= android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL;
   Activity a=Robolectric.buildActivity(HostedPreferences.class).setup().get();JSONArray rows=new JSONArray();
   for(String tag:TAGS){Configuration cfg=new Configuration(a.getResources().getConfiguration());cfg.setLocales(new LocaleList(Locale.forLanguageTag(tag)));cfg.fontScale=1.3f;Context c=a.createConfigurationContext(cfg);
-   for(String key:KEYS){int id=c.getResources().getIdentifier("cap_"+key,"string",c.getPackageName());assertNotEquals(tag+":"+key,0,id);String s=CaptionStrings.settings(c,key);assertEquals(c.getString(id),s);assertFalse(s.contains("cap_"));assertNotEquals(key,s);
+   for(String key:KEYS){int id=c.getResources().getIdentifier("cap_"+key,"string",c.getPackageName());assertNotEquals(tag+":"+key,0,id);String s=CaptionStrings.get(c,key);assertEquals(c.getString(id),s);assertFalse(s.contains("cap_"));assertNotEquals(key,s);
     if(!tag.startsWith("zh")&&!tag.equals("ja"))assertFalse(tag+":"+key,s.matches("(?s).*[\\p{IsHan}].*"));}
-   assertNotEquals(CaptionStrings.settings(c,"autosave"),CaptionStrings.settings(c,"ai_summary"));assertEquals(CaptionStrings.settings(c,"default_prompt"),DeepSeekConfig.defaultPrompt(c));
+   assertNotEquals(CaptionStrings.get(c,"autosave"),CaptionStrings.get(c,"ai_summary"));assertEquals(CaptionStrings.get(c,"default_prompt"),DeepSeekConfig.defaultPrompt(c));
    LinearLayout page=new LinearLayout(c);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(16,8,16,8);page.setBackgroundColor(Color.WHITE);page.setLayoutDirection(tag.equals("ar")?View.LAYOUT_DIRECTION_RTL:View.LAYOUT_DIRECTION_LTR);
-   for(String key:new String[]{"ai_quick_toggle_on","ai_quick_toggle_off","ai_summary","languages_title","languages_summary","languages_empty","preview"}){TextView v=new TextView(c);v.setText(CaptionStrings.settings(c,key));v.setTextSize(18);v.setTextColor(Color.BLACK);v.setEllipsize(null);v.setMaxLines(Integer.MAX_VALUE);page.addView(v,new LinearLayout.LayoutParams(-1,-2));}
-   PreferenceManager pm=((PreferenceActivity)a).getPreferenceManager();PreferenceScreen screen=pm.createPreferenceScreen(c);screen.setTitle(CaptionStrings.settings(c,"ai_title"));screen.setSummary(CaptionStrings.settings(c,"ai_summary"));screen.setSingleLineTitle(false);screen.setIconSpaceReserved(false);
+   for(String key:new String[]{"ai_quick_toggle_on","ai_quick_toggle_off","ai_summary","languages_title","languages_summary","languages_empty","preview"}){TextView v=new TextView(c);v.setText(CaptionStrings.get(c,key));v.setTextSize(18);v.setTextColor(Color.BLACK);v.setEllipsize(null);v.setMaxLines(Integer.MAX_VALUE);page.addView(v,new LinearLayout.LayoutParams(-1,-2));}
+   PreferenceManager pm=((PreferenceActivity)a).getPreferenceManager();PreferenceScreen screen=pm.createPreferenceScreen(c);screen.setTitle(CaptionStrings.get(c,"ai_title"));screen.setSummary(CaptionStrings.get(c,"ai_summary"));screen.setSingleLineTitle(false);screen.setIconSpaceReserved(false);
    View entry=screen.getView(null,new FrameLayout(c));page.addView(entry,new LinearLayout.LayoutParams(-1,-2));
    CaptionLanguagesPreference pref=new CaptionLanguagesPreference(c);View row=pref.getView(null,new FrameLayout(c));page.addView(row,new LinearLayout.LayoutParams(-1,-2));
    int width=Math.round(320*c.getResources().getDisplayMetrics().density);page.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));page.layout(0,0,width,page.getMeasuredHeight());
@@ -38,10 +38,9 @@ public class N30LocalizationRuntimeTest {
   JSONObject expected=new JSONObject(new String(getClass().getResourceAsStream("/n30/localization-expected.json").readAllBytes(),"UTF-8"));Activity a=Robolectric.buildActivity(Activity.class).setup().get();
   for(String tag:TAGS){String folder=tag.equals("zh-CN")?"zh-rCN":tag.equals("zh-TW")?"zh-rTW":tag;JSONObject values=expected.getJSONObject(folder);assertEquals(232,values.length());
    Configuration config=new Configuration(a.getResources().getConfiguration());config.setLocales(new LocaleList(Locale.forLanguageTag(tag)));Context c=a.createConfigurationContext(config);
-   java.util.Iterator<String> keys=values.keys();while(keys.hasNext()){String key=keys.next();assertEquals(tag+":"+key,values.getString(key),CaptionStrings.settings(c,key));}
+   java.util.Iterator<String> keys=values.keys();while(keys.hasNext()){String key=keys.next();assertEquals(tag+":"+key,values.getString(key),CaptionStrings.get(c,key));}
   }a.finish();
  }
- @Test public void missingResourceFallbackNeverLeaksAKeyOrChinese(){assertEquals("AI caption translation · On",CaptionStrings.get(null,"ai_quick_toggle_on"));assertEquals("AI caption translation · Off",CaptionStrings.get(null,"ai_quick_toggle_off"));assertEquals("",CaptionStrings.get(null,"unknown_missing_key"));}
  @Test public void rawTechnicalExportRemainsEnglishWhileEvidenceIsVerbatim(){Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionDiagnostics.clear(a);String evidence="source=原始证据;response=texte brut;prompt=自定义";CaptionDiagnostics.mark(a,"N30_RAW_EVIDENCE",evidence);
   String raw=CaptionDiagnostics.fullText(a);assertTrue(raw.contains("Engine: "));assertTrue(raw.contains("Latest stage: "));assertTrue(raw.contains("N30_RAW_EVIDENCE"));assertTrue(raw.contains(evidence));a.finish();}
 }

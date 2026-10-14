@@ -87,26 +87,13 @@ public class DisplayReplayTest {
       }
       RebuildProtocol.Plan plan=plans.get(index);
       List<RebuildDisplayGroups.Unit> units=RebuildDisplayGroups.partition(index,plan.events,c.source,CONTEXT,
-          DisplayReplayTest::fits,e->RebuildReview.semanticBlocked(plan,e));
+          DisplayReplayTest::fits,e->RebuildReview.blocked(plan,e));
       RebuildDisplayGroups.Unit unit=cursor.select(index,plan.events,units,t);
       if(unit==null||unit.blocked||unit.text.isEmpty())continue;
       if(pages.isEmpty()||pages.get(pages.size()-1).unit!=unit)pages.add(new Page(unit,t));
       cursor.shown(unit);
     }
     return pages;
-  }
-
-  /** The former pairwise display join, counted for the report: pages that re-show earlier text. */
-  static int upstreamRepeats(Capture c,int first,int last) {
-    List<RebuildProtocol.Event> events=new ArrayList<>();
-    for(int i=first;i<=last;i++)events.addAll(c.plans.get(i).get(c.plans.get(i).size()-1).events);
-    int repeats=0;
-    for(int i=1;i<events.size();i++) {
-      RebuildProtocol.Event previous=events.get(i-1),current=events.get(i);
-      if((RebuildDisplayMerge.isLead(previous)||RebuildDisplayMerge.isShort(current))
-          &&RebuildDisplayMerge.merge(c.source,previous,current)!=null&&fits(RebuildDisplayMerge.merge(c.source,previous,current).text))repeats++;
-    }
-    return repeats;
   }
 
   static void assertContinuous(String label,List<Page> pages,Capture c,int first,int last) {
@@ -132,7 +119,7 @@ public class DisplayReplayTest {
     List<Page> pages=replay(c,0,14,Collections.singletonMap(1,9920L));
     assertContinuous("DEEPSEEK",pages,c,0,14);
     int events=0;for(int i=0;i<=14;i++)events+=c.plans.get(i).get(c.plans.get(i).size()-1).events.size();
-    System.out.println("REPLAY_DEEPSEEK upstream_repeated_pages="+upstreamRepeats(c,0,14)+" events="+events+" pages="+pages.size());
+    System.out.println("REPLAY_DEEPSEEK events="+events+" pages="+pages.size());
     assertTrue("short DeepSeek fragments are joined into fuller pages",pages.size()<events);
   }
 
@@ -140,7 +127,6 @@ public class DisplayReplayTest {
     Capture c=load("qwen3.8-flash.jsonl");
     List<Page> pages=replay(c,0,10,Collections.emptyMap());
     assertContinuous("QWEN",pages,c,0,10);
-    System.out.println("REPLAY_QWEN upstream_repeated_pages="+upstreamRepeats(c,0,10));
   }
 
   @Test public void repairWaitsForASharedBoundaryInsteadOfRestartingTheSentence() throws Exception {

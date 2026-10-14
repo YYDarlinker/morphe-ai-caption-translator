@@ -1,3 +1,9 @@
+## [1.5.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.2...v1.5.3) (2026-10-14)
+
+- Smaller and simpler: the code was hand-rewritten module by module (dead code removed, long logic split, about 8-12% less main code) and the extension is shrunk by R8; the patch package drops from 1.3 MB to about 0.57 MB. Translation prompts and protocol are unchanged and match the pinned upstream.
+- Experimental support for YouTube 21.40.161, 21.39.522, 21.38.130, 21.28.208 and 21.23.492, following the experimental targets of official Morphe Patches 1.47.0. 21.13.164 and 21.07.247 are no longer declared.
+- Both patches are selected by default. The reference caption cache now persists, saving one download when reopening a video.
+
 ## [1.5.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.1...v1.5.2) (2026-10-12)
 
 - Keep uploaded subtitles exactly as authored, including two-row subtitles such as romanization above a translation; only auto-generated subtitles get locally optimized sentence breaks and page turns, tuned for Japanese and other unpunctuated languages.

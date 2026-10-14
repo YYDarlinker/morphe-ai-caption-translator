@@ -51,7 +51,7 @@ public class N37R2CenterMatrixTest {
   @Test public void physicalCenterForEveryTextShape()throws Exception{
     int kind=0;
     for(String value:samples()){
-      CaptionOverlay.showEvent(value,()->true,()->"","matrix:"+kind,1000,61000,2000,CaptionLanguageContext.explicit("en",target).renderSpec,null);
+      CaptionOverlay.showEvent(value,()->true,"matrix:"+kind,1000,61000,2000,CaptionLanguageContext.explicit("en",target).renderSpec);
       layout();FrameLayout outer=h.anchor();TextView text=h.text();Rect video=N39UiGeometryFixture.bounds;
       float center=outer.getLeft()+outer.getTranslationX()+outer.getWidth()/2f-host.getScrollX();
       float error=center-video.exactCenterX();

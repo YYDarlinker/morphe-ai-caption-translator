@@ -17,7 +17,7 @@ public class N37R2PlacementContractTest {
  @Before public void setup(){CaptionPlayerAuthority.resetForTests();h=new N39UiGeometryFixture();h.setup();h.a.getApplicationInfo().flags|=android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL;host=(FrameLayout)h.a.findViewById(android.R.id.content);host.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);}
  @After public void done(){h.done();CaptionPlayerAuthority.resetForTests();}
  void layout(){h.awaitPreparedCaption();host.measure(1073743104,1073742824);host.layout(0,0,1280,1000);host.getViewTreeObserver().dispatchOnPreDraw();host.measure(1073743104,1073742824);host.layout(0,0,1280,1000);}
- void show(String value,String lang,String id){CaptionOverlay.showEvent(value,()->true,()->"",id,1000,61000,2000,CaptionLanguageContext.explicit("en",lang).renderSpec,null);layout();}
+ void show(String value,String lang,String id){CaptionOverlay.showEvent(value,()->true,id,1000,61000,2000,CaptionLanguageContext.explicit("en",lang).renderSpec);layout();}
  void center()throws Exception{FrameLayout a=h.anchor();assertTrue(Math.abs(a.getLeft()+a.getTranslationX()+a.getWidth()/2f-host.getScrollX()-N39UiGeometryFixture.bounds.exactCenterX())<=1);assertEquals(0f,a.getTranslationX(),0f);}
  @Test public void exactHalfPixelRoundingAndOffCenterRectangle(){assertEquals(74,CaptionHorizontalPlacement.physicalLeft(new Rect(71,0,672,300),596));assertEquals(71,CaptionHorizontalPlacement.physicalLeft(new Rect(71,0,672,300),601));}
  @Test public void paddingScrollLogicalMarginsAndStaleTranslationAreReplaced()throws Exception{

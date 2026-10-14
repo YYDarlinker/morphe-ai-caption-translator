@@ -99,7 +99,7 @@ public class N25PreviewSampleTest {
                 assertNotEquals(tag+" must not fall back to a raw key",SubtitleStylePreview.SAMPLE_KEY,sample);
                 // The catalog lookup is the identity: the rendered string is the authored catalog value.
                 assertEquals(tag+" must read the settings catalog",
-                        CaptionStrings.settings(c,SubtitleStylePreview.SAMPLE_KEY),sample);
+                        CaptionStrings.get(c,SubtitleStylePreview.SAMPLE_KEY),sample);
                 assertTrue(tag+" must be a complete sentence",sample.trim().length()>1);
                 float budget=referenceBudget(c);
                 float box=budget+2*Math.round(6*c.getResources().getDisplayMetrics().density);

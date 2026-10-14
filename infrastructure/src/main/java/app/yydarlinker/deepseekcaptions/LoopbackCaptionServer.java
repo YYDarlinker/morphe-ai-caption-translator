@@ -10,6 +10,7 @@ import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -19,82 +20,106 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Private loopback sink for YouTube Auto-translate requests owned by the AI overlay.
+ * Private loopback sink for the requests of YouTube's own auto-translated captions.
  *
- * <p>The native request completes locally and its text is never used for AI output. The AI runtime
- * fetches the source-language track independently, translates around the play head and draws only
- * the translated text in the custom overlay.</p>
- *
- * <p>Renderer ownership is intentionally stronger than a generic empty document. When the source
- * track is available in the existing source cache, the sink mirrors that document's real format,
- * cue count and timing while replacing every cue payload with an invisible character. This gives
- * YouTube's native renderer a structurally valid replacement track at every real cue boundary and
- * evicts source-language text that some builds otherwise keep painted underneath the AI overlay.
- * No extra YouTube request is made here: the sink only waits briefly for the source fetch already
- * started by the AI runtime. If that source is not ready in time, the previous long-lived invisible
- * ownership track remains the closed fallback.</p>
+ * <p>The native request is answered here and its text is never shown: the AI runtime fetches the
+ * source track itself, translates around the play head and draws the translation in the overlay.
+ * What the sink answers with is a track that has the format, cue count and timing of the real
+ * source track (read from the source cache, where the AI runtime has put it; nothing is fetched
+ * here) and an invisible character as the text of every cue. The native renderer is then
+ * structurally satisfied at every cue boundary, and no source text stays painted under the overlay.
+ * When the source is not in the cache within a short wait, one long invisible cue of the requested
+ * format is the fallback.
  */
 final class LoopbackCaptionServer {
-    private static volatile LoopbackCaptionServer instance;
     private static final AtomicInteger THREAD_IDS = new AtomicInteger();
     private static final String INVISIBLE_CUE = "\u2060";
-    private static final long STRUCTURAL_SINK_WAIT_MS = 1_600L;
-    private static final long STRUCTURAL_SINK_POLL_MS = 35L;
+    private static final long SOURCE_WAIT_MS = 1_600L;
+    private static final long SOURCE_POLL_MS = 35L;
+    private static final int MAX_LINE = 32 * 1024;
+    private static final long MAX_BODY = 4L * 1024L * 1024L;
+    private static final int MAX_ENCODED_URL = 24 * 1024;
+    private static final String JSON_TYPE = "application/json; charset=utf-8";
+    private static final String XML_TYPE = "application/xml; charset=utf-8";
+
+    private static volatile LoopbackCaptionServer instance;
 
     private final Context context;
     private final ServerSocket server;
-    private final ExecutorService workers = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(
-                    runnable,
-                    "DeepSeekCaptionSink-" + THREAD_IDS.incrementAndGet()
-            );
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
     private final String secret;
+    private final ExecutorService workers =
+            Executors.newCachedThreadPool(
+                    runnable -> {
+                        Thread thread =
+                                new Thread(
+                                        runnable,
+                                        "DeepSeekCaptionSink-" + THREAD_IDS.incrementAndGet());
+                        thread.setDaemon(true);
+                        return thread;
+                    });
     private volatile String lastMaskedSourceKey = "";
     private volatile String lastFallbackSourceKey = "";
 
-    static LoopbackCaptionServer get(Context context) throws Exception {
+    /** What the sink answers with. */
+    private static final class Track {
+        final String contentType;
+        final byte[] body;
+
+        Track(String contentType, byte[] body) {
+            this.contentType = contentType;
+            this.body = body;
+        }
+
+        static Track of(String contentType, String body) {
+            return new Track(contentType, body.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    static LoopbackCaptionServer get(Context context) throws IOException {
         LoopbackCaptionServer local = instance;
         if (local != null && !local.server.isClosed()) return local;
         synchronized (LoopbackCaptionServer.class) {
             local = instance;
-            if (local == null || local.server.isClosed()) {
+            if (local == null || local.server.isClosed())
                 instance = local = new LoopbackCaptionServer(context.getApplicationContext());
-            }
             return local;
         }
     }
 
-    private LoopbackCaptionServer(Context context) throws Exception {
+    private LoopbackCaptionServer(Context context) throws IOException {
         this.context = context;
-        this.secret = randomSecret();
-        this.server = new ServerSocket(0, 24, InetAddress.getByName("127.0.0.1"));
-        CaptionDiagnostics.mark(context, "SERVER_STARTED", "Local empty-caption track port " + server.getLocalPort());
-        Thread acceptThread = new Thread(this::acceptLoop, "DeepSeekCaptionLoopback");
-        acceptThread.setDaemon(true);
-        acceptThread.start();
+        byte[] random = new byte[16];
+        new SecureRandom().nextBytes(random);
+        secret = base64(random);
+        server = new ServerSocket(0, 24, InetAddress.getByName("127.0.0.1"));
+        CaptionDiagnostics.mark(
+                context,
+                "SERVER_STARTED",
+                "Local empty-caption track port " + server.getLocalPort());
+        Thread acceptor = new Thread(this::acceptLoop, "DeepSeekCaptionLoopback");
+        acceptor.setDaemon(true);
+        acceptor.start();
     }
 
+    private static String base64(byte[] bytes) {
+        return Base64.encodeToString(bytes, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+    }
+
+    /** The address on which the sink answers instead of [originalUrl]. */
     String urlFor(String originalUrl) {
-        String encoded = Base64.encodeToString(
-                originalUrl.getBytes(StandardCharsets.UTF_8),
-                Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING
-        );
-        return "http://127.0.0.1:" + server.getLocalPort() + "/" + secret +
-                "/caption?u=" + encoded;
+        return "http://127.0.0.1:"
+                + server.getLocalPort()
+                + "/"
+                + secret
+                + "/caption?u="
+                + base64(originalUrl.getBytes(StandardCharsets.UTF_8));
     }
 
     private void acceptLoop() {
@@ -103,189 +128,167 @@ final class LoopbackCaptionServer {
                 Socket socket = server.accept();
                 workers.execute(() -> handle(socket));
             } catch (Throwable failure) {
-                if (!server.isClosed()) {
+                if (!server.isClosed())
                     CaptionDiagnostics.mark(
                             context,
                             "SERVER_ACCEPT_ERROR",
-                            CaptionDiagnostics.errorDetail(failure)
-                    );
-                }
+                            CaptionDiagnostics.errorDetail(failure));
             }
         }
     }
 
     private void handle(Socket socket) {
-        try {
+        try (socket) {
             socket.setSoTimeout(5_000);
-            BufferedInputStream input = new BufferedInputStream(socket.getInputStream());
-            String requestLine = readAsciiLine(input, 32 * 1024);
-            if (requestLine == null || requestLine.isEmpty()) {
-                writeText(socket, 400, "Bad Request", "empty request", false);
-                return;
-            }
-
-            String[] requestParts = requestLine.split(" ", 3);
-            if (requestParts.length < 2) {
-                writeText(socket, 400, "Bad Request", "invalid request line", false);
-                return;
-            }
-            String method = requestParts[0].toUpperCase(Locale.ROOT);
-            if (!("GET".equals(method) || "POST".equals(method) || "HEAD".equals(method))) {
-                writeText(socket, 405, "Method Not Allowed", "unsupported method", false);
-                return;
-            }
-
-            Map<String, String> headers = readHeaders(input);
-            if ("100-continue".equalsIgnoreCase(headers.get("expect"))) {
-                OutputStream output = socket.getOutputStream();
-                output.write("HTTP/1.1 100 Continue\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
-                output.flush();
-            }
-            drainBody(input, headers);
-
-            String target = requestParts[1];
-            int queryIndex = target.indexOf('?');
-            String path = queryIndex >= 0 ? target.substring(0, queryIndex) : target;
-            if (!("/" + secret + "/caption").equals(path)) {
-                writeText(socket, 404, "Not Found", "not found", "HEAD".equals(method));
-                return;
-            }
-
-            String rawQuery = queryIndex >= 0 ? target.substring(queryIndex + 1) : "";
-            String encoded = queryValue(rawQuery, "u");
-            if (encoded == null || encoded.length() > 24 * 1024) {
-                writeText(socket, 400, "Bad Request", "missing caption url", "HEAD".equals(method));
-                return;
-            }
-            String translatedUrl = new String(
-                    Base64.decode(
-                            URLDecoder.decode(encoded, "UTF-8"),
-                            Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING
-                    ),
-                    StandardCharsets.UTF_8
-            );
-            if (!DeepSeekCaptionHook.isAutoTranslatedCaptionUrl(translatedUrl)) {
-                writeText(socket, 403, "Forbidden", "invalid caption url", "HEAD".equals(method));
-                return;
-            }
-
-            EmptyTrack track = ownershipTrackFor(translatedUrl);
-            write(socket, 200, "OK", track.contentType, track.body, "HEAD".equals(method));
-        } catch (Throwable failure) {
-            CaptionDiagnostics.mark(context, "BRIDGE_ERROR", CaptionDiagnostics.errorDetail(failure));
-            // Stay closed even on errors. A real invisible cue is preferable to events=[] because
-            // the latter can leave an already-loaded native source cue painted on some builds.
             try {
-                byte[] body = jsonOwnershipTrack();
-                write(socket, 200, "OK", "application/json; charset=utf-8", body, false);
-            } catch (Throwable ignored) {
+                answer(socket);
+            } catch (Reject refused) {
+                respond(
+                        socket,
+                        refused.status,
+                        refused.reason,
+                        Track.of("text/plain; charset=utf-8", refused.getMessage()),
+                        refused.head);
+            } catch (Throwable failure) {
+                CaptionDiagnostics.mark(
+                        context, "BRIDGE_ERROR", CaptionDiagnostics.errorDetail(failure));
+                // Even an error answers with a real invisible cue: an empty list of events can
+                // leave a source cue that was loaded earlier painted on some builds.
+                respond(socket, 200, "OK", Track.of(JSON_TYPE, jsonTrack()), false);
             }
-        } finally {
-            try { socket.close(); } catch (Throwable ignored) {}
+        } catch (IOException ignored) {
+            // The caller is gone.
         }
     }
 
-    /**
-     * Prefer a format- and timing-identical mirror of the real source track. The source is not
-     * fetched here; CaptionActions has already started RawCaptionSource.load(), which
-     * writes the successful provider bytes to SourceCaptionCache before any AI request. Waiting on
-     * that cache avoids a second YouTube request and keeps the renderer sink isolated from the
-     * translation scheduler.
-     */
-    private EmptyTrack ownershipTrackFor(String translatedUrl) {
-        // Invisible TimedText can still allocate a native background window.
+    private void answer(Socket socket) throws Exception {
+        BufferedInputStream input = new BufferedInputStream(socket.getInputStream());
+        String requestLine = readLine(input, MAX_LINE);
+        if (requestLine == null || requestLine.isEmpty())
+            throw new Reject(400, "Bad Request", "empty request", false);
+        String[] parts = requestLine.split(" ", 3);
+        if (parts.length < 2) throw new Reject(400, "Bad Request", "invalid request line", false);
+        String method = parts[0].toUpperCase(Locale.ROOT);
+        if (!method.equals("GET") && !method.equals("POST") && !method.equals("HEAD"))
+            throw new Reject(405, "Method Not Allowed", "unsupported method", false);
+        boolean head = method.equals("HEAD");
+
+        Map<String, String> headers = readHeaders(input);
+        if ("100-continue".equalsIgnoreCase(headers.get("expect"))) {
+            OutputStream output = socket.getOutputStream();
+            output.write("HTTP/1.1 100 Continue\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+            output.flush();
+        }
+        drainBody(input, headers);
+
+        String target = parts[1];
+        int query = target.indexOf('?');
+        String path = query >= 0 ? target.substring(0, query) : target;
+        if (!path.equals("/" + secret + "/caption"))
+            throw new Reject(404, "Not Found", "not found", head);
+        String encoded = queryValue(query >= 0 ? target.substring(query + 1) : "", "u");
+        if (encoded == null || encoded.length() > MAX_ENCODED_URL)
+            throw new Reject(400, "Bad Request", "missing caption url", head);
+        String url =
+                new String(
+                        Base64.decode(
+                                URLDecoder.decode(encoded, "UTF-8"),
+                                Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING),
+                        StandardCharsets.UTF_8);
+        if (!DeepSeekCaptionHook.isAutoTranslatedCaptionUrl(url))
+            throw new Reject(403, "Forbidden", "invalid caption url", head);
+        respond(socket, 200, "OK", trackFor(url), head);
+    }
+
+    /** A request that is refused with a plain-text answer. */
+    private static final class Reject extends Exception {
+        final int status;
+        final String reason;
+        final boolean head;
+
+        Reject(int status, String reason, String text, boolean head) {
+            super(text);
+            this.status = status;
+            this.reason = reason;
+            this.head = head;
+        }
+    }
+
+    /** The mirror of the real source track, or the fallback of the requested format. */
+    private Track trackFor(String translatedUrl) {
+        // An invisible TimedText can still allocate a native background window.
         CaptionMusicSuppressor.forceNativeRendererScan();
         String sourceKey = "";
+        String failure = "Source track not ready within the short wait window";
         try {
-            String sourceUrl = CaptionUrls.sourceCaptionUrl(translatedUrl);
-            sourceKey = SourceCaptionCache.key(sourceUrl);
-            SourceCaptionCache.Entry source = SourceCaptionCache.get(context, sourceKey);
-            long deadline = SystemClock.elapsedRealtime() + STRUCTURAL_SINK_WAIT_MS;
-            while (source == null && SystemClock.elapsedRealtime() < deadline) {
-                try { Thread.sleep(STRUCTURAL_SINK_POLL_MS); }
-                catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    break;
+            sourceKey = SourceCaptionCache.key(CaptionUrls.sourceCaptionUrl(translatedUrl));
+            SourceCaptionCache.Entry source = awaitSource(sourceKey);
+            Track masked = source == null ? null : mask(source.body, source.contentType);
+            if (masked != null) {
+                if (!sourceKey.equals(lastMaskedSourceKey)) {
+                    lastMaskedSourceKey = sourceKey;
+                    CaptionDiagnostics.mark(
+                            context,
+                            "NATIVE_RENDERER_MASKED",
+                            "Native renderer owns an invisible mirror track with matching format"
+                                    + " and timing; source captions will not overlap AI captions");
                 }
-                source = SourceCaptionCache.get(context, sourceKey);
+                return masked;
             }
-
-            if (source != null) {
-                EmptyTrack masked = maskSourceTrack(source.body, source.contentType);
-                if (masked != null) {
-                    if (!sourceKey.equals(lastMaskedSourceKey)) {
-                        lastMaskedSourceKey = sourceKey;
-                        CaptionDiagnostics.mark(
-                                context,
-                                "NATIVE_RENDERER_MASKED",
-                                "Native renderer owns an invisible mirror track with matching format and timing; source captions will not overlap AI captions"
-                        );
-                    }
-                    return masked;
-                }
-            }
-        } catch (Throwable failure) {
-            if (!sourceKey.equals(lastFallbackSourceKey)) {
-                lastFallbackSourceKey = sourceKey;
-                CaptionDiagnostics.mark(
-                        context,
-                        "NATIVE_RENDERER_MASK_FALLBACK",
-                        "Source-track mirror unavailable; falling back to invisible ownership track: " +
-                                CaptionDiagnostics.errorDetail(failure)
-                );
-            }
-            CaptionMusicSuppressor.forceNativeRendererScan();
-            return emptyTrackFor(translatedUrl);
+        } catch (Throwable error) {
+            failure = "Source-track mirror unavailable: " + CaptionDiagnostics.errorDetail(error);
         }
-
         if (!sourceKey.equals(lastFallbackSourceKey)) {
             lastFallbackSourceKey = sourceKey;
             CaptionDiagnostics.mark(
                     context,
                     "NATIVE_RENDERER_MASK_FALLBACK",
-                    "Source track not ready within the short wait window; falling back to invisible ownership track"
-            );
+                    failure + "; falling back to invisible ownership track");
         }
         CaptionMusicSuppressor.forceNativeRendererScan();
-        return emptyTrackFor(translatedUrl);
+        return fallbackTrack(translatedUrl);
     }
 
-    private static EmptyTrack maskSourceTrack(byte[] body, String contentType) throws Exception {
+    private SourceCaptionCache.Entry awaitSource(String key) {
+        SourceCaptionCache.Entry source = SourceCaptionCache.get(context, key);
+        long deadline = SystemClock.elapsedRealtime() + SOURCE_WAIT_MS;
+        while (source == null && SystemClock.elapsedRealtime() < deadline) {
+            try {
+                Thread.sleep(SOURCE_POLL_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            source = SourceCaptionCache.get(context, key);
+        }
+        return source;
+    }
+
+    /** The source track with the same cues and timing, every text replaced by the invisible one. */
+    private static Track mask(byte[] body, String contentType) throws Exception {
         CaptionDocument.Parsed parsed = CaptionDocument.parse(body, contentType);
-        int cueCount = parsed.texts().size();
-        if (cueCount <= 0) return null;
-
-        List<String> invisible = Collections.nCopies(cueCount, INVISIBLE_CUE);
-        byte[] masked = parsed.render(invisible);
-
-        // JSON3 ASR tracks can carry incremental aAppend events that CaptionDocument deliberately
-        // excludes from semantic translation. They still belong to YouTube's native renderer, so
-        // scrub every segment after the ordinary cue render to ensure no source word can leak.
-        masked = maskAllJsonSegments(masked);
-        return new EmptyTrack(parsed.contentType(), masked);
+        int cues = parsed.texts().size();
+        if (cues <= 0) return null;
+        byte[] masked = parsed.render(Collections.nCopies(cues, INVISIBLE_CUE));
+        // A JSON3 track of automatic captions also has incremental events that the document does
+        // not count as cues. They belong to the native renderer as well, so no segment stays.
+        return new Track(parsed.contentType(), maskJsonSegments(masked));
     }
 
-    private static byte[] maskAllJsonSegments(byte[] body) {
-        if (body == null || body.length == 0) return body;
+    private static byte[] maskJsonSegments(byte[] body) {
         try {
             String text = new String(body, StandardCharsets.UTF_8);
-            String trimmed = text.trim();
-            if (!trimmed.startsWith("{") || !trimmed.contains("\"events\"")) return body;
-
+            if (!text.trim().startsWith("{") || !text.contains("\"events\"")) return body;
             JSONObject root = new JSONObject(text);
             JSONArray events = root.optJSONArray("events");
             if (events == null) return body;
             boolean changed = false;
             for (int i = 0; i < events.length(); i++) {
                 JSONObject event = events.optJSONObject(i);
-                if (event == null) continue;
-                JSONArray segments = event.optJSONArray("segs");
+                JSONArray segments = event == null ? null : event.optJSONArray("segs");
                 if (segments == null || segments.length() == 0) continue;
                 JSONObject first = segments.optJSONObject(0);
-                if (first == null) {
-                    first = new JSONObject();
-                    segments.put(0, first);
-                }
+                if (first == null) segments.put(0, first = new JSONObject());
                 first.put("utf8", INVISIBLE_CUE);
                 for (int j = 1; j < segments.length(); j++) {
                     JSONObject segment = segments.optJSONObject(j);
@@ -293,197 +296,143 @@ final class LoopbackCaptionServer {
                 }
                 changed = true;
             }
-            return changed
-                    ? root.toString().getBytes(StandardCharsets.UTF_8)
-                    : body;
-        } catch (Throwable ignored) {
+            return changed ? root.toString().getBytes(StandardCharsets.UTF_8) : body;
+        } catch (Throwable invalid) {
             return body;
         }
     }
 
-    private static EmptyTrack emptyTrackFor(String translatedUrl) {
+    private static String jsonTrack() {
+        return "{\"wireMagic\":\"pb3\",\"events\":[{\"tStartMs\":0,\"dDurationMs\":360000000,"
+                + "\"segs\":[{\"utf8\":\"\\u2060\"}]}]}";
+    }
+
+    /** One invisible cue that lasts for the whole video, in the format the request asked for. */
+    private static Track fallbackTrack(String translatedUrl) {
         String format = "";
         try {
             String value = Uri.parse(translatedUrl).getQueryParameter("fmt");
             if (value != null) format = value.toLowerCase(Locale.ROOT);
-        } catch (Throwable ignored) {
+        } catch (RuntimeException ignored) {
+            // The default format.
         }
-
-        if (format.contains("json")) {
-            return new EmptyTrack(
-                    "application/json; charset=utf-8",
-                    jsonOwnershipTrack()
-            );
-        }
-        if (format.contains("vtt")) {
-            return new EmptyTrack(
+        if (format.contains("json")) return Track.of(JSON_TYPE, jsonTrack());
+        if (format.contains("vtt"))
+            return Track.of(
                     "text/vtt; charset=utf-8",
-                    ("WEBVTT\n\n00:00.000 --> 99:59:59.999\n" + INVISIBLE_CUE + "\n\n")
-                            .getBytes(StandardCharsets.UTF_8)
-            );
-        }
-        if (format.startsWith("srv") || format.contains("ttml")) {
-            return new EmptyTrack(
-                    "application/xml; charset=utf-8",
-                    ("<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
-                            "<timedtext format=\"3\"><body><p t=\"0\" d=\"360000000\">" +
-                            "<s>&#8288;</s></p></body></timedtext>")
-                            .getBytes(StandardCharsets.UTF_8)
-            );
-        }
-        return new EmptyTrack(
-                "application/xml; charset=utf-8",
-                ("<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
-                        "<transcript><text start=\"0\" dur=\"360000\">&#8288;</text></transcript>")
-                        .getBytes(StandardCharsets.UTF_8)
-        );
+                    "WEBVTT\n\n00:00.000 --> 99:59:59.999\n" + INVISIBLE_CUE + "\n\n");
+        if (format.startsWith("srv") || format.contains("ttml"))
+            return Track.of(
+                    XML_TYPE,
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?><timedtext format=\"3\"><body>"
+                            + "<p t=\"0\" d=\"360000000\"><s>&#8288;</s></p></body></timedtext>");
+        return Track.of(
+                XML_TYPE,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?><transcript><text start=\"0\""
+                        + " dur=\"360000\">&#8288;</text></transcript>");
     }
 
-    private static byte[] jsonOwnershipTrack() {
-        return ("{\"wireMagic\":\"pb3\",\"events\":[{" +
-                "\"tStartMs\":0,\"dDurationMs\":360000000," +
-                "\"segs\":[{\"utf8\":\"\\u2060\"}]}]}")
-                .getBytes(StandardCharsets.UTF_8);
-    }
-
-    private static Map<String, String> readHeaders(BufferedInputStream input) throws Exception {
+    private static Map<String, String> readHeaders(BufferedInputStream input) throws IOException {
         Map<String, String> headers = new HashMap<>();
         for (int i = 0; i < 100; i++) {
-            String line = readAsciiLine(input, 32 * 1024);
+            String line = readLine(input, MAX_LINE);
             if (line == null || line.isEmpty()) break;
             int colon = line.indexOf(':');
-            if (colon <= 0) continue;
-            headers.put(
-                    line.substring(0, colon).trim().toLowerCase(Locale.ROOT),
-                    line.substring(colon + 1).trim()
-            );
+            if (colon > 0)
+                headers.put(
+                        line.substring(0, colon).trim().toLowerCase(Locale.ROOT),
+                        line.substring(colon + 1).trim());
         }
         return headers;
     }
 
+    /** Reads the body of the request and drops it. */
     private static void drainBody(BufferedInputStream input, Map<String, String> headers)
-            throws Exception {
-        String transferEncoding = headers.get("transfer-encoding");
-        if (transferEncoding != null && transferEncoding.toLowerCase(Locale.ROOT).contains("chunked")) {
+            throws IOException {
+        String encoding = headers.get("transfer-encoding");
+        if (encoding != null && encoding.toLowerCase(Locale.ROOT).contains("chunked")) {
             long total = 0;
-            while (true) {
-                String sizeLine = readAsciiLine(input, 1024);
-                if (sizeLine == null) return;
-                int semicolon = sizeLine.indexOf(';');
-                int size = Integer.parseInt(
-                        (semicolon >= 0 ? sizeLine.substring(0, semicolon) : sizeLine).trim(),
-                        16
-                );
-                if (size == 0) {
-                    while (true) {
-                        String trailer = readAsciiLine(input, 4096);
-                        if (trailer == null || trailer.isEmpty()) return;
-                    }
+            for (String size = readLine(input, 1024); size != null; size = readLine(input, 1024)) {
+                int semicolon = size.indexOf(';');
+                int chunk =
+                        Integer.parseInt(
+                                (semicolon >= 0 ? size.substring(0, semicolon) : size).trim(), 16);
+                if (chunk == 0) {
+                    String trailer;
+                    do trailer = readLine(input, 4096);
+                    while (trailer != null && !trailer.isEmpty());
+                    return;
                 }
-                total += size;
-                if (total > 4L * 1024L * 1024L) throw new IllegalStateException("request body too large");
-                skipFully(input, size);
-                readAsciiLine(input, 4);
+                total += chunk;
+                skip(input, chunk, total);
+                readLine(input, 4);
             }
+            return;
         }
-
         String length = headers.get("content-length");
-        if (length == null || length.isEmpty()) return;
-        long count = Long.parseLong(length);
-        if (count < 0 || count > 4L * 1024L * 1024L) {
-            throw new IllegalStateException("request body too large");
+        if (length != null && !length.isEmpty()) {
+            long count = Long.parseLong(length);
+            skip(input, count, count);
         }
-        skipFully(input, count);
     }
 
-    private static void skipFully(BufferedInputStream input, long count) throws Exception {
-        long remaining = count;
+    private static void skip(BufferedInputStream input, long count, long total) throws IOException {
+        if (count < 0 || total > MAX_BODY) throw new IOException("request body too large");
         byte[] buffer = new byte[8192];
-        while (remaining > 0) {
-            int read = input.read(buffer, 0, (int) Math.min(buffer.length, remaining));
-            if (read < 0) throw new IllegalStateException("unexpected end of request body");
-            remaining -= read;
+        for (long left = count; left > 0; ) {
+            int read = input.read(buffer, 0, (int) Math.min(buffer.length, left));
+            if (read < 0) throw new IOException("unexpected end of request body");
+            left -= read;
         }
     }
 
-    private static String readAsciiLine(BufferedInputStream input, int maximum) throws Exception {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        while (output.size() < maximum) {
+    /** A line of ASCII without its line end; null at the end of the stream. */
+    private static String readLine(BufferedInputStream input, int maximum) throws IOException {
+        ByteArrayOutputStream line = new ByteArrayOutputStream();
+        while (line.size() < maximum) {
             int value = input.read();
-            if (value < 0) return output.size() == 0 ? null : output.toString("US-ASCII");
-            if (value == '\n') break;
-            if (value != '\r') output.write(value);
+            if (value < 0) return line.size() == 0 ? null : line.toString("US-ASCII");
+            if (value == '\n') return line.toString("US-ASCII");
+            if (value != '\r') line.write(value);
         }
-        if (output.size() >= maximum) throw new IllegalStateException("HTTP line too long");
-        return output.toString("US-ASCII");
+        throw new IOException("HTTP line too long");
     }
 
-    private static String queryValue(String rawQuery, String key) {
-        for (String part : rawQuery.split("&", -1)) {
+    /** The raw, still encoded value of the query parameter [key]. */
+    private static String queryValue(String query, String key) {
+        for (String part : query.split("&", -1)) {
             int equals = part.indexOf('=');
-            String rawKey = equals < 0 ? part : part.substring(0, equals);
-            String decodedKey;
-            try { decodedKey = URLDecoder.decode(rawKey, "UTF-8"); }
-            catch (Throwable ignored) { decodedKey = rawKey; }
-            if (key.equals(decodedKey)) return equals < 0 ? "" : part.substring(equals + 1);
+            String name = equals < 0 ? part : part.substring(0, equals);
+            try {
+                name = URLDecoder.decode(name, "UTF-8");
+            } catch (Exception undecodable) {
+                // Compared as it is.
+            }
+            if (key.equals(name)) return equals < 0 ? "" : part.substring(equals + 1);
         }
         return null;
     }
 
-    private static void writeText(
-            Socket socket,
-            int status,
-            String reason,
-            String text,
-            boolean headOnly
-    ) throws Exception {
-        write(
-                socket,
-                status,
-                reason,
-                "text/plain; charset=utf-8",
-                text.getBytes(StandardCharsets.UTF_8),
-                headOnly
-        );
-    }
-
-    private static void write(
-            Socket socket,
-            int status,
-            String reason,
-            String contentType,
-            byte[] body,
-            boolean headOnly
-    ) throws Exception {
-        String headers = "HTTP/1.1 " + status + " " + reason + "\r\n" +
-                "Content-Type: " + sanitizeHeader(contentType) + "\r\n" +
-                "Content-Length: " + body.length + "\r\n" +
-                "Cache-Control: no-store\r\n" +
-                "Connection: close\r\n\r\n";
-        OutputStream output = socket.getOutputStream();
-        output.write(headers.getBytes(StandardCharsets.US_ASCII));
-        if (!headOnly) output.write(body);
-        output.flush();
-    }
-
-    private static String sanitizeHeader(String value) {
-        if (value == null || value.isEmpty()) return "application/octet-stream";
-        return value.replace("\r", "").replace("\n", "");
-    }
-
-    private static String randomSecret() {
-        byte[] bytes = new byte[16];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.encodeToString(bytes, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
-    }
-
-    private static final class EmptyTrack {
-        final String contentType;
-        final byte[] body;
-
-        EmptyTrack(String contentType, byte[] body) {
-            this.contentType = contentType;
-            this.body = body;
+    private static void respond(
+            Socket socket, int status, String reason, Track track, boolean headOnly) {
+        String type = track.contentType.replace("\r", "").replace("\n", "");
+        String headers =
+                "HTTP/1.1 "
+                        + status
+                        + " "
+                        + reason
+                        + "\r\nContent-Type: "
+                        + type
+                        + "\r\nContent-Length: "
+                        + track.body.length
+                        + "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
+        try {
+            OutputStream output = socket.getOutputStream();
+            output.write(headers.getBytes(StandardCharsets.US_ASCII));
+            if (!headOnly) output.write(track.body);
+            output.flush();
+        } catch (IOException ignored) {
+            // The caller is gone.
         }
     }
 }

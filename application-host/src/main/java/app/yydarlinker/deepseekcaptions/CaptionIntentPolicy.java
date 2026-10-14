@@ -8,6 +8,38 @@ final class CaptionIntentPolicy {
     static final int OFF = 0;
     static final int ON = 1;
 
+    /** Phrases of the CC button's description that mean captions are on (or can be turned off). */
+    private static final String[] MEANS_ON = {
+        "turn off",
+        "disable captions",
+        "captions on",
+        "captions enabled",
+        "关闭字幕",
+        "關閉字幕",
+        "字幕已开启",
+        "字幕已開啟",
+        "字幕开启",
+        "字幕開啟",
+        "字幕をオフ",
+        "자막 사용 중지"
+    };
+
+    /** Phrases that mean captions are off (or can be turned on). */
+    private static final String[] MEANS_OFF = {
+        "turn on",
+        "enable captions",
+        "captions off",
+        "captions disabled",
+        "字幕已关闭",
+        "字幕已關閉",
+        "字幕关闭",
+        "字幕關閉",
+        "开启字幕",
+        "開啟字幕",
+        "打开字幕",
+        "字幕をオン"
+    };
+
     private CaptionIntentPolicy() {}
 
     static boolean mayActivate(int intent, long nowMs, long explicitSelectionUntilMs) {
@@ -15,36 +47,20 @@ final class CaptionIntentPolicy {
     }
 
     static boolean shouldTurnOff(boolean aiVisible, int nativeState, int rememberedIntent) {
-        return aiVisible || nativeState == ON ||
-                (nativeState == UNKNOWN && rememberedIntent == ON);
+        return aiVisible || nativeState == ON || (nativeState == UNKNOWN && rememberedIntent == ON);
     }
 
-    /** Parses both action labels and current-state labels without depending on one locale. */
+    /** Parses action labels and current-state labels without depending on one locale. */
     static int fromDescription(String rawDescription) {
-        String description = rawDescription == null
-                ? ""
-                : rawDescription.trim().toLowerCase(Locale.ROOT);
-        if (description.isEmpty()) return UNKNOWN;
-
-        if (containsAny(description, "turn off", "disable captions", "captions on",
-                "captions enabled", "关闭字幕", "關閉字幕", "字幕已开启", "字幕已開啟",
-                "字幕开启", "字幕開啟", "字幕をオフ", "자막 사용 중지")) {
-            return ON;
-        }
-        if (containsAny(description, "turn on", "enable captions", "captions off",
-                "captions disabled", "字幕已关闭", "字幕已關閉", "字幕关闭", "字幕關閉",
-                "开启字幕", "開啟字幕", "打开字幕", "字幕をオン")) {
-            return OFF;
-        }
+        String description =
+                rawDescription == null ? "" : rawDescription.trim().toLowerCase(Locale.ROOT);
+        if (containsAny(description, MEANS_ON)) return ON;
+        if (containsAny(description, MEANS_OFF)) return OFF;
         return UNKNOWN;
     }
 
-    private static boolean containsAny(String value, String... candidates) {
-        for (String candidate : candidates) {
-            if (!candidate.isEmpty() && value.contains(candidate.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
+    private static boolean containsAny(String value, String[] phrases) {
+        for (String phrase : phrases) if (value.contains(phrase)) return true;
         return false;
     }
 }

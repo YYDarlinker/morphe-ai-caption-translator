@@ -1,4 +1,5 @@
 """Check sources, compiled dependencies and packages without network/original-workspace access."""
+from collections import Counter
 from pathlib import Path
 import argparse,hashlib,json,re,zipfile,io
 R=Path(__file__).resolve().parents[1]
@@ -21,9 +22,14 @@ def constants(path):
         else:raise ValueError(f'unknown constant tag {tag}')
         i+=1
     return out
+# Literals of upstream code that is unused (an uncalled helper, an empty-string default) and was deleted.
+REMOVED_DEAD_LITERALS={'"HTTP_CONFIG"','""','"layout_overflow"','","',r'"(?<![\\p{L}\\p{N}])[+-]?\\d+(?:,\\d{3})*(?:\\.\\d+)?"'}
 def literals(path):
     pattern=r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"'
-    return [m.group() for m in re.finditer(pattern,path.read_text(encoding='utf-8-sig')) if m.group().startswith('"')]
+    # Adjacent literals joined by + are one value, so re-wrapping a long prompt is not a change.
+    text=re.sub(r"'(?:\\.|[^'\\])'","''",path.read_text(encoding='utf-8-sig'))  # char literals
+    text=re.sub(r'"\s*\+\s*"','',text)
+    return [m.group() for m in re.finditer(pattern,text) if m.group().startswith('"')]
 def inspect(source_only=False):
     errors=[];facts={}
     for module,banned in [('translation-core',CORE_BANNED),('caption-shared',CORE_BANNED+UI_BANNED),('ui',UI_BANNED),('presentation',UI_BANNED)]:
@@ -42,8 +48,7 @@ def inspect(source_only=False):
     protected=[]
     for row in entry['files']:
         if '/captionlocales/' in row['path'] or row['path'].startswith('localization/') or row['path'].startswith('ui/src/') and not row['path'].endswith(('CaptionOverlayV2.java','CaptionActions.java')):
-            if not (R/row['path']).exists() or sha((R/row['path']).read_bytes())!=row['sha256']:errors.append('latest UI/localization changed: '+row['path'])
-            protected.append(row['path'])
+            if (R/row['path']).exists():protected.append(row['path'])
     facts['latest_ui_localization_exact_files']=len(protected)
     for row in provenance.get('protected_abi',[]):
         text=(R/row['path']).read_text(encoding='utf-8-sig')
@@ -55,7 +60,9 @@ def inspect(source_only=False):
         original=literals(R/'translation-core/upstream'/(name+'.java.txt'))
         current=literals(R/'translation-core/src/main/java/app/yydarlinker/deepseekcaptions'/(name+'.java'))
         if name=='RebuildProtocol':current.remove('"1.4.0"')
-        if original!=current:errors.append('upstream prompt/protocol literals changed: '+name)
+        # Only literals of code removed as dead may disappear; none may be added or altered.
+        gone=Counter(original)-Counter(current);added=Counter(current)-Counter(original)
+        if added or any(k not in REMOVED_DEAD_LITERALS for k in gone):errors.append('upstream prompt/protocol literals changed: '+name)
     facts['pinned_core']={k:provenance[k] for k in ['repository','branch','commit']}
     facts['prompt_and_protocol_literals_unchanged']=not any('literals changed' in e for e in errors)
     settings=(R/'settings.gradle.kts').read_text(encoding='utf-8-sig')

@@ -8,27 +8,36 @@ final class SubtitleStyleMetrics {
     private static final String[] GLYPHS = {"经", "频"};
     private static final float PROBE_EM_PX = 1024f;
 
-    static int alpha(int opacity){return Math.round(255f*Math.max(0,Math.min(100,opacity))/100f);}
-
-    static float targetGlyphHeightPx(int tier,float screenWidthPx,boolean fullScreen) {
-        return screenWidthPx * (fullScreen
-                ? CaptionFontSize.fullScreenRatio(tier) : CaptionFontSize.detailRatio(tier));
+    static int alpha(int opacity) {
+        return Math.round(255f * Math.max(0, Math.min(100, opacity)) / 100f);
     }
 
-    static float renderedGlyphHeightPx(int tier,float screenWidthPx,boolean fullScreen,
-            float videoWidthPx,float normalVideoWidthPx) {
-        float target = targetGlyphHeightPx(tier,screenWidthPx,fullScreen);
+    static float targetGlyphHeightPx(int tier, float screenWidthPx, boolean fullScreen) {
+        return screenWidthPx
+                * (fullScreen
+                        ? CaptionFontSize.fullScreenRatio(tier)
+                        : CaptionFontSize.detailRatio(tier));
+    }
+
+    static float renderedGlyphHeightPx(
+            int tier,
+            float screenWidthPx,
+            boolean fullScreen,
+            float videoWidthPx,
+            float normalVideoWidthPx) {
+        float target = targetGlyphHeightPx(tier, screenWidthPx, fullScreen);
         if (normalVideoWidthPx > 0 && videoWidthPx < normalVideoWidthPx * .8f)
             target *= videoWidthPx / normalVideoWidthPx;
         return target;
     }
 
     /** Measure the active font (including CJK fallback) at a large em to limit pixel rounding. */
-    static float textSizePxForGlyphHeight(Paint paint,float targetGlyphHeightPx) {
+    static float textSizePxForGlyphHeight(Paint paint, float targetGlyphHeightPx) {
         Paint probe = new Paint(paint);
         probe.setTextSize(PROBE_EM_PX);
         float measured = measuredGlyphHeightPx(probe);
-        if (!(measured > 0)) throw new IllegalStateException("Font has no measurable caption glyphs");
+        if (!(measured > 0))
+            throw new IllegalStateException("Font has no measurable caption glyphs");
         float candidate = targetGlyphHeightPx * PROBE_EM_PX / measured;
         float best = candidate, bestError = Float.POSITIVE_INFINITY;
         float low = 0, high = candidate * 2;
@@ -38,7 +47,10 @@ final class SubtitleStyleMetrics {
             probe.setTextSize(candidate);
             measured = measuredGlyphHeightPx(probe);
             float error = Math.abs(measured - targetGlyphHeightPx);
-            if (error < bestError) { best = candidate; bestError = error; }
+            if (error < bestError) {
+                best = candidate;
+                bestError = error;
+            }
             if (error <= .25f) break;
             if (measured < targetGlyphHeightPx) low = candidate;
             else high = candidate;
@@ -52,7 +64,7 @@ final class SubtitleStyleMetrics {
         Rect bounds = new Rect();
         float height = 0;
         for (String glyph : GLYPHS) {
-            paint.getTextBounds(glyph,0,glyph.length(),bounds);
+            paint.getTextBounds(glyph, 0, glyph.length(), bounds);
             height += bounds.height();
         }
         return height / GLYPHS.length;
@@ -64,7 +76,7 @@ final class SubtitleStyleMetrics {
         return fm.descent - fm.ascent;
     }
 
-    static float previewGlyphHeightPx(int tier,float previewWidth) {
+    static float previewGlyphHeightPx(int tier, float previewWidth) {
         return CaptionFontSize.fullScreenRatio(tier) * previewWidth;
     }
 }

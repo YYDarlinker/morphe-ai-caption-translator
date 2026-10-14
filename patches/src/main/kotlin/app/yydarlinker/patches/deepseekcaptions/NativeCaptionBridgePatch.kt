@@ -1,491 +1,786 @@
 package app.yydarlinker.patches.deepseekcaptions
 
-import app.morphe.patcher.patch.BytecodePatchContext
-import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.patch.BytecodePatchContext
+import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.ClassDef
 import com.android.tools.smali.dexlib2.iface.Method
-import com.android.tools.smali.dexlib2.iface.instruction.Instruction
-import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
-import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
-import com.android.tools.smali.dexlib2.iface.reference.MethodReference
-import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 
-private const val BRIDGE = "Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;"
-private const val STRING = "Ljava/lang/String;"
-private const val OBJECT = "Ljava/lang/Object;"
-private fun Instruction.field() = (this as? ReferenceInstruction)?.reference as? FieldReference
-private fun Instruction.call() = (this as? ReferenceInstruction)?.reference as? MethodReference
-private fun Instruction.text() = ((this as? ReferenceInstruction)?.reference as? StringReference)?.string
-private fun Method.code() = implementation?.instructions?.toList() ?: emptyList()
-private fun Method.hasText(s: String) = code().any { it.text()==s }
-private fun FieldReference.id() = "$definingClass->$name:$type"
-private fun MethodReference.id() = "$definingClass->$name(${parameterTypes.joinToString("")})$returnType"
-private fun <T> Iterable<T>.unique(role: String): T {
-    val list=toList()
-    if(list.size!=1) throw PatchException("AI captions: $role must match exactly once; found ${list.size}")
-    return list.single()
+private const val BRIDGE = "${EXTENSION}NativeCaptionBridge;"
+private const val SUPPORT = "${EXTENSION}CaptionAddonSupport;"
+private const val LIST = "Ljava/util/List;"
+private const val CANVAS = "Landroid/graphics/Canvas;"
+private const val RENDERER = "Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;"
+private const val SETTINGS_FRAGMENT = "Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;"
+
+/** The name that the wrapped original of the settings fragment's long-press handler gets. */
+private const val ORIGINAL_LONG_CLICK = "aiCaptionOriginalLongClick"
+
+/** The wire schemas of YouTube's translation metadata and of one entry of it, as they were verified. */
+private const val METADATA_SCHEMA = "\u0001\u0007\u0000\u0001\u0001\u0007\u0007\u0000\u0004\u0004\u0001Л\u0002" +
+    "\u001b\u0003Л\u0004င\u0000\u0005ᐉ\u0001\u0006\u0016\u0007ᐉ\u0002"
+private const val TRANSLATION_ENTRY_SCHEMA = "\u0001\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0002\u0001\u0001" +
+    "ဈ\u0000\u0002ᐉ\u0001\u0003\u0016\u0004\u0016"
+
+/**
+ * Binds the stubs of the extension's `NativeCaptionBridge` to the obfuscated caption classes of YouTube and hooks the
+ * native track flow. It runs once, after every selected patch has executed, because the hooks depend on which
+ * features were asked for.
+ *
+ * Every class, field and method is found by its structure, never by its obfuscated name. When a structure is not
+ * found exactly once the patching fails, instead of installing a hook that could crash YouTube.
+ */
+internal fun BytecodePatchContext.installNativeCaptionBridge(translation: Boolean, rememberSelection: Boolean) {
+    NativeCaptionBridgeInstaller(this, translation, rememberSelection).install()
 }
 
-/** Bind once after all bundles execute; no copied official extension or cross-bundle dependency. */
-internal fun BytecodePatchContext.installNativeCaptionBridge(ai:Boolean, simplified:Boolean, memory:Boolean) {
-    val featureRuntime=mutableClassDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
-    fun publishFeatures() {
-    for((name,enabled) in listOf("aiInstalled" to ai,"simplifiedInstalled" to simplified,"memoryInstalled" to memory)) {
-        val stub=featureRuntime.methods.single { it.name==name }
-        val replacement=ImmutableMethod(featureRuntime.type,name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,MutableMethodImplementation(1)).toMutable()
-        replacement.addInstructions(0,"const/4 v0, ${if(enabled) "0x1" else "0x0"}\nreturn v0")
-        featureRuntime.methods.remove(stub);featureRuntime.methods.add(replacement)
-    }
-    }
-    val quickToggle=if(ai) prepareCaptionQuickToggle() else null
-    val renderer=if(ai) mutableClassDefBy("Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;") else null
-    if(renderer!=null && (renderer.superclass==null || renderer.methods.any { it.name=="draw" && it.parameterTypes.toList()==listOf("Landroid/graphics/Canvas;") }))
-        throw PatchException("AI captions: native draw override unavailable or already exists")
-    val fragment=if(ai) mutableClassDefBy("Lapp/morphe/extension/shared/settings/preference/AbstractPreferenceFragment;") else null
-    val copyPath=fragment?.methods?.filter { it.name=="onPreferenceLongClick" && it.returnType=="Z" &&
-        it.parameterTypes.map { t->t.toString() }==listOf("Landroid/widget/AdapterView;","Landroid/view/View;","I","J") }
-        ?.unique("official breadcrumb long-press handler")
-    val originalName="aiCaptionOriginalLongClick"
-    if(fragment!=null && (copyPath?.implementation==null || AccessFlags.STATIC.isSet(copyPath.accessFlags) || fragment.methods.any { it.name==originalName }))
-        throw PatchException("AI settings: handler unavailable or already wrapped")
-    val track=getAllClassesWithString("AUTO_TRANSLATE_CAPTIONS_OPTION").map { classDefBy(it.type) }
-        .filter { "Landroid/os/Parcelable;" in it.interfaces }.unique("caption model")
-    val sentinel=track.methods.filter { it.returnType=="Z" && it.hasText("AUTO_TRANSLATE_CAPTIONS_OPTION") }
-        .unique("auto-translate sentinel")
-    val language=sentinel.code().mapNotNull { it.field() }.filter { it.definingClass==track.type && it.type==STRING }
-        .distinctBy { it.id() }.unique("language field")
-    val vss=track.methods.filter { it.returnType=="Z" && it.hasText("t") }
-        .flatMap { it.code().mapNotNull { ins -> ins.field() } }.filter { it.type==STRING }
-        .distinctBy { it.id() }.unique("vss field")
-    val display=track.methods.filter { it.name=="toString" }.flatMap { it.code().mapNotNull { ins -> ins.field() } }
-        .filter { it.type=="Ljava/lang/CharSequence;" }.unique("display field")
-    val listMethod=getAllClassesWithString("&tlang=").flatMap { classDefBy(it.type).methods.toList() }
-        .filter { it.hasText("&tlang=") && it.parameterTypes.isEmpty() && it.returnType=="Ljava/util/List;" }
-        .unique("translated track list")
-    val listCode=listMethod.code()
-    val url=listCode.mapIndexedNotNull { i,ins -> if(ins.text()=="&tlang=") listCode.getOrNull(i-2)?.field() else null }
-        .filter { it.definingClass==track.type && it.type==STRING }.unique("signed source URL")
-    val builderFactory=track.methods.filter { AccessFlags.STATIC.isSet(it.accessFlags) && it.parameterTypes.isEmpty()
-        && it.returnType.startsWith("L") && it.returnType!=track.type }.unique("track builder factory")
-    val builder=classDefBy(builderFactory.returnType)
-    val copy=builder.methods.filter { it.name=="<init>" && it.parameterTypes.toList()==listOf(track.type) }
-        .unique("immutable track copy constructor")
-    fun builderField(field: FieldReference): FieldReference {
-        val c=copy.code()
-        return c.mapIndexedNotNull { i, ins ->
-            if(ins.field()?.id()==field.id()) c.getOrNull(i+1)?.field() else null
-        }.filter { it.definingClass==builder.type }.unique("builder field ${field.name}")
-    }
-    fun setter(field: FieldReference): Method {
-        val bf=builderField(field)
-        return builder.methods.filter { it.parameterTypes.toList()==listOf(STRING) && it.returnType=="V" &&
-            it.code().any { ins -> ins.opcode==Opcode.IPUT_OBJECT && ins.field()?.id()==bf.id() } }
-            .unique("builder setter ${field.name}")
-    }
-    val languageSetter=setter(language); val urlSetter=setter(url); val vssSetter=setter(vss)
-    val builderDisplay=builderField(display)
-    val build=builder.methods.filter { it.parameterTypes.isEmpty() && it.returnType==track.type }.unique("build track")
-    val selectorLog="setSubtitleTrack name:%s languageCode:%s languageName:%s format:%d trackName:%s vssid:%s videoid:%s"
-    val logged=getAllClassesWithString(selectorLog)
-        .flatMap { classDefBy(it.type).methods.toList() }.filter { it.hasText(selectorLog) }
-    // YouTube 21.20 removed the log string but kept the method: it is the manager's only instance
-    // method (track, origin, reason) that builds the caption event (track, origin, reason, id).
-    val selector=if(logged.isNotEmpty()) logged.unique("all-menu track selection") else {
-        val found=mutableListOf<Method>()
-        classDefForEach { candidate ->
-            if(candidate.methods.none { it.parameterTypes.isEmpty() && it.returnType==track.type }) return@classDefForEach
-            for(m in candidate.methods) {
-                val types=m.parameterTypes.map { it.toString() }
-                if(AccessFlags.STATIC.isSet(m.accessFlags) || m.returnType!="V" || types.size!=3 ||
-                    types[0]!=track.type || types[2]!="I" || !types[1].startsWith("L")) continue
-                if(m.code().any { ins -> ins.opcode==Opcode.INVOKE_DIRECT && ins.call()?.let { c ->
-                        c.name=="<init>" && c.parameterTypes.map { it.toString() }==listOf(track.type,types[1],"I",STRING) } == true })
-                    found.add(m)
-            }
+/** The obfuscated class of a caption track with the fields and the builder that the bridge needs. */
+private class TrackModel(
+    val track: ClassDef,
+    val language: FieldReference,
+    val vss: FieldReference,
+    val display: FieldReference,
+    val url: FieldReference,
+    /** The caption model's method that lists the tracks YouTube can translate. */
+    val translatedList: Method,
+    val builder: ClassDef,
+    val copyConstructor: Method,
+    val languageSetter: Method,
+    val urlSetter: Method,
+    val vssSetter: Method,
+    val builderDisplay: FieldReference,
+    val build: Method,
+)
+
+private class NativeCaptionBridgeInstaller(
+    private val context: BytecodePatchContext,
+    private val translation: Boolean,
+    private val rememberSelection: Boolean,
+) {
+    private val bridge = context.mutableClassDefBy(BRIDGE)
+
+    fun install() {
+        // Whatever can fail is resolved before the first change of the app's code.
+        val renderer = if (translation) findNativeRenderer() else null
+        val pathCopy = if (translation) findPathCopyHandler() else null
+        val quickToggle = if (translation) context.prepareCaptionQuickToggle() else null
+        val model = findTrackModel()
+        val selector = findTrackSelector(model.track)
+
+        bindTrackAccessors(model)
+        if (translation) {
+            bindCloneTranslation(model)
+            hookTranslatedTrackList(model)
+            bindSelectNative(model, selector)
         }
-        found.unique("all-menu track selection")
-    }
-    if(selector.parameterTypes.firstOrNull()!=track.type || AccessFlags.STATIC.isSet(selector.accessFlags))
-        throw PatchException("AI captions: unexpected native track selector")
-    for(m in listOf(copy,languageSetter,urlSetter,vssSetter,build))
-        if(!AccessFlags.PUBLIC.isSet(m.accessFlags)) throw PatchException("AI captions: non-public builder")
-    if(!AccessFlags.PUBLIC.isSet(builder.fields.first { it.name==builderDisplay.name }.accessFlags))
-        throw PatchException("AI captions: private display field")
-    fun mutable(m:Method)=mutableClassDefBy(m.definingClass).methods.filter { it.id()==m.id() }.unique("mutable method")
-    val runtime=mutableClassDefBy(BRIDGE)
-    fun bind(name:String, body:String) {
-        val args=if(name=="cloneTranslation") listOf(OBJECT,STRING) else listOf(OBJECT)
-        val stub=runtime.methods.filter { it.name==name && it.parameterTypes.toList()==args }.unique(name)
-        val m=ImmutableMethod(BRIDGE,name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,
-            MutableMethodImplementation(3+args.size)).toMutable()
-        m.addInstructionsWithLabels(0,body.trimIndent());runtime.methods.remove(stub);runtime.methods.add(m)
-    }
-    bind("language","check-cast p0, ${track.type}\niget-object v0, p0, ${language.id()}\nreturn-object v0")
-    bind("vss","check-cast p0, ${track.type}\niget-object v0, p0, ${vss.id()}\nreturn-object v0")
-    bind("url","check-cast p0, ${track.type}\niget-object v0, p0, ${url.id()}\nreturn-object v0")
-    bind("displayName","check-cast p0, ${track.type}\niget-object v0, p0, ${display.id()}\nreturn-object v0")
-    if(ai || simplified) {
-    bind("cloneSimplified", """
-        check-cast p0, ${track.type}
-        new-instance v0, ${builder.type}
-        invoke-direct {v0, p0}, ${copy.id()}
-        const-string v1, "zh-Hans"
-        invoke-virtual {v0, v1}, ${languageSetter.id()}
-        invoke-static {}, Lapp/yydarlinker/deepseekcaptions/LanguageMenuOrder;->simplifiedLabel()$STRING
-        move-result-object v1
-        iput-object v1, v0, ${builderDisplay.id()}
-        iget-object v1, p0, ${url.id()}
-        invoke-static {v1}, $BRIDGE->simplifiedUrl($STRING)$STRING
-        move-result-object v1
-        invoke-virtual {v0, v1}, ${urlSetter.id()}
-        iget-object v1, p0, ${vss.id()}
-        invoke-static {v1}, $BRIDGE->simplifiedVss($STRING)$STRING
-        move-result-object v1
-        invoke-virtual {v0, v1}, ${vssSetter.id()}
-        invoke-virtual {v0}, ${build.id()}
-        move-result-object v0
-        return-object v0
-    """)
-    bind("cloneTranslation", """
-        check-cast p0, ${track.type}
-        new-instance v0, ${builder.type}
-        invoke-direct {v0, p0}, ${copy.id()}
-        const-string v1, "zh-Hans"
-        invoke-virtual {v0, v1}, ${languageSetter.id()}
-        invoke-static {p1}, Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;->translationLabel($STRING)$STRING
-        move-result-object v1
-        iput-object v1, v0, ${builderDisplay.id()}
-        iget-object v1, p0, ${url.id()}
-        invoke-static {v1, p1}, $BRIDGE->translationUrl($STRING$STRING)$STRING
-        move-result-object v1
-        invoke-virtual {v0, v1}, ${urlSetter.id()}
-        iget-object v1, p0, ${vss.id()}
-        invoke-static {v1, p1}, $BRIDGE->translationVss($STRING$STRING)$STRING
-        move-result-object v1
-        invoke-virtual {v0, v1}, ${vssSetter.id()}
-        invoke-virtual {v0}, ${build.id()}
-        move-result-object v0
-        return-object v0
-    """)
-    mutable(listMethod).apply {
-        val returns=implementation!!.instructions.mapIndexedNotNull { i,ins ->
-            if(ins.opcode==Opcode.RETURN_OBJECT) i to (ins as OneRegisterInstruction).registerA else null }
-        for((i,r) in returns.reversed()) {
-            // Replace the labeled instruction itself: branch targets must execute the hook.
-            replaceInstruction(i,"invoke-static/range {v$r .. v$r}, $BRIDGE->augmentTranslations(Ljava/util/List;)Ljava/util/List;")
-            addInstructions(i+1,"move-result-object v$r\nreturn-object v$r")
+        hookTrackApplied(model, selector)
+
+        val owner = context.classDefBy(selector.definingClass)
+        val (defaultTrack, modelField) = findDefaultTrack(owner, model)
+        bindModelAccessors(model, owner, modelField)
+        hookOriginalTrackList(model)
+        if (rememberSelection) hookRememberedDefault(model, owner, defaultTrack, modelField)
+        if (translation) {
+            hookLanguageMetadata(model)
+            quickToggle!!()
+            hookNativeDraw(renderer!!)
+            hookPathCopy(pathCopy!!.first, pathCopy.second)
         }
-    }
-    } // optional simplified language menu
-    if(selector.returnType!="V" || selector.parameterTypes.size !in 2..3 ||
-        (selector.parameterTypes.size==3 && selector.parameterTypes[2]!="I"))throw PatchException("Caption selector signature changed")
-    // setSubtitleTrack is a USER entry point, not the automatic new-video path. Its final
-    // event dispatcher is shared with model-ready/default restoration. Capture the COMMITTED
-    // track there (after Off/auto-caption/forced-track filtering), before renderer I/O starts.
-    val dispatcherRef=selector.code().mapNotNull { it.call() }.filter {
-        it.definingClass==selector.definingClass && it.returnType=="V" && it.parameterTypes.size==1 &&
-            it.parameterTypes[0].toString().startsWith("L")
-    }.distinctBy { it.id() }.unique("shared caption event dispatcher")
-    val dispatcher=classDefBy(dispatcherRef.definingClass).methods.filter { it.id()==dispatcherRef.id() }
-        .unique("caption event method")
-    val event=classDefBy(dispatcher.parameterTypes.single().toString())
-    fun eventField(type:String)=event.fields.filter { it.type==type && !AccessFlags.STATIC.isSet(it.accessFlags) && AccessFlags.PUBLIC.isSet(it.accessFlags) }
-        .unique("caption event field $type")
-    val eventRequested=eventField(track.type)
-    val eventOrigin=eventField(selector.parameterTypes[1].toString())
-    val eventReason=eventField("I")
-    // The event's String is a playback identifier (manager.c -> player.ap), NOT a
-    // video ID. Resolve ownership from the model field that feeds the builder's
-    // explicitly named videoId property. Never infer semantics from a field type.
-    val videoSetter=builder.methods.filter { it.parameterTypes.toList()==listOf(STRING) &&
-        it.returnType=="V" && it.hasText("Null videoId") }.unique("videoId builder setter")
-    val model=classDefBy(listMethod.definingClass)
-    val modelVideoField=model.methods.flatMap { m ->
-        val code=m.code()
-        code.mapIndexedNotNull { i,ins ->
-            if(ins.call()?.id()!=videoSetter.id()) return@mapIndexedNotNull null
-            val read=code.getOrNull(i-1) as? TwoRegisterInstruction ?: return@mapIndexedNotNull null
-            val call=ins as? FiveRegisterInstruction ?: return@mapIndexedNotNull null
-            val field=code[i-1].field()
-            if(code[i-1].opcode==Opcode.IGET_OBJECT && call.registerCount==2 &&
-                read.registerA==call.registerD && field?.definingClass==model.type && field.type==STRING) field else null
-        }
-    }.distinctBy { it.id() }.unique("caption model videoId provenance")
-    val modelGetterName="captionAddonVideoId"
-    val mutableModel=mutableClassDefBy(model.type)
-    if(mutableModel.methods.any { it.name==modelGetterName })throw PatchException("Caption model getter already exists")
-    val modelGetter=ImmutableMethod(model.type,modelGetterName,emptyList(),STRING,
-        AccessFlags.PUBLIC.value or AccessFlags.FINAL.value,null,null,MutableMethodImplementation(2)).toMutable()
-    modelGetter.addInstructions(0,"iget-object v0, p0, ${modelVideoField.id()}\nreturn-object v0")
-    mutableModel.methods.add(modelGetter)
-    val committed=dispatcher.code().filter { it.opcode==Opcode.IPUT_OBJECT }.mapNotNull { it.field() }
-        .filter { it.definingClass==selector.definingClass && it.type==track.type }
-        .distinctBy { it.id() }.unique("committed caption track")
-    if(!AccessFlags.PUBLIC.isSet(classDefBy(selector.definingClass).fields.single { it.name==committed.name }.accessFlags))
-        throw PatchException("AI captions: committed track is not accessible")
-    val rendererIndex=dispatcher.code().indices.filter { index ->
-        val call=dispatcher.code()[index].call()
-        call?.definingClass==selector.definingClass && call.returnType=="V" &&
-            call.parameterTypes.map { it.toString() }==listOf(track.type,"Z")
-    }.unique("caption renderer update")
-    if(dispatcher.code().drop(rendererIndex).any { it.opcode==Opcode.IPUT_OBJECT && it.field()?.id()==committed.id() })
-        throw PatchException("AI captions: track mutates after renderer update")
-    val sharedCallers=classDefBy(selector.definingClass).methods.filter { m -> m.code().any { it.call()?.id()==dispatcherRef.id() } }
-    if(sharedCallers.none { it.id()!=selector.id() && it.parameterTypes.size==2 })
-        throw PatchException("AI captions: automatic model initializer does not share the dispatcher")
-    val appliedStub=runtime.methods.single { it.name=="onNativeTrackApplied" }
-    val applied=ImmutableMethod(BRIDGE,appliedStub.name,appliedStub.parameters,appliedStub.returnType,appliedStub.accessFlags,
-        appliedStub.annotations,null,MutableMethodImplementation(8)).toMutable()
-    applied.addInstructionsWithLabels(0,"""
-        if-eqz p0, :done
-        if-eqz p1, :done
-        check-cast p0, ${selector.definingClass}
-        check-cast p1, ${event.type}
-        move-object v0, p0
-        iget-object v1, p0, ${committed.id()}
-        iget-object v2, p1, ${eventRequested.id()}
-        iget-object v3, p1, ${eventOrigin.id()}
-        iget v4, p1, ${eventReason.id()}
-        invoke-static {p0}, $BRIDGE->nativeModelVideo($OBJECT)$STRING
-        move-result-object v5
-        invoke-static/range {v0 .. v5}, $BRIDGE->onNativeAppliedEvent($OBJECT$OBJECT$OBJECT${OBJECT}I$STRING)V
-        :done
-        return-void
-    """.trimIndent())
-    runtime.methods.remove(appliedStub);runtime.methods.add(applied)
-    mutable(dispatcher).apply {
-        val renderer=dispatcher.code()[rendererIndex]
-        val registers=renderer as? FiveRegisterInstruction ?: throw PatchException("AI captions: renderer invoke changed")
-        if(renderer.opcode!=Opcode.INVOKE_VIRTUAL || registers.registerCount!=3)
-            throw PatchException("AI captions: unexpected renderer update signature")
-        // Replace the labeled instruction so every incoming native branch executes capture.
-        replaceInstruction(rendererIndex,"invoke-static/range {p0 .. p1}, $BRIDGE->onNativeTrackApplied($OBJECT$OBJECT)V")
-        addInstructions(rendererIndex+1,"invoke-virtual {v${registers.registerC}, v${registers.registerD}, v${registers.registerE}}, ${renderer.call()!!.id()}")
+        verifyHooks()
+        publishFeatures()
     }
 
-    if(ai) {
-        val stub=runtime.methods.single { it.name=="selectNative" }
-        val m=ImmutableMethod(BRIDGE,stub.name,stub.parameters,stub.returnType,stub.accessFlags,stub.annotations,null,MutableMethodImplementation(4)).toMutable()
-        m.addInstructions(0,"""
-            check-cast p0, ${selector.definingClass}
-            check-cast p1, ${track.type}
-            check-cast p2, ${selector.parameterTypes[1]}
-            ${if(selector.parameterTypes.size==3) "invoke-virtual/range {p0 .. p3}" else "invoke-virtual {p0, p1, p2}"}, ${selector.id()}
-            return-void
-        """.trimIndent())
-        runtime.methods.remove(stub);runtime.methods.add(m)
-    }
-    // Global per-launch memory uses fresh native tracks; never carries old-video URLs.
-    val owner=classDefBy(selector.definingClass)
-    val defaultTrack=owner.methods.filter { it.parameterTypes.isEmpty() && it.returnType==track.type }.unique("native default selector")
-    val modelField=defaultTrack.code().mapNotNull { it.field() }.first { it.definingClass==owner.type && it.type==listMethod.definingClass }
-    bind("nativeModelVideo", """
-        check-cast p0, ${owner.type}
-        if-eqz p0, :no_model
-        iget-object v0, p0, ${modelField.id()}
-        if-eqz v0, :no_model
-        invoke-virtual {v0}, ${modelGetter.id()}
-        move-result-object v0
-        return-object v0
-        :no_model
-        const-string v0, ""
-        return-object v0
-    """)
-    val nativeList=classDefBy(listMethod.definingClass).methods.filter {
-        it.parameterTypes.isEmpty() && it.returnType=="Ljava/util/List;" && it.name!=listMethod.name
-    }.unique("native original track list")
-    // Observe the model's signed source descriptors as soon as the list is built. A returned
-    // list is only a candidate for source prewarm; NativeCaptionBridge still checks foreground
-    // ownership and translated ON intent before starting an invisible session.
-    mutable(nativeList).apply {
-        val returns=implementation!!.instructions.mapIndexedNotNull { i,ins ->
-            if(ins.opcode==Opcode.RETURN_OBJECT) i to (ins as OneRegisterInstruction).registerA else null }
-        for((i,r) in returns.reversed()) {
-            replaceInstruction(i,"invoke-static/range {v$r .. v$r}, $BRIDGE->onOriginalTrackList(Ljava/util/List;)V")
-            addInstructions(i+1,"return-object v$r")
+    // region Discovery
+
+    private fun findTrackModel(): TrackModel {
+        val track = context.getAllClassesWithString("AUTO_TRANSLATE_CAPTIONS_OPTION")
+            .map { context.classDefBy(it.type) }
+            .filter { "Landroid/os/Parcelable;" in it.interfaces }
+            .unique("caption model")
+        val sentinel = track.methods
+            .filter { it.returnType == "Z" && it.hasText("AUTO_TRANSLATE_CAPTIONS_OPTION") }
+            .unique("auto-translate sentinel")
+        // Up to 20.51 the sentinel compares the language through a getter of the track, not through the field.
+        fun stringFields(method: Method) = method.code().mapNotNull { it.field() }
+            .filter { it.definingClass == track.type && it.type == STRING }
+        val language = (stringFields(sentinel).ifEmpty {
+            val getters = sentinel.code().mapNotNull { it.call() }
+                .filter { it.definingClass == track.type && it.parameterTypes.isEmpty() && it.returnType == STRING }
+                .map { it.id() }
+            track.methods.filter { it.id() in getters }.flatMap { stringFields(it) }
+        }).distinctBy { it.id() }.unique("language field")
+        val vss = track.methods.filter { it.returnType == "Z" && it.hasText("t") }
+            .flatMap { it.code().mapNotNull { instruction -> instruction.field() } }
+            .filter { it.type == STRING }
+            .distinctBy { it.id() }.unique("vss field")
+        val display = track.methods.filter { it.name == "toString" }
+            .flatMap { it.code().mapNotNull { instruction -> instruction.field() } }
+            .filter { it.type == "Ljava/lang/CharSequence;" }.unique("display field")
+        val translatedList = context.getAllClassesWithString("&tlang=")
+            .flatMap { context.classDefBy(it.type).methods.toList() }
+            .filter { it.hasText("&tlang=") && it.parameterTypes.isEmpty() && it.returnType == LIST }
+            .unique("translated track list")
+        val listCode = translatedList.code()
+        val url = listCode.mapIndexedNotNull { index, instruction ->
+            if (instruction.text() == "&tlang=") listCode.getOrNull(index - 2)?.field() else null
+        }.filter { it.definingClass == track.type && it.type == STRING }.unique("signed source URL")
+
+        val builderFactory = track.methods
+            .filter { it.isStatic() && it.parameterTypes.isEmpty() && it.returnType.startsWith("L") && it.returnType != track.type }
+            .unique("track builder factory")
+        val builder = context.classDefBy(builderFactory.returnType)
+        val copy = builder.methods
+            .filter { it.name == "<init>" && it.parameterNames() == listOf(track.type) }
+            .unique("immutable track copy constructor")
+
+        /** The builder field that the copy constructor fills from [field] of the track. */
+        fun builderField(field: FieldReference): FieldReference {
+            val code = copy.code()
+            return code.mapIndexedNotNull { index, instruction ->
+                if (instruction.field()?.id() == field.id()) code.getOrNull(index + 1)?.field() else null
+            }.filter { it.definingClass == builder.type }.unique("builder field ${field.name}")
         }
+
+        fun setter(field: FieldReference): Method {
+            val target = builderField(field)
+            return builder.methods
+                .filter { method ->
+                    method.parameterNames() == listOf(STRING) && method.returnType == "V" &&
+                        method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == target.id() }
+                }
+                .unique("builder setter ${field.name}")
+        }
+
+        val languageSetter = setter(language)
+        val urlSetter = setter(url)
+        val vssSetter = setter(vss)
+        val builderDisplay = builderField(display)
+        val build = builder.methods.filter { it.parameterTypes.isEmpty() && it.returnType == track.type }
+            .unique("build track")
+
+        // The generated smali calls these from another class.
+        for (method in listOf(copy, languageSetter, urlSetter, vssSetter, build)) {
+            if (!AccessFlags.PUBLIC.isSet(method.accessFlags)) throw PatchException("AI captions: non-public builder")
+        }
+        if (!AccessFlags.PUBLIC.isSet(builder.fields.first { it.name == builderDisplay.name }.accessFlags)) {
+            throw PatchException("AI captions: private display field")
+        }
+        return TrackModel(
+            track, language, vss, display, url, translatedList,
+            builder, copy, languageSetter, urlSetter, vssSetter, builderDisplay, build,
+        )
     }
-    fun listAccessor(m:Method) = """
-        check-cast p0, ${owner.type}
-        iget-object v0, p0, ${modelField.id()}
-        if-nez v0, :model_ready
-        const/4 v0, 0x0
-        return-object v0
-        :model_ready
-        invoke-virtual {v0}, ${m.id()}
-        move-result-object v0
-        return-object v0
-    """
-    bind("nativeTracks",listAccessor(nativeList));bind("translatedTracks",listAccessor(listMethod))
-    if(memory) {
-    mutable(defaultTrack).apply {
-        if(implementation!!.registerCount < 2) throw PatchException("AI memory: no scratch register")
-        addInstructionsWithLabels(0,"""
-            invoke-static {p0}, $BRIDGE->resolveRemembered($OBJECT)$OBJECT
-            move-result-object v0
-            if-nez v0, :remembered_track
-            invoke-static {}, $BRIDGE->restoreDecision()I
-            move-result v0
-            if-nez v0, :original_default
+
+    /**
+     * The manager's method that returns the track to start with, and the field of its caption model. From 21.23 a
+     * private helper is split off a public wrapper; the model-ready initializer calls the one that is hooked.
+     */
+    private fun findDefaultTrack(owner: ClassDef, model: TrackModel): Pair<Method, FieldReference> {
+        val candidates = owner.methods.filter { it.parameterTypes.isEmpty() && it.returnType == model.track.type }
+        val modelField = candidates.flatMap { it.code().mapNotNull { instruction -> instruction.field() } }
+            .first { it.definingClass == owner.type && it.type == model.translatedList.definingClass }
+        val initializer = owner.methods.filter { method ->
+            method.returnType == "V" && method.parameterTypes.size == 2 &&
+                method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == modelField.id() } &&
+                method.code().any { call -> candidates.any { it.id() == call.call()?.id() } }
+        }.unique("caption model ready initializer")
+        val called = candidates.filter { candidate -> initializer.code().any { it.call()?.id() == candidate.id() } }
+        return called.unique("native default selector") to modelField
+    }
+
+    /** The method of the caption manager that selects a track for the "all captions" menu. */
+    private fun findTrackSelector(track: ClassDef): Method {
+        val log = "setSubtitleTrack name:%s languageCode:%s languageName:%s format:%d trackName:%s vssid:%s videoid:%s"
+        val logged = context.getAllClassesWithString(log)
+            .flatMap { context.classDefBy(it.type).methods.toList() }
+            .filter { it.hasText(log) }
+
+        // YouTube 21.20 removed the log string but kept the method: it is the manager's only instance method
+        // (track, origin, reason) that builds the caption event (track, origin, reason, id).
+        val selector = if (logged.isNotEmpty()) {
+            logged.unique("all-menu track selection")
+        } else {
+            val found = mutableListOf<Method>()
+            context.classDefForEach { candidate ->
+                if (candidate.methods.none { it.parameterTypes.isEmpty() && it.returnType == track.type }) {
+                    return@classDefForEach
+                }
+                for (method in candidate.methods) {
+                    val types = method.parameterNames()
+                    if (method.isStatic() || method.returnType != "V" || types.size != 3 ||
+                        types[0] != track.type || types[2] != "I" || !types[1].startsWith("L")
+                    ) {
+                        continue
+                    }
+                    val buildsEvent = method.code().any { instruction ->
+                        instruction.opcode == Opcode.INVOKE_DIRECT && instruction.call()?.let { call ->
+                            call.name == "<init>" &&
+                                call.parameterTypes.map { it.toString() } == listOf(track.type, types[1], "I", STRING)
+                        } == true
+                    }
+                    if (buildsEvent) found.add(method)
+                }
+            }
+            found.unique("all-menu track selection")
+        }
+        if (selector.parameterTypes.firstOrNull() != track.type || selector.isStatic() ||
+            selector.returnType != "V" || selector.parameterTypes.size !in 2..3 ||
+            (selector.parameterTypes.size == 3 && selector.parameterTypes[2] != "I")
+        ) {
+            throw PatchException("AI captions: unexpected native track selector")
+        }
+        return selector
+    }
+
+    /** The class of the native caption renderer; its `draw` is overridden to hide the native caption. */
+    private fun findNativeRenderer(): MutableClass {
+        val renderer = context.mutableClassDefBy(RENDERER)
+        if (renderer.superclass == null || renderer.methods.any { it.name == "draw" && it.parameterNames() == listOf(CANVAS) }) {
+            throw PatchException("AI captions: native draw override unavailable or already exists")
+        }
+        return renderer
+    }
+
+    /** The settings screen's long-press handler that copies the breadcrumb path (see [hookPathCopy]). */
+    private fun findPathCopyHandler(): Pair<MutableClass, Method> {
+        val fragment = context.mutableClassDefBy(SETTINGS_FRAGMENT)
+        val handler = fragment.methods
+            .filter {
+                it.name == "onPreferenceLongClick" && it.returnType == "Z" &&
+                    it.parameterNames() == listOf("Landroid/widget/AdapterView;", "Landroid/view/View;", "I", "J")
+            }
+            .unique("official breadcrumb long-press handler")
+        if (handler.implementation == null || handler.isStatic() || fragment.methods.any { it.name == ORIGINAL_LONG_CLICK }) {
+            throw PatchException("AI captions: settings long-press handler unavailable or already wrapped")
+        }
+        return fragment to handler
+    }
+
+    /** The caption model's list of the tracks of the video, without the translations. */
+    private fun findNativeList(model: TrackModel) = context.classDefBy(model.translatedList.definingClass).methods
+        .filter { it.parameterTypes.isEmpty() && it.returnType == LIST && it.name != model.translatedList.name }
+        .unique("native original track list")
+
+    // endregion
+
+    // region Bindings of stubs
+
+    private fun mutable(method: Method): MutableMethod = context.mutableClassDefBy(method.definingClass).methods
+        .filter { it.id() == method.id() }.unique("mutable method")
+
+    private fun bindTrackAccessors(model: TrackModel) {
+        fun read(field: FieldReference) =
+            "check-cast p0, ${model.track.type}\niget-object v0, p0, ${field.id()}\nreturn-object v0"
+        bridge.bindStub("language", 3, read(model.language))
+        bridge.bindStub("vss", 3, read(model.vss))
+        bridge.bindStub("url", 3, read(model.url))
+        bridge.bindStub("displayName", 3, read(model.display))
+    }
+
+    /** The translation of a track: the copy of an original track with the language, label, URL and vss of the target. */
+    private fun bindCloneTranslation(model: TrackModel) {
+        bridge.bindStub(
+            "cloneTranslation",
+            3,
+            """
+                check-cast p0, ${model.track.type}
+                new-instance v0, ${model.builder.type}
+                invoke-direct {v0, p0}, ${model.copyConstructor.id()}
+                const-string v1, "zh-Hans"
+                invoke-virtual {v0, v1}, ${model.languageSetter.id()}
+                invoke-static {p1}, $BRIDGE->translationLabel($STRING)$STRING
+                move-result-object v1
+                iput-object v1, v0, ${model.builderDisplay.id()}
+                iget-object v1, p0, ${model.url.id()}
+                invoke-static {v1, p1}, $BRIDGE->translationUrl($STRING$STRING)$STRING
+                move-result-object v1
+                invoke-virtual {v0, v1}, ${model.urlSetter.id()}
+                iget-object v1, p0, ${model.vss.id()}
+                invoke-static {v1, p1}, $BRIDGE->translationVss($STRING$STRING)$STRING
+                move-result-object v1
+                invoke-virtual {v0, v1}, ${model.vssSetter.id()}
+                invoke-virtual {v0}, ${model.build.id()}
+                move-result-object v0
+                return-object v0
+            """,
+        )
+    }
+
+    /** Lets the extension select a track through the manager's selector. */
+    private fun bindSelectNative(model: TrackModel, selector: Method) {
+        val invoke = if (selector.parameterTypes.size == 3) "invoke-virtual/range {p0 .. p3}" else "invoke-virtual {p0, p1, p2}"
+        bridge.bindStub(
+            "selectNative",
+            0,
+            """
+                check-cast p0, ${selector.definingClass}
+                check-cast p1, ${model.track.type}
+                check-cast p2, ${selector.parameterTypes[1]}
+                $invoke, ${selector.id()}
+                return-void
+            """,
+        )
+    }
+
+    /** The caption model of the manager, and the lists of tracks it holds. */
+    private fun bindModelAccessors(model: TrackModel, owner: ClassDef, modelField: FieldReference) {
+        val modelClass = context.classDefBy(model.translatedList.definingClass)
+        val videoSetter = model.builder.methods
+            .filter { it.parameterNames() == listOf(STRING) && it.returnType == "V" && it.hasText("Null videoId") }
+            .unique("videoId builder setter")
+        // The String of a caption event is a playback identifier, not a video ID: the video comes from the model
+        // field that feeds the builder's videoId property.
+        val videoField = modelClass.methods.flatMap { method ->
+            val code = method.code()
+            code.mapIndexedNotNull { index, instruction ->
+                if (instruction.call()?.id() != videoSetter.id()) return@mapIndexedNotNull null
+                val read = code.getOrNull(index - 1) as? TwoRegisterInstruction ?: return@mapIndexedNotNull null
+                val call = instruction as? FiveRegisterInstruction ?: return@mapIndexedNotNull null
+                val field = code[index - 1].field()
+                if (code[index - 1].opcode == Opcode.IGET_OBJECT && call.registerCount == 2 &&
+                    read.registerA == call.registerD && field?.definingClass == modelClass.type && field.type == STRING
+                ) field else null
+            }
+        }.distinctBy { it.id() }.unique("caption model videoId provenance")
+
+        val getterName = "captionAddonVideoId"
+        val mutableModel = context.mutableClassDefBy(modelClass.type)
+        if (mutableModel.methods.any { it.name == getterName }) throw PatchException("AI captions: caption model getter already exists")
+        val getter = ImmutableMethod(
+            modelClass.type, getterName, emptyList(), STRING,
+            AccessFlags.PUBLIC.value or AccessFlags.FINAL.value, null, null, MutableMethodImplementation(2),
+        ).toMutable()
+        getter.addInstructions(0, "iget-object v0, p0, ${videoField.id()}\nreturn-object v0")
+        mutableModel.methods.add(getter)
+
+        bridge.bindStub(
+            "nativeModelVideo",
+            3,
+            """
+                check-cast p0, ${owner.type}
+                if-eqz p0, :no_model
+                iget-object v0, p0, ${modelField.id()}
+                if-eqz v0, :no_model
+                invoke-virtual {v0}, ${getter.id()}
+                move-result-object v0
+                return-object v0
+                :no_model
+                const-string v0, ""
+                return-object v0
+            """,
+        )
+
+        fun listAccessor(method: Method) = """
+            check-cast p0, ${owner.type}
+            iget-object v0, p0, ${modelField.id()}
+            if-nez v0, :model_ready
             const/4 v0, 0x0
             return-object v0
-            :remembered_track
-            check-cast v0, ${track.type}
+            :model_ready
+            invoke-virtual {v0}, ${method.id()}
+            move-result-object v0
             return-object v0
-        """.trimIndent(),ExternalLabel("original_default",implementation!!.instructions.first()))
-    }
-    val initializer=owner.methods.filter { m -> m.returnType=="V" && m.parameterTypes.size==2 &&
-        m.code().any { it.opcode==Opcode.IPUT_OBJECT && it.field()?.id()==modelField.id() } &&
-        m.code().any { it.call()?.id()==defaultTrack.id() }
-    }.unique("caption model ready initializer")
-    // Replace the shared model-ready branch entry, not one of several native settings flags.
-    val ci=initializer.code();val dc=ci.indexOfFirst { it.call()?.id()==defaultTrack.id() }
-    val entry=(0 until dc).filter { i ->
-        ci[i].opcode==Opcode.IGET_OBJECT && ci[i].field()?.id()==modelField.id() &&
-        ci.getOrNull(i+1)?.opcode==Opcode.IF_NEZ && ci.getOrNull(i+3)?.opcode==Opcode.IGET_BOOLEAN
-    }.unique("model ready decision")+3
-    val nativeRead=ci[entry] as TwoRegisterInstruction
-    val scratch=(ci.first() as OneRegisterInstruction).registerA
-    val enabled=ci[dc-1]
-    val eventType=(enabled as ReferenceInstruction).reference.toString()
-    val disabledIndex=(dc+1 until ci.size).filter { i -> ci[i].opcode==Opcode.NEW_INSTANCE &&
-        (ci[i] as? ReferenceInstruction)?.reference.toString()==eventType }.firstOrNull()
-        ?: throw PatchException("AI memory: disabled event missing")
-    mutable(initializer).apply {
-        val on=implementation!!.instructions[dc-1];val off=implementation!!.instructions[disabledIndex]
-        replaceInstruction(entry,"invoke-static {}, $BRIDGE->restoreDecision()I")
-        addInstructionsWithLabels(entry+1,"""
-            move-result v$scratch
-            if-ltz v$scratch, :native_settings
-            if-eqz v$scratch, :remembered_off
-            const/4 v$scratch, 0x0
-            goto :remembered_on
-            :remembered_off
-            const/4 v$scratch, 0x0
-            goto :off_event
-            :native_settings
-            const/4 v$scratch, 0x0
-            iget-boolean v${nativeRead.registerA}, v${nativeRead.registerB}, ${ci[entry].field()!!.id()}
-        """.trimIndent(),ExternalLabel("remembered_on",on),ExternalLabel("off_event",off))
+        """
+        bridge.bindStub("nativeTracks", 3, listAccessor(findNativeList(model)))
+        bridge.bindStub("translatedTracks", 3, listAccessor(model.translatedList))
     }
 
-    } // optional cross-video memory
+    // endregion
 
-    if(ai || simplified) {
-    // Both modern protobuf settings and legacy CC rows consume this shared metadata field.
-    val metadataField=listCode.mapNotNull { it.field() }.first { it.definingClass==listMethod.definingClass && it.type.startsWith("L") }
-    val metadata=classDefBy(metadataField.type)
-    val metadataBase=classDefBy(metadata.superclass!!)
-    val schema=metadata.methods.flatMap { it.code() }.mapNotNull { it.text() }.filter { it.startsWith("\u0001\u0007") }.unique("translation metadata schema")
-    if(schema!="\u0001\u0007\u0000\u0001\u0001\u0007\u0007\u0000\u0004\u0004\u0001\u041b\u0002\u001b\u0003\u041b\u0004\u1004\u0000\u0005\u1409\u0001\u0006\u0016\u0007\u1409\u0002")
-        throw PatchException("AI menu: metadata wire schema changed")
-    // In this verified schema field d is field 3, but bind through the schema object table, not class name.
-    val schemaCode=metadata.methods.first { it.code().any { ins -> ins.text()==schema } }.code()
-    val schemaNames=schemaCode.mapNotNull { it.text() }.filter { name -> metadata.fields.any { it.name==name } }
-    val translationField=metadata.fields.firstOrNull { it.name==schemaNames.getOrNull(3) }
-        ?: throw PatchException("AI menu: translation field missing")
-    val translationEntryType=listCode.filter { it.opcode==Opcode.CHECK_CAST }.map {
-        (it as ReferenceInstruction).reference.toString()
-    }.distinct().mapNotNull { classDefByOrNull(it) }.filter { cls -> cls.methods.any { m -> m.code().any { ins ->
-        ins.text()=="\u0001\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0002\u0001\u0001\u1008\u0000\u0002\u1409\u0001\u0003\u0016\u0004\u0016"
-    } } }.unique("translation entry wire schema")
-    val parse=metadataBase.methods.filter { it.name=="parseFrom" && it.parameterTypes.toList()==listOf(metadataBase.type,"[B")
-        && AccessFlags.PUBLIC.isSet(it.accessFlags) }.unique("public metadata parser")
-    val instance=metadata.fields.filter { it.type==metadata.type && AccessFlags.STATIC.isSet(it.accessFlags) }.unique("metadata default")
-    bind("augmentMetadata", """
-        check-cast p0, ${metadata.type}
-        invoke-virtual {p0}, ${metadata.type}->toByteArray()[B
-        move-result-object v0
-        invoke-static {v0}, Lapp/yydarlinker/deepseekcaptions/CaptionLanguageMetadata;->addSimplified([B)[B
-        move-result-object v0
-        sget-object v1, ${instance.id()}
-        invoke-static {v1, v0}, ${parse.id()}
-        move-result-object v0
-        return-object v0
-    """)
-    val constructors=classDefBy(listMethod.definingClass).methods.filter { it.name=="<init>" &&
-        it.code().any { ins -> ins.opcode==Opcode.IPUT_OBJECT && ins.field()?.id()==metadataField.id() } }
-    if(constructors.isEmpty()) throw PatchException("AI menu: metadata constructor missing")
-    constructors.forEach { ctor ->
-        val writeIndex=ctor.code().indexOfFirst { it.opcode==Opcode.IPUT_OBJECT && it.field()?.id()==metadataField.id() }
-        val write=ctor.code()[writeIndex] as TwoRegisterInstruction
-        mutable(ctor).apply {
-            replaceInstruction(writeIndex,"invoke-static/range {v${write.registerA} .. v${write.registerA}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT")
-            addInstructions(writeIndex+1,"move-result-object v${write.registerA}\ncheck-cast v${write.registerA}, ${metadata.type}\niput-object v${write.registerA}, v${write.registerB}, ${metadataField.id()}")
+    // region Hooks into the app
+
+    /** Replaces every `return-object` of [method] by a call of the extension that may replace the returned object. */
+    private fun MutableMethod.hookReturns(call: (register: Int) -> Pair<String, String>) {
+        val returns = code().mapIndexedNotNull { index, instruction ->
+            if (instruction.opcode == Opcode.RETURN_OBJECT) index to (instruction as OneRegisterInstruction).registerA else null
+        }
+        // Last first, so that the inserted instructions do not move the indexes that are still to be done.
+        for ((index, register) in returns.reversed()) {
+            val (hook, after) = call(register)
+            // Replace the labeled instruction itself: branch targets must execute the hook.
+            replaceInstruction(index, hook)
+            addInstructions(index + 1, after)
         }
     }
-    data class ReadHook(val m:Method,val index:Int,val dest:Int,val receiver:Int)
-    val reads=mutableListOf<ReadHook>()
-    classDefForEach { cls ->
-        if(cls.type==metadata.type || cls.type.startsWith("Lapp/")) return@classDefForEach
-        cls.methods.forEach { m -> m.code().forEachIndexed { i,ins ->
-            if(ins.opcode==Opcode.IGET_OBJECT && ins.field()?.id()==translationField.id()) {
-                val r=ins as TwoRegisterInstruction;reads.add(ReadHook(m,i,r.registerA,r.registerB))
+
+    /** The extension adds the translations that the user selected to the list of translated tracks. */
+    private fun hookTranslatedTrackList(model: TrackModel) {
+        mutable(model.translatedList).hookReturns { register ->
+            "invoke-static/range {v$register .. v$register}, $BRIDGE->augmentTranslations($LIST)$LIST" to
+                "move-result-object v$register\nreturn-object v$register"
+        }
+    }
+
+    /**
+     * Tells the extension about the signed source tracks as soon as the model builds them. The list is only a
+     * candidate for a source prewarm; the extension still checks the foreground owner and the translation intent
+     * before it starts an invisible session.
+     */
+    private fun hookOriginalTrackList(model: TrackModel) {
+        mutable(findNativeList(model)).hookReturns { register ->
+            "invoke-static/range {v$register .. v$register}, $BRIDGE->onOriginalTrackList($LIST)V" to
+                "return-object v$register"
+        }
+    }
+
+    /**
+     * Reports the track that the manager committed. `setSubtitleTrack` is a user entry point, not the automatic
+     * new-video path; its final event dispatcher is shared with the model-ready restoration. The committed track is
+     * captured there (after Off, auto-caption and forced-track filtering), before the renderer starts.
+     */
+    private fun hookTrackApplied(model: TrackModel, selector: Method) {
+        val track = model.track
+        val dispatcherRef = selector.code().mapNotNull { it.call() }.filter {
+            it.definingClass == selector.definingClass && it.returnType == "V" && it.parameterTypes.size == 1 &&
+                it.parameterTypes[0].toString().startsWith("L")
+        }.distinctBy { it.id() }.unique("shared caption event dispatcher")
+        val dispatcher = context.classDefBy(dispatcherRef.definingClass).methods
+            .filter { it.id() == dispatcherRef.id() }.unique("caption event method")
+        val event = context.classDefBy(dispatcher.parameterTypes.single().toString())
+
+        fun eventField(type: String) = event.fields
+            .filter { it.type == type && !AccessFlags.STATIC.isSet(it.accessFlags) && AccessFlags.PUBLIC.isSet(it.accessFlags) }
+            .unique("caption event field $type")
+
+        val eventRequested = eventField(track.type)
+        val eventOrigin = eventField(selector.parameterTypes[1].toString())
+        val eventReason = eventField("I")
+
+        val code = dispatcher.code()
+        val committed = code.filter { it.opcode == Opcode.IPUT_OBJECT }.mapNotNull { it.field() }
+            .filter { it.definingClass == selector.definingClass && it.type == track.type }
+            .distinctBy { it.id() }.unique("committed caption track")
+        if (!AccessFlags.PUBLIC.isSet(context.classDefBy(selector.definingClass).fields.single { it.name == committed.name }.accessFlags)) {
+            throw PatchException("AI captions: committed track is not accessible")
+        }
+        val rendererIndex = code.indices.filter { index ->
+            val call = code[index].call()
+            call?.definingClass == selector.definingClass && call.returnType == "V" &&
+                call.parameterTypes.map { it.toString() } == listOf(track.type, "Z")
+        }.unique("caption renderer update")
+        if (code.drop(rendererIndex).any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == committed.id() }) {
+            throw PatchException("AI captions: track mutates after renderer update")
+        }
+        val sharedCallers = context.classDefBy(selector.definingClass).methods
+            .filter { method -> method.code().any { it.call()?.id() == dispatcherRef.id() } }
+        if (sharedCallers.none { it.id() != selector.id() && it.parameterTypes.size == 2 }) {
+            throw PatchException("AI captions: automatic model initializer does not share the dispatcher")
+        }
+
+        bridge.bindStub(
+            "onNativeTrackApplied",
+            6,
+            """
+                if-eqz p0, :done
+                if-eqz p1, :done
+                check-cast p0, ${selector.definingClass}
+                check-cast p1, ${event.type}
+                move-object v0, p0
+                iget-object v1, p0, ${committed.id()}
+                iget-object v2, p1, ${eventRequested.id()}
+                iget-object v3, p1, ${eventOrigin.id()}
+                iget v4, p1, ${eventReason.id()}
+                invoke-static {p0}, $BRIDGE->nativeModelVideo($OBJECT)$STRING
+                move-result-object v5
+                invoke-static/range {v0 .. v5}, $BRIDGE->onNativeAppliedEvent($OBJECT$OBJECT$OBJECT${OBJECT}I$STRING)V
+                :done
+                return-void
+            """,
+        )
+
+        val renderer = code[rendererIndex]
+        val registers = renderer as? FiveRegisterInstruction ?: throw PatchException("AI captions: renderer invoke changed")
+        if (renderer.opcode != Opcode.INVOKE_VIRTUAL || registers.registerCount != 3) {
+            throw PatchException("AI captions: unexpected renderer update signature")
+        }
+        mutable(dispatcher).apply {
+            // Replace the labeled instruction so every incoming native branch executes the capture.
+            replaceInstruction(rendererIndex, "invoke-static/range {p0 .. p1}, $BRIDGE->onNativeTrackApplied($OBJECT$OBJECT)V")
+            addInstructions(
+                rendererIndex + 1,
+                "invoke-virtual {v${registers.registerC}, v${registers.registerD}, v${registers.registerE}}, ${renderer.call()!!.id()}",
+            )
+        }
+    }
+
+    /**
+     * Lets the remembered selection choose the track of a new video: the manager's default track choice asks the
+     * extension first, and the model-ready branch follows the remembered on/off state instead of the native setting.
+     */
+    private fun hookRememberedDefault(model: TrackModel, owner: ClassDef, defaultTrack: Method, modelField: FieldReference) {
+        mutable(defaultTrack).apply {
+            if (implementation!!.registerCount < 2) throw PatchException("AI captions: no scratch register for the remembered track")
+            addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static {p0}, $BRIDGE->resolveRemembered($OBJECT)$OBJECT
+                    move-result-object v0
+                    if-nez v0, :remembered_track
+                    invoke-static {}, $BRIDGE->restoreDecision()I
+                    move-result v0
+                    if-nez v0, :original_default
+                    const/4 v0, 0x0
+                    return-object v0
+                    :remembered_track
+                    check-cast v0, ${model.track.type}
+                    return-object v0
+                """.trimIndent(),
+                ExternalLabel("original_default", implementation!!.instructions.first()),
+            )
+        }
+
+        val initializer = owner.methods.filter { method ->
+            method.returnType == "V" && method.parameterTypes.size == 2 &&
+                method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == modelField.id() } &&
+                method.code().any { it.call()?.id() == defaultTrack.id() }
+        }.unique("caption model ready initializer")
+
+        // Replace the shared model-ready branch entry, not one of several native settings flags.
+        val code = initializer.code()
+        val defaultCall = code.indexOfFirst { it.call()?.id() == defaultTrack.id() }
+        // The model is checked for null and then the "native settings" flag is read: with a jump in between
+        // up to 21.40 (if-nez, goto), directly after the branch since 21.41 (if-eqz).
+        fun flagRead(index: Int): Int? {
+            if (code[index].opcode != Opcode.IGET_OBJECT || code[index].field()?.id() != modelField.id()) return null
+            val flag = when (code.getOrNull(index + 1)?.opcode) {
+                Opcode.IF_NEZ -> index + 3
+                Opcode.IF_EQZ -> index + 2
+                else -> return null
             }
-        } }
-    }
-    if(reads.isEmpty()) throw PatchException("AI menu: no translation metadata consumers")
-    reads.groupBy { it.m.id() }.values.forEach { hooks ->
-        val m=mutable(hooks.first().m)
-        hooks.sortedByDescending { it.index }.forEach { h ->
-            m.replaceInstruction(h.index,"invoke-static/range {v${h.receiver} .. v${h.receiver}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT")
-            m.addInstructions(h.index+1,"move-result-object v${h.dest}\ncheck-cast v${h.dest}, ${metadata.type}\niget-object v${h.dest}, v${h.dest}, ${translationField.id()}")
+            return flag.takeIf { code.getOrNull(it)?.opcode == Opcode.IGET_BOOLEAN }
         }
-    }
-    java.util.logging.Logger.getLogger("AI captions").info("Shared translation metadata readers hooked: ${reads.size}; mode-aware memory ready")
-    } // optional metadata augmentation
-    if(!ai){publishFeatures();return}
-    quickToggle!!()
-    val draw=ImmutableMethod(renderer!!.type,"draw",listOf(ImmutableMethodParameter("Landroid/graphics/Canvas;",null,null)),
-        "V",AccessFlags.PUBLIC.value,null,null,MutableMethodImplementation(3)).toMutable()
-    draw.addInstructionsWithLabels(0,"""
-        invoke-static {}, $BRIDGE->suppressNativeDraw()Z
-        move-result v0
-        if-eqz v0, :original
-        return-void
-        :original
-        invoke-super {p0, p1}, ${renderer.superclass}->draw(Landroid/graphics/Canvas;)V
-        return-void
-    """.trimIndent())
-    renderer.methods.add(draw)
-    val original=ImmutableMethod(fragment!!.type,originalName,copyPath!!.parameters,copyPath.returnType,
-        copyPath.accessFlags,copyPath.annotations,null,copyPath.implementation).toMutable()
-    val wrapper=ImmutableMethod(fragment.type,copyPath.name,copyPath.parameters,copyPath.returnType,
-        copyPath.accessFlags,copyPath.annotations,null,MutableMethodImplementation(7)).toMutable()
-    wrapper.addInstructionsWithLabels(0,"""
-        invoke-static/range {p1 .. p5}, Lapp/yydarlinker/deepseekcaptions/ApiInputPolicy;->consumePathCopy(Landroid/widget/AdapterView;Landroid/view/View;IJ)Z
-        move-result v0
-        if-eqz v0, :original_copy
-        const/4 v0, 0x1
-        return v0
-        :original_copy
-        invoke-direct/range {p0 .. p5}, ${fragment.type}->$originalName(Landroid/widget/AdapterView;Landroid/view/View;IJ)Z
-        move-result v0
-        return v0
-    """.trimIndent())
-    fragment.methods.remove(copyPath);fragment.methods.add(original);fragment.methods.add(wrapper)
-    val required=mapOf("onMenu" to 1,"observeMenuPath" to 1,"suppressNativeDraw" to 1,"initialize" to 1,"onNativeTrackApplied" to 1,"consumePathCopy" to 1)
-    val counts=mutableMapOf<String,Int>()
-    classDefForEach { initial ->
-        if(!initial.type.startsWith("Lapp/yydarlinker/")) classDefBy(initial.type).methods.forEach { m ->
-            m.code().mapNotNull { it.call() }.filter { it.definingClass.startsWith("Lapp/yydarlinker/deepseekcaptions/") }.forEach { r -> counts[r.name]=(counts[r.name]?:0)+1 }
-        }
-    }
-    required.forEach { (name,expected) -> if((counts[name]?:0)!=expected) throw PatchException("AI captions: finalizer incomplete: $name expected=$expected actual=${counts[name]?:0}") }
-    if((counts["onNativeSelectionWithReason"]?:0)!=0 || (counts["onNativeSelection"]?:0)!=0) throw PatchException("AI captions: duplicate manual selection dispatcher")
-    // Immutable patch-time permission is published only after every mandatory seam succeeds.
-    publishFeatures()
+        val entry = (0 until defaultCall).mapNotNull(::flagRead).unique("model ready decision")
+        val nativeRead = code[entry] as TwoRegisterInstruction
+        val scratch = (code.first() as OneRegisterInstruction).registerA
+        val eventType = (code[defaultCall - 1] as ReferenceInstruction).reference.toString()
+        val disabledIndex = (defaultCall + 1 until code.size).firstOrNull { index ->
+            code[index].opcode == Opcode.NEW_INSTANCE && (code[index] as? ReferenceInstruction)?.reference.toString() == eventType
+        } ?: throw PatchException("AI captions: disabled event missing")
 
+        mutable(initializer).apply {
+            val on = implementation!!.instructions[defaultCall - 1]
+            val off = implementation!!.instructions[disabledIndex]
+            replaceInstruction(entry, "invoke-static {}, $BRIDGE->restoreDecision()I")
+            addInstructionsWithLabels(
+                entry + 1,
+                """
+                    move-result v$scratch
+                    if-ltz v$scratch, :native_settings
+                    if-eqz v$scratch, :remembered_off
+                    const/4 v$scratch, 0x0
+                    goto :remembered_on
+                    :remembered_off
+                    const/4 v$scratch, 0x0
+                    goto :off_event
+                    :native_settings
+                    const/4 v$scratch, 0x0
+                    iget-boolean v${nativeRead.registerA}, v${nativeRead.registerB}, ${code[entry].field()!!.id()}
+                """.trimIndent(),
+                ExternalLabel("remembered_on", on),
+                ExternalLabel("off_event", off),
+            )
+        }
+    }
+
+    /**
+     * Adds the selected languages to the metadata that YouTube builds the "Auto-translate" menu from. Both the
+     * protobuf settings and the legacy CC rows read the same metadata field.
+     */
+    private fun hookLanguageMetadata(model: TrackModel) {
+        val listCode = model.translatedList.code()
+        val metadataField = listCode.mapNotNull { it.field() }
+            .first { it.definingClass == model.translatedList.definingClass && it.type.startsWith("L") }
+        val metadata = context.classDefBy(metadataField.type)
+        val metadataBase = context.classDefBy(metadata.superclass!!)
+        val schema = metadata.methods.flatMap { it.code() }.mapNotNull { it.text() }
+            .filter { it.startsWith("\u0001\u0007") }.unique("translation metadata schema")
+        if (schema != METADATA_SCHEMA) throw PatchException("AI captions: metadata wire schema changed")
+
+        // Field 3 of the verified schema holds the translations; it is bound through the schema's object table.
+        val schemaCode = metadata.methods.first { method -> method.code().any { it.text() == schema } }.code()
+        val schemaNames = schemaCode.mapNotNull { it.text() }.filter { name -> metadata.fields.any { it.name == name } }
+        val translationField = metadata.fields.firstOrNull { it.name == schemaNames.getOrNull(3) }
+            ?: throw PatchException("AI captions: translation field missing")
+        listCode.filter { it.opcode == Opcode.CHECK_CAST }
+            .map { (it as ReferenceInstruction).reference.toString() }.distinct()
+            .mapNotNull { context.classDefByOrNull(it) }
+            .filter { cls -> cls.methods.any { method -> method.code().any { it.text() == TRANSLATION_ENTRY_SCHEMA } } }
+            .unique("translation entry wire schema")
+
+        val parse = metadataBase.methods
+            .filter {
+                it.name == "parseFrom" && it.parameterNames() == listOf(metadataBase.type, "[B") &&
+                    AccessFlags.PUBLIC.isSet(it.accessFlags)
+            }
+            .unique("public metadata parser")
+        val default = metadata.fields.filter { it.type == metadata.type && AccessFlags.STATIC.isSet(it.accessFlags) }
+            .unique("metadata default")
+        bridge.bindStub(
+            "augmentMetadata",
+            3,
+            """
+                check-cast p0, ${metadata.type}
+                invoke-virtual {p0}, ${metadata.type}->toByteArray()[B
+                move-result-object v0
+                invoke-static {v0}, ${EXTENSION}CaptionLanguageMetadata;->addSimplified([B)[B
+                move-result-object v0
+                sget-object v1, ${default.id()}
+                invoke-static {v1, v0}, ${parse.id()}
+                move-result-object v0
+                return-object v0
+            """,
+        )
+
+        // Where the model stores the metadata.
+        val constructors = context.classDefBy(model.translatedList.definingClass).methods.filter { method ->
+            method.name == "<init>" && method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == metadataField.id() }
+        }
+        if (constructors.isEmpty()) throw PatchException("AI captions: metadata constructor missing")
+        for (constructor in constructors) {
+            val writeIndex = constructor.code().indexOfFirst { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == metadataField.id() }
+            val write = constructor.code()[writeIndex] as TwoRegisterInstruction
+            mutable(constructor).apply {
+                replaceInstruction(
+                    writeIndex,
+                    "invoke-static/range {v${write.registerA} .. v${write.registerA}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT",
+                )
+                addInstructions(
+                    writeIndex + 1,
+                    "move-result-object v${write.registerA}\ncheck-cast v${write.registerA}, ${metadata.type}\n" +
+                        "iput-object v${write.registerA}, v${write.registerB}, ${metadataField.id()}",
+                )
+            }
+        }
+
+        // Where the app reads the translation entries from it.
+        class Read(val method: Method, val index: Int, val destination: Int, val receiver: Int)
+
+        val reads = mutableListOf<Read>()
+        context.classDefForEach { cls ->
+            if (cls.type == metadata.type || cls.type.startsWith("Lapp/")) return@classDefForEach
+            for (method in cls.methods) {
+                method.code().forEachIndexed { index, instruction ->
+                    if (instruction.opcode == Opcode.IGET_OBJECT && instruction.field()?.id() == translationField.id()) {
+                        val read = instruction as TwoRegisterInstruction
+                        reads.add(Read(method, index, read.registerA, read.registerB))
+                    }
+                }
+            }
+        }
+        if (reads.isEmpty()) throw PatchException("AI captions: no translation metadata consumers")
+        for (hooks in reads.groupBy { it.method.id() }.values) {
+            val method = mutable(hooks.first().method)
+            for (hook in hooks.sortedByDescending { it.index }) {
+                method.replaceInstruction(
+                    hook.index,
+                    "invoke-static/range {v${hook.receiver} .. v${hook.receiver}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT",
+                )
+                method.addInstructions(
+                    hook.index + 1,
+                    "move-result-object v${hook.destination}\ncheck-cast v${hook.destination}, ${metadata.type}\n" +
+                        "iget-object v${hook.destination}, v${hook.destination}, ${translationField.id()}",
+                )
+            }
+        }
+    }
+
+    /** The native caption renderer draws nothing while a translated caption is shown. */
+    private fun hookNativeDraw(renderer: MutableClass) {
+        val draw = ImmutableMethod(
+            renderer.type, "draw", listOf(ImmutableMethodParameter(CANVAS, null, null)),
+            "V", AccessFlags.PUBLIC.value, null, null, MutableMethodImplementation(3),
+        ).toMutable()
+        draw.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static {}, $BRIDGE->suppressNativeDraw()Z
+                move-result v0
+                if-eqz v0, :original
+                return-void
+                :original
+                invoke-super {p0, p1}, ${renderer.superclass}->draw($CANVAS)V
+                return-void
+            """.trimIndent(),
+        )
+        renderer.methods.add(draw)
+    }
+
+    /**
+     * A long press on a settings row copies the path of the row to the clipboard. The extension takes the long
+     * press of its own rows first (a key that was typed in must not be replaced by a path); the other rows keep the
+     * original behavior.
+     */
+    private fun hookPathCopy(fragment: MutableClass, handler: Method) {
+        val original = ImmutableMethod(
+            fragment.type, ORIGINAL_LONG_CLICK, handler.parameters, handler.returnType,
+            handler.accessFlags, handler.annotations, null, handler.implementation,
+        ).toMutable()
+        val wrapper = ImmutableMethod(
+            fragment.type, handler.name, handler.parameters, handler.returnType,
+            handler.accessFlags, handler.annotations, null, MutableMethodImplementation(7),
+        ).toMutable()
+        wrapper.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static/range {p1 .. p5}, ${EXTENSION}ApiInputPolicy;->consumePathCopy(Landroid/widget/AdapterView;Landroid/view/View;IJ)Z
+                move-result v0
+                if-eqz v0, :original_copy
+                const/4 v0, 0x1
+                return v0
+                :original_copy
+                invoke-direct/range {p0 .. p5}, ${fragment.type}->$ORIGINAL_LONG_CLICK(Landroid/widget/AdapterView;Landroid/view/View;IJ)Z
+                move-result v0
+                return v0
+            """.trimIndent(),
+        )
+        fragment.methods.remove(handler)
+        fragment.methods.add(original)
+        fragment.methods.add(wrapper)
+    }
+
+    // endregion
+
+    /** Every entry point that the extension expects from the patched app is called exactly once. */
+    private fun verifyHooks() {
+        val required = mutableMapOf("onNativeTrackApplied" to 1, "initialize" to 1)
+        if (translation) {
+            for (name in listOf("onMenu", "observeMenuPath", "suppressNativeDraw", "consumePathCopy")) required[name] = 1
+        }
+        val counts = mutableMapOf<String, Int>()
+        context.classDefForEach { app ->
+            if (app.type.startsWith("Lapp/yydarlinker/")) return@classDefForEach
+            for (method in app.methods) {
+                method.code().mapNotNull { it.call() }
+                    .filter { it.definingClass.startsWith(EXTENSION) }
+                    .forEach { call -> counts[call.name] = (counts[call.name] ?: 0) + 1 }
+            }
+        }
+        for ((name, expected) in required) {
+            val actual = counts[name] ?: 0
+            if (actual != expected) throw PatchException("AI captions: hook $name expected $expected call(s), found $actual")
+        }
+    }
+
+    /** Tells the extension which features were selected; published last, after every hook succeeded. */
+    private fun publishFeatures() {
+        val support = context.mutableClassDefBy(SUPPORT)
+        support.bindStub("aiInstalled", 1, "const/4 v0, ${if (translation) "0x1" else "0x0"}\nreturn v0")
+        support.bindStub("memoryInstalled", 1, "const/4 v0, ${if (rememberSelection) "0x1" else "0x0"}\nreturn v0")
+    }
 }

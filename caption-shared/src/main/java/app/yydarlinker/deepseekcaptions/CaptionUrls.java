@@ -2,54 +2,66 @@ package app.yydarlinker.deepseekcaptions;
 
 import android.net.Uri;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Source URL and video identity helpers shared by UI, host and core. */
+/** Source url and video identity helpers shared by UI, host and core. */
 final class CaptionUrls {
     private CaptionUrls() {}
 
+    /** Is [value] a plain https timed-text url on youtube.com, with no credentials in it? */
     static boolean isTimedText(String value) {
-        try { java.net.URI u=java.net.URI.create(value);String h=u.getHost();
-            return "https".equals(u.getScheme()) && ("www.youtube.com".equals(h)||"youtube.com".equals(h))
-                && u.getRawUserInfo()==null && (u.getPort()==-1||u.getPort()==443) && "/api/timedtext".equals(u.getPath());
-        } catch(Exception e){return false;}
+        try {
+            URI uri = URI.create(value);
+            String host = uri.getHost();
+            return "https".equals(uri.getScheme())
+                    && ("www.youtube.com".equals(host) || "youtube.com".equals(host))
+                    && uri.getRawUserInfo() == null
+                    && (uri.getPort() == -1 || uri.getPort() == 443)
+                    && "/api/timedtext".equals(uri.getPath());
+        } catch (Exception malformed) {
+            return false;
+        }
     }
+
+    /** The video of a timed-text url; empty if it names none or more than one. */
     static String videoId(String value) {
-        try { java.util.List<String> ids=Uri.parse(value).getQueryParameters("v");return ids.size()==1?ids.get(0):""; }
-        catch(Exception e){return "";}
+        try {
+            List<String> ids = Uri.parse(value).getQueryParameters("v");
+            return ids.size() == 1 ? ids.get(0) : "";
+        } catch (Exception malformed) {
+            return "";
+        }
     }
+
+    /** [translatedUrl] without its tlang parameter, otherwise byte for byte as it was. */
     static String sourceCaptionUrl(String translatedUrl) {
         if (translatedUrl == null) return null;
-        int fragmentIndex = translatedUrl.indexOf('#');
-        String fragment = fragmentIndex >= 0 ? translatedUrl.substring(fragmentIndex) : "";
-        String withoutFragment = fragmentIndex >= 0
-                ? translatedUrl.substring(0, fragmentIndex)
-                : translatedUrl;
+        int hash = translatedUrl.indexOf('#');
+        String fragment = hash >= 0 ? translatedUrl.substring(hash) : "";
+        String url = hash >= 0 ? translatedUrl.substring(0, hash) : translatedUrl;
 
-        int queryStart = withoutFragment.indexOf('?');
-        if (queryStart < 0 || queryStart == withoutFragment.length() - 1) {
-            return withoutFragment + fragment;
-        }
+        int queryStart = url.indexOf('?');
+        if (queryStart < 0 || queryStart == url.length() - 1) return url + fragment;
 
-        String prefix = withoutFragment.substring(0, queryStart);
-        String rawQuery = withoutFragment.substring(queryStart + 1);
-        String[] parts = rawQuery.split("&", -1);
-        List<String> kept = new ArrayList<>(parts.length);
-        for (String part : parts) {
+        List<String> kept = new ArrayList<>();
+        for (String part : url.substring(queryStart + 1).split("&", -1)) {
             if (part.isEmpty()) continue;
             int equals = part.indexOf('=');
-            String rawKey = equals < 0 ? part : part.substring(0, equals);
-            String decodedKey;
-            try {
-                decodedKey = Uri.decode(rawKey);
-            } catch (Throwable ignored) {
-                decodedKey = rawKey;
-            }
-            if ("tlang".equalsIgnoreCase(decodedKey)) continue;
-            kept.add(part);
+            String key = equals < 0 ? part : part.substring(0, equals);
+            if (!"tlang".equalsIgnoreCase(decode(key))) kept.add(part);
         }
-        return prefix + (kept.isEmpty() ? "" : "?" + String.join("&", kept)) + fragment;
+        return url.substring(0, queryStart)
+                + (kept.isEmpty() ? "" : "?" + String.join("&", kept))
+                + fragment;
     }
 
+    private static String decode(String key) {
+        try {
+            return Uri.decode(key);
+        } catch (Throwable unavailable) {
+            return key;
+        }
+    }
 }

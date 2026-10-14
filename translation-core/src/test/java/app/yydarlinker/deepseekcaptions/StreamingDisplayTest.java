@@ -94,7 +94,7 @@ public class StreamingDisplayTest {
       }
     });
     TranslationOutput.install(new TranslationOutput.Sink(){
-      public void showEvent(String text,TranslationOutput.RenderGuard g,Supplier<String> f,String id,long start,long end,long at,CaptionRenderSpec spec,CaptionDisplayCandidate candidate){
+      public void showEvent(String text,TranslationOutput.RenderGuard g,String id,long start,long end,long at,CaptionRenderSpec spec){
         if(!g.isValid())return;
         if(shown.isEmpty())firstShownAt=System.nanoTime();
         shown.add(text);g.onApplied();

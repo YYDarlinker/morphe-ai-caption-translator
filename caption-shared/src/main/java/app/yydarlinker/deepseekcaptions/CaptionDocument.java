@@ -25,84 +25,143 @@ import javax.xml.transform.stream.StreamResult;
 
 /** Parses common YouTube Timed Text formats and exposes a format-independent cue timeline. */
 final class CaptionDocument {
-    interface Parsed {
-        List<String> texts();
-        List<Cue> cues();
-        default JSONObject json3() { return null; }
-        default WebVttSourceReader.Result vtt() { return null; }
-        default String detectedFormat() { return "unknown"; }
-        default List<RawFragment> rawFragments() { return Collections.emptyList(); }
-        default String timingCapabilities() {
-            int offsets=0,speakers=0;for(RawFragment fragment:rawFragments()){
-                if(fragment.nativeOffset)offsets++;speakers+=fragment.speakerOffsets.size();
-            }
-            if(vtt()!=null)for(WebVttSourceReader.Range range:vtt().ranges){if(range.nativeStart)offsets++;speakers+=range.speakerMarkers.size();}
-            return "detected_fmt="+detectedFormat()+";raw_fragments="+rawFragments().size()+";offset_segments="+offsets+";speaker_markers="+speakers;
-        }
+    /** Puts translated texts back into the document the cues were read from. */
+    private interface Renderer {
         byte[] render(List<String> translated) throws Exception;
-        String contentType();
+    }
+
+    /** One parsed caption file: its cues, its raw timing fragments and how to write it back. */
+    static final class Parsed {
+        private final List<String> texts;
+        private final List<Cue> cues;
+        private final List<RawFragment> fragments;
+        private final String contentType, format;
+        private final WebVttSourceReader.Result vtt;
+        private final Renderer renderer;
+
+        private Parsed(
+                List<String> texts,
+                List<Cue> cues,
+                List<RawFragment> fragments,
+                String contentType,
+                String format,
+                WebVttSourceReader.Result vtt,
+                Renderer renderer) {
+            this.texts = texts;
+            this.cues = Collections.unmodifiableList(cues);
+            this.fragments = Collections.unmodifiableList(fragments);
+            this.contentType = contentType;
+            this.format = format;
+            this.vtt = vtt;
+            this.renderer = renderer;
+        }
+
+        List<String> texts() {
+            return texts;
+        }
+
+        List<Cue> cues() {
+            return cues;
+        }
+
+        List<RawFragment> rawFragments() {
+            return fragments;
+        }
+
+        String contentType() {
+            return contentType;
+        }
+
+        WebVttSourceReader.Result vtt() {
+            return vtt;
+        }
+
+        byte[] render(List<String> translated) throws Exception {
+            if (texts.size() != translated.size())
+                throw new IllegalArgumentException("翻译条数与原字幕不一致");
+            return renderer.render(translated);
+        }
+
+        String timingCapabilities() {
+            int offsets = 0, speakers = 0;
+            for (RawFragment fragment : fragments) {
+                if (fragment.nativeOffset) offsets++;
+                speakers += fragment.speakerOffsets.size();
+            }
+            if (vtt != null)
+                for (WebVttSourceReader.Range range : vtt.ranges) {
+                    if (range.nativeStart) offsets++;
+                    speakers += range.speakerMarkers.size();
+                }
+            return "detected_fmt="
+                    + format
+                    + ";raw_fragments="
+                    + fragments.size()
+                    + ";offset_segments="
+                    + offsets
+                    + ";speaker_markers="
+                    + speakers;
+        }
     }
 
     static final class RawFragment {
-        final int id,cue;
+        final int id, cue;
         final String raw;
-        final long startMs,endMs;
+        final long startMs, endMs;
         final boolean nativeOffset;
         final List<Integer> speakerOffsets;
-        RawFragment(int id,int cue,String raw,long start,long end,boolean nativeOffset,List<Integer> speakers){
-            this.id=id;this.cue=cue;this.raw=raw;startMs=start;endMs=end;this.nativeOffset=nativeOffset;
-            speakerOffsets=Collections.unmodifiableList(new ArrayList<>(speakers));
+
+        RawFragment(
+                int id,
+                int cue,
+                String raw,
+                long start,
+                long end,
+                boolean nativeOffset,
+                List<Integer> speakers) {
+            this.id = id;
+            this.cue = cue;
+            this.raw = raw;
+            startMs = start;
+            endMs = end;
+            this.nativeOffset = nativeOffset;
+            speakerOffsets = Collections.unmodifiableList(new ArrayList<>(speakers));
         }
     }
 
     static final class Cue {
-        final long startMs;
-        final long endMs;
+        final long startMs, endMs;
         final String text;
-        final int authorOrdinal;
-        final String rawText;
-        final List<RawFragment> rawFragments;
-        final List<Integer> explicitLineBreaks;
-        final String sourceKind,precision;
 
         Cue(long startMs, long endMs, String text) {
-            this(startMs,endMs,text,-1,Collections.emptyList());
-        }
-        Cue(long startMs,long endMs,String text,int ordinal,List<RawFragment> fragments){
-            this(startMs,endMs,text,ordinal,fragments,"unknown");
-        }
-        Cue(long startMs,long endMs,String text,int ordinal,List<RawFragment> fragments,String kind){
-            sourceKind=kind;boolean offsets=false;for(RawFragment fragment:fragments)offsets|=fragment.nativeOffset;precision=offsets?"native_segment":"author_cue";
-            authorOrdinal=ordinal;rawText=text;rawFragments=Collections.unmodifiableList(new ArrayList<>(fragments));
-            List<Integer> breaks=new ArrayList<>();for(int i=0;i<text.length();i++)if(text.charAt(i)=='\n')breaks.add(i);explicitLineBreaks=Collections.unmodifiableList(breaks);
             this.startMs = Math.max(0L, startMs);
             this.endMs = Math.max(this.startMs + 1L, endMs);
             this.text = text;
         }
-        Cue withSourceKind(String kind){return new Cue(startMs,endMs,rawText,authorOrdinal,rawFragments,kind);}
     }
+
+    private static final long DEFAULT_CUE_MS = 2_000L;
 
     private CaptionDocument() {}
 
     static Parsed parse(byte[] data, String fallbackContentType) throws Exception {
         if (data == null || data.length == 0) throw new IllegalArgumentException("字幕为空");
         String body = new String(data, StandardCharsets.UTF_8);
-        if(body.startsWith("\uFEFF"))body=body.substring(1);
+        if (body.startsWith("\uFEFF")) body = body.substring(1);
         String trimmed = body.trim();
 
-        if (trimmed.startsWith("{") && trimmed.contains("\"events\"")) {
-            return parseJson3(body);
-        }
-        if (trimmed.startsWith("<?xml") || trimmed.startsWith("<transcript") ||
-                trimmed.startsWith("<timedtext")) {
-            return parseXml(data);
-        }
+        if (trimmed.startsWith("{") && trimmed.contains("\"events\"")) return parseJson3(body);
+        if (trimmed.startsWith("<?xml")
+                || trimmed.startsWith("<transcript")
+                || trimmed.startsWith("<timedtext")) return parseXml(data);
         if (trimmed.startsWith("WEBVTT")) return parseBlockFormat(body, "text/vtt; charset=utf-8");
-        if (looksLikeSrt(trimmed)) {
+        if (looksLikeSrt(trimmed))
             return parseBlockFormat(body, "application/x-subrip; charset=utf-8");
-        }
-
-        throw new IllegalArgumentException("暂不支持此字幕格式: " + safeType(fallbackContentType));
+        throw new IllegalArgumentException(
+                "暂不支持此字幕格式: "
+                        + (fallbackContentType == null || fallbackContentType.isEmpty()
+                                ? "unknown"
+                                : fallbackContentType));
     }
 
     private static Parsed parseJson3(String body) throws Exception {
@@ -112,14 +171,13 @@ final class CaptionDocument {
 
         List<JSONObject> cueEvents = new ArrayList<>();
         List<String> texts = new ArrayList<>();
-        List<Cue> rawCues = new ArrayList<>();
-        List<RawFragment> fragments=new ArrayList<>();
+        List<Cue> cues = new ArrayList<>();
+        List<RawFragment> fragments = new ArrayList<>();
         for (int i = 0; i < events.length(); i++) {
             JSONObject event = events.optJSONObject(i);
             if (event == null) continue;
             JSONArray segments = event.optJSONArray("segs");
             if (segments == null || segments.length() == 0) continue;
-
             long startMs = event.optLong("tStartMs", -1L);
             if (startMs < 0L) continue;
             long durationMs = event.optLong("dDurationMs", -1L);
@@ -127,70 +185,88 @@ final class CaptionDocument {
             StringBuilder text = new StringBuilder();
             for (int j = 0; j < segments.length(); j++) {
                 JSONObject segment = segments.optJSONObject(j);
-                if (segment != null) {
-                    String exact=segment.optString("utf8", "");text.append(exact);
-                    long offset=segment.optLong("tOffsetMs",0),until=durationMs>0?durationMs:2000;
-                    for(int k=j+1;k<segments.length();k++){JSONObject next=segments.optJSONObject(k);if(next!=null&&next.has("tOffsetMs")){until=next.optLong("tOffsetMs",until);break;}}
-                    fragments.add(new RawFragment(fragments.size(),i,exact,startMs+offset,startMs+until,segment.has("tOffsetMs"),Collections.emptyList()));
+                if (segment == null) continue;
+                String exact = segment.optString("utf8", "");
+                text.append(exact);
+                long offset = segment.optLong("tOffsetMs", 0);
+                long until = durationMs > 0 ? durationMs : DEFAULT_CUE_MS;
+                for (int k = j + 1; k < segments.length(); k++) {
+                    JSONObject next = segments.optJSONObject(k);
+                    if (next != null && next.has("tOffsetMs")) {
+                        until = next.optLong("tOffsetMs", until);
+                        break;
+                    }
                 }
+                fragments.add(
+                        new RawFragment(
+                                fragments.size(),
+                                i,
+                                exact,
+                                startMs + offset,
+                                startMs + until,
+                                segment.has("tOffsetMs"),
+                                Collections.emptyList()));
             }
             String value = text.toString();
             if (value.trim().isEmpty()) continue;
-
             cueEvents.add(event);
             texts.add(value);
-            rawCues.add(new Cue(startMs, durationMs > 0L ? startMs + durationMs : startMs + 2_000L, value));
+            cues.add(
+                    new Cue(
+                            startMs,
+                            startMs + (durationMs > 0L ? durationMs : DEFAULT_CUE_MS),
+                            value));
         }
-        List<Cue> cues = bindAuthorEvidence(rawCues,fragments);
-
-        return new Parsed() {
-            @Override public List<String> texts() { return texts; }
-            @Override public List<Cue> cues() { return cues; }
-            @Override public String contentType() { return "application/json; charset=utf-8"; }
-            @Override public JSONObject json3() { return root; }
-            @Override public String detectedFormat() { return "json3"; }
-            @Override public List<RawFragment> rawFragments() { return Collections.unmodifiableList(fragments); }
-
-            @Override
-            public byte[] render(List<String> translated) throws Exception {
-                requireSameSize(texts, translated);
-                for (int i = 0; i < cueEvents.size(); i++) {
-                    JSONArray segments = cueEvents.get(i).getJSONArray("segs");
-                    JSONObject first = segments.optJSONObject(0);
-                    if (first == null) {
-                        first = new JSONObject();
-                        segments.put(0, first);
+        return new Parsed(
+                texts,
+                cues,
+                fragments,
+                "application/json; charset=utf-8",
+                "json3",
+                null,
+                translated -> {
+                    for (int i = 0; i < cueEvents.size(); i++) {
+                        JSONArray segments = cueEvents.get(i).getJSONArray("segs");
+                        JSONObject first = segments.optJSONObject(0);
+                        if (first == null) {
+                            first = new JSONObject();
+                            segments.put(0, first);
+                        }
+                        first.put("utf8", translated.get(i));
+                        for (int j = 1; j < segments.length(); j++) {
+                            JSONObject segment = segments.optJSONObject(j);
+                            if (segment != null) segment.put("utf8", "");
+                        }
                     }
-                    first.put("utf8", translated.get(i));
-                    for (int j = 1; j < segments.length(); j++) {
-                        JSONObject segment = segments.optJSONObject(j);
-                        if (segment != null) segment.put("utf8", "");
-                    }
-                }
-                return root.toString().getBytes(StandardCharsets.UTF_8);
-            }
-        };
+                    return root.toString().getBytes(StandardCharsets.UTF_8);
+                });
     }
 
     private static Parsed parseXml(byte[] data) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(false);
-        try { factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true); }
-        catch (Throwable ignored) {}
-        try { factory.setFeature("http://xml.org/sax/features/external-general-entities", false); }
-        catch (Throwable ignored) {}
-        try { factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false); }
-        catch (Throwable ignored) {}
-
+        for (String feature :
+                new String[] {
+                    "http://apache.org/xml/features/disallow-doctype-decl",
+                    "http://xml.org/sax/features/external-general-entities",
+                    "http://xml.org/sax/features/external-parameter-entities"
+                }) {
+            try {
+                factory.setFeature(feature, feature.endsWith("decl"));
+            } catch (Throwable unsupported) {
+                // A parser without the feature has no such entity expansion to refuse.
+            }
+        }
         Document document = factory.newDocumentBuilder().parse(new ByteArrayInputStream(data));
         NodeList nodes = document.getElementsByTagName("text");
+        // <p> elements carry Timed Text 2 (milliseconds in t/d); <text> carries seconds.
         boolean timedTextP = nodes.getLength() == 0;
         if (timedTextP) nodes = document.getElementsByTagName("p");
 
         List<Node> cueNodes = new ArrayList<>();
-        List<RawFragment> fragments=new ArrayList<>();
+        List<RawFragment> fragments = new ArrayList<>();
         List<String> texts = new ArrayList<>();
-        List<Cue> rawCues = new ArrayList<>();
+        List<Cue> cues = new ArrayList<>();
         for (int i = 0; i < nodes.getLength(); i++) {
             Node node = nodes.item(i);
             if (!(node instanceof Element)) continue;
@@ -198,149 +274,142 @@ final class CaptionDocument {
             if (value.trim().isEmpty()) continue;
 
             Element element = (Element) node;
-            long startMs;
-            long endMs;
-            if (timedTextP) {
-                startMs = firstTime(element, true, "t", "begin", "start");
-                long durationMs = firstTime(element, true, "d", "dur");
-                long explicitEnd = firstTime(element, true, "end");
-                endMs = explicitEnd >= 0L
-                        ? explicitEnd
-                        : startMs + (durationMs > 0L ? durationMs : 2_000L);
-            } else {
-                startMs = firstTime(element, false, "start", "begin", "t");
-                long durationMs = firstTime(element, false, "dur", "d");
-                long explicitEnd = firstTime(element, false, "end");
-                endMs = explicitEnd >= 0L
-                        ? explicitEnd
-                        : startMs + (durationMs > 0L ? durationMs : 2_000L);
-            }
+            long startMs =
+                    timedTextP
+                            ? firstTime(element, true, "t", "begin", "start")
+                            : firstTime(element, false, "start", "begin", "t");
             if (startMs < 0L) continue;
+            long durationMs =
+                    timedTextP
+                            ? firstTime(element, true, "d", "dur")
+                            : firstTime(element, false, "dur", "d");
+            long explicitEnd = firstTime(element, timedTextP, "end");
+            long endMs =
+                    explicitEnd >= 0L
+                            ? explicitEnd
+                            : startMs + (durationMs > 0L ? durationMs : DEFAULT_CUE_MS);
 
             // Only explicit <s t="milliseconds"> onsets are read. Text-only XML stays CUE.
-            NodeList segments=element.getElementsByTagName("s");
-            if(timedTextP&&segments.getLength()>0){
-                for(int j=0;j<segments.getLength();j++){
-                    Element segment=(Element)segments.item(j);long offset=firstTime(segment,true,"t");
-                    long until=endMs;
-                    if(j+1<segments.getLength()){long next=firstTime((Element)segments.item(j+1),true,"t");if(next>=0)until=Math.min(until,startMs+next);}
-                    fragments.add(new RawFragment(fragments.size(),i,segment.getTextContent(),offset>=0?startMs+offset:startMs,until,offset>=0,Collections.emptyList()));
+            NodeList segments = element.getElementsByTagName("s");
+            if (timedTextP && segments.getLength() > 0) {
+                for (int j = 0; j < segments.getLength(); j++) {
+                    Element segment = (Element) segments.item(j);
+                    long offset = firstTime(segment, true, "t");
+                    long until = endMs;
+                    if (j + 1 < segments.getLength()) {
+                        long next = firstTime((Element) segments.item(j + 1), true, "t");
+                        if (next >= 0) until = Math.min(until, startMs + next);
+                    }
+                    fragments.add(
+                            new RawFragment(
+                                    fragments.size(),
+                                    i,
+                                    segment.getTextContent(),
+                                    offset >= 0 ? startMs + offset : startMs,
+                                    until,
+                                    offset >= 0,
+                                    Collections.emptyList()));
                 }
-            }else fragments.add(new RawFragment(fragments.size(),i,node.getTextContent(),startMs,endMs,false,Collections.emptyList()));
-
+            } else {
+                fragments.add(
+                        new RawFragment(
+                                fragments.size(),
+                                i,
+                                value,
+                                startMs,
+                                endMs,
+                                false,
+                                Collections.emptyList()));
+            }
             cueNodes.add(node);
             texts.add(value);
-            rawCues.add(new Cue(startMs, endMs, value));
+            cues.add(new Cue(startMs, endMs, value));
         }
-        List<Cue> cues = bindAuthorEvidence(rawCues,fragments);
-
-        return new Parsed() {
-            @Override public List<String> texts() { return texts; }
-            @Override public List<Cue> cues() { return cues; }
-            @Override public String contentType() { return "application/xml; charset=utf-8"; }
-            @Override public String detectedFormat() { return "xml"; }
-            @Override public List<RawFragment> rawFragments() { return Collections.unmodifiableList(fragments); }
-
-            @Override
-            public byte[] render(List<String> translated) throws Exception {
-                requireSameSize(texts, translated);
-                for (int i = 0; i < cueNodes.size(); i++) {
-                    cueNodes.get(i).setTextContent(translated.get(i));
-                }
-
-                TransformerFactory transformerFactory = TransformerFactory.newInstance();
-                Transformer transformer = transformerFactory.newTransformer();
-                transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
-                transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
-                ByteArrayOutputStream output = new ByteArrayOutputStream();
-                transformer.transform(new DOMSource(document), new StreamResult(output));
-                return output.toByteArray();
-            }
-        };
+        return new Parsed(
+                texts,
+                cues,
+                fragments,
+                "application/xml; charset=utf-8",
+                "xml",
+                null,
+                translated -> {
+                    for (int i = 0; i < cueNodes.size(); i++)
+                        cueNodes.get(i).setTextContent(translated.get(i));
+                    Transformer transformer = TransformerFactory.newInstance().newTransformer();
+                    transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+                    transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+                    ByteArrayOutputStream output = new ByteArrayOutputStream();
+                    transformer.transform(new DOMSource(document), new StreamResult(output));
+                    return output.toByteArray();
+                });
     }
 
+    /** WebVTT and SRT: blocks separated by blank lines, a timing line, then the payload. */
     private static Parsed parseBlockFormat(String body, String contentType) {
-        WebVttSourceReader.Result timing = contentType.startsWith("text/vtt") ? WebVttSourceReader.read(body) : null;
+        boolean vtt = contentType.startsWith("text/vtt");
+        WebVttSourceReader.Result timing = vtt ? WebVttSourceReader.read(body) : null;
         String newline = body.contains("\r\n") ? "\r\n" : "\n";
         List<String> blocks = new ArrayList<>(Arrays.asList(body.split("\\r?\\n\\r?\\n", -1)));
         List<Integer> cueIndexes = new ArrayList<>();
-        List<RawFragment> fragments=new ArrayList<>();
+        List<RawFragment> fragments = new ArrayList<>();
         List<String> texts = new ArrayList<>();
-        List<Cue> rawCues = new ArrayList<>();
+        List<Cue> cues = new ArrayList<>();
 
-        int sourceCue=0;
+        int sourceCue = 0;
         for (int i = 0; i < blocks.size(); i++) {
-            if(contentType.startsWith("text/vtt") && WebVttSourceReader.metadata(blocks.get(i)))continue;
+            if (vtt && WebVttSourceReader.metadata(blocks.get(i))) continue;
             String[] lines = blocks.get(i).split("\\r?\\n", -1);
-            int timeline = -1;
-            for (int j = 0; j < lines.length; j++) {
-                if (lines[j].contains(" --> ")) {
-                    timeline = j;
-                    break;
-                }
-            }
+            int timeline = timingLine(lines);
             if (timeline < 0 || timeline + 1 >= lines.length) continue;
 
             String[] times = lines[timeline].split("\\s+-->\\s+", 2);
             if (times.length != 2) continue;
             long startMs = parseTime(times[0], false);
-            String endToken = times[1].trim().split("\\s+", 2)[0];
-            long endMs = parseTime(endToken, false);
+            long endMs = parseTime(times[1].trim().split("\\s+", 2)[0], false);
             if (startMs < 0L || endMs <= startMs) continue;
 
-            String payload = String.join("\n",Arrays.copyOfRange(lines,timeline+1,lines.length));
-            String decoded=contentType.startsWith("text/vtt")?WebVttSourceReader.decode(payload):payload;
-            fragments.add(new RawFragment(fragments.size(),sourceCue++,decoded,startMs,endMs,false,Collections.emptyList()));
-            String text = decoded;
+            String payload =
+                    String.join("\n", Arrays.copyOfRange(lines, timeline + 1, lines.length));
+            String text = vtt ? WebVttSourceReader.decode(payload) : payload;
+            fragments.add(
+                    new RawFragment(
+                            fragments.size(),
+                            sourceCue++,
+                            text,
+                            startMs,
+                            endMs,
+                            false,
+                            Collections.emptyList()));
             if (text.trim().isEmpty()) continue;
             cueIndexes.add(i);
             texts.add(text);
-            rawCues.add(new Cue(startMs, endMs, text));
+            cues.add(new Cue(startMs, endMs, text));
         }
-        List<Cue> cues = bindAuthorEvidence(rawCues,fragments);
-
-        return new Parsed() {
-            @Override public List<String> texts() { return texts; }
-            @Override public List<Cue> cues() { return cues; }
-            @Override public String contentType() { return contentType; }
-            @Override public WebVttSourceReader.Result vtt() { return timing; }
-            @Override public String detectedFormat() { return timing==null?"srt":"vtt"; }
-            @Override public List<RawFragment> rawFragments() {
-                return Collections.unmodifiableList(fragments);
-            }
-
-            @Override
-            public byte[] render(List<String> translated) {
-                requireSameSize(texts, translated);
-                for (int i = 0; i < cueIndexes.size(); i++) {
-                    int blockIndex = cueIndexes.get(i);
-                    String[] lines = blocks.get(blockIndex).split("\\r?\\n", -1);
-                    int timeline = -1;
-                    for (int j = 0; j < lines.length; j++) {
-                        if (lines[j].contains(" --> ")) {
-                            timeline = j;
-                            break;
-                        }
+        return new Parsed(
+                texts,
+                cues,
+                fragments,
+                contentType,
+                vtt ? "vtt" : "srt",
+                timing,
+                translated -> {
+                    for (int i = 0; i < cueIndexes.size(); i++) {
+                        int blockIndex = cueIndexes.get(i);
+                        String[] lines = blocks.get(blockIndex).split("\\r?\\n", -1);
+                        int timeline = timingLine(lines);
+                        if (timeline < 0) continue;
+                        List<String> output = new ArrayList<>();
+                        Collections.addAll(output, Arrays.copyOfRange(lines, 0, timeline + 1));
+                        output.add(translated.get(i));
+                        blocks.set(blockIndex, String.join(newline, output));
                     }
-                    if (timeline < 0) continue;
-                    List<String> output = new ArrayList<>();
-                    Collections.addAll(output, Arrays.copyOfRange(lines, 0, timeline + 1));
-                    output.add(translated.get(i));
-                    blocks.set(blockIndex, String.join(newline, output));
-                }
-                return String.join(newline + newline, blocks).getBytes(StandardCharsets.UTF_8);
-            }
-        };
+                    return String.join(newline + newline, blocks).getBytes(StandardCharsets.UTF_8);
+                });
     }
 
-    private static List<Cue> bindAuthorEvidence(List<Cue> raw,List<RawFragment> fragments){
-        List<Cue> result=new ArrayList<>();int cursor=0;
-        for(Cue cue:raw){List<RawFragment> own=new ArrayList<>();int ordinal=-1;
-            while(cursor<fragments.size()&&(fragments.get(cursor).endMs<=cue.startMs||fragments.get(cursor).raw.trim().isEmpty()))cursor++;
-            if(cursor<fragments.size())ordinal=fragments.get(cursor).cue;
-            while(cursor<fragments.size()&&fragments.get(cursor).cue==ordinal)own.add(fragments.get(cursor++));
-            result.add(new Cue(cue.startMs,cue.endMs,cue.text,ordinal,own));
-        }return Collections.unmodifiableList(result);
+    private static int timingLine(String[] lines) {
+        for (int i = 0; i < lines.length; i++) if (lines[i].contains(" --> ")) return i;
+        return -1;
     }
 
     private static long firstTime(Element element, boolean numericIsMilliseconds, String... names) {
@@ -358,42 +427,29 @@ final class CaptionDocument {
         String value = raw.trim().toLowerCase(Locale.ROOT).replace(',', '.');
         if (value.isEmpty()) return -1L;
         try {
-            if (value.endsWith("ms")) {
+            if (value.endsWith("ms"))
                 return Math.round(Double.parseDouble(value.substring(0, value.length() - 2)));
-            }
-            if (value.endsWith("s")) {
-                return Math.round(Double.parseDouble(value.substring(0, value.length() - 1)) * 1_000d);
-            }
-            if (value.endsWith("m")) {
-                return Math.round(Double.parseDouble(value.substring(0, value.length() - 1)) * 60_000d);
-            }
-            if (value.endsWith("h")) {
-                return Math.round(Double.parseDouble(value.substring(0, value.length() - 1)) * 3_600_000d);
-            }
+            if (value.endsWith("s")) return scaled(value, 1_000d);
+            if (value.endsWith("m")) return scaled(value, 60_000d);
+            if (value.endsWith("h")) return scaled(value, 3_600_000d);
             if (value.contains(":")) {
-                String[] parts = value.split(":");
                 double seconds = 0d;
-                for (String part : parts) seconds = seconds * 60d + Double.parseDouble(part);
+                for (String part : value.split(":"))
+                    seconds = seconds * 60d + Double.parseDouble(part);
                 return Math.round(seconds * 1_000d);
             }
-            double numeric = Double.parseDouble(value);
-            return Math.round(numeric * (numericIsMilliseconds ? 1d : 1_000d));
+            return Math.round(Double.parseDouble(value) * (numericIsMilliseconds ? 1d : 1_000d));
         } catch (Throwable ignored) {
             return -1L;
         }
     }
 
+    /** [value] without its one-letter unit, times [unitMs]. */
+    private static long scaled(String value, double unitMs) {
+        return Math.round(Double.parseDouble(value.substring(0, value.length() - 1)) * unitMs);
+    }
+
     private static boolean looksLikeSrt(String trimmed) {
         return trimmed.matches("(?s)^\\d+\\s*\\R\\d{1,2}:\\d{2}:\\d{2}[,.]\\d{3}\\s+-->.*");
-    }
-
-    private static void requireSameSize(List<String> source, List<String> translated) {
-        if (source.size() != translated.size()) {
-            throw new IllegalArgumentException("翻译条数与原字幕不一致");
-        }
-    }
-
-    private static String safeType(String value) {
-        return value == null || value.isEmpty() ? "unknown" : value;
     }
 }

@@ -34,7 +34,7 @@ public class CaptionRatioSettingsTest {
                         previewRoot.findViewWithTag("ai_style_preview_canvas");
                 DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);
                 preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);
-                preference.setTitle(CaptionStrings.settings(activity,"size"));
+                preference.setTitle(CaptionStrings.get(activity,"size"));
                 LinearLayout root=(LinearLayout)preference.onCreateView(new FrameLayout(activity));
                 SeekBar slider=(SeekBar)root.getChildAt(1);
                 TextView summary=(TextView)root.getChildAt(3);
@@ -50,8 +50,8 @@ public class CaptionRatioSettingsTest {
                     slider.setProgress(tier);
                     listener.onProgressChanged(slider,tier,true);
                     assertEquals(String.format(java.util.Locale.ROOT,
-                            CaptionStrings.settings(activity,"size_tier_hint"),
-                            CaptionStrings.settings(activity,names[tier]),labels[tier].replace(" px",""),full[tier]),
+                            CaptionStrings.get(activity,"size_tier_hint"),
+                            CaptionStrings.get(activity,names[tier]),labels[tier].replace(" px",""),full[tier]),
                             summary.getText().toString());
                     assertEquals(tier,preview.sizeTier);
                     assertEquals("drag only previews",2,DeepSeekConfig.displayStyle(activity).captionSizeTier);
@@ -73,7 +73,7 @@ public class CaptionRatioSettingsTest {
             DeepSeekConfig.saveBackgroundOpacity(activity,70);
             DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);
             preference.setKey(DeepSeekSliderPreference.KEY_OPACITY);
-            preference.setTitle(CaptionStrings.settings(activity,"opacity"));
+            preference.setTitle(CaptionStrings.get(activity,"opacity"));
             LinearLayout root=(LinearLayout)preference.onCreateView(new FrameLayout(activity));
             LinearLayout heading=(LinearLayout)root.getChildAt(0);
             assertEquals("the opacity row keeps the percentage beside its title",2,heading.getChildCount());
@@ -95,11 +95,11 @@ public class CaptionRatioSettingsTest {
         Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
         try {
             for(String key:new String[]{"size_tier_xs","size_tier_s","size_tier_standard","size_tier_l","size_tier_xl"}) {
-                String name=CaptionStrings.settings(activity,key);
+                String name=CaptionStrings.get(activity,key);
                 assertFalse(name.isEmpty());assertFalse(name.startsWith("size_tier_"));
             }
-            String summary=String.format(CaptionStrings.settings(activity,"size_tier_hint"),
-                    CaptionStrings.settings(activity,"size_tier_standard"),"44.5","55.5");
+            String summary=String.format(CaptionStrings.get(activity,"size_tier_hint"),
+                    CaptionStrings.get(activity,"size_tier_standard"),"44.5","55.5");
             assertTrue(summary,summary.contains("44.5"));
             assertTrue(summary,summary.contains("55.5"));
             assertTrue(summary,summary.contains("px"));

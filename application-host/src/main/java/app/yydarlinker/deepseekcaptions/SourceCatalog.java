@@ -1,70 +1,75 @@
 package app.yydarlinker.deepseekcaptions;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 
-/** Bounded native catalogue, collected even when the overlay or source prewarm is inactive. */
+/** The native source tracks of recent videos, collected even while the overlay is inactive. */
 final class SourceCatalog {
+    private static final int MAX_VIDEOS = 6;
+
+    /** What is known of one video; [revision] changes whenever the tracks or the default change. */
     static final class Snapshot {
-        final String video, defaultLanguage;
+        final String defaultLanguage;
         final boolean complete;
         final long revision;
         final List<SourceSelection> tracks;
-        Snapshot(String video, String language, boolean complete, long revision, List<SourceSelection> tracks) {
-            this.video = video; defaultLanguage = language; this.complete = complete; this.revision = revision;
+
+        Snapshot(String language, boolean complete, long revision, List<SourceSelection> tracks) {
+            defaultLanguage = language;
+            this.complete = complete;
+            this.revision = revision;
             this.tracks = Collections.unmodifiableList(new ArrayList<>(tracks));
         }
     }
+
+    /** Oldest first. */
     private static final LinkedHashMap<String, Snapshot> videos = new LinkedHashMap<>();
+
     private static long revision;
-    private static String currentVideo="";
-    static synchronized void pin(String video){currentVideo=video==null?"":video;}
-    private static void trim(){
-        while(videos.size()>6){
-            String victim=null;for(String video:videos.keySet())if(!video.equals(currentVideo)){victim=video;break;}
-            if(victim==null)break;videos.remove(victim);
-        }
-    }
+
+    private SourceCatalog() {}
 
     static synchronized Snapshot snapshot(String video) {
         Snapshot known = videos.get(video);
-        return known == null ? new Snapshot(video, "", false, revision, Collections.emptyList()) : known;
+        return known != null
+                ? known
+                : new Snapshot("", false, revision, Collections.<SourceSelection>emptyList());
     }
 
-    static synchronized void register(String video, List<SourceSelection> tracks, boolean complete) {
+    /** Stores the tracks of [video]; an identical registration changes nothing. */
+    static synchronized void register(
+            String video, List<SourceSelection> tracks, boolean complete) {
         Snapshot old = videos.get(video);
-        if (old != null && old.complete == complete && old.tracks.size() == tracks.size()) {
-            boolean same = true;
-            for (int i = 0; i < tracks.size(); i++) if (!old.tracks.get(i).identity().equals(tracks.get(i).identity())
-                    || !old.tracks.get(i).url.equals(tracks.get(i).url)) { same = false; break; }
-            if (same) return;
-        }
-        String language = old == null ? "" : old.defaultLanguage;
-        videos.put(video, new Snapshot(video, language, complete, ++revision, tracks));
-        trim();
+        if (old != null && old.complete == complete && sameTracks(old.tracks, tracks)) return;
+        put(
+                video,
+                new Snapshot(old == null ? "" : old.defaultLanguage, complete, ++revision, tracks));
     }
 
+    /** The first automatic native selection establishes the default source language of a video. */
     static synchronized void defaultLanguage(String video, String language) {
         Snapshot old = snapshot(video);
-        // The first automatic native selection establishes the video's default source language.
-        if (!old.defaultLanguage.isEmpty()) return;
-        videos.put(video, new Snapshot(video, language, old.complete, ++revision, old.tracks));
-        trim();
+        if (old.defaultLanguage.isEmpty())
+            put(video, new Snapshot(language, old.complete, ++revision, old.tracks));
     }
 
-    static List<SourceSelection> ranked(Snapshot snapshot, String requestedLanguage) {
-        List<SourceSelection> result = new ArrayList<>(snapshot.tracks);
-        Comparator<SourceSelection> order = Comparator
-                .comparingInt((SourceSelection t) -> t.kind == SourceSelection.Kind.MANUAL ? 0 : t.kind == SourceSelection.Kind.ASR ? 1 : 2)
-                .thenComparingInt(t -> match(t.language, requestedLanguage))
-                .thenComparingInt(t -> match(t.language, snapshot.defaultLanguage))
-                .thenComparing(t -> t.language).thenComparing(t -> t.trackId);
-        result.sort(order);
-        return result;
+    static synchronized void clear() {
+        videos.clear();
+        revision++;
     }
 
-    private static int match(String a, String b) {
-        if (a.equalsIgnoreCase(b) && !b.isEmpty()) return 0;
-        return !b.isEmpty() && Locale.forLanguageTag(a).getLanguage().equals(Locale.forLanguageTag(b).getLanguage()) ? 1 : 2;
+    private static void put(String video, Snapshot value) {
+        videos.put(video, value);
+        while (videos.size() > MAX_VIDEOS) videos.remove(videos.keySet().iterator().next());
     }
-    static synchronized void clear() { videos.clear(); currentVideo="";revision++; }
+
+    private static boolean sameTracks(List<SourceSelection> a, List<SourceSelection> b) {
+        if (a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++)
+            if (!a.get(i).identity().equals(b.get(i).identity())
+                    || !a.get(i).url.equals(b.get(i).url)) return false;
+        return true;
+    }
 }

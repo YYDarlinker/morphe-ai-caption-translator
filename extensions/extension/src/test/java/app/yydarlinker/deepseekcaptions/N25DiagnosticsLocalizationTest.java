@@ -52,7 +52,7 @@ public class N25DiagnosticsLocalizationTest {
                 // that carries a value is checked by its template's fixed part, since the rendered line
                 // substitutes the value into it.
                 for(String key:new String[]{"engine","mode","display_debug","timing_decisions","recent_trace"}){
-                    String value=CaptionStrings.settings(c,key);
+                    String value=CaptionStrings.get(c,key);
                     String fixed=value.replace("%1$s","").replace("  "," ").trim();
                     assertTrue(tag+" must render '"+key+"' in the interface language (looked for '"
                                     +fixed+"' in '"+ui+"')",
@@ -60,16 +60,16 @@ public class N25DiagnosticsLocalizationTest {
                 }
                 assertTrue(tag+" must render the debug state in the interface language",
                         ui.contains(String.format(java.util.Locale.ROOT,
-                                CaptionStrings.settings(c,"display_debug"),
-                                CaptionStrings.settings(c,"off"))));
+                                CaptionStrings.get(c,"display_debug"),
+                                CaptionStrings.get(c,"off"))));
                 // The export keeps the raw headings, so an old report and a new one are comparable. A
                 // locale whose own word for "Engine" is the English word cannot be distinguished this way,
                 // so the check is skipped only for that exact collision and always uses the joined line.
                 assertTrue(tag+" export must keep the raw engine heading",
                         export.contains("Engine: Event rebuild / " + CaptionDiagnostics.engineVersion()));
                 assertTrue(tag+" export must keep the raw stage heading",export.contains("Latest stage: "));
-                String localizedEngine=CaptionStrings.settings(c,"label_separator")
-                        .replace("%1$s",CaptionStrings.settings(c,"engine"));
+                String localizedEngine=CaptionStrings.get(c,"label_separator")
+                        .replace("%1$s",CaptionStrings.get(c,"engine"));
                 if(!localizedEngine.equals("Engine: ")){
                     assertFalse(tag+" export must not carry the localized engine heading",
                             export.contains(localizedEngine));
@@ -83,13 +83,13 @@ public class N25DiagnosticsLocalizationTest {
                 // Event names, JSON keys and protocol codes are never translated.
                 assertTrue(tag+" must not translate an event name",ui.contains("REBUILD_PRESENTED"));
                 record.add(new JSONObject().put("locale",tag)
-                        .put("ui_engine_line",CaptionStrings.settings(c,"engine")
-                                +CaptionStrings.settings(c,"engine_event_rebuild")+" / "+CaptionDiagnostics.engineVersion())
-                        .put("ui_mode_line",CaptionStrings.settings(c,"label_separator")
-                                .replace("%1$s",CaptionStrings.settings(c,"mode"))
-                                +CaptionStrings.settings(c,"mode_auto_translate"))
+                        .put("ui_engine_line",CaptionStrings.get(c,"engine")
+                                +CaptionStrings.get(c,"engine_event_rebuild")+" / "+CaptionDiagnostics.engineVersion())
+                        .put("ui_mode_line",CaptionStrings.get(c,"label_separator")
+                                .replace("%1$s",CaptionStrings.get(c,"mode"))
+                                +CaptionStrings.get(c,"mode_auto_translate"))
                         .put("ui_debug_line",String.format(java.util.Locale.ROOT,
-                                CaptionStrings.settings(c,"display_debug"),CaptionStrings.settings(c,"on")))
+                                CaptionStrings.get(c,"display_debug"),CaptionStrings.get(c,"on")))
                         .put("raw_engine_heading","Engine: Event rebuild / "+CaptionDiagnostics.engineVersion()));
             }
         }finally{activity.finish();}
@@ -105,14 +105,14 @@ public class N25DiagnosticsLocalizationTest {
             // No usage yet: the empty-state sentence is localized, and the raw form is the English one.
             String emptyUi=TokenCostAudit.uiText(c);
             String emptyRaw=TokenCostAudit.uiText(c,false);
-            assertEquals(CaptionStrings.settings(c,"audit_no_usage"),emptyUi);
+            assertEquals(CaptionStrings.get(c,"audit_no_usage"),emptyUi);
             assertTrue(emptyRaw.startsWith("Token cost audit: no API usage yet."));
             assertNotEquals(emptyUi,emptyRaw);
             // The same holds for the English interface, where the two happen to read alike in structure.
             Context en=locale(activity,"en");
             TokenCostAudit.install(en);
             TokenCostAudit.clear(en);
-            assertEquals(CaptionStrings.settings(en,"audit_no_usage"),TokenCostAudit.uiText(en));
+            assertEquals(CaptionStrings.get(en,"audit_no_usage"),TokenCostAudit.uiText(en));
         }finally{activity.finish();}
     }
 

@@ -1,136 +1,188 @@
 package app.yydarlinker.patches.deepseekcaptions
-import app.morphe.patcher.patch.BytecodePatchContext
-import app.morphe.patcher.patch.PatchException
+
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
-import app.morphe.patcher.util.smali.ExternalLabel
-import com.android.tools.smali.dexlib2.builder.BuilderOffsetInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.patch.BytecodePatchContext
+import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
-import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.reference.MethodReference
-import com.android.tools.smali.dexlib2.iface.reference.TypeReference
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.builder.BuilderOffsetInstruction
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 
-/** Reuse the official menu inflater; never scan Activity windows or replace CC gestures. */
+private const val FLYOUT_UTILS = "Lapp/morphe/extension/youtube/patches/utils/FlyoutUtils;"
+private const val FLYOUT_FILTER = "Lapp/morphe/extension/youtube/patches/components/PlayerFlyoutMenuComponentsFilter;"
+private const val SHORTS_STATE = "Lapp/morphe/extension/youtube/shared/ShortsPlayerState;"
+private const val MORPHE_UTILS = "Lapp/morphe/extension/shared/Utils;"
+private const val QUICK_TOGGLE = "${EXTENSION}CaptionQuickToggle;"
+
+private const val DRAWABLE = "Landroid/graphics/drawable/Drawable;"
+private const val CLICK_LISTENER = "Landroid/view/View\$OnClickListener;"
+private const val RUNNABLE = "Ljava/lang/Runnable;"
+private const val LINEAR_LAYOUT = "Landroid/widget/LinearLayout;"
+
+/** The name of the public bridge that is added to Morphe's `FlyoutUtils` for its non-public row inflater. */
+private const val ADD_BUTTON_BRIDGE = "addonCaptionButton"
+
+/** The only static method of [owner] with this signature; [returns] is not checked when it is null. */
+private fun <M : Method> Iterable<M>.staticMethod(owner: String, name: String, returns: String?, vararg parameters: String): M =
+    singleOrNull {
+        it.name == name && it.isStatic() && (returns == null || it.returnType == returns) &&
+            it.parameterNames() == parameters.toList()
+    } ?: throw PatchException("AI captions: $owner->$name is unavailable; the flyout of Morphe changed")
+
+/**
+ * The quick toggle row of the player's flyout menu. It reuses the official menu of Morphe: the extension adds its row
+ * with Morphe's own inflater, at the position where the official rows end, and never looks for windows or replaces
+ * gestures.
+ *
+ * Every structure is resolved before the first change, because the patching must not fail after the app was
+ * modified; the returned function applies the changes.
+ */
 internal fun BytecodePatchContext.prepareCaptionQuickToggle(): () -> Unit {
-    val utils=mutableClassDefBy("Lapp/morphe/extension/youtube/patches/utils/FlyoutUtils;")
-    val filter=mutableClassDefBy("Lapp/morphe/extension/youtube/patches/components/PlayerFlyoutMenuComponentsFilter;")
-    val runtime=mutableClassDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionQuickToggle;")
-    val objectType="Ljava/lang/Object;"
-    val add=utils.methods.singleOrNull { it.name=="addFlyoutButton" && it.parameterTypes.map { t->t.toString() }==listOf(objectType,"Landroid/graphics/drawable/Drawable;","Ljava/lang/String;","Landroid/view/View\$OnClickListener;","I") }
-        ?:throw PatchException("AI quick toggle: official flyout inflater signature unavailable")
-    val entry=utils.methods.singleOrNull { it.name=="addFlyoutElements" && it.parameterTypes.map { t->t.toString() }==listOf(objectType) }
-        ?:throw PatchException("AI quick toggle: official menu binding unavailable")
-    fun requireUnique(ok: Boolean, role: String) { if(!ok) throw PatchException("AI quick toggle: $role must match exactly once") }
-    requireUnique(add.returnType=="I" && AccessFlags.STATIC.isSet(add.accessFlags), "flyout inflater type")
-    requireUnique(AccessFlags.STATIC.isSet(entry.accessFlags), "static menu binding")
-    requireUnique(utils.methods.none { it.name=="addonCaptionButton" }, "unbound inflater bridge")
-    for(name in listOf("addNativeRow","topMenu","shortsOpen","dismissNative","nativeContainer"))
-        requireUnique(runtime.methods.count { it.name==name }==1, "runtime $name")
-    requireUnique(filter.methods.count { it.name=="getTopFlyoutMenuVisible" && it.returnType=="Z" && it.parameterTypes.isEmpty() && AccessFlags.STATIC.isSet(it.accessFlags) }==1, "top menu signal")
-    val shorts=classDefBy("Lapp/morphe/extension/youtube/shared/ShortsPlayerState;")
-    requireUnique(shorts.methods.count { it.name=="isOpen" && it.returnType=="Z" && it.parameterTypes.isEmpty() && AccessFlags.STATIC.isSet(it.accessFlags) }==1, "Shorts state")
-    requireUnique(utils.methods.count { it.name=="dismissFlyout" && it.returnType=="V" && it.parameterTypes.isEmpty() && AccessFlags.STATIC.isSet(it.accessFlags) }==1, "dismiss signal")
-    val info=utils.methods.singleOrNull { it.name=="getFlyoutMenuInfo" && it.parameterTypes.map { t->t.toString() }==listOf(objectType,"I") && AccessFlags.STATIC.isSet(it.accessFlags) }
-        ?:throw PatchException("AI quick toggle: menu info signature must match exactly once")
-    val container=classDefBy(info.returnType)
-    requireUnique(container.methods.count { it.name=="menuContainer" && it.parameterTypes.isEmpty() && it.returnType=="Landroid/widget/LinearLayout;" && AccessFlags.PUBLIC.isSet(it.accessFlags) }==1, "typed menu container")
-    val detector=filter.methods.filter { it.name=="isFiltered" }.singleOrNull()
-        ?:throw PatchException("AI quick toggle: isFiltered must match exactly once")
-    val params=detector.parameterTypes.map { it.toString() }
-    val bytes=params.indexOf("[B")
-    val pathType=params.getOrNull(bytes-1)
-    if(detector.returnType!="Z" || params.count { it=="[B" }!=1 || bytes<1 || pathType !in listOf("Ljava/lang/String;","Ljava/lang/CharSequence;") || detector.implementation==null)
-        throw PatchException("AI quick toggle: unsupported menu path signature: ${detector.name}($params)${detector.returnType}")
-    val expectedParams=listOf("Lapp/morphe/extension/shared/patches/components/ContextInterface;","Ljava/lang/String;","Ljava/lang/String;",pathType!!,"[B",
-        "Lapp/morphe/extension/shared/patches/components/BufferAsciiStrings;","Lapp/morphe/extension/shared/patches/components/StringFilterGroup;",
-        "Lapp/morphe/extension/shared/patches/components/Filter\$FilterContentType;","I")
-    if(params!=expectedParams || AccessFlags.STATIC.isSet(detector.accessFlags))
-        throw PatchException("AI quick toggle: unsupported isFiltered structure: $params flags=${detector.accessFlags}")
-    fun words(t:String)=if(t=="J" || t=="D")2 else 1
-    val pathRegister=(if(AccessFlags.STATIC.isSet(detector.accessFlags))0 else 1)+params.take(bytes-1).sumOf(::words)
-    requireUnique(detector.implementation!!.registerCount >= (if(AccessFlags.STATIC.isSet(detector.accessFlags))0 else 1)+params.sumOf(::words), "detector parameter registers")
-    requireUnique(runtime.methods.count { it.name=="observeMenuPath" && it.parameterTypes.map { t->t.toString() }==listOf(pathType,"[B") && it.returnType=="V" }==1, "typed menu observer")
-    // Older official bundles defer the group insertion to a captured Runnable.
-    // Follow its actual DEX call to the typed static body; never guess an R8 lambda
-    // name or inject at the outer entry before menu detection has completed.
-    fun dividerCount(method: com.android.tools.smali.dexlib2.iface.Method) =
-        method.implementation?.instructions?.count { instruction ->
-            val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
-            reference?.definingClass==utils.type && reference.name=="addDivider"
-        } ?: 0
-    val menuBody=if(dividerCount(entry)==1) entry else {
-        requireUnique(dividerCount(entry)==0,"direct divider count")
-        val outer=entry.implementation!!.instructions.toList()
-        requireUnique(outer.count { instruction ->
-            val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
-            reference?.definingClass=="Lapp/morphe/extension/shared/Utils;" &&
-                reference.name=="runOnMainThreadDelayed" && reference.returnType=="V" &&
-                reference.parameterTypes.map { it.toString() }==listOf("Ljava/lang/Runnable;","J")
-        }==1,"deferred menu dispatch")
-        val delegates=outer.filter { it.opcode==Opcode.NEW_INSTANCE }.mapNotNull {
-            ((it as? ReferenceInstruction)?.reference as? TypeReference)?.type
-        }.distinct().map { classDefBy(it) }.filter { "Ljava/lang/Runnable;" in it.interfaces }
-            .flatMap { runnable ->
-                requireUnique(outer.count { instruction ->
-                    val reference=(instruction as? ReferenceInstruction)?.reference as? MethodReference
-                    reference?.definingClass==runnable.type && reference.name=="<init>" &&
-                        reference.parameterTypes.map { it.toString() }==listOf(objectType)
-                }==1,"captured menu constructor")
-                runnable.methods.filter { it.name=="run" && it.returnType=="V" && it.parameterTypes.isEmpty() }
-                    .flatMap { it.implementation?.instructions?.toList() ?: emptyList() }
-                    .mapNotNull { ((it as? ReferenceInstruction)?.reference as? MethodReference) }
-                    .filter { it.definingClass==utils.type && it.returnType=="V" &&
-                        it.parameterTypes.map { type->type.toString() }==listOf(objectType) }
-                    .mapNotNull { reference -> utils.methods.singleOrNull { method ->
-                        method.name==reference.name && method.returnType==reference.returnType &&
-                            method.parameterTypes.map { it.toString() }==listOf(objectType) &&
-                            AccessFlags.STATIC.isSet(method.accessFlags)
-                    } }
-            }.distinct().filter { dividerCount(it)==1 }
-        requireUnique(delegates.size==1,"reachable deferred divider body")
-        delegates.single()
+    val utils = mutableClassDefBy(FLYOUT_UTILS)
+    val filter = mutableClassDefBy(FLYOUT_FILTER)
+    val runtime = mutableClassDefBy(QUICK_TOGGLE)
+
+    val addButton = utils.methods.staticMethod(FLYOUT_UTILS, "addFlyoutButton", "I", OBJECT, DRAWABLE, STRING, CLICK_LISTENER, "I")
+    val menuInfo = utils.methods.staticMethod(FLYOUT_UTILS, "getFlyoutMenuInfo", null, OBJECT, "I")
+    val containerClass = classDefBy(menuInfo.returnType)
+    if (containerClass.methods.none {
+            it.name == "menuContainer" && it.parameterTypes.isEmpty() && it.returnType == LINEAR_LAYOUT &&
+                AccessFlags.PUBLIC.isSet(it.accessFlags)
+        }
+    ) {
+        throw PatchException("AI captions: the flyout menu info has no typed menu container")
     }
-    val instructions=menuBody.implementation!!.instructions.toList()
-    val dividerCalls=instructions.indices.filter { i -> (instructions[i] as? ReferenceInstruction)?.reference.let { it is MethodReference && it.definingClass==utils.type && it.name=="addDivider" } }
-    requireUnique(dividerCalls.size==1,"shared divider call")
-    val dividerCall=dividerCalls.single()
-    val guard=(dividerCall-1 downTo 0).firstOrNull { instructions[it].opcode==Opcode.IF_LEZ }
-        ?:throw PatchException("AI quick toggle: shared divider guard unavailable")
-    val indexRegister=(instructions[guard] as? OneRegisterInstruction)?.registerA
-        ?:throw PatchException("AI quick toggle: divider guard register unavailable")
-    val afterDivider=(instructions[guard] as? BuilderOffsetInstruction)?.target?.location?.instruction
-        ?:throw PatchException("AI quick toggle: divider guard target unavailable")
-    // Every known late guard is resolved before the first bytecode mutation.
+    filter.methods.staticMethod(FLYOUT_FILTER, "getTopFlyoutMenuVisible", "Z")
+    classDefBy(SHORTS_STATE).methods.staticMethod(SHORTS_STATE, "isOpen", "Z")
+    utils.methods.staticMethod(FLYOUT_UTILS, "dismissFlyout", "V")
+    if (utils.methods.any { it.name == ADD_BUTTON_BRIDGE }) throw PatchException("AI captions: flyout bridge already exists")
+
+    // The component filter reports every menu path with its buffer; the extension needs both to know which menu is
+    // open. The path parameter is the one before the byte array.
+    val detector = filter.methods.filter { it.name == "isFiltered" }.unique("menu component filter")
+    val parameters = detector.parameterNames()
+    val pathType = parameters.getOrNull(parameters.indexOf("[B") - 1)
+    val expected = listOf(
+        "Lapp/morphe/extension/shared/patches/components/ContextInterface;", STRING, STRING, pathType, "[B",
+        "Lapp/morphe/extension/shared/patches/components/BufferAsciiStrings;",
+        "Lapp/morphe/extension/shared/patches/components/StringFilterGroup;",
+        "Lapp/morphe/extension/shared/patches/components/Filter\$FilterContentType;", "I",
+    )
+    if (detector.returnType != "Z" || detector.isStatic() || detector.implementation == null ||
+        pathType !in listOf(STRING, "Ljava/lang/CharSequence;") || parameters != expected
+    ) {
+        throw PatchException("AI captions: unsupported menu filter signature: ${detector.name}$parameters")
+    }
+    // The parameters before the path are references, so the path is in p4 and the byte array in p5.
+    val pathRegister = 4
+
+    val menuBody = findMenuBody(utils)
+    val code = menuBody.code()
+    val dividerCall = code.indices
+        .filter { code[it].call()?.let { call -> call.definingClass == utils.type && call.name == "addDivider" } == true }
+        .unique("shared divider call")
+    val guard = (dividerCall - 1 downTo 0).firstOrNull { code[it].opcode == Opcode.IF_LEZ }
+        ?: throw PatchException("AI captions: shared divider guard unavailable")
+    val indexRegister = (code[guard] as OneRegisterInstruction).registerA
+    val afterDivider = (code[guard] as? BuilderOffsetInstruction)?.target?.location?.instruction
+        ?: throw PatchException("AI captions: divider guard target unavailable")
+
     return {
-    // Expose only the existing checked inflater through a generated bridge in its own class.
-    val bridge=ImmutableMethod(utils.type,"addonCaptionButton",add.parameters,add.returnType,AccessFlags.PUBLIC.value or AccessFlags.STATIC.value,null,null,MutableMethodImplementation(6)).toMutable()
-    bridge.addInstructions(0,"invoke-static/range {p0 .. p4}, ${utils.type}->${add.name}(Ljava/lang/Object;Landroid/graphics/drawable/Drawable;Ljava/lang/String;Landroid/view/View\$OnClickListener;I)I\nmove-result v0\nreturn v0")
-    utils.methods.add(bridge)
-    fun bind(name:String,body:String,registers:Int){
-        val old=runtime.methods.single { it.name==name }
-        val replacement=ImmutableMethod(runtime.type,name,old.parameters,old.returnType,old.accessFlags,old.annotations,null,MutableMethodImplementation(registers)).toMutable()
-        replacement.addInstructions(0,body);runtime.methods.remove(old);runtime.methods.add(replacement)
+        // The extension calls Morphe's checked inflater through a public bridge in its own class.
+        val bridge = ImmutableMethod(
+            utils.type, ADD_BUTTON_BRIDGE, addButton.parameters, addButton.returnType,
+            AccessFlags.PUBLIC.value or AccessFlags.STATIC.value, null, null, MutableMethodImplementation(6),
+        ).toMutable()
+        bridge.addInstructions(0, "invoke-static/range {p0 .. p4}, ${addButton.id()}\nmove-result v0\nreturn v0")
+        utils.methods.add(bridge)
+
+        runtime.bindStub("addNativeRow", 1, "invoke-static/range {p0 .. p4}, ${bridge.id()}\nmove-result v0\nreturn v0")
+        runtime.bindStub("topMenu", 1, "invoke-static {}, $FLYOUT_FILTER->getTopFlyoutMenuVisible()Z\nmove-result v0\nreturn v0")
+        runtime.bindStub("shortsOpen", 1, "invoke-static {}, $SHORTS_STATE->isOpen()Z\nmove-result v0\nreturn v0")
+        runtime.bindStub("dismissNative", 0, "invoke-static {}, $FLYOUT_UTILS->dismissFlyout()V\nreturn-void")
+        // Each path returns its own type: ART does not narrow a null branch, and merging the menu info with the
+        // layout at one return would make the whole class fail verification.
+        runtime.bindStub(
+            "nativeContainer",
+            1,
+            """
+                const/4 v0, 0x0
+                invoke-static {p0, v0}, ${menuInfo.id()}
+                move-result-object v0
+                if-nez v0, :container
+                const/4 v0, 0x0
+                return-object v0
+                :container
+                invoke-virtual {v0}, ${containerClass.type}->menuContainer()$LINEAR_LAYOUT
+                move-result-object v0
+                return-object v0
+            """,
+        )
+        // The menu info type is private in Morphe's class; the extension reads its container.
+        menuInfo.accessFlags = (menuInfo.accessFlags and AccessFlags.PRIVATE.value.inv()) or AccessFlags.PUBLIC.value
+
+        // Insert at the shared group's boundary, before its conditional divider and signal reset. The index is the
+        // official inflater's next insertion position (the dialog and the popup differ). The labeled instruction is
+        // replaced so that zero or hidden official buttons reach the hook too.
+        menuBody.replaceInstruction(guard, "invoke-static {p0, v$indexRegister}, $QUICK_TOGGLE->onMenu(${OBJECT}I)I")
+        menuBody.addInstructionsWithLabels(
+            guard + 1,
+            "move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",
+            ExternalLabel("after_divider", afterDivider),
+        )
+        detector.addInstructions(
+            0,
+            "invoke-static/range {p$pathRegister .. p${pathRegister + 1}}, $QUICK_TOGGLE->observeMenuPath($pathType[B)V",
+        )
     }
-    bind("addNativeRow","invoke-static/range {p0 .. p4}, ${utils.type}->addonCaptionButton(Ljava/lang/Object;Landroid/graphics/drawable/Drawable;Ljava/lang/String;Landroid/view/View\$OnClickListener;I)I\nmove-result v0\nreturn v0",6)
-    bind("topMenu","invoke-static {}, ${filter.type}->getTopFlyoutMenuVisible()Z\nmove-result v0\nreturn v0",1)
-    bind("shortsOpen","invoke-static {}, ${shorts.type}->isOpen()Z\nmove-result v0\nreturn v0",1)
-    bind("dismissNative","invoke-static {}, ${utils.type}->dismissFlyout()V\nreturn-void",0)
-    // Insert at the shared group's boundary, BEFORE its conditional divider and signal reset.
-    // The index is the official inflater's next insertion position (dialog vs popup differ).
-    // Retain incoming branch labels on the hook: zero/hidden official buttons must also reach it.
-    menuBody.replaceInstruction(guard,"invoke-static {p0, v$indexRegister}, ${runtime.type}->onMenu(Ljava/lang/Object;I)I")
-    menuBody.addInstructionsWithLabels(guard+1,"move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",ExternalLabel("after_divider",afterDivider))
-    info.accessFlags=(info.accessFlags and AccessFlags.PRIVATE.value.inv()) or AccessFlags.PUBLIC.value
-    // ART does not narrow the null branch's reference register to a null type.
-    // Do not merge FlyoutMenuInfo and LinearLayout at one return: that becomes Object
-    // and rejects the entire CaptionQuickToggle class. Each path returns its own type.
-    bind("nativeContainer","const/4 v0, 0x0\ninvoke-static {p0, v0}, ${utils.type}->getFlyoutMenuInfo(Ljava/lang/Object;I)${info.returnType}\nmove-result-object v0\nif-nez v0, :container\nconst/4 v0, 0x0\nreturn-object v0\n:container\ninvoke-virtual {v0}, ${info.returnType}->menuContainer()Landroid/widget/LinearLayout;\nmove-result-object v0\nreturn-object v0",2)
-    detector.addInstructions(0,"invoke-static/range {p$pathRegister .. p${pathRegister+1}}, ${runtime.type}->observeMenuPath($pathType[B)V")
+}
+
+/**
+ * The method that adds the official rows of the menu and, once, the divider after them. Older bundles of Morphe
+ * defer that to a captured `Runnable`; its call is followed to the typed static body instead of guessing a
+ * generated lambda name.
+ */
+private fun BytecodePatchContext.findMenuBody(utils: MutableClass): MutableMethod {
+    fun dividers(method: Method) = method.code().count {
+        it.call()?.let { call -> call.definingClass == utils.type && call.name == "addDivider" } == true
     }
+
+    val entry = utils.methods.staticMethod(FLYOUT_UTILS, "addFlyoutElements", null, OBJECT)
+    if (dividers(entry) == 1) return entry
+    if (dividers(entry) != 0) throw PatchException("AI captions: unexpected divider count in the menu binding")
+
+    val outer = entry.code()
+    outer.filter {
+        it.call()?.let { call ->
+            call.definingClass == MORPHE_UTILS && call.name == "runOnMainThreadDelayed" &&
+                call.parameterNames() == listOf(RUNNABLE, "J")
+        } == true
+    }.unique("deferred menu dispatch")
+
+    val bodies = outer.filter { it.opcode == Opcode.NEW_INSTANCE }
+        .mapNotNull { ((it as? ReferenceInstruction)?.reference as? TypeReference)?.type }.distinct()
+        .map { classDefBy(it) }.filter { RUNNABLE in it.interfaces }
+        .flatMap { runnable ->
+            outer.filter {
+                it.call()?.let { call ->
+                    call.definingClass == runnable.type && call.name == "<init>" && call.parameterNames() == listOf(OBJECT)
+                } == true
+            }.unique("captured menu constructor")
+            runnable.methods.filter { it.name == "run" && it.returnType == "V" && it.parameterTypes.isEmpty() }
+                .flatMap { it.code() }.mapNotNull { it.call() }
+                .filter { it.definingClass == utils.type && it.returnType == "V" && it.parameterNames() == listOf(OBJECT) }
+                .mapNotNull { reference -> utils.methods.singleOrNull { it.id() == reference.id() && it.isStatic() } }
+        }.distinct().filter { dividers(it) == 1 }
+    return bodies.unique("reachable deferred divider body")
 }

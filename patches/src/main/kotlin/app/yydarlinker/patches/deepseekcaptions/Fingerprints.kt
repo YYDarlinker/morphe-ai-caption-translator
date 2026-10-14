@@ -4,10 +4,13 @@ import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
 import app.morphe.patcher.InstructionLocation.MatchAfterWithin
 import app.morphe.patcher.OpcodesFilter
+import app.morphe.patcher.StringComparisonType
+import app.morphe.patcher.anyInstruction
 import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.literal
 import app.morphe.patcher.methodCall
 import app.morphe.patcher.opcode
+import app.morphe.patcher.string
 import app.yydarlinker.patches.shared.CaptionResourceType
 import app.yydarlinker.patches.shared.captionResourceLiteral
 import com.android.tools.smali.dexlib2.AccessFlags
@@ -68,8 +71,7 @@ internal object PlayerTimeReferenceFingerprint : Fingerprint(
     filters = OpcodesFilter.opcodesToFilters(
         Opcode.INVOKE_DIRECT_RANGE,
         Opcode.IGET_OBJECT,
-    ),
-    strings = listOf("Media progress reported outside media playback: "),
+    ) + string("Media progress reported outside media playback: ", comparison = StringComparisonType.CONTAINS),
 )
 
 /** Parent and callback used by Morphe's stable current-video ID hook. */
@@ -89,8 +91,17 @@ internal object CurrentVideoIdFingerprint : Fingerprint(
     filters = listOf(
         methodCall(opcode = Opcode.INVOKE_INTERFACE, returnType = "Ljava/lang/String;"),
         opcode(Opcode.MOVE_RESULT_OBJECT, location = MatchAfterImmediately()),
-        methodCall(
-            smali = "Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+        anyInstruction(
+            // 21.35 and older.
+            methodCall(
+                smali = "Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            ),
+            // 21.36+: the map moved behind a method taking the video ID and one more object.
+            methodCall(
+                opcode = Opcode.INVOKE_VIRTUAL,
+                returnType = "V",
+                parameters = listOf("Ljava/lang/String;", "L"),
+            ),
             location = MatchAfterWithin(6),
         ),
         opcode(Opcode.RETURN_VOID, location = MatchAfterImmediately()),

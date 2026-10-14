@@ -23,3 +23,10 @@ plugins {
 include(":caption-contracts", ":caption-shared", ":translation-core")
 
 include(":ui-preview")
+
+settings {
+    extensions {
+        // Shrinks the extension: unused library code (Kotlin standard library) is dropped.
+        proguardFiles(rootProject.projectDir.resolve("extensions/proguard-rules.pro").toString())
+    }
+}

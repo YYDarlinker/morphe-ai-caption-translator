@@ -53,7 +53,7 @@ public class ShortsEngineSwitchTest {
         }
     }
     @Implements(CaptionActions.class) public static class Core {
-        @Implementation public static void activate(Context c,String url){activations.add(CaptionActions.videoIdFromUrl(url));activationUrls.add(url);}
+        @Implementation public static void activate(Context c,String url){activations.add(CaptionUrls.videoId(url));activationUrls.add(url);}
         @Implementation public static void refreshConfiguration(Context c){refreshModes.add(DeepSeekConfig.enabled(c));}
     }
     Activity activity;

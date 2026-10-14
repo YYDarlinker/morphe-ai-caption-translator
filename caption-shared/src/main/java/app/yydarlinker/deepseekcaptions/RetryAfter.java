@@ -9,10 +9,20 @@ final class RetryAfter {
             return Math.max(0, Math.min(Long.MAX_VALUE / 1000, seconds)) * 1000;
         } catch (NumberFormatException date) {
             try {
-                long at = java.time.ZonedDateTime.parse(value.trim(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli();
+                long at =
+                        java.time.ZonedDateTime.parse(
+                                        value.trim(),
+                                        java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+                                .toInstant()
+                                .toEpochMilli();
                 return Math.max(0, at - now);
-            } catch (RuntimeException invalid) { return 0; }
+            } catch (RuntimeException invalid) {
+                return 0;
+            }
         }
     }
-    static long after(long now, long delay) { return delay > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + delay; }
+
+    static long after(long now, long delay) {
+        return delay > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + delay;
+    }
 }

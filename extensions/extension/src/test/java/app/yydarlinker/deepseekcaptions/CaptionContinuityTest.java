@@ -30,7 +30,7 @@ public class CaptionContinuityTest {
   @After public void done(){h.done();CaptionPlayerAuthority.resetForTests();}
 
   void layout(){host.measure(1073743104,1073742824);host.layout(0,0,1280,1000);host.getViewTreeObserver().dispatchOnPreDraw();}
-  void show(String text,String id,long start,long end){CaptionOverlay.showEvent(text,guard,()->"",id,start,end,position.get(),zh,null);}
+  void show(String text,String id,long start,long end){CaptionOverlay.showEvent(text,guard,id,start,end,position.get(),zh);}
   void at(long time){position.set(time);CaptionOverlay.position(time,guard);Shadows.shadowOf(Looper.getMainLooper()).idle();layout();}
 
   @Test public void adjacentCaptionsChangeTextInsideABoxThatStaysVisible() throws Exception {

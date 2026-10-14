@@ -47,7 +47,7 @@ public class SettingsPolish113Test {
             assertEquals(0,countViews(root,Button.class));
             assertFalse(preference.isSelectable());assertFalse(preview.isClickable());assertFalse(preview.isFocusable());
             assertFalse(preview.performClick());
-            assertEquals(CaptionStrings.settings(activity,"preview"),preview.getContentDescription());
+            assertEquals(CaptionStrings.get(activity,"preview"),preview.getContentDescription());
             for(int width:new int[]{320,420,960}){
                 preview.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
                 assertEquals(width,preview.getMeasuredWidth());
@@ -66,7 +66,7 @@ public class SettingsPolish113Test {
         assertEquals(0,names.getPaddingLeft());assertEquals(0,names.getPaddingRight());
         assertFalse("tier names may overflow their equal cells to sit on their ticks",names.getClipChildren());
         String[] keys={"size_tier_xs","size_tier_s","size_tier_standard","size_tier_l","size_tier_xl"};
-        String current=CaptionStrings.settings(root.getContext(),keys[selected]);
+        String current=CaptionStrings.get(root.getContext(),keys[selected]);
         assertTrue(slider.getContentDescription().toString().contains(current));
         assertTrue(names.getContentDescription().toString().contains(current));
         float tolerance=1f;
@@ -104,7 +104,7 @@ public class SettingsPolish113Test {
         int previousRight=-1;float maxAlignmentError=0;
         for(int tier=0;tier<5;tier++){
             TextView label=(TextView)names.getChildAt(tier);
-            assertEquals(CaptionStrings.settings(root.getContext(),keys[tier]),label.getText().toString());
+            assertEquals(CaptionStrings.get(root.getContext(),keys[tier]),label.getText().toString());
             assertFalse(label.getText().toString().contains("px"));
             int expected=tier==selected?CaptionSettingsStyle.primary(root.getContext()):CaptionSettingsStyle.secondary(root.getContext());
             assertEquals(expected,label.getCurrentTextColor());assertEquals(tier==selected,label.getTypeface().isBold());
@@ -132,7 +132,7 @@ public class SettingsPolish113Test {
         Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
         try{
             DeepSeekConfig.saveCaptionSizeTier(activity,2);
-            DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);preference.setTitle(CaptionStrings.settings(activity,"size"));
+            DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);preference.setTitle(CaptionStrings.get(activity,"size"));
             View root=preference.onCreateView(new FrameLayout(activity));root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             SeekBar slider=(SeekBar)root.findViewWithTag("ai_size_tier_slider");
             root.measure(View.MeasureSpec.makeMeasureSpec(420,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,420,root.getMeasuredHeight());
@@ -148,7 +148,7 @@ public class SettingsPolish113Test {
             activity.setTheme(dark?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);
             try{
                 DeepSeekConfig.saveCaptionSizeTier(activity,2);
-                DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);preference.setTitle(CaptionStrings.settings(activity,"size"));
+                DeepSeekSliderPreference preference=new DeepSeekSliderPreference(activity);preference.setKey(DeepSeekSliderPreference.KEY_TEXT_SIZE);preference.setTitle(CaptionStrings.get(activity,"size"));
                 View root=preference.onCreateView(new FrameLayout(activity));
                 SeekBar slider=(SeekBar)root.findViewWithTag("ai_size_tier_slider");
                 for(int width:new int[]{320,420,960}){
@@ -177,7 +177,7 @@ public class SettingsPolish113Test {
             ApiKeyPreference key=new ApiKeyPreference(activity);key.setKey(DeepSeekTextPreference.KEY_API_KEY);key.setTitle("API Key");row(key,root);
             DeepSeekModelPreference model=new DeepSeekModelPreference(activity);model.setKey(DeepSeekModelPreference.KEY_MODEL);model.setTitle("模型");row(model,root);
             heading(root,"字幕样式");SubtitleStylePreview pref=new SubtitleStylePreview(activity);View previewRow=row(pref,root);SubtitleStylePreview.Preview preview=(SubtitleStylePreview.Preview)previewRow.findViewWithTag("ai_style_preview_canvas");
-            for(String field:new String[]{DeepSeekSliderPreference.KEY_TEXT_SIZE,DeepSeekSliderPreference.KEY_OPACITY}){DeepSeekSliderPreference slider=new DeepSeekSliderPreference(activity);slider.setKey(field);slider.setTitle(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?CaptionStrings.settings(activity,"size"):"背景不透明度");slider.setSummary(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?String.format(CaptionStrings.settings(activity,"size_tier_hint"),CaptionStrings.settings(activity,"size_tier_"+tierName),pixels(activity,tier,false),pixels(activity,tier,true)):"0% 为透明，100% 为不透明；松手保存");row(slider,root);}
+            for(String field:new String[]{DeepSeekSliderPreference.KEY_TEXT_SIZE,DeepSeekSliderPreference.KEY_OPACITY}){DeepSeekSliderPreference slider=new DeepSeekSliderPreference(activity);slider.setKey(field);slider.setTitle(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?CaptionStrings.get(activity,"size"):"背景不透明度");slider.setSummary(field.equals(DeepSeekSliderPreference.KEY_TEXT_SIZE)?String.format(CaptionStrings.get(activity,"size_tier_hint"),CaptionStrings.get(activity,"size_tier_"+tierName),pixels(activity,tier,false),pixels(activity,tier,true)):"0% 为透明，100% 为不透明；松手保存");row(slider,root);}
             heading(root,"缓存与诊断");row(new DeepSeekDiagnosticsPreference(activity),root);
             root.measure(View.MeasureSpec.makeMeasureSpec(420,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));root.layout(0,0,420,root.getMeasuredHeight());
             Bitmap bitmap=Bitmap.createBitmap(420,root.getHeight(),Bitmap.Config.ARGB_8888);root.draw(new Canvas(bitmap));
@@ -239,7 +239,7 @@ public class SettingsPolish113Test {
         Activity activity=Robolectric.buildActivity(Activity.class).setup().get();
         try{
             String source=SubtitleStylePreview.sample(activity);
-            assertEquals(CaptionStrings.settings(activity,SubtitleStylePreview.SAMPLE_KEY),source);
+            assertEquals(CaptionStrings.get(activity,SubtitleStylePreview.SAMPLE_KEY),source);
             assertTrue("the sample must be a complete sentence",source.trim().length()>1);
             float budget=SubtitleStylePreview.sampleTextWidthPx(activity,
                     SubtitleStylePreview.LANDSCAPE_REFERENCE_WIDTH_PX);

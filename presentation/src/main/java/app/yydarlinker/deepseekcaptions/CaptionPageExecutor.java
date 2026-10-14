@@ -1,37 +1,112 @@
 package app.yydarlinker.deepseekcaptions;
 
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.function.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
-/** One bounded background lane and cache for application-provided immutable page plans. */
+/**
+ * One background thread that plans the pages of a caption, and a cache of the plans. Planning needs
+ * the measured text, which is slow on the main thread; a plan is only ever published whole.
+ */
 final class CaptionPageExecutor {
-    private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(2),r->{Thread t=new Thread(r,"CaptionPresentation");t.setDaemon(true);return t;},new ThreadPoolExecutor.AbortPolicy());
-    private final LinkedHashMap<String,List<CaptionPageLayout.Page>> cache=new LinkedHashMap<>(64,.75f,true);
-    private final Set<String> running=new HashSet<>();
-    synchronized List<CaptionPageLayout.Page> get(String key){return cache.get(key);}
-    synchronized void remove(String key){cache.remove(key);}
+    private static final int CACHED_PLANS = 64;
+    private static final int QUEUED_JOBS = 2;
+
+    private final ThreadPoolExecutor worker =
+            new ThreadPoolExecutor(
+                    1,
+                    1,
+                    0,
+                    TimeUnit.MILLISECONDS,
+                    new ArrayBlockingQueue<>(QUEUED_JOBS),
+                    task -> {
+                        Thread thread = new Thread(task, "CaptionPresentation");
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+
+    /** Least recently used plans. An empty plan marks a layout that could not be planned. */
+    private final Map<String, List<CaptionPageLayout.Page>> cache =
+            new LinkedHashMap<String, List<CaptionPageLayout.Page>>(CACHED_PLANS, .75f, true) {
+                @Override
+                protected boolean removeEldestEntry(
+                        Map.Entry<String, List<CaptionPageLayout.Page>> eldest) {
+                    return size() > CACHED_PLANS;
+                }
+            };
+
+    private final Set<String> running = new HashSet<>();
+
+    synchronized List<CaptionPageLayout.Page> get(String key) {
+        return cache.get(key);
+    }
+
+    synchronized void remove(String key) {
+        cache.remove(key);
+    }
+
     private final class Job implements Runnable {
         final String key;
-        final Supplier<List<CaptionDisplayPage>> task;
+        final Supplier<List<CaptionDisplayPage>> plan;
         final Consumer<List<CaptionPageLayout.Page>> ready;
-        Job(String key,Supplier<List<CaptionDisplayPage>> task,Consumer<List<CaptionPageLayout.Page>> ready){this.key=key;this.task=task;this.ready=ready;}
-        public void run(){
-            List<CaptionPageLayout.Page> result=Collections.emptyList();
-            try{result=CaptionPageLayout.adapt(task.get());}catch(RuntimeException failure){/* Failed geometry stays bounded and cannot publish partial pages. */}
-            synchronized(CaptionPageExecutor.this){running.remove(key);cache.put(key,result);while(cache.size()>64)cache.remove(cache.keySet().iterator().next());}
-            ready.accept(result);
+
+        Job(
+                String key,
+                Supplier<List<CaptionDisplayPage>> plan,
+                Consumer<List<CaptionPageLayout.Page>> ready) {
+            this.key = key;
+            this.plan = plan;
+            this.ready = ready;
+        }
+
+        @Override
+        public void run() {
+            List<CaptionPageLayout.Page> pages = Collections.emptyList();
+            try {
+                pages = CaptionPageLayout.adapt(plan.get());
+            } catch (RuntimeException failed) {
+                // The empty plan is remembered, so the same geometry is not planned again and
+                // again.
+            }
+            synchronized (CaptionPageExecutor.this) {
+                running.remove(key);
+                cache.put(key, pages);
+            }
+            ready.accept(pages);
         }
     }
-    synchronized void request(String key,Supplier<List<CaptionDisplayPage>> task,Consumer<List<CaptionPageLayout.Page>> ready){
-        if(running.contains(key))return;
-        Job job=new Job(key,task,ready);running.add(key);
-        try{worker.execute(job);}catch(RejectedExecutionException full){
-            // Pending layouts have no publication authority. Replace the oldest pending request
-            // so rapid surface/owner changes cannot starve the newest CURRENT geometry.
-            Runnable obsolete=worker.getQueue().poll();
-            if(obsolete instanceof CaptionPageExecutor.Job)running.remove(((Job)obsolete).key);
-            try{worker.execute(job);}catch(RejectedExecutionException stopped){running.remove(key);}
+
+    /**
+     * Plans [key] unless that is already going on; [ready] gets the plan on the planning thread.
+     */
+    synchronized void request(
+            String key,
+            Supplier<List<CaptionDisplayPage>> plan,
+            Consumer<List<CaptionPageLayout.Page>> ready) {
+        if (!running.add(key)) return;
+        Job job = new Job(key, plan, ready);
+        try {
+            worker.execute(job);
+        } catch (RejectedExecutionException full) {
+            // A waiting plan has no authority yet: the newest geometry replaces the oldest waiting
+            // one, so quick
+            // changes of the surface cannot starve the plan that is needed now.
+            Runnable dropped = worker.getQueue().poll();
+            if (dropped instanceof Job) running.remove(((Job) dropped).key);
+            try {
+                worker.execute(job);
+            } catch (RejectedExecutionException stillFull) {
+                running.remove(key);
+            }
         }
     }
 }

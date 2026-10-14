@@ -1,3 +1,7 @@
+## [1.5.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.3...v1.5.4) (2026-10-14)
+
+- The add-on icon is shown again on the player menu row for the regular player and Shorts; the 1.5.3 resource rewrite had dropped it.
+
 ## [1.5.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.2...v1.5.3) (2026-10-14)
 
 - Smaller and simpler: the code was hand-rewritten module by module (dead code removed, long logic split, about 8-12% less main code) and the extension is shrunk by R8; the patch package drops from 1.3 MB to about 0.57 MB. Translation prompts and protocol are unchanged and match the pinned upstream.

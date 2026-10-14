@@ -13,9 +13,20 @@ internal object CaptionFeatures {
     var rememberSelection = false
 }
 
-/** Adds the strings of the add-on, in every language that it was translated to, to the app's resources. */
-private val captionStringsPatch = resourcePatch {
+/** The icon of the add-on's row in the player's menu, for the regular player and for Shorts. */
+private const val MENU_ICON = """<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="?android:attr/textColorPrimary"
+        android:pathData="M3,5L17,5L17,17L8,17L4,21L4,17L3,17ZM5,7L5,15L15,15L15,7ZM6,9L14,9L14,10.5L6,10.5ZM6,12L12,12L12,13.5L6,13.5ZM20,1L21,4L24,5L21,6L20,9L19,6L16,5L19,4Z" />
+</vector>
+"""
+
+/** Adds the icon and the strings of the add-on, in every language that it was translated to, to the app's resources. */
+private val captionResourcesPatch = resourcePatch {
     execute {
+        get("res/drawable").mkdirs()
+        get("res/drawable/deepseek_caption_settings.xml").writeText(MENU_ICON)
+
         val loader = CaptionFeatures.javaClass.classLoader
         fun read(path: String) = loader.getResourceAsStream("captionlocales/$path")?.bufferedReader()?.use { it.readText() }
             ?: error("Caption locale resource missing: $path")
@@ -41,7 +52,7 @@ private val captionStringsPatch = resourcePatch {
  * activity to it. The native caption hooks are installed here, once, for whatever was selected.
  */
 internal val captionSupportPatch = bytecodePatch {
-    dependsOn(captionStringsPatch)
+    dependsOn(captionResourcesPatch)
     extendWith("extensions/extension.mpe")
 
     execute {

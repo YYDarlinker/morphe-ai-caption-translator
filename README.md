@@ -63,7 +63,7 @@ Turning AI off returns translation to YouTube’s native behavior. Selecting an 
 ## Available patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.5.3](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
+> **[v1.5.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;2 patches total
 <details open>
 <summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>

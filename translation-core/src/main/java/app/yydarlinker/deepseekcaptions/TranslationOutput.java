@@ -64,6 +64,18 @@ final class TranslationOutput {
                 long end,
                 long at,
                 CaptionRenderSpec spec) {}
+
+        default void showEvent(
+                String text,
+                RenderGuard guard,
+                String id,
+                long start,
+                long end,
+                long at,
+                CaptionRenderSpec spec,
+                long[] sourceAnchors) {
+            showEvent(text, guard, id, start, end, at, spec);
+        }
     }
 
     private static volatile Sink sink = new Sink() {};
@@ -114,5 +126,17 @@ final class TranslationOutput {
             long at,
             CaptionRenderSpec spec) {
         sink.showEvent(text, g, id, start, end, at, spec);
+    }
+
+    static void showEvent(
+            String text,
+            RenderGuard g,
+            String id,
+            long start,
+            long end,
+            long at,
+            CaptionRenderSpec spec,
+            long[] sourceAnchors) {
+        sink.showEvent(text, g, id, start, end, at, spec, sourceAnchors);
     }
 }

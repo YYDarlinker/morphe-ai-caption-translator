@@ -29,21 +29,39 @@ public class ContinuousDisplayTest {
   final String url="https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en&tlang=zh-Hans";
   final AtomicLong position=new AtomicLong(500);
   final List<String> shown=new CopyOnWriteArrayList<>();
+  final List<String> waiting=new CopyOnWriteArrayList<>();
   final List<String> hidden=new CopyOnWriteArrayList<>();
   final List<String> blank=new CopyOnWriteArrayList<>();
-  volatile boolean truncated,inspected;
+  volatile boolean truncated,inspected;volatile int malformedReplies;
+  /** The provider refuses the reply with finish_reason=content_filter: a terminal block failure. */
+  volatile boolean filtered;
+  /** Reply with an English echo for this sentence number: one unusable event in a good block. */
+  volatile int echoSentence=-1;
+  /** Echo the reply of a hole sub-request too, so the hole cannot be filled in this fixture. */
+  volatile boolean holeEcho;
   MockWebServer server;
+
+  /** Joins the fixture tokens of one event range, the same way the source text does. */
+  static String join(JSONArray tokens,int from,int to) throws JSONException {
+    StringBuilder out=new StringBuilder();
+    for(int i=from;i<=to;i++){if(out.length()>0)out.append(' ');out.append(tokens.getJSONArray(i).getString(1));}
+    return out.toString();
+  }
 
   @Before public void setup() throws Exception {
     RebuildController.stop();RebuildApi.reset();RebuildCache.clear(context);
     server=new MockWebServer();
     server.setDispatcher(new Dispatcher(){public MockResponse dispatch(RecordedRequest request){
       try {
+        if(filtered)return new MockResponse().setBody(new JSONObject().put("choices",new JSONArray().put(new JSONObject()
+          .put("finish_reason","content_filter").put("message",new JSONObject().put("content","")))).toString());
+        if(malformedReplies>0){malformedReplies--;return new MockResponse().setResponseCode(502).setBody("bad gateway");}
         if(truncated)return new MockResponse().setBody(new JSONObject().put("choices",new JSONArray().put(new JSONObject()
           .put("message",new JSONObject().put("content","{\"block\":\"b0_0_9\",\"events\":[{\"from\":0,\"to\":3,\"source\":\"sentence 0")))).toString());
         JSONObject input=new JSONObject(new JSONObject(request.getBody().readUtf8()).getJSONArray("messages").getJSONObject(1).getString("content"));
         JSONArray tokens=input.getJSONArray("owned_tokens"),events=new JSONArray();
         String block=input.getString("block");
+        boolean holeRequest=tokens.length()>0&&!tokens.getJSONArray(0).getString(1).equals("sentence");
         if(inspected&&block.startsWith("b0_"))return new MockResponse().setResponseCode(400)
             .setBody("{\"error\":{\"code\":\"data_inspection_failed\",\"message\":\"Input data may contain inappropriate content.\"}}");
         // One event per fixture sentence ("sentence N says ... over time").
@@ -51,8 +69,20 @@ public class ContinuousDisplayTest {
           int end=start;StringBuilder source=new StringBuilder(tokens.getJSONArray(start).getString(1));
           while(end+1<tokens.length()&&!tokens.getJSONArray(end+1).getString(1).equals("sentence"))source.append(' ').append(tokens.getJSONArray(++end).getString(1));
           String number=tokens.getJSONArray(start).getString(1).equals("sentence")&&start+1<tokens.length()?tokens.getJSONArray(start+1).getString(1):"x";
+          String text="第"+number+"句说预算每年都在增长而军队变化缓慢。";
+          if(holeEcho&&holeRequest)text=source.toString();
+          if(number.equals(String.valueOf(echoSentence))){
+            // Two events in one block: the first half is a good translation, the second half is an
+            // English echo (unusable for zh-Hans) and must become an explicit hole.
+            int mid=start+(end-start)/2;
+            events.put(new JSONObject().put("from",tokens.getJSONArray(start).getInt(0)).put("to",tokens.getJSONArray(mid).getInt(0))
+                .put("source",join(tokens,start,mid)).put("text","第"+number+"句的前半句。"));
+            events.put(new JSONObject().put("from",tokens.getJSONArray(mid+1).getInt(0)).put("to",tokens.getJSONArray(end).getInt(0))
+                .put("source",join(tokens,mid+1,end)).put("text",join(tokens,mid+1,end)));
+            start=end+1;continue;
+          }
           events.put(new JSONObject().put("from",tokens.getJSONArray(start).getInt(0)).put("to",tokens.getJSONArray(end).getInt(0))
-              .put("source",source.toString()).put("text","第"+number+"句说预算每年都在增长而军队变化缓慢。"));
+              .put("source",source.toString()).put("text",text));
           start=end+1;
         }
         String reply=new JSONObject().put("block",block).put("events",events).toString();
@@ -75,6 +105,9 @@ public class ContinuousDisplayTest {
     TranslationOutput.install(new TranslationOutput.Sink(){
       public void showEvent(String text,TranslationOutput.RenderGuard g,String id,long start,long end,long at,CaptionRenderSpec spec){
         if(g.isValid()){if(text.trim().isEmpty())blank.add(id);shown.add(text);g.onApplied();}
+      }
+      public void showWaitingEvent(String text,TranslationOutput.RenderGuard g,String id,long start,long end,long at){
+        if(g.isValid()){waiting.add(text);g.onApplied();}
       }
       public void hide(TranslationOutput.RenderGuard g){if(g.isValid()){hidden.add(g.blankReason());g.onApplied();}}
     });
@@ -111,21 +144,76 @@ public class ContinuousDisplayTest {
     assertTrue(hidden.isEmpty());
   }
 
-  @Test public void aBlockThatFailedToTranslateClearsTheBoxInsteadOfShowingAnEmptyEvent() throws Exception {
+  /**
+   * A block whose reply never parses has no translation. The video's own line is never a
+   * substitute for one: only the neutral waiting placeholder may stand in while a reply can still
+   * arrive.
+   */
+  @Test public void aBlockThatFailedToTranslateNeverShowsItsSourceLine() throws Exception {
     truncated=true;
     RebuildController.activate(context,url,false,true);
-    await(()->hidden.contains("translation_failed"));
+    await(()->!waiting.isEmpty()||!hidden.isEmpty());
+    assertEquals("the video's own line reached the caption box: "+shown,Collections.emptyList(),shown);
+    for(String text:waiting) assertFalse("source text reached the caption box: "+text,text.startsWith("sentence"));
     assertTrue("empty text reached the overlay as an event: "+blank,blank.isEmpty());
+  }
+
+  @Test public void anAbandonedBlockShowsANeutralMarkerNotItsSourceLine() throws Exception {
+    filtered=true;
+    RebuildController.activate(context,url,false,true);
+    await(()->shown.stream().anyMatch(x->x.equals("\u2026")));
+    assertFalse("the source line reached the caption box: "+shown,shown.stream().anyMatch(x->x.startsWith("sentence")));
   }
 
   /** Bailian refuses one block's text with HTTP 400; later blocks must still be translated. */
   @Test public void aProviderInspectionRefusalOfOneBlockDoesNotStopLaterBlocks() throws Exception {
     inspected=true;
     RebuildController.activate(context,url,false,true);
-    await(()->hidden.contains("translation_failed"));
-    assertTrue("nothing from the refused block is shown: "+shown,shown.isEmpty());
+    await(()->!waiting.isEmpty()||!hidden.isEmpty());
+    assertFalse("the refused block showed its source line: "+shown,shown.stream().anyMatch(x->x.startsWith("sentence")));
     position.set(60000);RebuildController.time(60000);
-    await(()->{try{play(60100);}catch(Exception e){throw new AssertionError(e);}return !shown.isEmpty();});
-    assertTrue(shown.get(0).startsWith("第"));
+    await(()->{try{play(60100);}catch(Exception e){throw new AssertionError(e);}
+      return shown.stream().anyMatch(x->x.startsWith("第"));});
+  }
+
+  @Test public void aTransientlyFailingBlockRetriesInsteadOfDisappearingForGood() throws Exception {
+    malformedReplies=1;
+    RebuildController.activate(context,url,false,true);
+    await(()->shown.stream().anyMatch(x->x.startsWith("第0句")));
+  }
+
+  /**
+   * One unusable event (an English echo in a Chinese target) must not hide the good events of the
+   * same block: the good half is published, the bad range becomes a neutral marker, and the next
+   * sentence still arrives.
+   */
+  @Test public void oneUnusableEventDoesNotHideTheRestOfItsBlock() throws Exception {
+    echoSentence=1;
+    holeEcho=true;
+    RebuildController.activate(context,url,false,true);
+    await(()->shown.stream().anyMatch(x->x.startsWith("第0句")));
+    await(()->{try{play(8000);}catch(Exception e){throw new AssertionError(e);}
+      return shown.stream().anyMatch(x->x.equals("第1句的前半句。"));});
+    await(()->{try{play(12000);}catch(Exception e){throw new AssertionError(e);}
+      return shown.stream().anyMatch(x->x.equals("\u2026"));});
+    assertFalse("the echo reached the caption box: "+shown,shown.stream().anyMatch(x->x.startsWith("sentence")));
+    await(()->{try{play(15000);}catch(Exception e){throw new AssertionError(e);}
+      return shown.stream().anyMatch(x->x.startsWith("第2句"));});
+  }
+
+  /**
+   * The bounded hole sub-request asks only for the missing token range; its reply is merged into
+   * the published plan and the previously missing half becomes readable.
+   */
+  @Test public void aHoleSubRequestFillsTheMissingHalf() throws Exception {
+    echoSentence=1;
+    holeEcho=false;
+    RebuildController.activate(context,url,false,true);
+    await(()->shown.stream().anyMatch(x->x.startsWith("第0句")));
+    await(()->{try{play(8000);}catch(Exception e){throw new AssertionError(e);}
+      return shown.stream().anyMatch(x->x.equals("第1句的前半句。"));});
+    await(()->{try{play(12000);}catch(Exception e){throw new AssertionError(e);}
+      return shown.stream().anyMatch(x->x.startsWith("第x句"));});
+    assertFalse("the echo reached the caption box: "+shown,shown.stream().anyMatch(x->x.startsWith("sentence")));
   }
 }

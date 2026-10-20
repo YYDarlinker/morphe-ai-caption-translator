@@ -48,6 +48,23 @@ final class SourceTrackPolicy {
      * already names the preferred track, a video without a complete catalogue, or a catalogue with
      * nothing to choose between is returned unchanged.
      */
+    /**
+     * Is the source track this url names a manually authored one? Answered from the same signed
+     * catalogue the choice above was made from; an unknown video or track is not authored, so the
+     * local page rules apply as before.
+     */
+    static synchronized boolean authored(String url) {
+        if (url == null) return false;
+        String video = CaptionUrls.videoId(url);
+        if (video.isEmpty()) return false;
+        SourceCatalog.Snapshot snapshot = SourceCatalog.snapshot(video);
+        if (snapshot == null) return false;
+        String wanted = descriptor(url);
+        for (SourceSelection track : snapshot.tracks)
+            if (descriptor(track.url).equals(wanted)) return track.kind == SourceSelection.Kind.MANUAL;
+        return false;
+    }
+
     static synchronized String apply(Context context, String url) {
         TargetLanguage target = TargetLanguage.fromUrl(url);
         String video = target == null ? "" : CaptionUrls.videoId(url);

@@ -49,7 +49,7 @@ public class CaptionContinuityTest {
 
   @Test public void aLongerPauseOrAnExplicitHideStillClearsTheBox() throws Exception {
     position.set(2000);show("第一句话说完了。","a",1000,3000);h.awaitPreparedCaption();layout();
-    at(3400);
+    at(3900);
     assertNotEquals("nothing followed within the hold: the box is cleared",View.VISIBLE,h.anchor().getVisibility());
     position.set(4000);show("第二句。","b",4000,6000);h.awaitPreparedCaption();layout();
     CaptionOverlay.hide(guard);Shadows.shadowOf(Looper.getMainLooper()).idle();

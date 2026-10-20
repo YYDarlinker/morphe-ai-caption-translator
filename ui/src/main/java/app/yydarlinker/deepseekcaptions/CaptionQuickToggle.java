@@ -116,8 +116,9 @@ public final class CaptionQuickToggle {
             toast(context, "configure_api");
             return false;
         }
-        boolean previous = DeepSeekConfig.enabled(context);
         DeepSeekConfig.saveEnabled(context, enabled);
+        // Turning the engine back on never creates a language choice. The current native
+        // selection, if any, is adopted by refreshNativeTrack/onCaptionsShown.
         CaptionActions.refreshConfiguration(context);
         NativeCaptionBridge.Refresh refreshed = NativeCaptionBridge.Refresh.DEFERRED;
         try {
@@ -128,6 +129,19 @@ public final class CaptionQuickToggle {
         }
         CaptionMusicSuppressor.forceNativeRendererScan();
         CaptionMusicSuppressor.kick();
+        if (enabled
+                && refreshed == NativeCaptionBridge.Refresh.DEFERRED
+                && !CaptionChoice.isOn()
+                && CaptionButtonController.captionsKnownOn()) {
+            try {
+                NativeCaptionBridge.onCaptionsShown();
+            } catch (Exception failed) {
+                CaptionDiagnostics.mark(
+                        context,
+                        "ENGINE_CAPTIONS_SHOWN_DEFERRED",
+                        failed.getClass().getSimpleName());
+            }
+        }
         CaptionDiagnostics.mark(
                 context,
                 "ENGINE_MODE_SAVED",
@@ -139,10 +153,6 @@ public final class CaptionQuickToggle {
                         + CaptionActions.isVisibleActive()
                         + ";choice_known="
                         + CaptionChoice.known());
-        if (previous != enabled && refreshed == NativeCaptionBridge.Refresh.DEFERRED)
-            toast(context, enabled ? "mode_pending" : "mode_off_pending");
-        else if (enabled && CaptionChoice.isOn() && !CaptionChoice.translates())
-            toast(context, "choose_translation");
         return true;
     }
 

@@ -43,6 +43,20 @@ final class RebuildCache {
             TranslationSettings config,
             String target,
             CaptionLanguageContext context) {
+        return identity(source, config, target, context, false);
+    }
+
+    /**
+     * The authored flag and cue sequence are part of a cached plan's identity. A manual cue is a
+     * display boundary; a plan produced under another cue partition must not be restored as if it
+     * were the same page.
+     */
+    static String identity(
+            RebuildSource source,
+            TranslationSettings config,
+            String target,
+            CaptionLanguageContext context,
+            boolean authored) {
         StringBuilder b =
                 new StringBuilder(RebuildProtocol.VERSION)
                         .append('|')
@@ -52,8 +66,9 @@ final class RebuildCache {
                         .append('|')
                         .append(hash(RebuildApi.prompt(config, target, context)));
         if (!context.canApplyEnglishToChinese) b.append('|').append(context.scope());
-        if (!context.renderSpec.legacy) b.append('|').append(context.renderSpec.presentationPolicy);
-        for (RebuildSource.Word w : source.words)
+        b.append('|').append(context.renderSpec.presentationPolicy);
+        if (authored) b.append('|').append(RebuildCueContract.VERSION).append("|authored=1");
+        for (RebuildSource.Word w : source.words) {
             b.append('\n')
                     .append(w.start)
                     .append(':')
@@ -62,6 +77,8 @@ final class RebuildCache {
                     .append(w.precision)
                     .append(':')
                     .append(w.text);
+            if (authored) b.append(':').append(w.cue);
+        }
         return hash(b.toString());
     }
 

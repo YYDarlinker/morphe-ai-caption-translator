@@ -16,7 +16,7 @@ import java.util.Objects;
 /** Platform ICU boundaries in UTF-16 offsets. Input is never normalized or reordered. */
 final class CaptionUnicode {
     static final String COUNTER_VERSION = "caption-visible-counters-v4-r1";
-    static final String BOUNDARY_VERSION = "android-icu+devanagari-virama-v1";
+    static final String BOUNDARY_VERSION = "android-icu+indic-virama-v2";
 
     private CaptionUnicode() {}
 
@@ -41,28 +41,30 @@ final class CaptionUnicode {
         iterator.setText(text);
         List<Integer> out = new ArrayList<>();
         for (int n = iterator.first(); n != BreakIterator.DONE; n = iterator.next()) {
-            if (n == 0 || n == text.length() || !insideDevanagariConjunct(text, n)) out.add(n);
+            if (n == 0 || n == text.length() || !insideIndicConjunct(text, n)) out.add(n);
         }
         return integers(out);
     }
 
     /**
-     * API28 lacks newer Indic-conjunct rules. Exclude only a Devanagari virama-linked letter cut.
-     * ZWNJ deliberately ends this safety link; no arbitrary script/ZWJ concatenation is performed.
+     * API28 lacks newer Indic-conjunct rules. Exclude a virama-linked consonant cut for every Indic
+     * script that uses a visible virama (Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil,
+     * Telugu, Kannada, Malayalam, Sinhala, Myanmar, Khmer). ZWNJ deliberately ends the link; no
+     * arbitrary script/ZWJ concatenation is performed.
      */
-    private static boolean insideDevanagariConjunct(String text, int boundary) {
+    private static boolean insideIndicConjunct(String text, int boundary) {
         int right = text.codePointAt(boundary);
-        if (!devanagariConsonant(right)) return false;
+        if (!indicConsonant(right)) return false;
         for (int at = boundary; at > 0; ) {
             int cp = text.codePointBefore(at);
             at -= Character.charCount(cp);
-            if (cp == 0x094d) {
-                // The virama must follow a Devanagari letter (possibly with nukta/other marks).
+            if (indicVirama(cp)) {
+                // The virama must follow a consonant of the same script (possibly with marks).
                 while (at > 0) {
                     int base = text.codePointBefore(at);
                     at -= Character.charCount(base);
                     if (mark(base)) continue;
-                    return devanagariConsonant(base);
+                    return indicConsonant(base);
                 }
                 return false;
             }
@@ -72,10 +74,41 @@ final class CaptionUnicode {
         return false;
     }
 
-    private static boolean devanagariConsonant(int cp) {
-        return (cp >= 0x0915 && cp <= 0x0939)
+    private static boolean indicVirama(int cp) {
+        switch (cp) {
+            case 0x094D: // Devanagari
+            case 0x09CD: // Bengali
+            case 0x0A4D: // Gurmukhi
+            case 0x0ACD: // Gujarati
+            case 0x0B4D: // Oriya
+            case 0x0BCD: // Tamil
+            case 0x0C4D: // Telugu
+            case 0x0CCD: // Kannada
+            case 0x0D4D: // Malayalam
+            case 0x0DCA: // Sinhala
+            case 0x1039: // Myanmar
+            case 0x17D2: // Khmer coeng
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean indicConsonant(int cp) {
+        return (cp >= 0x0915 && cp <= 0x0939) // Devanagari
                 || (cp >= 0x0958 && cp <= 0x095f)
-                || (cp >= 0x0978 && cp <= 0x097f);
+                || (cp >= 0x0978 && cp <= 0x097f)
+                || (cp >= 0x0995 && cp <= 0x09b9) // Bengali
+                || (cp >= 0x0a15 && cp <= 0x0a39) // Gurmukhi
+                || (cp >= 0x0a95 && cp <= 0x0ab9) // Gujarati
+                || (cp >= 0x0b15 && cp <= 0x0b39) // Oriya
+                || (cp >= 0x0b95 && cp <= 0x0bb9) // Tamil
+                || (cp >= 0x0c15 && cp <= 0x0c39) // Telugu
+                || (cp >= 0x0c95 && cp <= 0x0cb9) // Kannada
+                || (cp >= 0x0d15 && cp <= 0x0d39) // Malayalam
+                || (cp >= 0x0d9a && cp <= 0x0dc6) // Sinhala
+                || (cp >= 0x1000 && cp <= 0x102a) // Myanmar
+                || (cp >= 0x1780 && cp <= 0x17b3); // Khmer
     }
 
     static int[] lineBoundaries(String text, Locale locale) {

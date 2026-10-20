@@ -24,11 +24,13 @@ public final class CaptionLanguageMetadata {
             List<byte[]> languages = new ArrayList<>();
             byte[] prototype = null;
             Set<String> present = new HashSet<>();
+            Map<String, Integer> positions = new LinkedHashMap<>();
             Map<String, String> labels = new LinkedHashMap<>();
             for (Field f : root)
                 if (f.number == 3 && f.wire == 2) {
-                    languages.add(f.value);
                     String normalized = CaptionLanguageSelection.canonical(code(f.value));
+                    positions.put(normalized, languages.size());
+                    languages.add(f.value);
                     if (!normalized.isEmpty()) {
                         present.add(normalized);
                         labels.put(normalized, label(f.value));
@@ -38,8 +40,23 @@ public final class CaptionLanguageMetadata {
             NativeCaptionBridge.observeLanguageMetadata(labels);
             if (prototype == null) return original;
             Collator collator = Collator.getInstance(LanguageMenuOrder.locale());
+            boolean changed = false;
             for (String code : CaptionLanguageSelection.menuCodes()) {
-                if (!present.add(code)) continue;
+                if (present.contains(code)) {
+                    // A selected Chinese variant may be native with YouTube's redundant label.
+                    // Keep every other byte of that entry and replace only display field 4.
+                    if (!isChineseVariant(code)) continue;
+                    Integer at = positions.get(code);
+                    if (at == null) continue;
+                    byte[] existing = languages.get(at);
+                    if (!NativeCaptionBridge.redundantChineseLabel(code, label(existing))) continue;
+                    String wanted = NativeCaptionBridge.translationLabel(code);
+                    if (wanted.equals(label(existing))) continue;
+                    languages.set(at, relabel(existing, code, wanted));
+                    changed = true;
+                    continue;
+                }
+                present.add(code);
                 ByteArrayOutputStream entry = new ByteArrayOutputStream(),
                         name = new ByteArrayOutputStream();
                 write(entry, 1, code.getBytes(StandardCharsets.UTF_8));
@@ -58,7 +75,9 @@ public final class CaptionLanguageMetadata {
                         break;
                     }
                 languages.add(at, entry.toByteArray());
+                changed = true;
             }
+            if (!changed) return original;
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             boolean wrote = false;
             for (Field f : root) {
@@ -69,11 +88,48 @@ public final class CaptionLanguageMetadata {
                     }
                 } else out.write(f.raw);
             }
-            byte[] result = out.toByteArray();
-            return Arrays.equals(original, result) ? original : result;
+            return out.toByteArray();
         } catch (Exception malformed) {
             return original;
         }
+    }
+
+    private static boolean isChineseVariant(String code) {
+        String canonical = CaptionLanguageSelection.canonical(code);
+        return "zh-Hans".equals(canonical) || "zh-Hant".equals(canonical);
+    }
+
+    /** Replace only the display name (2.4) of one entry, preserving code and every other byte. */
+    private static byte[] relabel(byte[] entry, String code, String display) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        boolean wroteCode = false, wroteName = false;
+        for (Field f : fields(entry)) {
+            if (f.number == 1 && f.wire == 2) {
+                // Keep the native region/script spelling (for example zh-TW); only the label is
+                // product-owned. Rewriting the code here would silently change track identity.
+                out.write(f.raw);
+                wroteCode = true;
+            } else if (f.number == 2 && f.wire == 2) {
+                ByteArrayOutputStream name = new ByteArrayOutputStream();
+                boolean wroteDisplay = false;
+                for (Field nf : fields(f.value)) {
+                    if (nf.number == 4 && nf.wire == 2) {
+                        write(name, 4, display.getBytes(StandardCharsets.UTF_8));
+                        wroteDisplay = true;
+                    } else name.write(nf.raw);
+                }
+                if (!wroteDisplay) write(name, 4, display.getBytes(StandardCharsets.UTF_8));
+                write(out, 2, name.toByteArray());
+                wroteName = true;
+            } else out.write(f.raw);
+        }
+        if (!wroteCode) write(out, 1, code.getBytes(StandardCharsets.UTF_8));
+        if (!wroteName) {
+            ByteArrayOutputStream name = new ByteArrayOutputStream();
+            write(name, 4, display.getBytes(StandardCharsets.UTF_8));
+            write(out, 2, name.toByteArray());
+        }
+        return out.toByteArray();
     }
 
     private static String label(byte[] bytes) {

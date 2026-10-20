@@ -188,7 +188,7 @@ public class PlannerGoldenTest {
   }
 
   static final String SYNTHETIC=
-      "en>zh-Hans=b6f589574d42fb9f;en>ja=6074cfe211a1aa55;ja>zh-Hans=9cb92808b0326243;es>en=9cb92808b0326243;words=6000:b75a294e1333eaa8;en>zh-Hans=265:93e4e31b886667c7:d08a9b76b176c0b5;en>ja=265:93e4e31b886667c7:8bbc689d6e41be7f;ja>zh-Hans=265:17cc4d352098cca8:3f52c932f57ad08d;es>en=265:17cc4d352098cca8:8971554f5d7c6eba";
+      "en>zh-Hans=b6f589574d42fb9f;en>ja=6074cfe211a1aa55;ja>zh-Hans=9cb92808b0326243;es>en=9cb92808b0326243;words=6000:b75a294e1333eaa8;en>zh-Hans=265:93e4e31b886667c7:d1d2950a524402c0;en>ja=265:93e4e31b886667c7:849860df17a1b05d;ja>zh-Hans=265:17cc4d352098cca8:3482536821903eaa;es>en=265:17cc4d352098cca8:24ab7b5ccf161c00";
   static final String[] FEATURES={
       "en>zh-Hans=9353d9d253c6d7c0;en>ja=f23a12cf8ec48cd9;ja>zh-Hans=84ef4b28e3d6e460;es>en=84ef4b28e3d6e460;",
       "en>zh-Hans=0856449e1c00fde0;en>ja=05b3a49635f0972b;ja>zh-Hans=1b7bee45d64497ea;es>en=1b7bee45d64497ea;",

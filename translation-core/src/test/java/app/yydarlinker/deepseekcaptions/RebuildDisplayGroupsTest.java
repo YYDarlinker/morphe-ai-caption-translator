@@ -32,7 +32,7 @@ public class RebuildDisplayGroupsTest {
     List<RebuildDisplayGroups.Unit> units=partition(ZH,s,event(0,0,1400,"自信地把俄罗斯排在第二位"),
         event(1,1400,4400,"见鬼，甚至还有几个把俄罗斯排在第一位"),event(2,4400,8000,"想必是那些认为衡量军事实力的标准仍是坦克的人写的。"));
     assertEquals(2,units.size());
-    assertEquals("自信地把俄罗斯排在第二位 见鬼，甚至还有几个把俄罗斯排在第一位",units.get(0).text);
+    assertEquals("自信地把俄罗斯排在第二位\u200b见鬼，甚至还有几个把俄罗斯排在第一位",units.get(0).text);
     assertEquals(0,units.get(0).start);assertEquals(4400,units.get(0).end);
   }
 
@@ -41,8 +41,8 @@ public class RebuildDisplayGroupsTest {
     List<RebuildDisplayGroups.Unit> units=partition(ZH,s,event(0,0,1900,"那么这些……都从哪里来"),
         event(1,1900,2900,"隐形战斗机"),event(2,2900,3800,"航空母舰"),event(3,3800,4800,"高超音速导弹"),
         event(4,4800,6300,"以及反舰弹道导弹"),event(5,6300,6900,"又是从哪来的？"));
-    assertEquals("那么这些……都从哪里来 隐形战斗机 航空母舰 高超音速导弹",units.get(0).text);
-    assertEquals("以及反舰弹道导弹 又是从哪来的？",units.get(1).text);
+    assertEquals("那么这些……都从哪里来\u200b隐形战斗机\u200b航空母舰\u200b高超音速导弹",units.get(0).text);
+    assertEquals("以及反舰弹道导弹\u200b又是从哪来的？",units.get(1).text);
     assertEquals(2,units.size());
     units=partition(ZH,source(2),event(0,0,900,"毕竟，"),event(1,900,3000,"谁会在乎呢"));
     assertEquals("毕竟，谁会在乎呢",units.get(0).text);
@@ -52,15 +52,20 @@ public class RebuildDisplayGroupsTest {
     List<RebuildDisplayGroups.Unit> units=partition(ZH,source(3),event(0,0,1500,"好的。"),
         event(1,1500,4000,"我们开始吧"),event(2,4000,9500,"今天讲预算"));
     assertEquals(Arrays.asList("好的。","我们开始吧","今天讲预算"),texts(units));
-    // A lead before a long event would exceed the five-second page window.
+    // A lead without a sentence end joins its continuation: one page that reads as one thought is
+    // better than a page that stops mid-sentence, even when the joined hold runs past the nominal
+    // page time. A fragment that would run far beyond it still stays its own page.
     units=partition(ZH,source(2),event(0,0,1500,"而且"),event(1,1500,6600,"这支部队后来成为了正规军"));
+    assertEquals(1,units.size());
+    assertEquals("而且\u200b这支部队后来成为了正规军",units.get(0).text);
+    units=partition(ZH,source(2),event(0,0,1500,"而且"),event(1,1500,12000,"这支部队后来成为了正规军"));
     assertEquals(2,units.size());
   }
 
   @Test public void spacedAndJapaneseTargetsUseTheirOwnSeparator() {
     assertEquals("and the reason is simple:",partition(EN,source(2),event(0,0,600,"and the reason"),event(1,600,1500,"is simple:")).get(0).text);
     assertEquals("Well, that works",partition(EN,source(2),event(0,0,500,"Well,"),event(1,500,1500,"that works")).get(0).text);
-    assertEquals("そして　日本へ",partition(JA,source(2),event(0,0,700,"そして"),event(1,700,1800,"日本へ")).get(0).text);
+    assertEquals("そして\u200b日本へ",partition(JA,source(2),event(0,0,700,"そして"),event(1,700,1800,"日本へ")).get(0).text);
   }
 
   @Test public void blockedEmptyAndHardBreakEventsAreNeverJoined() {
@@ -101,7 +106,7 @@ public class RebuildDisplayGroupsTest {
     // A sentence end in the source keeps the pause separator where the target has no punctuation.
     s=words("ranked","second.","Heck,","some","said","first.");
     units=partition(ZH,s,new RebuildProtocol.Event(0,1,0,799,"排在第二"),new RebuildProtocol.Event(2,5,800,2399,"见鬼，有的排第一。"));
-    assertEquals("排在第二 见鬼，有的排第一。",units.get(0).text);
+    assertEquals("排在第二\u200b见鬼，有的排第一。",units.get(0).text);
   }
 
   @Test public void aLatinWordNextToChineseKeepsItsSpaceWhenPagesAreJoined() {
@@ -116,7 +121,7 @@ public class RebuildDisplayGroupsTest {
     RebuildSource s=source(3);
     List<RebuildDisplayGroups.Unit> units=partition(ZH,s,event(0,0,2900,"在2月24日之前，你在网上不用走多远"),
         event(1,2900,5000,"就能找到有人声称俄罗斯拥有"),event(2,5000,7000,"世界第二强大的军队"));
-    assertEquals(Arrays.asList("在2月24日之前，你在网上不用走多远","就能找到有人声称俄罗斯拥有 世界第二强大的军队"),texts(units));
+    assertEquals(Arrays.asList("在2月24日之前，你在网上不用走多远","就能找到有人声称俄罗斯拥有\u200b世界第二强大的军队"),texts(units));
   }
 
   @Test public void shortPausesAreBridgedSoTheCaptionDoesNotFlicker() {
@@ -133,8 +138,9 @@ public class RebuildDisplayGroupsTest {
 
   @Test public void cursorNeverShowsATokenTwiceAndAdoptsRepairsOnlyAtSharedBoundaries() {
     RebuildSource s=source(6);
-    RebuildProtocol.Plan old=new RebuildProtocol.Plan(Arrays.asList(new RebuildProtocol.Event(0,2,0,3000,"互联网上充斥着文章和指数"),
-        new RebuildProtocol.Event(3,3,3000,6000,"它们都把俄罗斯排第二"),new RebuildProtocol.Event(4,5,6000,9000,"甚至有排第一的。")),"{}");
+    // Each sentence is closed by its own full stop, so each stays its own page.
+    RebuildProtocol.Plan old=new RebuildProtocol.Plan(Arrays.asList(new RebuildProtocol.Event(0,2,0,3000,"互联网上充斥着文章和指数。"),
+        new RebuildProtocol.Event(3,3,3000,6000,"它们都把俄罗斯排第二。"),new RebuildProtocol.Event(4,5,6000,9000,"甚至有排第一的。")),"{}");
     RebuildProtocol.Plan repair=new RebuildProtocol.Plan(Arrays.asList(new RebuildProtocol.Event(0,3,0,6000,"互联网上充斥着文章和排行榜，它们都把俄罗斯排第二"),
         new RebuildProtocol.Event(4,5,6000,9000,"甚至有几篇排第一。")),"{}");
     RebuildDisplayGroups.Cursor cursor=new RebuildDisplayGroups.Cursor();

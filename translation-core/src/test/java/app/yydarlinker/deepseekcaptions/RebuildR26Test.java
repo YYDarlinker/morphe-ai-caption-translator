@@ -65,8 +65,11 @@ public class RebuildR26Test {
   }
   @Test public void nonChineseTranslationDoesNotNeedChineseEquipmentWords()throws Exception {
     RebuildSource s=RebuildContractTest.source("Aircraft carriers and tanks.",500);RebuildPlanner.Block b=RebuildContractTest.block(s);
-    for(String t:Arrays.asList("Porte-avions et chars.","空母と戦車です。","Aircraft carriers and tanks."))
-      assertEquals(1,RebuildProtocol.parseBound(RebuildContractTest.reply(b,new JSONArray().put(quoted(s,0,3,t))),s,b).events.size());
+    String[][] cases={{"Porte-avions et chars.","fr"},{"空母と戦車です。","ja"},{"Aircraft carriers and tanks.","en"}};
+    for(String[] c:cases)
+      assertEquals(1,RebuildProtocol.parseBound(
+              RebuildContractTest.reply(b,new JSONArray().put(quoted(s,0,3,c[0]))),s,b,
+              CaptionLanguageContext.explicit("en",c[1])).events.size());
   }
   @Test public void genericCarrierTankAndArmadaAreNotForcedMilitaryEntities()throws Exception {
     RebuildSource s=RebuildContractTest.source("The carrier filled a water tank near an armada.",500);RebuildPlanner.Block b=RebuildContractTest.block(s);

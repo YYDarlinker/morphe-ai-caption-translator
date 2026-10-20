@@ -10,7 +10,6 @@ import app.morphe.patcher.patch.resourcePatch
  */
 internal object CaptionFeatures {
     var translation = false
-    var rememberSelection = false
 }
 
 /** The icon of the add-on's row in the player's menu, for the regular player and for Shorts. */
@@ -57,7 +56,6 @@ internal val captionSupportPatch = bytecodePatch {
 
     execute {
         CaptionFeatures.translation = false
-        CaptionFeatures.rememberSelection = false
         YouTubeActivityOnCreateFingerprint.method.addInstruction(
             0,
             "invoke-static/range {p0 .. p0}, ${EXTENSION}CaptionAddonSupport;->initialize(Landroid/app/Activity;)V",
@@ -65,6 +63,6 @@ internal val captionSupportPatch = bytecodePatch {
     }
 
     finalize {
-        installNativeCaptionBridge(CaptionFeatures.translation, CaptionFeatures.rememberSelection)
+        installNativeCaptionBridge(CaptionFeatures.translation)
     }
 }

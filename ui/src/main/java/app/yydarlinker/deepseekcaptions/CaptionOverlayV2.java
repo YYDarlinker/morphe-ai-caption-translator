@@ -30,6 +30,7 @@ import app.yydarlinker.caption.contracts.CaptionContracts.Window;
 import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -81,7 +82,7 @@ final class CaptionOverlay {
      * caption stays while the next unit's pages are laid out off the main thread. Explicit hides,
      * seeks, owner changes and longer pauses still clear the box at once.
      */
-    private static final long END_HOLD_MS = 300, LAYOUT_HOLD_MS = 500;
+    private static final long END_HOLD_MS = 800, LAYOUT_HOLD_MS = 1200;
 
     private static final long SCAN_INTERVAL_MS = 500, DRAG_AFTER_MS = 350;
 
@@ -105,6 +106,7 @@ final class CaptionOverlay {
     private static long pendingStart = -1, pendingEnd = -1, pendingPosition = -1;
     private static boolean pendingStatus, pendingWaiting;
     private static CaptionRenderSpec pendingRenderSpec = CaptionRenderSpec.LEGACY;
+    private static long[] pendingSourceAnchors;
     private static List<CaptionPageLayout.Page> pendingPages = Collections.emptyList();
     private static int shownPage = -1;
 
@@ -209,12 +211,12 @@ final class CaptionOverlay {
     }
 
     static void showStatus(String s, RenderGuard g) {
-        show(s, true, g, "", -1, -1, -1, false, CaptionRenderSpec.LEGACY, null, "");
+        show(s, true, g, "", -1, -1, -1, false, CaptionRenderSpec.LEGACY, null, "", null);
     }
 
     static void showWaitingEvent(
             String s, RenderGuard g, String id, long start, long end, long position) {
-        show(s, false, g, id, start, end, position, true, CaptionRenderSpec.LEGACY, null, "");
+        show(s, false, g, id, start, end, position, true, CaptionRenderSpec.LEGACY, null, "", null);
     }
 
     static void showEvent(
@@ -225,6 +227,18 @@ final class CaptionOverlay {
             long end,
             long at,
             CaptionRenderSpec spec) {
+        showEvent(text, guard, id, start, end, at, spec, null);
+    }
+
+    static void showEvent(
+            String text,
+            RenderGuard guard,
+            String id,
+            long start,
+            long end,
+            long at,
+            CaptionRenderSpec spec,
+            long[] sourceAnchors) {
         // A failed or withheld event carries no text: it clears the box (the contract Unit rejects
         // blanks).
         if (text == null || text.trim().isEmpty()) {
@@ -253,7 +267,8 @@ final class CaptionOverlay {
                 false,
                 spec,
                 unit,
-                CaptionContracts.hash(text));
+                CaptionContracts.hash(text),
+                sourceAnchors);
     }
 
     private static void show(
@@ -267,7 +282,8 @@ final class CaptionOverlay {
             boolean waiting,
             CaptionRenderSpec spec,
             Unit sourceUnit,
-            String canonicalHash) {
+            String canonicalHash,
+            long[] sourceAnchors) {
         if (g != null && !g.isValid()) return;
         long command = g == null ? COMMAND.incrementAndGet() : COMMAND.get();
         final long renderEpoch = playerRenderEpoch;
@@ -277,6 +293,7 @@ final class CaptionOverlay {
                     pendingRenderSpec = spec;
                     pendingCanonicalHash = canonicalHash;
                     pendingUnit = sourceUnit;
+                    pendingSourceAnchors = sourceAnchors;
                     pendingText = s == null ? "" : s;
                     pendingIdentity = id;
                     pendingStart = start;
@@ -365,6 +382,7 @@ final class CaptionOverlay {
         pendingStart = -1;
         pendingEnd = -1;
         pendingIdentity = "";
+        pendingSourceAnchors = null;
         pendingPages = Collections.emptyList();
         shownPage = -1;
         desiredLayout = "";
@@ -762,7 +780,9 @@ final class CaptionOverlay {
                         + "|"
                         + budget.width
                         + "|"
-                        + Float.floatToIntBits(budget.preferredPx);
+                        + Float.floatToIntBits(budget.preferredPx)
+                        + "|"
+                        + java.util.Arrays.toString(pendingSourceAnchors);
         if (!key.equals(desiredLayout)) {
             desiredLayout = key;
             failedLayout = "";
@@ -775,7 +795,9 @@ final class CaptionOverlay {
         final RenderGuard guard = currentGuard;
         LAYOUTS.request(
                 key,
-                () -> CaptionActions.displayPages(body, start, end, budget, spec),
+                () ->
+                        CaptionActions.displayPages(
+                                body, start, end, budget, spec, pendingSourceAnchors),
                 pages ->
                         MAIN.post(
                                 () -> {
@@ -1264,7 +1286,7 @@ final class CaptionOverlay {
         int boxWidthPx =
                 Math.min(maximumInnerPx, Math.max(1, (int) Math.ceil(contentWidthPx) + 2))
                         + padding;
-        for (int pass = 0; pass < 2; pass++) {
+        for (int pass = 0; pass < 3; pass++) {
             ViewGroup.LayoutParams params = text.getLayoutParams();
             if (same
                     && !text.isLayoutRequested()
@@ -1285,13 +1307,22 @@ final class CaptionOverlay {
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
             if (spec.fits(shown, text.getLayout(), boxWidthPx - padding, 2)) return boxWidthPx;
             if (boxWidthPx == maximumInnerPx + padding) break;
-            boxWidthPx = maximumInnerPx + padding;
+            // The tight box re-wrapped differently from the page plan. Try the width the text
+            // itself wants before stretching the box to the whole frame: two-line captions used to
+            // jump straight to the maximum width.
+            float natural = spec.actualWidth(spec.layout(shown, size, maximumInnerPx));
+            int naturalBox =
+                    Math.min(maximumInnerPx, Math.max(1, (int) Math.ceil(natural) + 2)) + padding;
+            boxWidthPx = naturalBox > boxWidthPx ? naturalBox : maximumInnerPx + padding;
             Activity owner = activityRef.get();
             if (owner != null && DeepSeekConfig.displayTextDebugEnabled(owner))
                 CaptionDiagnostics.mark(
                         owner,
                         "CAPTION_COMPACT_MEASURE_RETRY",
-                        "reason=font_geometry_mismatch;maximum_inner_px=" + maximumInnerPx);
+                        "reason=font_geometry_mismatch;maximum_inner_px="
+                                + maximumInnerPx
+                                + ";natural_box_px="
+                                + naturalBox);
         }
         return -1;
     }
@@ -1451,6 +1482,8 @@ final class CaptionOverlay {
                         ? pendingPages.get(shownPage)
                         : null;
         CaptionLanguageProfile profile = pendingRenderSpec.profile;
+        int readingUnits = pendingRenderSpec.readingUnits(shown);
+        double readingCps = duration > 0 ? readingUnits * 1000.0 / duration : 0;
         String detail =
                 "id="
                         + pendingIdentity
@@ -1463,9 +1496,13 @@ final class CaptionOverlay {
                         + ";available_width_px="
                         + width
                         + ";reading_units="
-                        + pendingRenderSpec.readingUnits(shown)
+                        + readingUnits
                         + ";reading_rate_limit="
                         + profile.referenceCps
+                        + ";reading_cps="
+                        + String.format(Locale.ROOT, "%.2f", readingCps)
+                        + ";page_density_over_limit="
+                        + (readingCps > profile.referenceCps)
                         + ";minimum_page_wall_ms="
                         + profile.minimumPageMs
                         + ";maximum_recommended_page_wall_ms="

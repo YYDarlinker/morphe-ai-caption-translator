@@ -249,10 +249,6 @@ final class DeepSeekConfig {
         return Math.max(0.04f, Math.min(0.96f, value));
     }
 
-    static String defaultTargetLanguage(Context context) {
-        return CaptionChoice.isOn() && CaptionChoice.translates() ? CaptionChoice.language() : "";
-    }
-
     // ---- Values ----
 
     /** What a request needs of the provider settings; no size, opacity or plaintext key. */

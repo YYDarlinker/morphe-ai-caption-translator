@@ -1,4 +1,4 @@
-rootProject.name = "morphe-caption-upstream-integrated"
+rootProject.name = "morphe-ai-caption-translator"
 
 pluginManagement {
     repositories {

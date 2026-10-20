@@ -8,7 +8,7 @@ Both are independently persisted and enabled by default to preserve existing beh
 Regular controls portrait/fullscreen ordinary videos; Shorts controls Shorts, even when
 Morphe also reports the top-menu signal. Neither is dependent on the AI engine setting.
 A disabled entry is absent on the next menu opening.
-It does not change the engine, language memory, native captions, cached translations,
+It does not change the engine, the native caption language, native captions, cached translations,
 or API settings. The engine remains controllable from the settings page.
 
 When enabled, the same official inflater, icon, localized On/Off label, insertion index,
@@ -33,8 +33,7 @@ introduced. Unlike official built-in features, this separately distributed addon
 its Boolean in its existing private preferences and uses `AddonSwitchPreference`;
 using a host setting widget without registering its key in the host Setting registry
 would be unsafe. Strings are provided in all fourteen existing locales and honor the
-settings language override. The new settings are scoped to the AI patch's own settings
-screen; memory-only and language-only installations gain no extra UI.
+settings language override. The new settings are scoped to the AI patch's own settings screen; the AI root is the only public patch.
 
 ## Validation scope
 

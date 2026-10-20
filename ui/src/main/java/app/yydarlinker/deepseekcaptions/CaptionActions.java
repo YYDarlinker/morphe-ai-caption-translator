@@ -51,6 +51,16 @@ final class CaptionActions {
                 CaptionRenderSpec spec) {
             return Collections.emptyList();
         }
+
+        default List<CaptionDisplayPage> displayPages(
+                String text,
+                long start,
+                long end,
+                CaptionPresentationBudget geometry,
+                CaptionRenderSpec spec,
+                long[] sourceAnchors) {
+            return displayPages(text, start, end, geometry, spec);
+        }
     }
 
     private static volatile SettingsServices services =
@@ -152,6 +162,16 @@ final class CaptionActions {
             CaptionPresentationBudget geometry,
             CaptionRenderSpec spec) {
         return services.displayPages(text, start, end, geometry, spec);
+    }
+
+    static List<CaptionDisplayPage> displayPages(
+            String text,
+            long start,
+            long end,
+            CaptionPresentationBudget geometry,
+            CaptionRenderSpec spec,
+            long[] sourceAnchors) {
+        return services.displayPages(text, start, end, geometry, spec, sourceAnchors);
     }
 
     static String testApi() throws Exception {

@@ -53,9 +53,14 @@ final class CaptionApplication extends TranslationRuntime.Host
                 break;
             case DEACTIVATE:
                 // Only a reset YouTube made on its own may come back; every other off is the
-                // user's.
-                if (!"native_selection".equals(value) || !EngineResume.takeAutomatic())
+                // user's and must also close the caption choice, or a late tlang request could
+                // revive the overlay while CC shows off.
+                boolean automatic =
+                        "native_selection".equals(value) && EngineResume.takeAutomatic();
+                if (!automatic) {
                     EngineResume.declined();
+                    CaptionChoice.toggle(false);
+                }
                 RebuildController.stop();
                 break;
             case VIDEO:
@@ -145,7 +150,10 @@ final class CaptionApplication extends TranslationRuntime.Host
      * the session that stopped with the departure is restarted from what it was showing.
      */
     private static boolean resume(Context c, String via) {
-        if (!RebuildController.activeUrl().isEmpty()) return false;
+        if (!DeepSeekConfig.enabled(c) || !RebuildController.activeUrl().isEmpty()) return false;
+        // A user-off choice, an explicit CC-off or the AI switch beats a remembered session; an
+        // automatic YouTube reset is recoverable.
+        if (CaptionChoice.userOff()) return false;
         EngineResume.Session again = EngineResume.take(video);
         if (again == null) return false;
         if (video.isEmpty()) {
@@ -218,6 +226,11 @@ final class CaptionApplication extends TranslationRuntime.Host
     @Override
     String target() {
         return CaptionChoice.language();
+    }
+
+    @Override
+    boolean authoredTrack(String url) {
+        return SourceTrackPolicy.authored(url);
     }
 
     @Override
@@ -429,6 +442,22 @@ final class CaptionApplication extends TranslationRuntime.Host
         display(() -> CaptionOverlay.showEvent(text, guard(g), id, start, end, at, spec));
     }
 
+    @Override
+    public void showEvent(
+            String text,
+            TranslationOutput.RenderGuard g,
+            String id,
+            long start,
+            long end,
+            long at,
+            CaptionRenderSpec spec,
+            long[] sourceAnchors) {
+        display(
+                () ->
+                        CaptionOverlay.showEvent(
+                                text, guard(g), id, start, end, at, spec, sourceAnchors));
+    }
+
     /** A display fault must never take the host app down: the next tick draws the caption again. */
     private static void display(Runnable draw) {
         try {
@@ -446,6 +475,17 @@ final class CaptionApplication extends TranslationRuntime.Host
             CaptionPresentationBudget geometry,
             CaptionRenderSpec spec) {
         return TranslationPresentation.pages(text, start, end, geometry, spec);
+    }
+
+    @Override
+    public List<CaptionDisplayPage> displayPages(
+            String text,
+            long start,
+            long end,
+            CaptionPresentationBudget geometry,
+            CaptionRenderSpec spec,
+            long[] sourceAnchors) {
+        return TranslationPresentation.pages(text, start, end, geometry, spec, sourceAnchors);
     }
 
     @Override

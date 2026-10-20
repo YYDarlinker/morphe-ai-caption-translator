@@ -17,11 +17,44 @@ final class RebuildPlanner {
     static final long MAX_SPAN = 30000;
 
     static final class Block {
+        /** One authored cue inside a request block: a fixed display boundary. */
+        static final class CueRange {
+            final int index, from, to;
+            final long start, end;
+
+            CueRange(int index, int from, int to, long start, long end) {
+                this.index = index;
+                this.from = from;
+                this.to = to;
+                this.start = start;
+                this.end = end;
+            }
+        }
+
         final int index, from, to;
         final long start, end;
         final boolean continuedBefore, continuedAfter;
 
+        /** True only for a manually authored track; [cues] is then its display contract. */
+        final boolean authored;
+
+        final List<CueRange> cues;
+
         Block(int i, int f, int t, RebuildSource s) {
+            this(i, f, t, s, false, Collections.emptyList());
+        }
+
+        Block(int i, int f, int t, RebuildSource s, List<CueRange> cueRanges) {
+            this(i, f, t, s, true, cueRanges);
+        }
+
+        private Block(
+                int i,
+                int f,
+                int t,
+                RebuildSource s,
+                boolean manual,
+                List<CueRange> cueRanges) {
             index = i;
             from = f;
             to = t;
@@ -29,16 +62,89 @@ final class RebuildPlanner {
             end = s.words.get(t).end;
             continuedBefore = f > 0 && !boundary(s, f - 1);
             continuedAfter = t + 1 < s.words.size() && !boundary(s, t);
+            authored = manual;
+            cues =
+                    cueRanges.isEmpty()
+                            ? Collections.emptyList()
+                            : Collections.unmodifiableList(new ArrayList<>(cueRanges));
         }
 
         String id() {
             return "b" + index + "_" + from + "_" + to;
+        }
+
+        CueRange cue(int index) {
+            for (CueRange cue : cues) if (cue.index == index) return cue;
+            return null;
         }
     }
 
     /** Explicit legacy entry for fixed English fixtures. */
     static List<Block> plan(RebuildSource s) {
         return plan(s, CaptionLanguageContext.LEGACY);
+    }
+
+    // A manually authored cue is a display boundary, not a sentence. A request block may hold a
+    // few consecutive cues so the model sees the sentence around a fragment, while the cue
+    // directive still requires exactly one event per cue. The caps keep one reply bounded.
+    private static final int MAX_AUTHORED_CUES = 4,
+            MAX_AUTHORED_CHARS = 600;
+    private static final long MAX_AUTHORED_SPAN = 20_000L;
+
+    /**
+     * Request blocks for a manually authored track: consecutive cues up to a sentence/hard break,
+     * a small cue count and bounded text/time. Every authored cue remains a display boundary; a
+     * reply still has to contain exactly one event per cue (see RebuildGuidance).
+     */
+    static List<Block> planAuthored(RebuildSource s, CaptionLanguageContext context) {
+        List<Block> blocks = new ArrayList<>();
+        int from = 0;
+        while (from < s.words.size()) {
+            int to = from, cues = 1, chars = s.words.get(from).text.length();
+            while (to + 1 < s.words.size()) {
+                RebuildSource.Word next = s.words.get(to + 1);
+                if (next.cue != s.words.get(to).cue) {
+                    // The previous cue ended a sentence, a hard gap or a speaker change: keep that
+                    // cue as the last one of this block.
+                    if (cues >= MAX_AUTHORED_CUES
+                            || chars + next.text.length() > MAX_AUTHORED_CHARS
+                            || next.start - s.words.get(from).start > MAX_AUTHORED_SPAN
+                            || boundary(s, to)
+                            || hardBreakBefore(s, to + 1)) break;
+                    cues++;
+                }
+                to++;
+                chars += next.text.length();
+            }
+            blocks.add(new Block(blocks.size(), from, to, s, cueRanges(s, from, to)));
+            from = to + 1;
+        }
+        return blocks;
+    }
+
+    /** The authored cue ranges owned by [from..to]; both endpoints are cue boundaries. */
+    static List<Block.CueRange> cueRanges(RebuildSource s, int from, int to) {
+        List<Block.CueRange> out = new ArrayList<>();
+        int start = from;
+        for (int i = from; i <= to; i++) {
+            if (i > from && s.words.get(i).cue != s.words.get(i - 1).cue) {
+                addCue(out, s, start, i - 1);
+                start = i;
+            }
+        }
+        addCue(out, s, start, to);
+        return out;
+    }
+
+    private static void addCue(
+            List<Block.CueRange> out, RebuildSource s, int from, int to) {
+        out.add(
+                new Block.CueRange(
+                        s.words.get(from).cue,
+                        from,
+                        to,
+                        s.words.get(from).start,
+                        s.words.get(to).end));
     }
 
     static List<Block> plan(RebuildSource s, CaptionLanguageContext context) {
@@ -128,7 +234,13 @@ final class RebuildPlanner {
                     words("reduced|increased|announced|decided|said|argued|explained|aims|plans"),
             WEAK_END =
                     words(
-                            "a|an|the|of|to|with|without|and|or|not|no|very|particularly|more|less|than|as");
+                            "a|an|the|of|to|with|without|and|or|not|no|very|particularly|more|less|than|as"),
+            CJK_DEPENDENT =
+                    words(
+                            "の|が|を|に|で|と|は|も|へ|や|から|まで|より|って|ば|たら|ながら|ので|のに|けど|けれど|"
+                                    + "しかし|そして|また|でも|だから|ところが|けれども|しかしながら|それで|つまり|すなわち|ただし|なお|一方|一方で|"
+                                    + "的|地|得|了|着|过|過|和|与|與|及|或|而|但|因为|因為|所以|如果|虽然|雖然|"
+                                    + "当|當|在|从|從|向|对|對|把|被|이|가|을|를|은|는|에|에서|와|과|로|으로|의|도|만|까지|부터");
     private static final String[]
             PIVOT =
                     {
@@ -271,7 +383,13 @@ final class RebuildPlanner {
     }
 
     static boolean dependentEnding(RebuildSource s, int i, CaptionLanguageContext context) {
-        return context.englishSource && dependentEnding(s, i);
+        if (context.englishSource) return dependentEnding(s, i);
+        if (i < 0 || i >= s.words.size() || RebuildSource.terminal(s.words.get(i).text))
+            return false;
+        // Function words that cannot end a complete clause. This is a small cross-script set, not
+        // a per-language planner: Japanese/Korean particles and the common Chinese particles are
+        // the same linguistic category and were previously not protected at all.
+        return CJK_DEPENDENT.contains(s.words.get(i).key);
     }
 
     static boolean strongDependentEnding(RebuildSource s, int i, CaptionLanguageContext context) {
@@ -280,6 +398,38 @@ final class RebuildPlanner {
 
     static boolean protectedCut(RebuildSource s, int i, CaptionLanguageContext context) {
         return context.englishSource && protectedCut(s, i);
+    }
+
+    /** A token that only introduces or links the next clause, never a page on its own. */
+    static boolean functionWord(String text) {
+        if (text == null) return false;
+        String key = RebuildSource.key(text);
+        return !key.isEmpty() && CJK_DEPENDENT.contains(key);
+    }
+
+    /**
+     * True when the whole string can be consumed by function words, longest first. The tokenizer
+     * splits Japanese kana one character at a time, so 「がしかし」 is four tokens but two words;
+     * this check keeps it a fragment page.
+     */
+    static boolean functionWordsOnly(String text) {
+        if (text == null) return false;
+        String rest = text.replaceAll("[\\s，,、。.!?！？；;：:]+", "");
+        if (rest.isEmpty()) return false;
+        List<String> words = new ArrayList<>(CJK_DEPENDENT);
+        words.sort((a, b) -> Integer.compare(b.length(), a.length()));
+        int guard = 0;
+        while (!rest.isEmpty() && guard++ < 16) {
+            boolean consumed = false;
+            for (String word : words)
+                if (!word.isEmpty() && rest.startsWith(word)) {
+                    rest = rest.substring(word.length());
+                    consumed = true;
+                    break;
+                }
+            if (!consumed) return false;
+        }
+        return rest.isEmpty();
     }
 
     static boolean safeCut(RebuildSource s, int i, CaptionLanguageContext context) {

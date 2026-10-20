@@ -48,6 +48,22 @@ final class CaptionLanguageProfile {
             new CaptionLanguageProfile(
                     "generic", Direction.FIRST_STRONG, LineCounter.GRAPHEME, 17, 42);
 
+    /** Synthesized profile for an RTL script that has no named row yet. */
+    static final CaptionLanguageProfile RTL_GENERIC =
+            new CaptionLanguageProfile("generic-rtl", Direction.RTL, LineCounter.GRAPHEME, 17, 42);
+
+    /** Synthesized profiles for scripts whose named rows do not cover every code of that script. */
+    static final CaptionLanguageProfile CJK_GENERIC =
+            new CaptionLanguageProfile("generic-cjk", Direction.LTR, LineCounter.CJK, 9, 16);
+
+    static final CaptionLanguageProfile HANGUL_GENERIC =
+            new CaptionLanguageProfile(
+                    "generic-hangul", Direction.LTR, LineCounter.KOREAN_WIDTH, 12, 16);
+
+    static final CaptionLanguageProfile DEVANAGARI_GENERIC =
+            new CaptionLanguageProfile(
+                    "generic-devanagari", Direction.LTR, LineCounter.GRAPHEME, 22, 42);
+
     static {
         add("zh-Hans", Direction.LTR, LineCounter.CJK, 9, 16);
         add("zh-Hant", Direction.LTR, LineCounter.CJK, 9, 16);
@@ -104,10 +120,54 @@ final class CaptionLanguageProfile {
             if (region.equals("CN") || region.equals("SG")) return PROFILES.get("zh-Hans");
             if (region.equals("TW") || region.equals("HK") || region.equals("MO"))
                 return PROFILES.get("zh-Hant");
-            return GENERIC;
+            // A bare `zh` from YouTube's auto-translate menu is Simplified in practice; it must
+            // keep the CJK metrics and line counter instead of falling to GENERIC.
+            return PROFILES.get("zh-Hans");
         }
         CaptionLanguageProfile p = PROFILES.get(parsed.getLanguage());
-        return p == null ? GENERIC : p;
+        if (p != null) return p;
+        return scriptFallback(tag);
+    }
+
+    /**
+     * A code that is not in the named table still gets the typography of its script instead of a
+     * single generic row: CJK metrics for Han/Kana, Korean width for Hangul, Devanagari reading
+     * metrics, RTL direction for Arabic/Hebrew/Syriac scripts. The visual result is not worse than
+     * GENERIC and is much closer for the scripts that differ most.
+     */
+    private static CaptionLanguageProfile scriptFallback(String tag) {
+        int script = CaptionScript.primary(tag);
+        switch (script) {
+            case android.icu.lang.UScript.HAN:
+            case android.icu.lang.UScript.HIRAGANA:
+            case android.icu.lang.UScript.KATAKANA:
+                return CJK_GENERIC;
+            case android.icu.lang.UScript.HANGUL:
+                return HANGUL_GENERIC;
+            case android.icu.lang.UScript.DEVANAGARI:
+                return DEVANAGARI_GENERIC;
+            default:
+                return rtl(Locale.forLanguageTag(tag)) ? RTL_GENERIC : GENERIC;
+        }
+    }
+
+    /** Direction from the script, so Hebrew/Persian/Urdu and other RTL codes get a contract. */
+    private static boolean rtl(Locale locale) {
+        int[] scripts = android.icu.lang.UScript.getCode(locale);
+        if (scripts == null) return false;
+        for (int script : scripts)
+            switch (script) {
+                case android.icu.lang.UScript.ARABIC:
+                case android.icu.lang.UScript.HEBREW:
+                case android.icu.lang.UScript.THAANA:
+                case android.icu.lang.UScript.SYRIAC:
+                case android.icu.lang.UScript.NKO:
+                case android.icu.lang.UScript.ADLAM:
+                    return true;
+                default:
+                    break;
+            }
+        return false;
     }
 
     String readingCounterId() {

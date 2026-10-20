@@ -23,6 +23,8 @@ public final class LanguageMenuOrder {
     }
 
     private static String simplifiedLabel() {
+        String app = appLabel("language_zh_hans");
+        if (app != null) return app;
         Locale display = locale();
         if ("zh".equals(display.getLanguage())) {
             boolean traditional =
@@ -31,6 +33,38 @@ public final class LanguageMenuOrder {
             return traditional ? "中文（簡體）" : "中文（简体）";
         }
         return Locale.forLanguageTag("zh-Hans").getDisplayName(display);
+    }
+
+    /**
+     * The Traditional Chinese label follows the same app resource as the settings picker. ICU's
+     * display name can be "中文 (繁体)" (ASCII space) or, on some platform data, redundantly
+     * "中文（繁体中文）"; neither is the product label.
+     */
+    private static String traditionalLabel() {
+        String app = appLabel("language_zh_hant");
+        if (app != null) return app;
+        Locale display = locale();
+        if ("zh".equals(display.getLanguage())) {
+            boolean simplified =
+                    "Hans".equals(display.getScript())
+                            || Arrays.asList("CN", "SG").contains(display.getCountry());
+            return simplified ? "中文（繁体）" : "中文（繁體）";
+        }
+        return Locale.forLanguageTag("zh-Hant").getDisplayName(display);
+    }
+
+    /** The localized app resource for [key], or null when this host has no caption resources. */
+    private static String appLabel(String key) {
+        Context c = CaptionAddonSupport.context();
+        if (c == null) return null;
+        try {
+            String value = CaptionStrings.get(c, key);
+            if (value == null || value.trim().isEmpty()) return null;
+            // A missing resource returns the key verbatim; never show that as a language name.
+            return value.equals(key) || value.startsWith("language_") ? null : value;
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
     }
 
     static int rank(String code) {
@@ -42,6 +76,7 @@ public final class LanguageMenuOrder {
 
     static String label(String code) {
         if (rank(code) == 1) return simplifiedLabel();
+        if ("zh-hant".equalsIgnoreCase(code == null ? "" : code.trim())) return traditionalLabel();
         return Locale.forLanguageTag(code == null ? "" : code).getDisplayName(locale());
     }
 

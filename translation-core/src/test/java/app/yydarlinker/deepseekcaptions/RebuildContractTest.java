@@ -49,6 +49,116 @@ public class RebuildContractTest {
   }
 
   @Test
+  public void aLongTranslatedEventIsPaginatedRatherThanRejected() throws Exception {
+    RebuildSource s =
+        source(String.join(" ", Collections.nCopies(100, "budget")), 300);
+    RebuildPlanner.Block b = block(s);
+    String longText = String.join("", Collections.nCopies(350, "预算"));
+    RebuildProtocol.Plan p =
+        RebuildProtocol.parseBound(
+            reply(
+                b,
+                new JSONArray()
+                    .put(
+                        event(0, s.words.size() - 1, longText)
+                            .put("source", s.text(0, s.words.size() - 1)))),
+            s,
+            b);
+    assertEquals(1, p.events.size());
+    assertEquals(longText, p.events.get(0).text);
+    assertTrue(p.issues.stream().anyMatch(x -> x.code.equals("paragraph")));
+  }
+
+  @Test
+  public void cjkSourceQuoteRebindsAShiftedBoundaryWithoutChangingText() throws Exception {
+    RebuildSource s = source("あいうえお", 400);
+    RebuildPlanner.Block b = block(s);
+    JSONArray events =
+        new JSONArray()
+            .put(event(0, 1, "甲乙").put("source", "あい"))
+            .put(event(1, 4, "丙丁戊").put("source", "うえお"));
+    RebuildProtocol.Plan p =
+        RebuildProtocol.parseBound(
+            reply(b, events), s, b, CaptionLanguageContext.explicit("ja", "zh-Hans"));
+    assertEquals(2, p.events.size());
+    assertEquals(0, p.events.get(0).from);
+    assertEquals(1, p.events.get(0).to);
+    assertEquals(2, p.events.get(1).from);
+    assertEquals(4, p.events.get(1).to);
+    assertEquals("あいうえお", s.text(p.events.get(0).from, p.events.get(1).to));
+  }
+
+  /**
+   * The caption pipeline renders 「, 、 and 。 tight against a following Latin word, but a model may
+   * still copy the text with a space (or without one). Whitespace is not source ownership: the
+   * quote must compare on visible characters only.
+   */
+  @Test
+  public void aSpaceInsideACjkQuoteIsNotAQuoteMismatch() throws Exception {
+    RebuildSource s = source("それは「AppleUnsold」です、そうですね", 400);
+    RebuildPlanner.Block b = block(s);
+    String exact = s.text(0, s.words.size() - 1);
+    for (String variant :
+        new String[] {
+          exact,
+          exact.replace("「Apple", "「 Apple").replace("、Apple", "、 Apple"),
+          exact.replace("、", "、 ").replace("」", " 」")
+        }) {
+      RebuildProtocol.Plan p =
+          RebuildProtocol.parseBound(
+              reply(
+                  b,
+                  new JSONArray()
+                      .put(event(0, s.words.size() - 1, "这是“AppleUnsold”，没错").put("source", variant))),
+              s,
+              b,
+              CaptionLanguageContext.explicit("ja", "zh-Hans"));
+      assertEquals(1, p.events.size());
+      assertEquals(0, p.reboundEvents);
+    }
+  }
+
+  /**
+   * A model sometimes drops one particle where it splits two events. Refusing the whole block for
+   * that loses every other translation in it, so the hole is accepted and simply never displayed.
+   */
+  @Test
+  public void aDroppedParticleBetweenEventsIsRecoveredWithoutInventingText() throws Exception {
+    RebuildSource s = source("あいうがえおか", 400);
+    RebuildPlanner.Block b = block(s);
+    JSONArray events =
+        new JSONArray()
+            .put(event(0, 2, "甲乙丙").put("source", "あいう"))
+            // "が" is skipped here: the next quote starts one token later.
+            .put(event(4, 6, "丁戊己").put("source", "えおか"));
+    RebuildProtocol.Plan p =
+        RebuildProtocol.parseBound(
+            reply(b, events), s, b, CaptionLanguageContext.explicit("ja", "zh-Hans"));
+    assertEquals(2, p.events.size());
+    assertEquals(0, p.events.get(0).from);
+    assertEquals(2, p.events.get(0).to);
+    assertEquals(4, p.events.get(1).from);
+    assertEquals(6, p.events.get(1).to);
+    for (RebuildProtocol.Event e : p.events)
+      for (int i = e.from; i <= e.to; i++) assertNotEquals("が", s.words.get(i).text);
+  }
+
+  @Test
+  public void aDroppedClauseIsStillRejected() throws Exception {
+    RebuildSource s = source("あいうがえおかきくけこ", 400);
+    RebuildPlanner.Block b = block(s);
+    reject(
+        "source_coverage",
+        reply(
+            b,
+            new JSONArray()
+                .put(event(0, 2, "甲乙丙").put("source", "あいう"))
+                .put(event(8, 10, "丁戊己").put("source", "くけこ"))),
+        s,
+        b);
+  }
+
+  @Test
   public void nativeOffsetsAreExact() throws Exception {
     RebuildSource s =
         json(
@@ -255,13 +365,19 @@ public class RebuildContractTest {
   }
 
   @Test
-  public void clearNumericSubstitutionRejected() throws Exception {
+  public void clearNumericSubstitutionIsAdvisoryNotBlank() throws Exception {
     RebuildSource s = source("20 missiles", 500);
-    reject(
-        "numeric_substitution",
-        reply(block(s), new JSONArray().put(event(0, 1, "200枚导弹"))),
-        s,
-        block(s));
+    RebuildProtocol.Plan p =
+        RebuildProtocol.parse(
+            reply(block(s), new JSONArray().put(event(0, 1, "200枚导弹"))), s, block(s));
+    assertEquals("200枚导弹", p.events.get(0).text);
+    assertTrue(
+        "the mismatch is recorded as an observation",
+        p.issues.stream().anyMatch(x -> x.code.equals("numeric_observation")));
+    assertEquals(
+        RebuildNumbers.Result.CONTRADICTED,
+        RebuildNumbers.compare(
+            s.text(0, 1), "200枚导弹", CaptionLanguageContext.explicit("en", "zh-Hans")));
   }
 
   @Test

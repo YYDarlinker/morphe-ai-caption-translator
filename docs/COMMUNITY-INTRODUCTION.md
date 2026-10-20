@@ -10,9 +10,9 @@ Repository URL: https://github.com/YYDarlinker/morphe-ai-caption-translator
 
 Description:
 
-Anchored AI Captions is an independently maintained, GPLv3 patch bundle for YouTube. It translates existing video subtitles using an OpenAI-compatible API configured by the user. It provides caption styling, configurable languages in the native Auto-translate menu, profiles, caching and diagnostics, plus an optional session-only caption-selection memory patch. It is designed to be selected alongside compatible official Morphe patches, not to replace them.
+Anchored AI Captions is an independently maintained, GPLv3 patch bundle for YouTube. It translates existing video subtitles using an OpenAI-compatible API configured by the user. It provides caption styling, configurable languages in the native Auto-translate menu, profiles, caching and diagnostics. Caption language remains owned by YouTube and the official Captions patch; the addon follows that native selection. It is designed to be selected alongside compatible official Morphe patches, not to replace them.
 
-Release 1.4.0 publishes an MPP with two public patches and Manager-readable metadata. Recommended combination: official Morphe Patches 1.45.0, original YouTube 21.16.256, Android 9+. Historical target declarations include YouTube 21.13.164 and 21.07.247 with matching official bundles from 1.42.0. These are not claims of complete device testing for every combination. The repository distributes patch code, not pre-patched YouTube APKs.
+Release 1.4.0 published an MPP with two public patches; the current source has a single public AI root after the language-memory patch was removed. Recommended combination: official Morphe Patches 1.45.0, original YouTube 21.16.256, Android 9+. Historical target declarations include YouTube 21.13.164 and 21.07.247 with matching official bundles from 1.42.0. These are not claims of complete device testing for every combination. The repository distributes patch code, not pre-patched YouTube APKs.
 
 Add-source link: https://morphe.software/add-source?github=YYDarlinker/morphe-ai-caption-translator
 
@@ -20,7 +20,7 @@ Form: https://github.com/nvbangg/awesome-morphe/issues/new?template=bundle-reque
 
 ## Morphe Community Patches Feedback
 
-Please consider adding Anchored AI Captions to your community index. The repository is https://github.com/YYDarlinker/morphe-ai-caption-translator. It provides independently maintained YouTube AI subtitle translation through a user's own OpenAI-compatible API, and optional caption-selection memory. It uses the standard Morphe MPP and patch-source metadata. The recommended combination is official patches 1.45.0 and original YouTube 21.16.256 on Android 9+. We publish the addon source and MPP, not patched YouTube APKs. Please let us know any additional inclusion requirements.
+Please consider adding Anchored AI Captions to your community index. The repository is https://github.com/YYDarlinker/morphe-ai-caption-translator. It provides independently maintained YouTube AI subtitle translation through a user's own OpenAI-compatible API, following the native caption language selection. It uses the standard Morphe MPP and patch-source metadata. The recommended combination is official patches 1.45.0 and original YouTube 21.16.256 on Android 9+. We publish the addon source and MPP, not patched YouTube APKs. Please let us know any additional inclusion requirements.
 
 Contact via the website's public Feedback form: https://morphe-patches.software/
 

@@ -24,18 +24,17 @@ import java.util.WeakHashMap;
 import java.util.function.Predicate;
 
 /**
- * Makes short-tap caption activation use the configured AI target without stealing YouTube's native
- * long-press caption menu.
+ * Follows YouTube's native caption controls without stealing the long-press caption menu.
  *
- * <p>Short tap and long press are intentionally different authorities. A short tap may turn the
- * configured default AI target on/off. A long press belongs entirely to YouTube: source-language
- * captions, Off, and any other native track selection must remain functional. The controller also
- * stays off the Activity's global-layout hot path so player animations remain uncontended.
+ * <p>Short tap and long press are intentionally different authorities. A short tap turns the
+ * native caption selection on/off; the language is whatever YouTube selected. A long press belongs
+ * entirely to YouTube: source-language captions, Off, and any other native track selection must
+ * remain functional. The controller also stays off the Activity's global-layout hot path so player
+ * animations remain uncontended.
  */
 final class CaptionButtonController {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    private static final long SELECTION_WINDOW_MS = 2_500L;
-    private static final long NATIVE_MENU_WINDOW_MS = 12_000L;
+    private static final long NATIVE_MENU_WINDOW_MS = 30_000L;
     private static final long NATIVE_MENU_MONITOR_MS = 160L;
     private static final long EXACT_MENU_MIN_ACTION_MS = 220L;
     private static final long EXACT_MENU_OFF_CONFIRM_MS = 90L;
@@ -53,8 +52,6 @@ final class CaptionButtonController {
     private static volatile WeakReference<View> captionButtonRef = new WeakReference<>(null);
     private static volatile WeakReference<View> exactCaptionButtonRef = new WeakReference<>(null);
     private static volatile int captionButtonViewId = View.NO_ID;
-    private static volatile long selectDefaultUntilMs;
-    private static volatile long suppressDefaultUntilMs;
     private static volatile long ignoreUiStateUntilMs;
     private static volatile long transitionQuietUntilMs;
     private static volatile long nativeMenuUntilMs;
@@ -64,11 +61,11 @@ final class CaptionButtonController {
     private static volatile long scanGeneration;
     private static volatile boolean scanPosted;
     private static volatile boolean maintenancePosted;
-    private static volatile boolean defaultSelectionLogged;
     private static volatile boolean turnCaptionsOffOnTouchUp;
     private static volatile boolean buttonTouchDown;
     private static volatile boolean longPressGesture;
     private static volatile boolean nativeMenuSelectionArmed;
+    private static volatile boolean captionsShownScheduled;
     private static volatile long buttonDownAtMs;
     private static volatile int intentBeforeTouch = CaptionIntentPolicy.UNKNOWN;
     private static volatile int nativeStateAtTouchDown = CaptionIntentPolicy.UNKNOWN;
@@ -140,19 +137,18 @@ final class CaptionButtonController {
         if (!clean.equals(currentVideoId)) {
             synchronized (NATIVE_STATE_LOCK) {
                 currentVideoId = clean;
-                selectDefaultUntilMs = 0L;
-                suppressDefaultUntilMs = 0L;
                 turnCaptionsOffOnTouchUp = false;
                 buttonTouchDown = false;
                 longPressGesture = false;
                 endNativeMenu();
                 lastExactNativeState = CaptionIntentPolicy.UNKNOWN;
-                defaultSelectionLogged = false;
+                if (!CaptionActions.isVisibleActive()) captionIntent = CaptionIntentPolicy.UNKNOWN;
             }
             MAIN.removeCallbacks(LONG_PRESS_ARM);
             MAIN.removeCallbacks(NATIVE_MENU_MONITOR);
         }
         scheduleScan(220L);
+        if (captionIntent == CaptionIntentPolicy.ON) NativeCaptionBridge.onCaptionsShown();
     }
 
     /**
@@ -213,32 +209,39 @@ final class CaptionButtonController {
     static boolean mayActivateAiTarget() {
         long now = SystemClock.uptimeMillis();
         return now > nativeMenuUntilMs
-                && CaptionIntentPolicy.mayActivate(captionIntent, now, selectDefaultUntilMs);
+                && CaptionIntentPolicy.mayActivate(captionIntent, now, 0L);
     }
 
-    static String rewriteDefaultTarget(Context context, String url) {
-        long now = SystemClock.uptimeMillis();
-        if (now <= nativeMenuUntilMs
-                || now <= suppressDefaultUntilMs
-                || now > selectDefaultUntilMs
-                || !DeepSeekCaptionHook.isYouTubeTimedTextUrl(url)) return url;
-        if (TargetLanguage.fromUrl(url) != null) {
-            selectDefaultUntilMs = 0L;
-            defaultSelectionLogged = false;
-            return url;
-        }
-        String code = DeepSeekConfig.defaultTargetLanguage(context);
-        if (code.isEmpty()) return url;
-        captionIntent = CaptionIntentPolicy.ON;
-        if (!defaultSelectionLogged) {
-            defaultSelectionLogged = true;
-            CaptionDiagnostics.mark(
-                    context,
-                    "DEFAULT_TARGET_SELECTED",
-                    "Caption button default target enabled: "
-                            + TargetLanguage.fromCode(code).promptLabel());
-        }
-        return TargetLanguage.withCode(url, code);
+    /** An explicit CC-off is authoritative even before the next accessibility scan. */
+    static boolean captionsKnownOff() {
+        return captionIntent == CaptionIntentPolicy.OFF;
+    }
+
+    /** CC was observed on for this video; a translated request is a real selection, not prefetch. */
+    static boolean captionsKnownOn() {
+        return captionIntent == CaptionIntentPolicy.ON;
+    }
+
+    /**
+     * Runs the memory trigger after the current native callback (for example the track-list
+     * builder) returns, so a re-selection cannot re-enter that callback.
+     */
+    static void scheduleCaptionsShown() {
+        if (captionsShownScheduled) return;
+        captionsShownScheduled = true;
+        MAIN.post(
+                () -> {
+                    captionsShownScheduled = false;
+                    NativeCaptionBridge.onCaptionsShown();
+                });
+    }
+
+    /** A request issued while the user is choosing in the native CC menu is a real selection. */
+    static boolean nativeMenuRecentlyOpened() {
+        // The pre-menu observation arms the window but does not necessarily set the exact-selection
+        // timestamp. Using the window alone keeps the user's first Auto-translate request from
+        // being stripped as an "automatic" request on a cold start.
+        return nativeMenuUntilMs > 0 && SystemClock.uptimeMillis() <= nativeMenuUntilMs;
     }
 
     // ---- The exact controller: YouTube's own report of the CC state ----
@@ -354,9 +357,6 @@ final class CaptionButtonController {
         synchronized (NATIVE_STATE_LOCK) {
             nativeMenuUntilMs = Math.max(nativeMenuUntilMs, now + NATIVE_MENU_WINDOW_MS);
             nativeMenuSelectionArmed = nativeMenuSelectionArmed || armSelectionImmediately;
-            selectDefaultUntilMs = 0L;
-            suppressDefaultUntilMs = Math.max(suppressDefaultUntilMs, nativeMenuUntilMs);
-            defaultSelectionLogged = false;
             ignoreUiStateUntilMs = Math.max(ignoreUiStateUntilMs, now + 300L);
             if (armSelectionImmediately) {
                 nativeMenuOpenedAtMs = now;
@@ -575,22 +575,12 @@ final class CaptionButtonController {
             turnCaptionsOffOnTouchUp = false;
             captionIntent = CaptionIntentPolicy.OFF;
             CaptionChoice.toggle(false);
-            selectDefaultUntilMs = 0L;
-            suppressDefaultUntilMs = now + SELECTION_WINDOW_MS;
-            defaultSelectionLogged = false;
             CaptionActions.deactivateFromCaptionButton();
             return;
         }
         captionIntent = CaptionIntentPolicy.ON;
         CaptionChoice.toggle(true);
-        Activity activity = activityRef.get();
-        if (activity != null
-                && DeepSeekConfig.load(activity).enabled
-                && !DeepSeekConfig.defaultTargetLanguage(activity).isEmpty()) {
-            selectDefaultUntilMs = now + SELECTION_WINDOW_MS;
-            suppressDefaultUntilMs = 0L;
-            defaultSelectionLogged = false;
-        }
+        NativeCaptionBridge.onCaptionsShown();
     }
 
     private static void onButtonCancel() {
@@ -606,7 +596,6 @@ final class CaptionButtonController {
         }
         MAIN.removeCallbacks(NATIVE_MENU_MONITOR);
         endNativeMenu();
-        if (!CaptionActions.isVisibleActive()) selectDefaultUntilMs = 0L;
     }
 
     // ---- State ----
@@ -646,23 +635,22 @@ final class CaptionButtonController {
                             + " reenable the native track");
             return;
         }
+        boolean becameOn;
         synchronized (NATIVE_STATE_LOCK) {
+            becameOn = captionIntent != CaptionIntentPolicy.ON;
             captionIntent = state;
         }
+        if (!becameOn) return;
+        NativeCaptionBridge.onCaptionsShown();
     }
 
     private static void commitNativeCaptionOff(boolean fromNativeMenu, String detail) {
         synchronized (NATIVE_STATE_LOCK) {
             captionIntent = CaptionIntentPolicy.OFF;
             endNativeMenu();
-            selectDefaultUntilMs = 0L;
-            suppressDefaultUntilMs =
-                    Math.max(
-                            suppressDefaultUntilMs,
-                            SystemClock.uptimeMillis() + SELECTION_WINDOW_MS);
-            defaultSelectionLogged = false;
         }
         MAIN.removeCallbacks(NATIVE_MENU_MONITOR);
+        CaptionChoice.toggle(false);
         CaptionActions.deactivateFromNativeCaptionState();
         Activity activity = activityRef.get();
         if (fromNativeMenu && activity != null)

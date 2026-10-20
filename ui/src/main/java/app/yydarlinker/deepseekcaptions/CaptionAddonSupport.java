@@ -32,8 +32,4 @@ public final class CaptionAddonSupport {
     public static boolean simplifiedInstalled() {
         return false;
     }
-
-    public static boolean memoryInstalled() {
-        return false;
-    }
 }

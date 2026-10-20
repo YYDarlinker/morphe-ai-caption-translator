@@ -1,3 +1,11 @@
+## 1.5.5-local (2026-10-20)
+
+- Local baseline for the upstream PR work. No 1.5.5 release asset is published; this is a local commit/tag only.
+- Remove the separate caption-language memory patch. YouTube's native Captions selection and the official Preferred caption language setting are the only language authority.
+- Keep one public patch: AI caption translator.
+- Carry the N40-N48 fixes: quote identity across CJK whitespace, block salvage and partial publication, numeric equivalence, authored-cue pages, all-language pagination, and failure without showing source text.
+- Add the N49 upstream-readiness assessment and the N50 implementation path under `docs/`.
+
 ## [1.5.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.3...v1.5.4) (2026-10-14)
 
 - The add-on icon is shown again on the player menu row for the regular player and Shorts; the 1.5.3 resource rewrite had dropped it.

@@ -24,13 +24,16 @@ final class CaptionRenderSpec {
     final CaptionLanguageProfile profile;
     final Locale locale;
     final CaptionLanguageProfile.Direction direction;
-    final boolean compactScript, legacy;
+    final boolean compactScript;
+
+    /** True when the captions come from a manually authored track: pages follow the author. */
+    final boolean authored;
     final int maxLines = 2;
     private final TextPaint measurementPaint;
     private final TextDirectionHeuristic measurementDirection;
 
     CaptionRenderSpec(String target, CaptionLanguageProfile profile, boolean chinese) {
-        this(target, profile, chinese, null, null);
+        this(target, profile, chinese, null, null, false);
     }
 
     private CaptionRenderSpec(
@@ -38,14 +41,18 @@ final class CaptionRenderSpec {
             CaptionLanguageProfile profile,
             boolean chinese,
             TextPaint paint,
-            TextDirectionHeuristic heuristic) {
+            TextDirectionHeuristic heuristic,
+            boolean authored) {
+        this.authored = authored;
         measurementPaint = paint;
         measurementDirection = heuristic;
         targetCode = target;
         this.profile = profile;
-        compactScript = chinese;
-        legacy = chinese;
+        // Script, not language id, decides whether adjacent translated events need a space. Han,
+        // Kana, Thai, Lao, Khmer and Myanmar are written without inter-word spaces; Korean is
+        // written with spaces between eojeol and must keep them.
         locale = Locale.forLanguageTag(target.equals("UNKNOWN") ? "und" : target);
+        compactScript = CaptionScript.compact(locale);
         direction = profile.direction;
         presentationPolicy = POLICY_VERSION;
     }
@@ -80,7 +87,15 @@ final class CaptionRenderSpec {
                                 ? TextDirectionHeuristics.FIRSTSTRONG_RTL
                                 : TextDirectionHeuristics.FIRSTSTRONG_LTR;
         }
-        return new CaptionRenderSpec(targetCode, profile, compactScript, paint, actual);
+        return new CaptionRenderSpec(targetCode, profile, compactScript, paint, actual, authored);
+    }
+
+    /** The same measurement contract, but pages follow a manually authored track. */
+    CaptionRenderSpec withAuthored() {
+        return authored
+                ? this
+                : new CaptionRenderSpec(
+                        targetCode, profile, compactScript, measurementPaint, measurementDirection, true);
     }
 
     boolean sameMeasurement(CaptionRenderSpec other) {

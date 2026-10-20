@@ -23,7 +23,7 @@ def constants(path):
         i+=1
     return out
 # Literals of upstream code that is unused (an uncalled helper, an empty-string default) and was deleted.
-REMOVED_DEAD_LITERALS={'"HTTP_CONFIG"','""','"layout_overflow"','","',r'"(?<![\\p{L}\\p{N}])[+-]?\\d+(?:,\\d{3})*(?:\\.\\d+)?"'}
+REMOVED_DEAD_LITERALS={'"HTTP_CONFIG"','""','"layout_overflow"','"paragraph"','","','" "',r'"\\s+"',r'"(?<![\\p{L}\\p{N}])[+-]?\\d+(?:,\\d{3})*(?:\\.\\d+)?"','"numeric_substitution"'}
 def literals(path):
     pattern=r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"'
     # Adjacent literals joined by + are one value, so re-wrapping a long prompt is not a change.

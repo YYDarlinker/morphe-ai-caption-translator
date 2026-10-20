@@ -5,6 +5,7 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -12,6 +13,13 @@ import java.util.List;
 final class RebuildProtocol {
     // Pinned upstream protocol identity, independent of the embedding UI or package version.
     static final String VERSION = "1.4.0";
+
+    /**
+     * Source characters a reply may leave untranslated between two events (or at the end). A model
+     * sometimes drops a single particle or conjunction while splitting; refusing the whole block
+     * for that loses every other translation it did produce. Anything larger still fails closed.
+     */
+    static final int MAX_HOLE_CHARS = 4;
     static final String PROMPT =
             "You create faithful live subtitles. Read the complete source and read-only context"
                 + " before translating. Preserve all spoken meaning, negation and its scope,"
@@ -116,6 +124,10 @@ final class RebuildProtocol {
         final int
                 reboundEvents; // Exactly matched source quotes whose claimed IDs were repaired
                                // locally.
+        /** True when the plan was salvaged from a reply that failed the strict full-block parse. */
+        final boolean partial;
+        /** Untranslated source token ranges (inclusive, ascending) of a salvaged plan. */
+        final List<int[]> holes;
 
         Plan(List<Event> e, String j) {
             this(e, j, Collections.emptyList());
@@ -126,15 +138,36 @@ final class RebuildProtocol {
         }
 
         Plan(List<Event> e, String j, List<RebuildReview.Issue> review, int rebounds) {
+            this(e, j, review, rebounds, false, Collections.emptyList());
+        }
+
+        Plan(
+                List<Event> e,
+                String j,
+                List<RebuildReview.Issue> review,
+                int rebounds,
+                boolean salvaged,
+                List<int[]> untranslated) {
             events = Collections.unmodifiableList(e);
             json = j;
             issues = review;
             reboundEvents = rebounds;
+            partial = salvaged;
+            List<int[]> copy = new ArrayList<>(untranslated.size());
+            for (int[] range : untranslated) copy.add(new int[] {range[0], range[1]});
+            holes = Collections.unmodifiableList(copy);
         }
 
         Event at(long time) {
             for (Event e : events) if (time >= e.start && time < e.end) return e;
             return null;
+        }
+
+        /** Tokens covered by accepted events, for diagnostics. */
+        int coveredTokens() {
+            int n = 0;
+            for (Event e : events) n += e.to - e.from + 1;
+            return n;
         }
     }
 
@@ -212,6 +245,7 @@ final class RebuildProtocol {
             p.put("source_code", context.sourceCode)
                     .put("policy_version", CaptionLanguageContext.POLICY_VERSION)
                     .put("presentation_policy", "legacy_n26");
+        if (b.authored) RebuildCueContract.addPayload(p, s, b);
         if (repair != null && !repair.isEmpty())
             p.put(
                     "repair",
@@ -256,7 +290,7 @@ final class RebuildProtocol {
                         content,
                         s,
                         b,
-                        !prefix && context.canApplyEnglishToChinese,
+                        !prefix,
                         0,
                         context,
                         prefix);
@@ -272,6 +306,29 @@ final class RebuildProtocol {
 
     static Plan parse(String content, RebuildSource s, RebuildPlanner.Block b) throws Exception {
         return parseInternal(content, s, b, true, 0, CaptionLanguageContext.LEGACY);
+    }
+
+    /**
+     * The production entry point: a complete plan when the reply is complete, otherwise the
+     * largest set of individually valid events from the same reply. Only a reply that yields no
+     * usable event is allowed to fail. Quality observations (numbers, semantic anchors, sentence
+     * ends, density) never reject a usable event; an event whose text is unusable (wrong script,
+     * echo, empty for speech, protocol leak, bad timing) is dropped and becomes an explicit hole,
+     * so the rest of the block still reaches the screen.
+     *
+     * <p>Authored tracks are not salvaged here: their display contract is one page per cue group,
+     * and a partial group set must go through the cue contract instead. They keep the strict path.
+     */
+    static Plan parseBestEffort(
+            String content, RebuildSource s, RebuildPlanner.Block b, CaptionLanguageContext context)
+            throws Exception {
+        try {
+            return parseBound(content, s, b, context);
+        } catch (Invalid strict) {
+            Plan salvaged = RebuildSalvage.parse(content, s, b, context);
+            if (salvaged == null) throw strict;
+            return salvaged;
+        }
     }
 
     private static Plan parseInternal(
@@ -318,9 +375,17 @@ final class RebuildProtocol {
             JSONObject e = rows.optJSONObject(i);
             if (e == null) throw new Invalid("event_shape");
             int from = integer(e.opt("from")), to = integer(e.opt("to"));
-            if (from != next || to < from || to > b.to) {
+            // A reply may leave a character or two it could not place (a lone conjunction or
+            // particle). Such a hole is tolerated, but never shown: every displayed line is still
+            // translated text, and the missing source words simply produce no caption. The first
+            // event must still start at the block start: a reply that begins late dropped content.
+            if (from < next
+                    || to < from
+                    || to > b.to
+                    || i == 0 && from != b.from
+                    || !withinHole(s, next, from)) {
                 if (mayRebind) {
-                    int changed = exactQuoteRebind(root, s, b);
+                    int changed = alignBySource(root, s, b);
                     if (changed > 0)
                         return parseInternal(root.toString(), s, b, false, changed, context);
                 }
@@ -337,12 +402,7 @@ final class RebuildProtocol {
             String source = s.text(from, to);
             if (e.has("source")
                     && (!(e.opt("source") instanceof String)
-                            || !source.replaceAll("\\s+", " ")
-                                    .trim()
-                                    .equals(
-                                            e.getString("source")
-                                                    .replaceAll("\\s+", " ")
-                                                    .trim()))) {
+                            || !sameSource(source, e.getString("source")))) {
                 Invalid mismatch =
                         new Invalid(
                                 "source_quote_mismatch",
@@ -350,7 +410,7 @@ final class RebuildProtocol {
                 // Only exact all-source recovery is allowed. No deletion, fuzzy matching, or free
                 // retries.
                 if (mayRebind) {
-                    int changed = exactQuoteRebind(root, s, b);
+                    int changed = alignBySource(root, s, b);
                     if (changed > 0)
                         return parseInternal(root.toString(), s, b, false, changed, context);
                 }
@@ -358,8 +418,9 @@ final class RebuildProtocol {
             }
             if (text.isEmpty() && !RebuildSource.nonSpeech(source))
                 throw new Invalid("empty_translation");
-            if (context.canApplyEnglishToChinese && text.length() > 600)
-                throw new Invalid("paragraph");
+            RebuildSemantics.validateTarget(source, text, context);
+            // A long event is a presentation concern, not a reason to discard a translation;
+            // page planning can split it without changing its source ownership.
             if (text.contains("\"events\"") || text.startsWith("```"))
                 throw new Invalid("protocol_leak");
             for (int k = from + 1; k <= to; k++)
@@ -371,9 +432,8 @@ final class RebuildProtocol {
             long a = s.words.get(from).start, z = s.words.get(to).end;
             // This is only a paragraph guard. Actual display fit is checked with Android
             // measurement.
-            if (context.canApplyEnglishToChinese
-                    && ((visible > (cj ? 60 : 155) && (z - a > 8500 || sentences(text) > 1))
-                            || visible > (cj ? 100 : 260)))
+            if ((visible > (cj ? 60 : 155) && (z - a > 8500 || sentences(text) > 1))
+                    || visible > (cj ? 100 : 260))
                 presentation.add(
                         new RebuildReview.Issue(
                                 from,
@@ -384,7 +444,17 @@ final class RebuildProtocol {
                                 true));
             RebuildNumbers.Result numeric = RebuildNumbers.compare(source, text, context);
             if (numeric == RebuildNumbers.Result.CONTRADICTED)
-                throw new Invalid("numeric_substitution");
+                // A numeric mismatch is a quality observation, not an unusable translation:
+                // withholding the block leaves the viewer with nothing. It is recorded, and the
+                // text is published.
+                presentation.add(
+                        new RebuildReview.Issue(
+                                from,
+                                to,
+                                RebuildSalvage.NUMERIC_OBSERVATION,
+                                RebuildNumbers.detail(from, to, source, text)
+                                        + RebuildSalvage.NUMERIC_ADVISORY,
+                                false));
             if (!context.canApplyEnglishToChinese
                     && numeric == RebuildNumbers.Result.UNKNOWN
                     && (RebuildNumbers.hasDigits(source) || RebuildNumbers.hasDigits(text)))
@@ -396,7 +466,7 @@ final class RebuildProtocol {
                                 "Numeric equivalence is unverified for this notation/language;"
                                     + " advisory only.",
                                 false));
-            if (!context.canApplyEnglishToChinese && visible > context.profile.referenceCpl * 2)
+            if (visible > context.profile.referenceCpl * 2)
                 presentation.add(
                         new RebuildReview.Issue(
                                 from,
@@ -406,7 +476,7 @@ final class RebuildProtocol {
                                     + " presentation_policy=legacy_n26.",
                                 false));
             RebuildSemantics.validate(s, from, to, text, context);
-            if (context.canApplyEnglishToChinese && to - from >= 8 && visible <= 1)
+            if (to - from >= 8 && visible <= 1)
                 throw new Invalid("information_collapse");
             if (to < b.to && RebuildPlanner.strongDependentEnding(s, to, context))
                 throw new Invalid("dependent_source_end");
@@ -415,15 +485,17 @@ final class RebuildProtocol {
             out.add(new Event(from, to, a, z, text));
             next = to + 1;
         }
-        if (!prefix && next != b.to + 1) throw new Invalid("missing_source");
+        if (!prefix && next != b.to + 1 && !withinHole(s, next, b.to + 1))
+            throw new Invalid("missing_source");
         RebuildSemantics.validatePlan(s, b, out, context);
+        if (!prefix) RebuildCueContract.validate(s, b, out);
         presentation.addAll(RebuildReview.inspect(s, b, out, context));
         return new Plan(
                 out, root.toString(), Collections.unmodifiableList(presentation), reboundEvents);
     }
 
     /** Accept only a known provider wrapper after a complete JSON object. */
-    private static String stripProviderEnvelope(String raw) throws Invalid {
+    static String stripProviderEnvelope(String raw) throws Invalid {
         int start = 0;
         while (start < raw.length() && Character.isWhitespace(raw.charAt(start))) start++;
         if (start >= raw.length() || raw.charAt(start) != '{') throw new Invalid("json");
@@ -460,15 +532,31 @@ final class RebuildProtocol {
     }
 
     /**
-     * Recover only a complete, byte-for-byte (apart from spaces) partition of the original words.
-     * Missing or changed source words, nonnumeric/out-of-block IDs, or changed numbers fail closed.
+     * Realign every event from its own source quote. Only a verbatim (whitespace-insensitive)
+     * substring of the block, starting at a token boundary, may define a range; consecutive quotes
+     * must cover the block in order and may leave at most {@link #MAX_HOLE_CHARS} characters
+     * untranslated between or after them. Missing text, reordered quotes, mid-token starts or a
+     * longer hole fail closed.
      */
-    private static int exactQuoteRebind(JSONObject root, RebuildSource s, RebuildPlanner.Block b)
+    private static int alignBySource(JSONObject root, RebuildSource s, RebuildPlanner.Block b)
             throws Exception {
         JSONArray events = root.optJSONArray("events");
         if (events == null || events.length() == 0 || events.length() > b.to - b.from + 1) return 0;
-        int cursor = b.from, changed = 0;
+        String block = compact(s.text(b.from, b.to));
+        int tokens = b.to - b.from + 1;
+        int[] starts = new int[tokens + 1];
+        int at = 0;
+        for (int i = 0; i < tokens; i++) {
+            starts[i] = at;
+            String word = compact(s.words.get(b.from + i).text);
+            // A token without visible characters has no usable boundary: never realign onto it.
+            if (word.isEmpty()) return 0;
+            at += word.length();
+        }
+        starts[tokens] = at;
+        if (at != block.length()) return 0;
         int[][] resolved = new int[events.length()][2];
+        int cursor = 0, moved = 0;
         for (int i = 0; i < events.length(); i++) {
             JSONObject event = events.optJSONObject(i);
             if (event == null || !(event.opt("source") instanceof String)) return 0;
@@ -479,30 +567,91 @@ final class RebuildProtocol {
             } catch (Invalid malformed) {
                 return 0;
             }
-            // The old IDs are untrusted hints; validate their type and bound, then derive actual
-            // IDs only from all quotes.
+            // A claimed ID outside the block is a malformed reply, not a repairable shift.
             if (oldFrom < b.from || oldFrom > b.to || oldTo < b.from || oldTo > b.to) return 0;
-            String quote = event.getString("source").replaceAll("\\s+", " ").trim();
+            String quote = compact(event.getString("source"));
             if (quote.isEmpty()) return 0;
-            String[] quoted = quote.split(" ");
-            if (cursor + quoted.length - 1 > b.to) return 0;
-            for (int j = 0; j < quoted.length; j++)
-                if (!quoted[j].equals(s.words.get(cursor + j).text)) return 0;
-            resolved[i][0] = cursor;
-            resolved[i][1] = cursor + quoted.length - 1;
-            if (oldFrom != cursor || oldTo != resolved[i][1]) changed++;
-            cursor += quoted.length;
+            int start = block.indexOf(quote, cursor);
+            if (start < 0 || start - cursor > MAX_HOLE_CHARS) return 0;
+            // The first quote must own the start of the block; a late start dropped its opening.
+            if (i == 0 && start != 0) return 0;
+            int end = start + quote.length();
+            int first = Arrays.binarySearch(starts, start), last = Arrays.binarySearch(starts, end);
+            if (first < 0 || last < 0 || last <= first) return 0;
+            resolved[i][0] = b.from + first;
+            resolved[i][1] = b.from + last - 1;
+            if (oldFrom != resolved[i][0] || oldTo != resolved[i][1]) moved++;
+            if (start > cursor) moved++;
+            cursor = end;
         }
-        if (cursor != b.to + 1 || changed == 0) return 0;
+        if (block.length() - cursor > MAX_HOLE_CHARS) return 0;
+        if (cursor < block.length()) moved++;
+        if (moved == 0) return 0;
         for (int i = 0; i < events.length(); i++) {
             JSONObject event = events.getJSONObject(i);
             event.put("from", resolved[i][0]);
             event.put("to", resolved[i][1]);
         }
-        return changed;
+        return moved;
     }
 
-    private static int integer(Object o) throws Invalid {
+    /** Are the tokens from {@code next} up to (not including) {@code from} a negligible hole? */
+    static boolean withinHole(RebuildSource s, int next, int from) {
+        if (next == from) return true;
+        if (next > from || from > s.words.size() || next < 0) return false;
+        return compact(s.text(next, from - 1)).length() <= MAX_HOLE_CHARS;
+    }
+
+    /** The same visible characters in the same order; our own token joins may add spacing only. */
+    static boolean sameSource(String expected, String quoted) {
+        String left = compact(expected), right = compact(quoted);
+        return left.equals(right) || identity(left).equals(identity(right));
+    }
+
+    /**
+     * Source identity without punctuation. A model may copy a cue with 「」/“”, ，/, or an added
+     * full stop without changing the words it owns. The token range still owns the exact source;
+     * punctuation-only differences must not discard an otherwise complete block. Letters, digits,
+     * marks and CJK characters still have to match exactly.
+     */
+    private static String identity(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int at = 0; at < value.length(); ) {
+            int cp = value.codePointAt(at);
+            at += Character.charCount(cp);
+            if (Character.isWhitespace(cp) || punctuation(cp)) continue;
+            out.appendCodePoint(cp);
+        }
+        return out.toString();
+    }
+
+    private static boolean punctuation(int cp) {
+        switch (Character.getType(cp)) {
+            case Character.CONNECTOR_PUNCTUATION:
+            case Character.DASH_PUNCTUATION:
+            case Character.START_PUNCTUATION:
+            case Character.END_PUNCTUATION:
+            case Character.INITIAL_QUOTE_PUNCTUATION:
+            case Character.FINAL_QUOTE_PUNCTUATION:
+            case Character.OTHER_PUNCTUATION:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** The source comparison unit: every visible character in order, whitespace ignored. */
+    static String compact(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int at = 0; at < value.length(); ) {
+            int cp = value.codePointAt(at);
+            if (!Character.isWhitespace(cp)) out.appendCodePoint(cp);
+            at += Character.charCount(cp);
+        }
+        return out.toString();
+    }
+
+    static int integer(Object o) throws Invalid {
         if (!(o instanceof Number)) throw new Invalid("index_type");
         double d = ((Number) o).doubleValue();
         if (!Double.isFinite(d) || d != Math.rint(d) || d < 0 || d > Integer.MAX_VALUE)

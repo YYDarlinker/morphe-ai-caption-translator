@@ -8,7 +8,6 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.util.proxy.mutableTypes.MutableClass
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
-import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
@@ -46,8 +45,8 @@ private const val TRANSLATION_ENTRY_SCHEMA = "\u0001\u0004\u0000\u0001\u0001\u00
  * Every class, field and method is found by its structure, never by its obfuscated name. When a structure is not
  * found exactly once the patching fails, instead of installing a hook that could crash YouTube.
  */
-internal fun BytecodePatchContext.installNativeCaptionBridge(translation: Boolean, rememberSelection: Boolean) {
-    NativeCaptionBridgeInstaller(this, translation, rememberSelection).install()
+internal fun BytecodePatchContext.installNativeCaptionBridge(translation: Boolean) {
+    NativeCaptionBridgeInstaller(this, translation).install()
 }
 
 /** The obfuscated class of a caption track with the fields and the builder that the bridge needs. */
@@ -71,7 +70,6 @@ private class TrackModel(
 private class NativeCaptionBridgeInstaller(
     private val context: BytecodePatchContext,
     private val translation: Boolean,
-    private val rememberSelection: Boolean,
 ) {
     private val bridge = context.mutableClassDefBy(BRIDGE)
 
@@ -86,16 +84,15 @@ private class NativeCaptionBridgeInstaller(
         bindTrackAccessors(model)
         if (translation) {
             bindCloneTranslation(model)
+            bindRelabelTranslation(model)
             hookTranslatedTrackList(model)
-            bindSelectNative(model, selector)
         }
         hookTrackApplied(model, selector)
 
         val owner = context.classDefBy(selector.definingClass)
-        val (defaultTrack, modelField) = findDefaultTrack(owner, model)
+        val (_, modelField) = findDefaultTrack(owner, model)
         bindModelAccessors(model, owner, modelField)
         hookOriginalTrackList(model)
-        if (rememberSelection) hookRememberedDefault(model, owner, defaultTrack, modelField)
         if (translation) {
             hookLanguageMetadata(model)
             quickToggle!!()
@@ -302,7 +299,7 @@ private class NativeCaptionBridgeInstaller(
                 check-cast p0, ${model.track.type}
                 new-instance v0, ${model.builder.type}
                 invoke-direct {v0, p0}, ${model.copyConstructor.id()}
-                const-string v1, "zh-Hans"
+                move-object v1, p1
                 invoke-virtual {v0, v1}, ${model.languageSetter.id()}
                 invoke-static {p1}, $BRIDGE->translationLabel($STRING)$STRING
                 move-result-object v1
@@ -322,18 +319,25 @@ private class NativeCaptionBridgeInstaller(
         )
     }
 
-    /** Lets the extension select a track through the manager's selector. */
-    private fun bindSelectNative(model: TrackModel, selector: Method) {
-        val invoke = if (selector.parameterTypes.size == 3) "invoke-virtual/range {p0 .. p3}" else "invoke-virtual {p0, p1, p2}"
+    /**
+     * A copy of an existing translation with the same language, URL and vss, and only the display
+     * label replaced. A selected native Chinese entry keeps its native object otherwise, but the
+     * menu must show the product label rather than YouTube's "中文（繁体中文）".
+     */
+    private fun bindRelabelTranslation(model: TrackModel) {
         bridge.bindStub(
-            "selectNative",
-            0,
+            "relabelTranslation",
+            3,
             """
-                check-cast p0, ${selector.definingClass}
-                check-cast p1, ${model.track.type}
-                check-cast p2, ${selector.parameterTypes[1]}
-                $invoke, ${selector.id()}
-                return-void
+                check-cast p0, ${model.track.type}
+                new-instance v0, ${model.builder.type}
+                invoke-direct {v0, p0}, ${model.copyConstructor.id()}
+                invoke-static {p1}, $BRIDGE->translationLabel($STRING)$STRING
+                move-result-object v1
+                iput-object v1, v0, ${model.builderDisplay.id()}
+                invoke-virtual {v0}, ${model.build.id()}
+                move-result-object v0
+                return-object v0
             """,
         )
     }
@@ -515,85 +519,6 @@ private class NativeCaptionBridgeInstaller(
             addInstructions(
                 rendererIndex + 1,
                 "invoke-virtual {v${registers.registerC}, v${registers.registerD}, v${registers.registerE}}, ${renderer.call()!!.id()}",
-            )
-        }
-    }
-
-    /**
-     * Lets the remembered selection choose the track of a new video: the manager's default track choice asks the
-     * extension first, and the model-ready branch follows the remembered on/off state instead of the native setting.
-     */
-    private fun hookRememberedDefault(model: TrackModel, owner: ClassDef, defaultTrack: Method, modelField: FieldReference) {
-        mutable(defaultTrack).apply {
-            if (implementation!!.registerCount < 2) throw PatchException("AI captions: no scratch register for the remembered track")
-            addInstructionsWithLabels(
-                0,
-                """
-                    invoke-static {p0}, $BRIDGE->resolveRemembered($OBJECT)$OBJECT
-                    move-result-object v0
-                    if-nez v0, :remembered_track
-                    invoke-static {}, $BRIDGE->restoreDecision()I
-                    move-result v0
-                    if-nez v0, :original_default
-                    const/4 v0, 0x0
-                    return-object v0
-                    :remembered_track
-                    check-cast v0, ${model.track.type}
-                    return-object v0
-                """.trimIndent(),
-                ExternalLabel("original_default", implementation!!.instructions.first()),
-            )
-        }
-
-        val initializer = owner.methods.filter { method ->
-            method.returnType == "V" && method.parameterTypes.size == 2 &&
-                method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == modelField.id() } &&
-                method.code().any { it.call()?.id() == defaultTrack.id() }
-        }.unique("caption model ready initializer")
-
-        // Replace the shared model-ready branch entry, not one of several native settings flags.
-        val code = initializer.code()
-        val defaultCall = code.indexOfFirst { it.call()?.id() == defaultTrack.id() }
-        // The model is checked for null and then the "native settings" flag is read: with a jump in between
-        // up to 21.40 (if-nez, goto), directly after the branch since 21.41 (if-eqz).
-        fun flagRead(index: Int): Int? {
-            if (code[index].opcode != Opcode.IGET_OBJECT || code[index].field()?.id() != modelField.id()) return null
-            val flag = when (code.getOrNull(index + 1)?.opcode) {
-                Opcode.IF_NEZ -> index + 3
-                Opcode.IF_EQZ -> index + 2
-                else -> return null
-            }
-            return flag.takeIf { code.getOrNull(it)?.opcode == Opcode.IGET_BOOLEAN }
-        }
-        val entry = (0 until defaultCall).mapNotNull(::flagRead).unique("model ready decision")
-        val nativeRead = code[entry] as TwoRegisterInstruction
-        val scratch = (code.first() as OneRegisterInstruction).registerA
-        val eventType = (code[defaultCall - 1] as ReferenceInstruction).reference.toString()
-        val disabledIndex = (defaultCall + 1 until code.size).firstOrNull { index ->
-            code[index].opcode == Opcode.NEW_INSTANCE && (code[index] as? ReferenceInstruction)?.reference.toString() == eventType
-        } ?: throw PatchException("AI captions: disabled event missing")
-
-        mutable(initializer).apply {
-            val on = implementation!!.instructions[defaultCall - 1]
-            val off = implementation!!.instructions[disabledIndex]
-            replaceInstruction(entry, "invoke-static {}, $BRIDGE->restoreDecision()I")
-            addInstructionsWithLabels(
-                entry + 1,
-                """
-                    move-result v$scratch
-                    if-ltz v$scratch, :native_settings
-                    if-eqz v$scratch, :remembered_off
-                    const/4 v$scratch, 0x0
-                    goto :remembered_on
-                    :remembered_off
-                    const/4 v$scratch, 0x0
-                    goto :off_event
-                    :native_settings
-                    const/4 v$scratch, 0x0
-                    iget-boolean v${nativeRead.registerA}, v${nativeRead.registerB}, ${code[entry].field()!!.id()}
-                """.trimIndent(),
-                ExternalLabel("remembered_on", on),
-                ExternalLabel("off_event", off),
             )
         }
     }
@@ -781,6 +706,5 @@ private class NativeCaptionBridgeInstaller(
     private fun publishFeatures() {
         val support = context.mutableClassDefBy(SUPPORT)
         support.bindStub("aiInstalled", 1, "const/4 v0, ${if (translation) "0x1" else "0x0"}\nreturn v0")
-        support.bindStub("memoryInstalled", 1, "const/4 v0, ${if (rememberSelection) "0x1" else "0x0"}\nreturn v0")
     }
 }

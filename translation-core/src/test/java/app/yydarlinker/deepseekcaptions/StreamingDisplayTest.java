@@ -137,8 +137,9 @@ public class StreamingDisplayTest {
     refuseStream=true;
     RebuildController.activate(context,url,false,true);
     await(()->!shown.isEmpty(),10);
-    // The complete plain reply joins the short lead with its continuation on one page.
-    assertEquals(TEXTS[0]+TEXTS[1],shown.get(0));
+    // The complete plain reply is one readable page: all three short clause events fit two lines
+    // and the recommended page wall time, so nothing is split from its continuation.
+    assertEquals(TEXTS[0]+TEXTS[1]+TEXTS[2],shown.get(0));
     // Only requests already in flight when the refusal arrived were sent in the streamed form.
     assertTrue("streamed attempts "+streamedRequests.get(),streamedRequests.get()<=2);
     assertTrue(plainRequests.get()>=1);

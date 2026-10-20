@@ -60,10 +60,11 @@ final class CaptionLanguageContext {
             // menu target. Legacy request/cache still use Session.target, including its old
             // aliases.
             List<String> targets = uri.getQueryParameters("tlang");
-            if (targets.size() == 1
+            TargetLanguage requested =
+                    targets.size() == 1 ? TargetLanguage.fromCode(targets.get(0)) : null;
+            if (requested != null
                     && !CaptionLanguageProfile.normalizeCode(targets.get(0)).equals("UNKNOWN")
-                    && TargetLanguage.fromCode(targets.get(0)).code.equals(confirmedSessionTarget))
-                target = targets.get(0);
+                    && requested.code.equals(confirmedSessionTarget)) target = targets.get(0);
         } catch (Exception ignored) {
             /* Missing/invalid URL is unknown; never infer from tlang. */
         }

@@ -124,11 +124,13 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
     @Test public void aNativeMenuOffIsNotUndoneEither() throws Exception {
         CaptionActions.activate(a,url);await(this::translated);
         CaptionActions.deactivateFromNativeCaptionState();
+        assertFalse("native Off closes the caption choice",CaptionChoice.isOn());
         CaptionActions.onVideoId("");CaptionActions.onVideoId("abcdefghijk");
         CaptionActions.onVideoTime(2000);Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));CaptionActions.onVideoTime(100);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));Thread.sleep(200);
         assertFalse(CaptionActions.isVisibleActive());
     }
+
     @Test public void configurationChangeUsesTheNewModelAndRetiresTheOutstandingRequest() throws Exception {
         delayFirst=true;CaptionActions.activate(a,url);assertTrue(received.await(3,TimeUnit.SECONDS));
         DeepSeekConfig.saveModel(a,"fixture-model-new");CaptionActions.refreshConfiguration(a);release.countDown();

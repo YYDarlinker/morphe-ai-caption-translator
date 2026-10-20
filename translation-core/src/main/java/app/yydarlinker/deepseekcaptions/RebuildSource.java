@@ -216,16 +216,34 @@ final class RebuildSource {
         StringBuilder b = new StringBuilder();
         for (int i = from; i <= to; i++) {
             String s = w.get(i).text;
-            if (b.length() > 0 && !s.isEmpty()) {
-                int l = b.codePointBefore(b.length()), q = s.codePointAt(0);
-                if (!cjk(l)
-                        && !cjk(q)
-                        && Character.isLetterOrDigit(q)
-                        && !"([{（【《“‘".contains(new String(Character.toChars(l)))) b.append(' ');
-            }
+            if (b.length() > 0 && !s.isEmpty() && needsSpace(b, s)) b.append(' ');
             b.append(s);
         }
         return b.toString();
+    }
+
+    /**
+     * A space belongs between two spaced-script words, never after CJK punctuation: 「, 、 and 。
+     * are set tight against a following Latin word. The injected space used to make every quote
+     * the model was asked to copy differ from the text it actually read.
+     */
+    private static boolean needsSpace(StringBuilder prior, String next) {
+        int left = prior.codePointBefore(prior.length()), right = next.codePointAt(0);
+        if (cjk(left) || cjk(right) || compactPunctuation(left)) return false;
+        if (!Character.isLetterOrDigit(right)) return false;
+        return "([{（【《“‘".indexOf(new String(Character.toChars(left))) < 0;
+    }
+
+    /** Punctuation that CJK typography sets tight against what follows it. */
+    private static boolean compactPunctuation(int cp) {
+        return cp >= 0x3000 && cp <= 0x303F
+                || cp >= 0xFF00 && cp <= 0xFFEF
+                || cp == 0x2018
+                || cp == 0x2019
+                || cp == 0x201C
+                || cp == 0x201D
+                || cp == 0x2026
+                || cp == 0x2014;
     }
 
     String text(int from, int to) {
@@ -346,7 +364,8 @@ final class RebuildSource {
     // ---- Word classes ----
 
     // Compiled once: terminal() runs for every source word while request blocks are planned.
-    private static final Pattern TERMINAL = Pattern.compile("(?s).*[.!?。！？][\\\"'”’）)]*$"),
+    private static final Pattern TERMINAL =
+                    Pattern.compile("(?s).*[.!?。！？؟۔।॥׃።][\\\"'”’）)]*$"),
             ABBREVIATION = Pattern.compile("(?i).*(?:\\bMr|\\bMrs|\\bDr|\\bProf|\\bvs|\\betc)\\."),
             MUSIC = Pattern.compile("[♪♫\\s]+"),
             NON_SPEECH =
@@ -356,7 +375,7 @@ final class RebuildSource {
         // Necessary condition for TERMINAL; unpunctuated ASR words never reach the pattern.
         boolean candidate = false;
         for (int i = 0; i < s.length() && !candidate; i++)
-            candidate = ".!?。！？".indexOf(s.charAt(i)) >= 0;
+            candidate = ".!?。！？؟۔।॥׃።".indexOf(s.charAt(i)) >= 0;
         return candidate && TERMINAL.matcher(s).matches() && !ABBREVIATION.matcher(s).matches();
     }
 
@@ -481,7 +500,12 @@ final class RebuildSource {
         String raw = new String(body, StandardCharsets.UTF_8).trim();
         if (raw.startsWith("\uFEFF")) raw = raw.substring(1).trim();
         boolean webVtt = raw.startsWith("WEBVTT"), json3 = raw.startsWith("{");
-        String formatEvidence = "";
+        boolean xml = raw.startsWith("<?xml")
+                || raw.startsWith("<transcript")
+                || raw.startsWith("<timedtext");
+        // Record the parsed format for every input, not only VTT/XML. A coarse JSON3/SRT body
+        // must be distinguishable in diagnostics from an XML/VTT body with native offsets.
+        String formatEvidence = parsed == null ? "" : parsed.timingCapabilities();
         List<Span> spans = new ArrayList<>();
         if (webVtt) {
             WebVttSourceReader.Result vtt = WebVttSourceReader.read(raw);
@@ -498,6 +522,31 @@ final class RebuildSource {
                                 range.speakerOffsets));
         }
         if (json3) json3Spans(new JSONObject(raw).optJSONArray("events"), spans);
+        // XML/srv3 already gives CaptionDocument per-<s> onsets. The old generic fallback read
+        // only whole <p> cues, throwing those onsets away before the planner saw them. Use the
+        // parsed fragments whenever they carry native offsets (or whenever the payload is XML);
+        // text-only formats keep the cue fallback.
+        boolean nativeXml = false;
+        for (CaptionDocument.RawFragment fragment : parsed.rawFragments())
+            if (fragment.nativeOffset) {
+                nativeXml = true;
+                break;
+            }
+        if (spans.isEmpty() && (xml || nativeXml)) {
+            for (CaptionDocument.RawFragment fragment : parsed.rawFragments()) {
+                if (fragment.raw == null || fragment.raw.trim().isEmpty()) continue;
+                spans.add(
+                        new Span(
+                                fragment.raw,
+                                fragment.startMs,
+                                fragment.endMs,
+                                fragment.cue,
+                                fragment.nativeOffset,
+                                false,
+                                Collections.emptyList()));
+            }
+            formatEvidence = parsed.timingCapabilities();
+        }
         if (spans.isEmpty() && !webVtt) {
             int i = 0;
             for (CaptionDocument.Cue c : parsed.cues())
@@ -533,6 +582,9 @@ final class RebuildSource {
             if (!spanTokens.isEmpty()) observed.add(new TimeAnchor(first, span.start, onset));
             Set<Integer> speakerWords = new HashSet<>();
             if (span.speakerBreak) speakerWords.add(0);
+            // XML/srv3 carries a segment onset but no inner word offsets. Claim the first token at
+            // that onset; JSON3/VTT already have their own word-level spans and keep the old rule.
+            boolean claimFirst = xml && span.nativeOffset;
             if (span.speakerOffsets.isEmpty())
                 addTokens(
                         out,
@@ -541,7 +593,8 @@ final class RebuildSource {
                         span.start,
                         end,
                         span.cue,
-                        span.nativeOffset);
+                        span.nativeOffset,
+                        claimFirst);
             else {
                 List<String> speech = new ArrayList<>();
                 int from = 0;
@@ -554,7 +607,8 @@ final class RebuildSource {
                 speech.addAll(tokens(span.text.substring(from).replace(' ', ' ')));
                 if (end - span.start < speech.size())
                     throw new IllegalArgumentException("vtt_voice_time_capacity");
-                addTokens(out, speech, span.text, span.start, end, span.cue, span.nativeOffset);
+                addTokens(
+                        out, speech, span.text, span.start, end, span.cue, span.nativeOffset, claimFirst);
             }
             if (!spanTokens.isEmpty())
                 observed.add(new TimeAnchor(out.size(), end, AnchorKind.CUE_END_BOUND));
@@ -767,10 +821,13 @@ final class RebuildSource {
             long start,
             long end,
             int cue,
-            boolean nativeOffset) {
+            boolean nativeOffset,
+            boolean claimFirst) {
         if (ts.isEmpty() || end <= start) return;
         if (end - start < ts.size()) {
-            out.add(new Word(text.trim(), start, end, cue, Precision.ESTIMATED));
+            if (claimFirst)
+                out.add(new Word(text.trim(), start, end, cue, Precision.NATIVE));
+            else out.add(new Word(text.trim(), start, end, cue, Precision.ESTIMATED));
             return;
         }
         for (int i = 0; i < ts.size(); i++) {
@@ -784,6 +841,7 @@ final class RebuildSource {
                                 b,
                                 cue,
                                 nativeOffset && ts.size() == 1
+                                                || claimFirst && i == 0
                                         ? Precision.NATIVE
                                         : Precision.ESTIMATED));
         }

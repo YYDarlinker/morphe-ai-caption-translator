@@ -32,6 +32,11 @@ final class TranslationRuntime {
             return true;
         }
 
+        /** True when the source track is a manually authored caption track for this url. */
+        boolean authoredTrack(String url) {
+            return false;
+        }
+
         boolean translates() {
             return true;
         }
@@ -137,6 +142,11 @@ final class TranslationRuntime {
 
     static void install(Host value) {
         host = Objects.requireNonNull(value);
+    }
+
+    static boolean authoredTrack(String url) {
+        Host h = host;
+        return h != null && h.authoredTrack(url);
     }
 
     static Host host() {

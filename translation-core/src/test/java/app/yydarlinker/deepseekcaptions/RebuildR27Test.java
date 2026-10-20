@@ -101,9 +101,13 @@ public class RebuildR27Test {
   }
   @Test public void faithfulNegationAndNonChineseTranslationsAvoidOmissionReview()throws Exception {
     JSONArray rows=fixture();RebuildSource s=RebuildR26Test.source(rows);JSONObject row=rows.getJSONObject(10);assertEquals(15,row.getInt("request"));
-    for(String text:Arrays.asList("最后说明限制：这期虽谈现代化为何迅速，但这种速度恐怕难以永远持续。","This pace probably cannot go on forever.")){
-      JSONObject response=new JSONObject(row.getJSONObject("response").toString());response.getJSONArray("events").getJSONObject(0).put("text",text);
-      RebuildProtocol.Plan p=RebuildProtocol.parseBound(response.toString(),s,RebuildR26Test.block(row,s));
+    String[][] cases={
+      {"最后说明限制：这期虽谈现代化为何迅速，但这种速度恐怕难以永远持续。","zh-Hans"},
+      {"This pace probably cannot go on forever.","en"}};
+    for(String[] c:cases){
+      JSONObject response=new JSONObject(row.getJSONObject("response").toString());response.getJSONArray("events").getJSONObject(0).put("text",c[0]);
+      RebuildProtocol.Plan p=RebuildProtocol.parseBound(response.toString(),s,RebuildR26Test.block(row,s),
+              CaptionLanguageContext.explicit("en",c[1]));
       assertFalse(p.issues.stream().anyMatch(x->x.code.equals("possible_omission")));
     }
   }

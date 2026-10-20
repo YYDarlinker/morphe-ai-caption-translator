@@ -243,9 +243,7 @@ final class RebuildReview {
                                 "Tank fleet means the tanks as a force, not a naval fleet; preserve"
                                     + " the intended military unit and repair the wording.",
                                 true));
-            if (context.canApplyEnglishToChinese
-                    && e.to < b.to
-                    && RebuildPlanner.protectedCut(s, e.to, context))
+            if (e.to < b.to && RebuildPlanner.protectedCut(s, e.to, context))
                 out.add(
                         new Issue(
                                 e.from,
@@ -255,6 +253,23 @@ final class RebuildReview {
                                     + " Reassign coherent SOURCE ranges, then translate each whole"
                                     + " range; never divide target text to create times.",
                                 true));
+            // The translation closes a sentence the source has not finished: this is how a long
+            // comparison loses its second half and comes out ungrammatical. Advisory only: the
+            // prompt now states the same rule, and a repair request costs a full block of tokens.
+            if (e.to < b.to && !RebuildSource.terminal(s.words.get(e.to).text)
+                    && endsSentence(text)
+                    && (continuesAfter(s, e.to)
+                            || RebuildPlanner.dependentEnding(s, e.to, context)
+                            || RebuildPlanner.protectedCut(s, e.to, context)))
+                out.add(
+                        new Issue(
+                                e.from,
+                                e.to,
+                                "invented_sentence_end",
+                                "The source sentence continues past this range, but the translation"
+                                    + " ends it here. Keep one event per complete source sentence,"
+                                    + " or split where each side keeps its subject and predicate.",
+                                false));
 
             Matcher adjacent = Pattern.compile("\\b(\\d{1,3}) (\\d{1,2})\\b").matcher(source);
             if (adjacent.find()) {
@@ -318,8 +333,7 @@ final class RebuildReview {
         }
         int totalWords = Math.max(1, b.to - b.from + 1);
         double average = (double) totalWords / Math.max(1, events.size());
-        if (context.canApplyEnglishToChinese
-                && out.size() < 16
+        if (out.size() < 16
                 && events.size() >= 9
                 && average < 9.0
                 && shortEvents * 100 >= events.size() * 60) {
@@ -362,7 +376,8 @@ final class RebuildReview {
             }
         return all.size() == plan.issues.size()
                 ? plan
-                : new RebuildProtocol.Plan(plan.events, plan.json, all, plan.reboundEvents);
+                : new RebuildProtocol.Plan(
+                        plan.events, plan.json, all, plan.reboundEvents, plan.partial, plan.holes);
     }
 
     static RebuildProtocol.Plan withLayoutReview(
@@ -382,37 +397,31 @@ final class RebuildReview {
                                 false));
         return all.size() == plan.issues.size()
                 ? plan
-                : new RebuildProtocol.Plan(plan.events, plan.json, all, plan.reboundEvents);
+                : new RebuildProtocol.Plan(
+                        plan.events, plan.json, all, plan.reboundEvents, plan.partial, plan.holes);
     }
 
     static RebuildProtocol.Plan withLayoutReview(
             RebuildProtocol.Plan plan, TranslationBudget budget, CaptionLanguageContext context) {
-        if (context.canApplyEnglishToChinese)
-            return withLayoutReview(
-                    plan, budget == null ? null : budget.withSpec(context.renderSpec));
         if (budget == null) return plan;
         List<Issue> all = new ArrayList<>(plan.issues);
         for (RebuildProtocol.Event e : plan.events)
             if (!budget.canPresent(e, context.renderSpec))
                 all.add(
-                        context.renderSpec.legacy
-                                ? new Issue(
-                                        e.from,
-                                        e.to,
-                                        "readability_observation",
-                                        "Measured legacy_n26 presentation capacity exceeded;"
-                                            + " advisory only; pagination policy is unchanged.",
-                                        false)
-                                : new Issue(
-                                        e.from,
-                                        e.to,
-                                        "presentation_geometry_observation",
-                                        "Preferred-font geometry is unresolved; retain accepted"
-                                            + " source/text, no paid repair; remeasure at"
-                                            + " presentation.",
-                                        false));
+                        new Issue(
+                                e.from,
+                                e.to,
+                                "presentation_geometry_observation",
+                                "Preferred-font geometry is unresolved; retain accepted source/text,"
+                                    + " no paid repair; remeasure at presentation.",
+                                false));
         return new RebuildProtocol.Plan(
-                plan.events, plan.json, Collections.unmodifiableList(all), plan.reboundEvents);
+                plan.events,
+                plan.json,
+                Collections.unmodifiableList(all),
+                plan.reboundEvents,
+                plan.partial,
+                plan.holes);
     }
 
     static RebuildProtocol.Plan prefer(
@@ -423,6 +432,76 @@ final class RebuildReview {
         return context.canApplyEnglishToChinese
                 ? prefer(previous, candidate, source)
                 : prefer(previous, candidate);
+    }
+
+    /**
+     * The controller's acceptance rule. A complete plan always wins; two partial plans are merged
+     * by their disjoint events, so a hole-filling retry adds text without replacing what is
+     * already on screen. A partial plan that adds nothing is not adopted.
+     */
+    static RebuildProtocol.Plan accept(
+            RebuildProtocol.Plan previous,
+            RebuildProtocol.Plan candidate,
+            RebuildSource source,
+            RebuildPlanner.Block block,
+            CaptionLanguageContext context) {
+        if (previous != null && candidate != null && previous.partial && candidate.partial) {
+            return mergeInto(previous, candidate, block);
+        }
+        return prefer(previous, candidate, source, context);
+    }
+
+    /**
+     * Union of an accepted partial plan and any plan's disjoint events, including a complete plan
+     * that covers only a missing token range (the hole-filling sub-request). Events that overlap an
+     * already published range are ignored, so nothing on screen is replaced or shown twice.
+     * Returns [previous] when the union covers no additional token.
+     */
+    static RebuildProtocol.Plan mergeInto(
+            RebuildProtocol.Plan previous,
+            RebuildProtocol.Plan candidate,
+            RebuildPlanner.Block block) {
+        if (previous == null) return candidate;
+        if (candidate == null || previous.holes.isEmpty()) return previous;
+        List<RebuildProtocol.Event> events = new ArrayList<>(previous.events);
+        boolean added = false;
+        for (RebuildProtocol.Event e : candidate.events) {
+            boolean overlap = false;
+            for (RebuildProtocol.Event p : events)
+                if (e.from <= p.to && p.from <= e.to) {
+                    overlap = true;
+                    break;
+                }
+            if (overlap) continue;
+            events.add(e);
+            added = true;
+        }
+        if (!added) return previous;
+        events.sort((left, right) -> Integer.compare(left.from, right.from));
+        List<int[]> holes = new ArrayList<>();
+        int next = block.from;
+        for (RebuildProtocol.Event e : events) {
+            if (e.from > next) holes.add(new int[] {next, e.from - 1});
+            next = e.to + 1;
+        }
+        if (next <= block.to) holes.add(new int[] {next, block.to});
+        if (holeTokens(holes) >= holeTokens(previous.holes)) return previous;
+        List<Issue> issues = new ArrayList<>(previous.issues);
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Issue issue : issues) seen.add(issueKey(issue));
+        for (Issue issue : candidate.issues)
+            if (seen.add(issueKey(issue))) issues.add(issue);
+        return new RebuildProtocol.Plan(events, candidate.json, issues, 0, true, holes);
+    }
+
+    private static int holeTokens(List<int[]> holes) {
+        int n = 0;
+        for (int[] hole : holes) n += Math.max(0, hole[1] - hole[0] + 1);
+        return n;
+    }
+
+    private static String issueKey(Issue issue) {
+        return issue.code + ':' + issue.from + ':' + issue.to;
     }
 
     /**
@@ -438,6 +517,29 @@ final class RebuildReview {
                     && issue.from <= event.to
                     && issue.to >= event.from) return true;
         return false;
+    }
+
+    private static boolean endsSentence(String text) {
+        String value = text.trim();
+        int end = value.length();
+        while (end > 0 && "\"'”’」』）)]》".indexOf(value.charAt(end - 1)) >= 0) end--;
+        return end > 0 && "。！？!?؛؟۔।॥׃።.".indexOf(value.charAt(end - 1)) >= 0;
+    }
+
+    /** Source words that open a continuation rather than a sentence of their own. */
+    private static final java.util.Set<String> CONTINUATIONS =
+            new java.util.HashSet<>(
+                    java.util.Arrays.asList(
+                            "than", "then", "and", "but", "that", "which", "who", "whom", "whose",
+                            "where", "when", "while", "whereas", "because", "so", "as", "to", "of",
+                            "for", "with", "from", "by", "on", "in", "at", "if", "unless",
+                            "although", "though", "or", "nor", "yet", "despite", "during", "after",
+                            "before", "since", "until", "whether", "not", "also"));
+
+    private static boolean continuesAfter(RebuildSource source, int to) {
+        if (to + 1 >= source.words.size()) return false;
+        String next = source.words.get(to + 1).text.trim().toLowerCase(java.util.Locale.ROOT);
+        return CONTINUATIONS.contains(next);
     }
 
     static int score(List<Issue> issues) {
@@ -508,6 +610,10 @@ final class RebuildReview {
     static RebuildProtocol.Plan prefer(
             RebuildProtocol.Plan previous, RebuildProtocol.Plan candidate) {
         if (previous == null) return candidate;
+        // A complete plan always beats a salvaged one; the salvaged plan only exists to keep the
+        // screen populated while a complete reply cannot be parsed.
+        if (previous.partial != candidate.partial)
+            return previous.partial ? candidate : previous;
         int oldSemantic = semanticScore(previous), newSemantic = semanticScore(candidate);
         if (oldSemantic != newSemantic) return oldSemantic < newSemantic ? previous : candidate;
         int oldSeg = segmentationPenalty(previous), newSeg = segmentationPenalty(candidate);
@@ -533,7 +639,10 @@ final class RebuildReview {
                 || code.equals("missing_source")
                 || code.equals("crosses_source_break")
                 || code.equals("block_identity")
-                || code.equals("source_quote_required");
+                || code.equals("source_quote_required")
+                || code.equals("authored_cue_boundary")
+                || code.equals("authored_cue_coverage")
+                || code.equals("authored_cue_hole");
     }
 
     static boolean shouldRepair(
@@ -545,3 +654,4 @@ final class RebuildReview {
                 && position < end;
     }
 }
+

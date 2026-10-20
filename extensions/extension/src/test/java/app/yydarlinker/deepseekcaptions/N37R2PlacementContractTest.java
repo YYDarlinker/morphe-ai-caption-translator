@@ -46,6 +46,6 @@ public class N37R2PlacementContractTest {
   show("Short caption","en","visible");CaptionDiagnostics.clear(h.a);AtomicBoolean valid=new AtomicBoolean(true);CaptionHorizontalPlacement placement=new CaptionHorizontalPlacement(host,h.anchor(),h.text());h.anchor().requestLayout();placement.observe(h.a,N39UiGeometryFixture.bounds,"old","old-session",1,1,valid::get);valid.set(false);layout();assertFalse(CaptionDiagnostics.fullText(h.a).contains("old-session"));
  }
  @Test public void fallbackUnicodeDirectionIsNotInferredFromAppLocale()throws Exception{
-  show("שלום J-20 (12)","he","hebrew");center();assertEquals(View.TEXT_DIRECTION_FIRST_STRONG_LTR,h.text().getTextDirection());assertEquals(-1,h.text().getLayout().getParagraphDirection(0));
+  show("שלום J-20 (12)","he","hebrew");center();assertEquals(View.TEXT_DIRECTION_RTL,h.text().getTextDirection());assertEquals(-1,h.text().getLayout().getParagraphDirection(0));
  }
 }

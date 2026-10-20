@@ -13,6 +13,10 @@ import java.util.Locale;
 /**
  * The caption request path: called by the patch immediately before YouTube creates the timed-text
  * request, it decides whether the request is passed on, closed, or answered by the loopback server.
+ *
+ * <p>The language is owned by YouTube. This hook only acts on a translated request that YouTube
+ * itself selected (the URL already contains {@code tlang}); it never adds a target to a source
+ * request and never keeps a separate language memory.
  */
 public final class DeepSeekCaptionHook {
     private static final String CLOSED_TRANSLATION_SINK =
@@ -42,6 +46,7 @@ public final class DeepSeekCaptionHook {
         try {
             CaptionPlayerAuthority.setVideo(videoId);
             TokenCostAudit.onVideoId(context(), videoId);
+            NativeCaptionBridge.onVideoId(videoId);
             CaptionActions.onVideoId(videoId);
             CaptionButtonController.onVideoId(videoId);
         } catch (Throwable ignored) {
@@ -76,54 +81,43 @@ public final class DeepSeekCaptionHook {
         Context context = context();
         if (!CaptionAddonSupport.aiInstalled()
                 || context == null
-                || !DeepSeekConfig.enabled(context)) return originalUrl;
+                || originalUrl == null) return originalUrl;
 
-        boolean timedText = isYouTubeTimedTextUrl(originalUrl);
-        boolean translated = TargetLanguage.fromUrl(originalUrl) != null;
-        if (timedText) {
-            // Prefetched or departed Shorts requests are not selections of the foreground video:
-            // never replace the visible session with another video's source.
-            String requested = CaptionUrls.videoId(originalUrl);
-            String foreground = CaptionActions.currentVideoIdSnapshot();
-            if (!requested.isEmpty() && !foreground.isEmpty() && !foreground.equals(requested))
-                return originalUrl;
-            // YouTube can prefetch remembered tlang urls while CC is Off, even on cold start. Only
-            // an actual Auto-translate selection may use the paid API, and a late translation
-            // fetch must neither revive Off nor change source-only mode.
-            if (translated && !CaptionChoice.allowsTranslation()) return CLOSED_TRANSLATION_SINK;
-            if (CaptionChoice.known()
-                    && (!CaptionChoice.isOn() || (!CaptionChoice.translates() && translated)))
-                return CLOSED_TRANSLATION_SINK;
-            if (!translated && CaptionChoice.isOn() && !CaptionChoice.translates())
-                return sourceOnly(context, originalUrl);
-        }
+        if (!isYouTubeTimedTextUrl(originalUrl)) return originalUrl;
+
+        // Prefetched or departed requests are not selections of the foreground video: never
+        // replace the visible session with another video's source.
+        String requested = CaptionUrls.videoId(originalUrl);
+        String foreground = CaptionActions.currentVideoIdSnapshot();
+        if (!requested.isEmpty() && !foreground.isEmpty() && !foreground.equals(requested))
+            return originalUrl;
+
+        boolean aiEnabled = DeepSeekConfig.enabled(context);
+        // Respect YouTube completely when AI is off.
+        if (!aiEnabled) return originalUrl;
+
+        // The native selection is the only language source. A source request means the user/native
+        // model selected source captions: never synthesize a target from it.
+        TargetLanguage target = TargetLanguage.fromUrl(originalUrl);
+        if (target == null) return originalUrl;
+
+        // A background prefetch is not the visible selection.
+        if (foreground.isEmpty()) return originalUrl;
+
+        // A late translated request must not revive an explicit Off or a background prefetch.
+        if (CaptionButtonController.captionsKnownOff()) return CLOSED_TRANSLATION_SINK;
+        if (CaptionChoice.explicitOff()) return CLOSED_TRANSLATION_SINK;
+        if (!selectionEvidence()) return originalUrl;
+
+        // This is a real, foreground translated selection. Keep the session state a projection of
+        // the native request instead of a separately remembered target.
+        CaptionChoice.select(target.code, true);
 
         String selected = CaptionActions.restoreTargetAfterMiniplayer(originalUrl);
         selected = CaptionLifecycleRestore.restoreAfterLifecycle(selected);
-        selected = CaptionButtonController.rewriteDefaultTarget(context, selected);
-        // The source YouTube names is its own automatic pick; translate the video's best track.
+        // The URL YouTube names is its own source pick; translate that track.
         selected = SourceTrackPolicy.apply(context, selected);
 
-        boolean intercepted =
-                TargetLanguage.fromUrl(selected) != null
-                        && (CaptionActions.isVisibleActive()
-                                || CaptionButtonController.mayActivateAiTarget()
-                                || translated);
-        if (intercepted
-                && CaptionUrls.videoId(selected).isEmpty()
-                && CaptionActions.currentVideoIdSnapshot().isEmpty()) {
-            CaptionDiagnostics.mark(
-                    context,
-                    "CONTEXTUAL_OWNER_UNRESOLVED_PASSTHROUGH",
-                    "Current request lacks a verifiable video owner; keeping YouTube timed-text"
-                            + " native passthrough");
-            CaptionActions.activateSource(context, selected);
-            return selected;
-        }
-        if (!intercepted) {
-            CaptionActions.activateSource(context, selected);
-            return selected;
-        }
         try {
             CaptionButtonController.noteAiTrackSelected();
             SourceSelection own = SourceTrackPolicy.ownTargetTrack(context, selected);
@@ -149,14 +143,17 @@ public final class DeepSeekCaptionHook {
         }
     }
 
-    /** The captions the user chose without translation are served untranslated by the overlay. */
-    private static String sourceOnly(Context context, String url) {
-        CaptionActions.activateSource(context, url);
-        try {
-            return LoopbackCaptionServer.get(context).urlFor(url);
-        } catch (Exception failure) {
-            return CLOSED_TRANSLATION_SINK;
-        }
+    /**
+     * Evidence that a translated timed-text request is a foreground selection rather than a
+     * background prefetch: the session is already visible, CC is known on, or the request arrived
+     * inside an explicit tap/menu transaction.
+     */
+    private static boolean selectionEvidence() {
+        return CaptionActions.isVisibleActive()
+                || CaptionChoice.isOn()
+                || CaptionButtonController.mayActivateAiTarget()
+                || CaptionButtonController.nativeMenuRecentlyOpened()
+                || CaptionButtonController.captionsKnownOn();
     }
 
     /** Opens [url] with the connection factory of YouTube's own network stack, or null. */

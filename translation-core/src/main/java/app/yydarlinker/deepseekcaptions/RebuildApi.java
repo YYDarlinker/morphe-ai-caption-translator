@@ -119,6 +119,7 @@ final class RebuildApi {
     static String prompt(TranslationSettings cfg, String lang) {
         return RebuildProtocol.PROMPT
                 + RebuildProtocol.FIDELITY_PROMPT
+                + RebuildGuidance.SENTENCE
                 + " Target language: "
                 + lang
                 + ". User translation preferences: "
@@ -151,15 +152,34 @@ final class RebuildApi {
                 + " not proven sentence boundaries.";
 
     static String prompt(TranslationSettings cfg, String lang, CaptionLanguageContext context) {
-        if (context.canApplyEnglishToChinese) return prompt(cfg, lang);
-        return NEUTRAL_PROMPT
-                + (context.englishSource ? ENGLISH_DEPENDENCY_PROMPT : "")
-                + " Source language: "
-                + context.sourceCode
-                + ". Target language: "
-                + context.targetCode
-                + ". User translation preferences: "
-                + context.preference(cfg);
+        return prompt(cfg, lang, context, null);
+    }
+
+    /**
+     * The same quality instructions for automatic and authored sources. An authored block only
+     * appends its fixed display-cue contract; it does not replace the sentence/quality guidance.
+     */
+    static String prompt(
+            TranslationSettings cfg,
+            String lang,
+            CaptionLanguageContext context,
+            RebuildPlanner.Block block) {
+        String base;
+        if (context.canApplyEnglishToChinese) base = prompt(cfg, lang);
+        else
+            base =
+                    NEUTRAL_PROMPT
+                            + (context.englishSource ? ENGLISH_DEPENDENCY_PROMPT : "")
+                            + RebuildGuidance.SENTENCE
+                            + " Source language: "
+                            + context.sourceCode
+                            + ". Target language: "
+                            + context.targetCode
+                            + ". User translation preferences: "
+                            + context.preference(cfg);
+        return block != null && block.authored
+                ? base + RebuildGuidance.displayCueRule(block)
+                : base;
     }
 
     static RebuildProtocol.Plan translate(
@@ -200,7 +220,8 @@ final class RebuildApi {
                                     "note",
                                     "Measured width only; reference counters do not control"
                                         + " pagination in this policy."));
-        String prompt = prompt(cfg, lang, context);
+        String prompt = prompt(cfg, lang, context, b);
+
         JSONObject request =
                 ProviderRequestPolicy.request(
                         cfg,
@@ -326,7 +347,7 @@ final class RebuildApi {
                                     + RebuildCache.hash(prompt));
                 if ("length".equals(finish)) throw new RebuildProtocol.Invalid("output_truncated");
                 if ("content_filter".equals(finish)) throw new Failure("content_filter", false, 0);
-                RebuildProtocol.Plan plan = RebuildProtocol.parseBound(content, s, b, context);
+                RebuildProtocol.Plan plan = RebuildProtocol.parseBestEffort(content, s, b, context);
                 if (plan.reboundEvents > 0)
                     trace(
                             control,

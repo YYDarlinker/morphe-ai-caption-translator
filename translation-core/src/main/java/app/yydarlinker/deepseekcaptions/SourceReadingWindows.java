@@ -17,7 +17,8 @@ final class SourceReadingWindows {
     static final long MAX_PAGE_MS = 5000;
 
     private static final long CLEAR_PAUSE_MS = 250, LONG_PAUSE_MS = 400;
-    private static final String CLAUSE = ",;:，、；：…";
+    /** Clause marks of the scripts the app can target, not only the CJK/Latin ones. */
+    private static final String CLAUSE = ",;:，、；：…،؛।॥؟۔׃።";
 
     /** Pages in source order, each a contiguous word range; covers every word of the source. */
     static List<RebuildSource.TimedWindow> build(
@@ -145,7 +146,10 @@ final class SourceReadingWindows {
                         || script == Character.UnicodeScript.HIRAGANA
                         || script == Character.UnicodeScript.KATAKANA
                         || script == Character.UnicodeScript.HANGUL
-                        || script == Character.UnicodeScript.THAI) wide++;
+                        || script == Character.UnicodeScript.THAI
+                        || script == Character.UnicodeScript.LAO
+                        || script == Character.UnicodeScript.KHMER
+                        || script == Character.UnicodeScript.MYANMAR) wide++;
             }
         }
         return all > 0 && wide * 2 > all;

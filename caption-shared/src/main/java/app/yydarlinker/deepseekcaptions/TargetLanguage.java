@@ -96,7 +96,9 @@ final class TargetLanguage {
 
     static TargetLanguage fromCode(String rawCode) {
         String code = normalize(rawCode);
-        if (code.isEmpty()) return SIMPLIFIED_CHINESE;
+        // No target is not Simplified Chinese. Returning a target here silently turns every empty
+        // or unknown code into zh-Hans on prewarm, handoff and diagnostic paths.
+        if (code.isEmpty()) return null;
         String lower = code.toLowerCase(Locale.ROOT);
         String name = CHINESE_NAMES.get(lower);
         if (name == null) name = CHINESE_NAMES.get(primary(lower));
@@ -112,7 +114,9 @@ final class TargetLanguage {
     /** Adds or replaces only the Timed Text target-language query item. */
     static String withCode(String url, String rawCode) {
         if (url == null) return null;
-        String code = fromCode(rawCode).code;
+        TargetLanguage requested = fromCode(rawCode);
+        if (requested == null) return url;
+        String code = requested.code;
         int fragmentIndex = url.indexOf('#');
         String fragment = fragmentIndex >= 0 ? url.substring(fragmentIndex) : "";
         String main = fragmentIndex >= 0 ? url.substring(0, fragmentIndex) : url;
@@ -144,6 +148,35 @@ final class TargetLanguage {
         if (!changed) {
             if (query.length() > 0) query.append('&');
             query.append("tlang=").append(Uri.encode(code));
+        }
+        return prefix + query + fragment;
+    }
+
+    /** Removes only the Timed Text target-language query item, keeping every signed parameter. */
+    static String withoutTarget(String url) {
+        if (url == null) return null;
+        if (fromUrl(url) == null) return url;
+        int fragmentIndex = url.indexOf('#');
+        String fragment = fragmentIndex >= 0 ? url.substring(fragmentIndex) : "";
+        String main = fragmentIndex >= 0 ? url.substring(0, fragmentIndex) : url;
+        int queryIndex = main.indexOf('?');
+        if (queryIndex < 0) return url;
+        String prefix = main.substring(0, queryIndex + 1);
+        String rawQuery = main.substring(queryIndex + 1);
+        StringBuilder query = new StringBuilder();
+        for (String part : rawQuery.split("&", -1)) {
+            if (part.isEmpty()) continue;
+            int equals = part.indexOf('=');
+            String rawKey = equals < 0 ? part : part.substring(0, equals);
+            String decodedKey;
+            try {
+                decodedKey = Uri.decode(rawKey);
+            } catch (Throwable ignored) {
+                decodedKey = rawKey;
+            }
+            if ("tlang".equalsIgnoreCase(decodedKey)) continue;
+            if (query.length() > 0) query.append('&');
+            query.append(part);
         }
         return prefix + query + fragment;
     }

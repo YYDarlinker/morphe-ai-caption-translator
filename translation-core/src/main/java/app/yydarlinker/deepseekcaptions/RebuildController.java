@@ -51,6 +51,13 @@ final class RebuildController {
     /** Before the first acceptance, only a next block starting this soon is requested with it. */
     static final long BOOTSTRAP_NEXT_MS = 20000;
 
+    /**
+     * Slow retries of a block that never produced a usable plan. A deterministic rejection repeats
+     * the same paid request; after this many the block is abandoned for the session instead of
+     * being retried forever behind the "翻译中…" placeholder.
+     */
+    static final int MAX_SLOW_RETRIES = 3;
+
     private static final AtomicLong IDS = new AtomicLong();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ExecutorService SOURCE_IO = lane("CaptionSourceIO", 1);
@@ -111,6 +118,9 @@ final class RebuildController {
         final CaptionLanguageContext languageContext;
         volatile String url;
         volatile boolean visible, cancelled, retired, loading, terminal;
+
+        /** The source evidence kind accepted for this generation; authored cue pages use it. */
+        volatile boolean authored;
         volatile long sourceRetry, position, providerRetry;
         long lastSeekAt = -1, prefetchPausedUntil;
         volatile long pausedDisplayPosition = -1;
@@ -153,6 +163,9 @@ final class RebuildController {
         String[] reasons;
         Job[] jobs;
         boolean[] cacheChecked;
+
+        /** Slow retries spent on a block that never produced a usable plan; capped per session. */
+        int[] slowRetries;
 
         /**
          * The single newest foreground request selected but not handed to a lane yet. It exists
@@ -335,6 +348,9 @@ final class RebuildController {
          */
         volatile boolean cancelled, sent, dispatched;
 
+        /** This attempt is a paid semantic/structural repair, not a transient retry. */
+        boolean repair;
+
         private long httpStartedAt;
 
         Job(Session session, int index, boolean priority) {
@@ -481,6 +497,35 @@ final class RebuildController {
             epoch = ++publicationEpoch;
         }
         clear(epoch);
+        if (s != null && s.plans != null) {
+            int complete = 0, partial = 0, failed = 0, holes = 0;
+            for (int i = 0; i < s.plans.length; i++) {
+                RebuildProtocol.Plan plan = s.plans[i];
+                if (plan != null) {
+                    if (plan.partial) {
+                        partial++;
+                        holes += plan.holes.size();
+                    } else complete++;
+                } else if (s.states != null && s.states[i] == FAILED) failed++;
+            }
+            TranslationRuntime.mark(
+                    s.context,
+                    "REBUILD_COVERAGE_REPORT",
+                    "session="
+                            + s.id
+                            + ";blocks="
+                            + s.plans.length
+                            + ";complete="
+                            + complete
+                            + ";partial="
+                            + partial
+                            + ";failed="
+                            + failed
+                            + ";holes="
+                            + holes
+                            + ";position="
+                            + s.position);
+        }
         // A stopped engine has no display owner: the authority returns to the safe UNKNOWN state.
         TranslationRuntime.stopped();
         // A stopped session must not donate a media snapshot to the next same-video session.
@@ -649,6 +694,29 @@ final class RebuildController {
                     s.context,
                     "LANGUAGE_PROFILE_BOUND",
                     "session=" + s.id + ";" + s.languageContext.diagnosticFields());
+            CaptionLanguageProfile profile = s.languageContext.profile;
+            int script = CaptionScript.primary(s.languageContext.targetCode);
+            TranslationRuntime.mark(
+                    s.context,
+                    "LANGUAGE_PROFILE",
+                    "session="
+                            + s.id
+                            + ";target="
+                            + s.languageContext.targetCode
+                            + ";profile="
+                            + profile.id
+                            + ";origin="
+                            + (profile.id.startsWith("generic") ? "generic_fallback" : "named")
+                            + ";script="
+                            + (script < 0 ? "?" : android.icu.lang.UScript.getShortName(script))
+                            + ";direction="
+                            + profile.direction
+                            + ";cps="
+                            + profile.referenceCps
+                            + ";cpl="
+                            + profile.referenceCpl
+                            + ";line_counter="
+                            + profile.lineCounterId());
             clear(epoch);
         }
         TranslationRuntime.mark(
@@ -989,12 +1057,36 @@ final class RebuildController {
             // planning run. Translation requests still wait for the full plan.
             render(s);
             RebuildSource source = RebuildSource.read(raw.body, raw.document, !s.sourceOnly);
+            // A coarse automatic track is exactly the case that needs a finer ASR reference. The
+            // old gate required native words first, so a completely coarse primary never tried the
+            // reference at all. A manually authored track keeps its cue-level timing and needs no
+            // second download.
+            boolean authoredTrack = authored(s);
             if (!s.sourceOnly
-                    && (source.hasPartialTiming()
-                            || source.nativeWordCount() < source.words.size()))
+                    && !authoredTrack
+                    && source.nativeWordCount() < source.words.size())
                 source = alignedToReference(s, source, control);
-            List<RebuildPlanner.Block> blocks = RebuildPlanner.plan(source, s.languageContext);
-            String key = RebuildCache.identity(source, s.config, s.target, s.languageContext);
+            else if (!s.sourceOnly && !authoredTrack)
+                TranslationRuntime.mark(
+                        s.context,
+                        "REBUILD_SOURCE_REFERENCE_SKIPPED",
+                        "session="
+                                + s.id
+                                + ";native_words="
+                                + source.nativeWordCount()
+                                + ";words="
+                                + source.words.size()
+                                + ";reason=all_words_native");
+            // A manually authored track keeps its own segmentation: every authored cue is a display
+            // boundary, while consecutive cues may share one request block so the model sees the
+            // sentence around a fragment. Automatic tracks keep the sentence-sized blocks.
+            List<RebuildPlanner.Block> blocks =
+                    authoredTrack
+                            ? RebuildPlanner.planAuthored(source, s.languageContext)
+                            : RebuildPlanner.plan(source, s.languageContext);
+            String key =
+                    RebuildCache.identity(
+                            source, s.config, s.target, s.languageContext, authoredTrack);
             RebuildProtocol.Plan[] plans = new RebuildProtocol.Plan[blocks.size()];
             int[] states = new int[blocks.size()];
             boolean[] checked = new boolean[blocks.size()];
@@ -1030,6 +1122,7 @@ final class RebuildController {
                     restored = 0;
                 }
                 s.source = source;
+                s.authored = authoredTrack;
                 s.cacheKey = key;
                 s.plans = plans;
                 s.pendingPlans = new RebuildProtocol.Plan[plans.length];
@@ -1041,6 +1134,7 @@ final class RebuildController {
                 s.reasons = reasons;
                 s.jobs = new Job[blocks.size()];
                 s.cacheChecked = checked;
+                s.slowRetries = new int[blocks.size()];
                 s.loading = false;
                 s.sourceJob = null;
                 s.status = "";
@@ -1067,7 +1161,9 @@ final class RebuildController {
                             + ";blocks="
                             + blocks.size()
                             + ";cache_hits="
-                            + restored);
+                            + restored
+                            + ";precision="
+                            + source.precisionEvidence());
             TranslationAudit.recordUnitCacheOutcome(
                     Math.min(2, blocks.size() - focusIndex), restored);
             render(s);
@@ -1174,7 +1270,7 @@ final class RebuildController {
      * job replaced before it is dispatched never consumes a translation attempt or a repair.
      */
     private static void markDispatched(Session s, Job job) {
-        if (s.attempts[job.index] > 0) s.repairCount++;
+        if (job.repair) s.repairCount++;
         s.attempts[job.index]++;
         s.states[job.index] = RUNNING;
         job.dispatched = true;
@@ -1380,13 +1476,47 @@ final class RebuildController {
                                                 && s.repairCount < RebuildReview.MAX_SESSION_REPAIRS
                                         ? 3
                                         : 2;
+                boolean slowRetry = false;
                 if (s.attempts[i] >= maxAttempts
                         || s.attempts[i] > 0
+                                && s.plans[i] != null
                                 && s.repairCount >= RebuildReview.MAX_SESSION_REPAIRS) {
-                    s.states[i] = s.plans[i] == null ? FAILED : READY;
-                    continue;
+                    if (s.plans[i] != null) {
+                        s.states[i] = READY;
+                        continue;
+                    }
+                    // A block that never produced anything keeps a slow, bounded-rate retry
+                    // while it is still in front of the viewer, instead of disappearing for good.
+                    // A deterministic rejection repeats the same paid request, so the retries are
+                    // capped: after MAX_SLOW_RETRIES the block is abandoned for this session.
+                    if (now < s.retryAt[i]) continue;
+                    if (s.slowRetries != null && s.slowRetries[i] >= MAX_SLOW_RETRIES) {
+                        s.states[i] = FAILED;
+                        TranslationRuntime.mark(
+                                s.context,
+                                "REBUILD_BLOCK_ABANDONED",
+                                "session="
+                                        + s.id
+                                        + ";block="
+                                        + b.index
+                                        + ";reason="
+                                        + s.reasons[i]
+                                        + ";slow_retries="
+                                        + s.slowRetries[i]
+                                        + ";position="
+                                        + s.position);
+                        continue;
+                    }
+                    if (s.slowRetries != null) s.slowRetries[i]++;
+                    s.attempts[i] = Math.max(0, maxAttempts - 1);
+                    slowRetry = true;
                 }
                 Job job = new Job(s, i, focus);
+                job.repair =
+                        !slowRetry
+                                && s.attempts[i] > 0
+                                && (s.plans[i] != null
+                                        || RebuildReview.structuralRetry(s.reasons[i]));
                 s.jobs[i] = job;
                 if (focus && focusDispatched >= MAX_FOCUS_CONCURRENCY) {
                     // Both foreground slots are busy: keep only this newest landing.
@@ -1458,6 +1588,7 @@ final class RebuildController {
                             s.reasons[job.index],
                             job.languageContext);
             RebuildProtocol.Plan accepted, old;
+            boolean cacheable;
             int generation;
             for (; ; ) {
                 synchronized (s) {
@@ -1469,12 +1600,15 @@ final class RebuildController {
                     old = s.plans[job.index];
                     generation = s.generation;
                 }
-                accepted = RebuildReview.prefer(old, candidate, s.source, job.languageContext);
+                accepted =
+                        RebuildReview.accept(
+                                old, candidate, s.source, b, job.languageContext);
                 if (prepared != null) {
                     prepared.close();
                     prepared = null;
                 }
-                if (RebuildReview.score(accepted.issues) == 0)
+                cacheable = !accepted.partial && RebuildReview.score(accepted.issues) == 0;
+                if (cacheable)
                     prepared =
                             RebuildCache.prepare(
                                     s.context,
@@ -1513,8 +1647,13 @@ final class RebuildController {
                 else s.plans[job.index] = accepted;
                 if (s.provisional != null) s.provisional[job.index] = null;
                 boolean review =
-                        RebuildReview.shouldRepair(
-                                accepted, s.attempts[job.index], s.repairCount, s.position, b.end);
+                        !accepted.partial
+                                && RebuildReview.shouldRepair(
+                                        accepted,
+                                        s.attempts[job.index],
+                                        s.repairCount,
+                                        s.position,
+                                        b.end);
                 s.states[job.index] = review ? WAITING : READY;
                 if (review) {
                     s.reasons[job.index] = RebuildReview.repair(accepted.issues);
@@ -1525,7 +1664,7 @@ final class RebuildController {
             }
             permit.close();
             permit = null;
-            if (RebuildReview.score(accepted.issues) == 0) {
+            if (cacheable) {
                 if (!durable)
                     TranslationRuntime.mark(
                             s.context,
@@ -1562,7 +1701,66 @@ final class RebuildController {
                             + ";review_risks="
                             + RebuildReview.score(accepted.issues)
                             + ";attempts="
-                            + s.attempts[b.index]);
+                            + s.attempts[b.index]
+                            + ";partial="
+                            + accepted.partial
+                            + ";holes="
+                            + accepted.holes.size()
+                            + (accepted.partial
+                                    ? ";covered_tokens="
+                                            + accepted.coveredTokens()
+                                            + ";tokens="
+                                            + (b.to - b.from + 1)
+                                    : "")
+                            + (b.authored
+                                    ? ";" + RebuildCueContract.summary(s.source, b, accepted.events)
+                                    : ""));
+            if (accepted.partial) {
+                TranslationRuntime.mark(
+                        s.context,
+                        "REBUILD_PARTIAL_ACCEPTED",
+                        "session="
+                                + s.id
+                                + ";block="
+                                + b.index
+                                + ";block_id="
+                                + b.id()
+                                + ";events="
+                                + accepted.events.size()
+                                + ";holes="
+                                + accepted.holes.size()
+                                + ";covered_tokens="
+                                + accepted.coveredTokens()
+                                + ";tokens="
+                                + (b.to - b.from + 1));
+                StringBuilder ranges = new StringBuilder();
+                for (int[] hole : accepted.holes) {
+                    if (ranges.length() > 0) ranges.append(',');
+                    ranges.append(hole[0]).append('-').append(hole[1]);
+                }
+                TranslationRuntime.mark(
+                        s.context,
+                        "REBUILD_COVERAGE",
+                        "session="
+                                + s.id
+                                + ";block="
+                                + b.index
+                                + ";events="
+                                + accepted.events.size()
+                                + ";covered_tokens="
+                                + accepted.coveredTokens()
+                                + ";tokens="
+                                + (b.to - b.from + 1)
+                                + ";holes="
+                                + ranges
+                                + ";reason="
+                                + s.reasons[b.index]);
+            }
+            if (accepted.partial
+                    && !accepted.holes.isEmpty()
+                    && s.slowRetries != null
+                    && s.slowRetries[job.index] < 1
+                    && s.position < b.end) fillHoles(s, job, b, accepted);
         } catch (Exception e) {
             if (!current(s)) return;
             rejected(s, job, b, e);
@@ -1571,6 +1769,108 @@ final class RebuildController {
             if (prepared != null) prepared.close();
             if (current(s)) kick(s);
         }
+    }
+
+    /**
+     * One bounded sub-request for the largest hole of a salvaged plan. It asks only for that token
+     * range (not the whole block), merges the reply into the published plan without replacing any
+     * shown text, and never fails the parent block: a failed sub-request just leaves the hole.
+     */
+    private static void fillHoles(
+            Session s, Job job, RebuildPlanner.Block parent, RebuildProtocol.Plan plan) {
+        int[] hole = largestHole(plan.holes);
+        if (hole == null) return;
+        RebuildPlanner.Block range = holeBlock(parent, s.source, hole);
+        if (range == null) return;
+        synchronized (s) {
+            if (!current(s)
+                    || s.plans[parent.index] != plan
+                    || s.slowRetries == null) return;
+            s.slowRetries[parent.index]++;
+        }
+        RebuildProtocol.Plan candidate;
+        try {
+            candidate =
+                    RebuildApi.translate(
+                            s.source,
+                            range,
+                            s.config,
+                            s.target,
+                            job,
+                            true,
+                            "Translate only this missing source range. Keep its complete meaning"
+                                    + " and return the complete range.",
+                            job.languageContext);
+        } catch (Exception failed) {
+            TranslationRuntime.mark(
+                    s.context,
+                    "REBUILD_HOLE_FAILED",
+                    "session="
+                            + s.id
+                            + ";block="
+                            + parent.index
+                            + ";range="
+                            + hole[0]
+                            + "-"
+                            + hole[1]
+                            + ";reason="
+                            + (failed instanceof RebuildProtocol.Invalid
+                                    ? ((RebuildProtocol.Invalid) failed).code
+                                    : failed.getClass().getSimpleName()));
+            return;
+        }
+        RebuildProtocol.Plan merged;
+        synchronized (s) {
+            if (!current(s) || s.plans[parent.index] != plan) return;
+            merged = RebuildReview.mergeInto(plan, candidate, parent);
+            if (merged == plan) return;
+            s.plans[parent.index] = merged;
+            s.states[parent.index] = READY;
+        }
+        TranslationRuntime.mark(
+                s.context,
+                "REBUILD_HOLE_FILLED",
+                "session="
+                        + s.id
+                        + ";block="
+                        + parent.index
+                        + ";range="
+                        + hole[0]
+                        + "-"
+                        + hole[1]
+                        + ";events="
+                        + merged.events.size()
+                        + ";holes="
+                        + merged.holes.size());
+        render(s);
+    }
+
+    private static int[] largestHole(List<int[]> holes) {
+        int[] best = null;
+        for (int[] hole : holes)
+            if (best == null || hole[1] - hole[0] > best[1] - best[0]) best = hole;
+        return best;
+    }
+
+    /**
+     * The request block of one hole. Authored holes are whole cue groups; a hole that does not
+     * match one cue exactly is not requested (a partial cue must never become a page).
+     */
+    private static RebuildPlanner.Block holeBlock(
+            RebuildPlanner.Block parent, RebuildSource source, int[] hole) {
+        int from = hole[0], to = hole[1];
+        if (source == null
+                || from < parent.from
+                || to > parent.to
+                || to < from
+                || from >= source.words.size()
+                || to >= source.words.size()) return null;
+        if (!parent.authored) return new RebuildPlanner.Block(parent.index, from, to, source);
+        for (RebuildPlanner.Block.CueRange cue : parent.cues)
+            if (cue.from == from && cue.to == to)
+                return new RebuildPlanner.Block(
+                        parent.index, from, to, source, Collections.singletonList(cue));
+        return null;
     }
 
     /** A failed request: schedules the retry (or gives the block up) and records the reason. */
@@ -1609,21 +1909,16 @@ final class RebuildController {
                                 code);
             }
             boolean filtered = failure != null && "content_filter".equals(failure.code);
-            boolean structuralRetry =
-                    s.plans[job.index] == null
-                            && s.attempts[job.index] < 3
-                            && RebuildReview.structuralRetry(code)
-                            && s.repairCount < RebuildReview.MAX_SESSION_REPAIRS;
-            s.states[job.index] =
-                    fatal
-                                    || filtered
-                                    || (!structuralRetry && s.attempts[job.index] >= 2)
-                                    || s.attempts[job.index] >= 3
-                                    || s.repairCount >= RebuildReview.MAX_SESSION_REPAIRS
-                            ? FAILED
-                            : WAITING;
+            // Only a provider refusal or a configuration error ends a block for good. Network,
+            // timeout, malformed-output and structural failures stay retryable; the view falls
+            // back to the source line while a slow retry keeps trying.
+            s.states[job.index] = fatal || filtered ? FAILED : WAITING;
             long delay = failure != null ? failure.delay : 0;
-            s.retryAt[job.index] = SystemClock.elapsedRealtime() + Math.max(1200, delay);
+            long backoff =
+                    s.attempts[job.index] >= 3
+                            ? 15000
+                            : s.attempts[job.index] >= 2 ? 5000 : 1200;
+            s.retryAt[job.index] = SystemClock.elapsedRealtime() + Math.max(backoff, delay);
             if (code.equals("http_429") || code.startsWith("http_5"))
                 s.providerRetry =
                         Math.max(
@@ -1744,6 +2039,92 @@ final class RebuildController {
         }
     }
 
+    /** True when the source track is manually authored rather than machine generated. */
+    private static boolean authored(Session s) {
+        return TranslationRuntime.authoredTrack(s.url);
+    }
+
+    /**
+     * One display unit per authored cue. The model may return several events inside a cue; those
+     * events are concatenated into the cue page. The page window is the cue window, not an
+     * estimated event time.
+     */
+    private static List<RebuildDisplayGroups.Unit> authoredUnits(
+            Session s, int index, RebuildProtocol.Plan plan) {
+        RebuildPlanner.Block block = s.blocks.get(index);
+        try {
+            List<RebuildDisplayGroups.Unit> units =
+                    plan.partial
+                            ? RebuildCueContract.unitsPartial(
+                                    index, s.source, block, plan.events, s.languageContext)
+                            : RebuildCueContract.units(
+                                    index, s.source, block, plan.events, s.languageContext);
+            return units;
+        } catch (RebuildProtocol.Invalid invalid) {
+            // A cached/old plan could predate the contract. Never fabricate a page from it; the
+            // block stays blank and the next request/repair can produce a conforming plan.
+            if (s.plans[index] == plan)
+                TranslationRuntime.mark(
+                        s.context,
+                        "REBUILD_CUE_CONTRACT_REJECTED",
+                        "session="
+                                + s.id
+                                + ";block="
+                                + index
+                                + ";reason="
+                                + invalid.code
+                                + ";"
+                                + invalid.detail);
+            return Collections.emptyList();
+        }
+    }
+
+    /** Diagnostic view of the authored cue contract: cue count and events per cue. */
+    private static String authoredSummary(
+            RebuildSource source, RebuildPlanner.Block block, RebuildProtocol.Plan plan) {
+        return RebuildCueContract.summary(source, block, plan.events);
+    }
+
+    /**
+     * Real speech boundaries inside one display unit: a word end followed by a pause or a clause
+     * mark. Page turns use these instead of character counts when the source has word timing.
+     */
+    private static long[] pageAnchors(Session s, RebuildDisplayGroups.Unit unit) {
+        if (s == null || s.source == null || unit == null || unit.end <= unit.start) return null;
+        java.util.List<Long> anchors = new java.util.ArrayList<>();
+        int from = Math.max(0, unit.from), to = Math.min(s.source.words.size() - 1, unit.to);
+        long last = -1;
+        for (int i = from; i <= to && anchors.size() < 64; i++) {
+            RebuildSource.Word word = s.source.words.get(i);
+            boolean pause =
+                    i > from && word.start - s.source.words.get(i - 1).end >= 220;
+            boolean clause = word.text != null && endsClauseMark(word.text.trim());
+            if (!pause && !clause) continue;
+            long at = word.end;
+            if (at <= unit.start + RebuildPageLayout.MIN_PAGE_MS
+                    || at >= unit.end - RebuildPageLayout.MIN_PAGE_MS
+                    || at <= last + 80) continue;
+            anchors.add(at);
+            last = at;
+        }
+        if (anchors.isEmpty()) return null;
+        long[] out = new long[anchors.size()];
+        for (int i = 0; i < out.length; i++) out[i] = anchors.get(i);
+        return out;
+    }
+
+    private static boolean endsClauseMark(String text) {
+        if (text == null || text.isEmpty()) return false;
+        char last = text.charAt(text.length() - 1);
+        return "，。！？；：,!?;:".indexOf(last) >= 0 || RebuildSource.terminal(text);
+    }
+
+    private static List<RebuildDisplayGroups.Unit> authoredPartialUnits(
+            Session s, int index, RebuildProtocol.Plan plan) {
+        return RebuildCueContract.partialUnits(
+                index, s.source, s.blocks.get(index), plan.events, s.languageContext);
+    }
+
     private static List<RebuildDisplayGroups.Unit> displayUnits(
             Session s, int index, RebuildProtocol.Plan plan) {
         CaptionRenderSpec spec = s.languageContext.renderSpec;
@@ -1765,18 +2146,52 @@ final class RebuildController {
         DisplayLayout cached = s.displayLayouts[index];
         if (cached != null && cached.plan == plan && cached.geometry.equals(geometry))
             return cached.units;
+        // A manually authored track is shown cue by cue. Events inside one cue are concatenated;
+        // no event may leave its cue, and the cue window is the page window.
+        boolean authoredTrack = s.blocks.get(index).authored;
+        if (authoredTrack) {
+            boolean partial = s.provisional != null && s.provisional[index] == plan;
+            List<RebuildDisplayGroups.Unit> units =
+                    partial
+                            ? authoredPartialUnits(s, index, plan)
+                            : authoredUnits(s, index, plan);
+            TranslationRuntime.mark(
+                    s.context,
+                    "REBUILD_UNIT_MODE",
+                    "session="
+                            + s.id
+                            + ";block="
+                            + index
+                            + ";authored=true;partial="
+                            + partial
+                            + ";units="
+                            + units.size()
+                            + ";"
+                            + authoredSummary(s.source, s.blocks.get(index), plan)
+                            + ";url="
+                            + s.url);
+            if (!units.isEmpty()) s.displayLayouts[index] = new DisplayLayout(plan, geometry, units);
+            return units;
+        }
+        TranslationRuntime.mark(
+                s.context,
+                "REBUILD_UNIT_MODE",
+                "session="
+                        + s.id
+                        + ";block="
+                        + index
+                        + ";authored=false;url="
+                        + s.url);
+        // A joined unit may use the two lines the box has, so a fragment the model cut in half can
+        // be completed inside one unit; the page planner still shows it as one-line clauses.
         Predicate<String> fits =
                 budget == null
                         ? null
                         : value -> measured.fits(value, budget.preferredPx, budget.width, 2);
+        // Advisory concerns are logged, not a reason to withhold a complete translation.
         List<RebuildDisplayGroups.Unit> units =
                 RebuildDisplayGroups.partition(
-                        index,
-                        plan.events,
-                        s.source,
-                        s.languageContext,
-                        fits,
-                        event -> RebuildReview.blocked(plan, event));
+                        index, plan.events, s.source, s.languageContext, fits, null);
         s.displayLayouts[index] = new DisplayLayout(plan, geometry, units);
         return units;
     }
@@ -1800,6 +2215,25 @@ final class RebuildController {
         return state == FAILED ? "failed:" + reason : "pending_translation";
     }
 
+    /** Neutral text for a source range a salvaged plan could not translate. Never source text. */
+    private static final String UNAVAILABLE_MARKER = "\u2026";
+
+    /** The source window of the salvaged-plan hole covering [time], or null. */
+    private static long[] holeWindow(
+            Session s, RebuildProtocol.Plan plan, long time) {
+        if (s.source == null || plan == null || !plan.partial || plan.holes.isEmpty()) return null;
+        int size = s.source.words.size();
+        for (int[] hole : plan.holes) {
+            int from = Math.max(0, Math.min(hole[0], size - 1));
+            int to = Math.max(0, Math.min(hole[1], size - 1));
+            if (to < from) continue;
+            long start = s.source.words.get(from).start;
+            long end = s.source.words.get(to).end;
+            if (time >= start && time < end) return new long[] {start, end};
+        }
+        return null;
+    }
+
     private static void render(Session s) {
         if (!current(s) || !s.visible) return;
         String translating = TranslationRuntime.message(s.context, "caption_translating");
@@ -1808,6 +2242,7 @@ final class RebuildController {
         int generation;
         long revision, submission, selectedAt, observedAt;
         long eventStart = -1, eventEnd = -1;
+        long[] eventAnchors = null;
         synchronized (s) {
             if (!current(s) || !s.visible) return;
             generation = s.generation;
@@ -1859,27 +2294,65 @@ final class RebuildController {
                         eventId = unit.id();
                         eventStart = unit.start;
                         eventEnd = unit.end;
+                        eventAnchors = pageAnchors(s, unit);
                         text = unit.text;
                         if (text.isEmpty()) displayEmptyReason = "non_speech";
-                        if (unit.blocked) {
-                            text = "";
-                            eventId = "source:" + eventId;
-                            fallbackReason = "event_review";
-                        } else if (!text.isEmpty()) s.display.shown(unit);
+                        if (!text.isEmpty()) s.display.shown(unit);
                     } else if (p == null || provisional) {
                         fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
-                        // Waiting and blank failure displays keep each source cue's own window: a
-                        // block-wide display must not announce a later cue before its onset.
+                        // Waiting displays keep each source cue's own window, so a block-wide
+                        // placeholder never announces a later cue before its onset. The video's own
+                        // line is never a substitute for a translation: only the neutral placeholder
+                        // may stand in while a reply can still arrive.
                         CaptionDocument.Cue cue = originalCue(s, selectedAt);
                         RebuildPlanner.Block block = s.blocks.get(i);
-                        if (cue != null && cue.startMs < block.end && cue.endMs > block.start) {
+                        if (fallbackReason.equals("pending_translation")
+                                && cue != null
+                                && cue.startMs < block.end
+                                && cue.endMs > block.start) {
                             eventStart = Math.max(cue.startMs, block.start);
                             eventEnd = Math.min(cue.endMs, block.end);
                             if (eventStart <= selectedAt && selectedAt < eventEnd) {
-                                text = s.states[i] == FAILED ? "" : translating;
-                                eventId = "source:" + i + ":" + eventStart + "_" + eventEnd;
+                                text = translating;
+                                eventId = "waiting:" + i + ":" + eventStart + "_" + eventEnd;
                             }
                         }
+                        // A block abandoned after bounded retries (or refused by the provider)
+                        // gets the same neutral marker: never the video's own line, never an
+                        // unexplained blank for a speech range.
+                        if (text.isEmpty()
+                                && s.states != null
+                                && s.states[i] == FAILED
+                                && cue != null
+                                && cue.startMs < block.end
+                                && cue.endMs > block.start) {
+                            eventStart = Math.max(cue.startMs, block.start);
+                            eventEnd = Math.min(cue.endMs, block.end);
+                            if (eventStart <= selectedAt && selectedAt < eventEnd) {
+                                text = UNAVAILABLE_MARKER;
+                                eventId =
+                                        "unavailable:failed:"
+                                                + i
+                                                + ":"
+                                                + eventStart
+                                                + "_"
+                                                + eventEnd;
+                            }
+                        }
+                    } else {
+                        // The plan is ready but this instant falls outside every display unit.
+                        // A salvaged plan knows which source ranges it could not translate; show a
+                        // neutral marker instead of an unexplained blank. A plain estimated gap
+                        // (no hole) stays empty: there is no speech there to stand in for.
+                        long[] hole = holeWindow(s, p, selectedAt);
+                        if (hole != null) {
+                            eventStart = hole[0];
+                            eventEnd = hole[1];
+                            text = UNAVAILABLE_MARKER;
+                            eventId =
+                                    "unavailable:" + i + ":" + eventStart + "_" + eventEnd;
+                        }
+                        fallbackReason = "";
                     }
                 }
             }
@@ -1900,15 +2373,13 @@ final class RebuildController {
         String appliedIdentity = s.id + ":" + generation + ":" + eventId;
         long appliedStart = eventStart, appliedEnd = eventEnd;
         String appliedReason =
-                fallbackReason.equals("event_review")
-                        ? "semantic_blocked"
-                        : fallbackReason.startsWith("failed:")
-                                ? "translation_failed"
-                                : fallbackReason.isEmpty()
-                                        ? (displayEmptyReason.isEmpty()
-                                                ? "source_gap"
-                                                : displayEmptyReason)
-                                        : "pending_translation";
+                fallbackReason.startsWith("failed:")
+                        ? "translation_failed"
+                        : fallbackReason.isEmpty()
+                                ? (displayEmptyReason.isEmpty()
+                                        ? "source_gap"
+                                        : displayEmptyReason)
+                                : "pending_translation";
         TranslationOutput.RenderGuard guard =
                 new TranslationOutput.RenderGuard() {
                     @Override
@@ -1974,7 +2445,10 @@ final class RebuildController {
                     eventStart,
                     eventEnd,
                     selectedAt,
-                    s.languageContext.renderSpec);
+                    s.authored
+                            ? s.languageContext.renderSpec.withAuthored()
+                            : s.languageContext.renderSpec,
+                    eventAnchors);
         if (TranslationRuntime.debugEnabled(s.context))
             TranslationRuntime.mark(
                     s.context,

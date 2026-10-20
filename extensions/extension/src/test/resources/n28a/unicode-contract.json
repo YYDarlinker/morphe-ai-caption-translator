@@ -1,6 +1,6 @@
 {
   "counter_version": "caption-visible-counters-v4-r1",
-  "boundary_version": "android-icu+devanagari-virama-v1",
+  "boundary_version": "android-icu+indic-virama-v2",
   "cases": [
     {
       "id": "nfc-accent",

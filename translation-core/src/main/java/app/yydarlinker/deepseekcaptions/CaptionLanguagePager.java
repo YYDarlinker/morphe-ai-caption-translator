@@ -10,22 +10,122 @@ final class CaptionLanguagePager {
 
     static List<RebuildPageLayout.Page> plan(
             String text, long start, long end, TranslationBudget budget, CaptionRenderSpec spec) {
+        return plan(text, start, end, budget, spec, null);
+    }
+
+    static List<RebuildPageLayout.Page> plan(
+            String text,
+            long start,
+            long end,
+            TranslationBudget budget,
+            CaptionRenderSpec spec,
+            long[] sourceAnchors) {
         if (text == null || text.isEmpty() || end <= start || !wellFormed(text, spec))
             return Collections.emptyList();
-        if (spec.fits(text, budget.preferredPx, budget.width, 2))
-            return Collections.singletonList(
-                    new RebuildPageLayout.Page(text, start, end, "SOURCE_EVENT"));
-        if (end - start < 2 * MIN_PAGE_MS && !spec.fits(text, budget.preferredPx, budget.width, 2))
-            return Collections.emptyList();
+        // A unit that already reads as one subtitle keeps its exact source window; only a unit
+        // holding several complete sentences is divided, and only between them.
+        List<RebuildPageLayout.Page> unit =
+                RebuildPageLayout.unitPages(text, start, end, budget, spec, sourceAnchors);
+        if (unit != null) return authoredLabel(unit, spec);
+        // Keeping the whole text is one of the candidates the search weighs: it is not granted for
+        // free, and no fixed duration forces a split. A plan only has to stay inside one clause at
+        // a time and remain comfortable to read.
         Seams seams = seams(text, budget, spec);
         List<RebuildPageLayout.Page> pages =
                 choose(text, start, end, seams.cuts, seams.kinds, budget, spec);
-        if (!pages.isEmpty()) return pages;
-        // Seven seconds and reading/CPL references are watches, not independent reasons for
-        // blanking.
-        return spec.fits(text, budget.preferredPx, budget.width, 2)
-                ? Collections.singletonList(new RebuildPageLayout.Page(text, start, end))
-                : Collections.emptyList();
+        if (!pages.isEmpty()) return authoredLabel(pages, spec);
+        // Time shortage or an indivisible long unit is not a reason to hide captions. Split by
+        // measured line capacity and keep the whole translation visible.
+        return authoredLabel(fallback(text, start, end, budget, spec, seams.cuts), spec);
+    }
+
+    /** An authored cue that cannot fit the two-line box is an explicit overflow projection. */
+    private static List<RebuildPageLayout.Page> authoredLabel(
+            List<RebuildPageLayout.Page> pages, CaptionRenderSpec spec) {
+        if (!spec.authored || pages.size() <= 1) return pages;
+        List<RebuildPageLayout.Page> out = new ArrayList<>(pages.size());
+        for (RebuildPageLayout.Page page : pages)
+            out.add(
+                    new RebuildPageLayout.Page(
+                            page.text, page.start, page.end, "AUTHORED_OVERFLOW"));
+        return Collections.unmodifiableList(out);
+    }
+
+    /** Last-resort pages: longest measured prefix per page, proportional reading time. */
+    private static List<RebuildPageLayout.Page> fallback(
+            String text,
+            long start,
+            long end,
+            TranslationBudget budget,
+            CaptionRenderSpec spec,
+            int[] cuts) {
+        CaptionClauses clauses = CaptionClauses.of(text);
+        List<String> parts = new ArrayList<>();
+        int from = 0;
+        while (from < text.length()) {
+            int best = -1, firstAllowed = -1;
+            for (int cut : cuts) {
+                if (cut <= from) continue;
+                if (clauses.allows(from, cut)) {
+                    if (firstAllowed < 0) firstAllowed = cut;
+                    if (spec.fits(text.substring(from, cut), budget.preferredPx, budget.width, 2))
+                        best = cut;
+                }
+            }
+            if (best < 0) {
+                // A single clause (or an unpunctuated cue) can exceed the two-line box. The
+                // semantic cut is impossible, so take the longest measured prefix that still
+                // shows complete glyph clusters; blanking the page is never the fallback.
+                best = measuredPrefix(text, from, budget, spec);
+            }
+            if (best < 0) best = firstAllowed;
+            if (best <= from) best = from + Character.charCount(text.codePointAt(from));
+            parts.add(text.substring(from, best));
+            from = best;
+        }
+        long[] weights = new long[parts.size()];
+        long total = 0;
+        for (int i = 0; i < parts.size(); i++) {
+            weights[i] = Math.max(1, spec.readingUnits(parts.get(i)));
+            total += weights[i];
+        }
+        List<RebuildPageLayout.Page> result = new ArrayList<>(parts.size());
+        long at = start, remainingWeight = total;
+        for (int i = 0; i < parts.size(); i++) {
+            if (i + 1 == parts.size()) {
+                result.add(new RebuildPageLayout.Page(parts.get(i), at, end));
+                break;
+            }
+            long remaining = end - at;
+            if (remaining <= parts.size() - i) {
+                // Less than one millisecond per remaining part: show the remainder as one page
+                // rather than dropping text or creating an invalid window.
+                StringBuilder merged = new StringBuilder();
+                for (int k = i; k < parts.size(); k++) merged.append(parts.get(k));
+                result.add(new RebuildPageLayout.Page(merged.toString(), at, end));
+                break;
+            }
+            long span = Math.max(1, remaining * weights[i] / remainingWeight);
+            long next = Math.min(end - 1, at + span);
+            result.add(new RebuildPageLayout.Page(parts.get(i), at, next));
+            at = next;
+            remainingWeight -= weights[i];
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /** Longest prefix from {@code from} that still fits the two-line box, on glyph boundaries. */
+    private static int measuredPrefix(
+            String text, int from, TranslationBudget budget, CaptionRenderSpec spec) {
+        int[] boundaries = CaptionUnicode.characterBoundaries(text, spec.locale);
+        int best = -1;
+        for (int boundary : boundaries) {
+            if (boundary <= from) continue;
+            if (spec.fits(text.substring(from, boundary), budget.preferredPx, budget.width, 2))
+                best = boundary;
+            else break;
+        }
+        return best;
     }
 
     static boolean wellFormed(String text, CaptionRenderSpec spec) {
@@ -177,6 +277,7 @@ final class CaptionLanguagePager {
         TreeMap<Integer, Integer> ordinary = new TreeMap<>();
         ordinary.put(0, SENTENCE);
         ordinary.put(text.length(), SENTENCE);
+        int lastSeam = 0;
         for (int n : graphemes) {
             if (n == 0 || n == text.length() || !legal(text, n, blocked)) continue;
             int kind = evidence(text, n);
@@ -196,7 +297,15 @@ final class CaptionLanguagePager {
                     && punctuation > 0
                     && text.codePointBefore(punctuation) == '.'
                     && !sentence) kind = WORD;
-            if (word || kind < WORD || sentence && kind == SENTENCE) ordinary.put(n, kind);
+            int mark = punctuation > 0 ? text.codePointBefore(punctuation) : -1;
+            // A colon introduces what follows, and a bare discourse marker ("当然，") belongs to
+            // the clause it introduces: neither may end a page.
+            if (mark == '：' || mark == ':') continue;
+            if (kind == CLAUSE && n - lastSeam <= 4) continue;
+            if (word || kind < WORD || sentence && kind == SENTENCE) {
+                ordinary.put(n, kind);
+                lastSeam = n;
+            }
         }
         TreeMap<Integer, Integer> all = new TreeMap<>(ordinary);
         List<Integer> units = new ArrayList<>(ordinary.keySet());
@@ -247,25 +356,31 @@ final class CaptionLanguagePager {
     }
 
     private static final class Score implements Comparable<Score> {
-        final int emergency, weak, pages, clauses;
+        final int emergency, weak, longPages, clauses, pages;
         final double balance;
 
-        Score(int e, int w, int p, int c, double b) {
+        Score(int e, int w, int longPages, int p, int c, double b) {
             emergency = e;
             weak = w;
+            this.longPages = longPages;
             pages = p;
             clauses = c;
             balance = b;
         }
 
         public int compareTo(Score o) {
+            // Meaning first: an emergency cut (inside a word) or a weak one is worse than any
+            // pacing preference. Then a page held past the recommended wall time, then whether the
+            // cut landed on a clause instead of a sentence, then how many pages, then balance.
             int n = Integer.compare(emergency, o.emergency);
             if (n != 0) return n;
             n = Integer.compare(weak, o.weak);
             if (n != 0) return n;
-            n = Integer.compare(pages, o.pages);
+            n = Integer.compare(longPages, o.longPages);
             if (n != 0) return n;
             n = Integer.compare(clauses, o.clauses);
+            if (n != 0) return n;
+            n = Integer.compare(pages, o.pages);
             return n != 0 ? n : Double.compare(balance, o.balance);
         }
     }
@@ -282,10 +397,11 @@ final class CaptionLanguagePager {
         long duration = end - start;
         int capacity = (int) Math.min(n - 1, duration / MIN_PAGE_MS);
         if (capacity < 1) return Collections.emptyList();
+        CaptionClauses clauses = CaptionClauses.of(text);
         Score[][] cost = new Score[capacity + 1][n];
         int[][] previous = new int[capacity + 1][n];
         for (int p = 0; p <= capacity; p++) Arrays.fill(previous[p], -1);
-        cost[0][0] = new Score(0, 0, 0, 0, 0);
+        cost[0][0] = new Score(0, 0, 0, 0, 0, 0);
         int total = Math.max(1, spec.readingUnits(text));
         Map<String, Measured> measurements = new HashMap<>();
         for (int count = 0; count < capacity; count++)
@@ -293,6 +409,9 @@ final class CaptionLanguagePager {
                 Score prior = cost[count][from];
                 if (prior == null) continue;
                 for (int to = from + 1; to < n; to++) {
+                    // A page may hold several complete clauses, or one long clause split on its
+                    // own; it never starts before a clause and ends inside it.
+                    if (!clauses.allows(cuts[from], cuts[to])) continue;
                     // Within this event/spec/geometry, identical complete parts have identical
                     // native layout.
                     String part = text.substring(cuts[from], cuts[to]);
@@ -316,6 +435,8 @@ final class CaptionLanguagePager {
                             new Score(
                                     prior.emergency + (kind == EMERGENCY ? 1 : 0),
                                     prior.weak + (kind == WORD ? 1 : 0),
+                                    prior.longPages
+                                            + (ms > spec.profile.softPageDurationMs ? 1 : 0),
                                     count + 1,
                                     prior.clauses + (kind == CLAUSE ? 1 : 0),
                                     prior.balance

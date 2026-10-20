@@ -10,7 +10,7 @@
 - 可在 AI 设置内勾选需要加入原生「自动翻译」列表的语言，包括简体中文。勾选仅增加可选语言，不会同时后台翻译所有语言。
 - 自定义字幕字号、背景透明度和垂直位置；字幕外层按视频物理中心定位，不受应用从左到右／从右到左的界面方向影响。
 - 多套 API 配置、模型选择、自定义翻译要求、缓存和诊断导出；设置界面适配十四语种。
-- 可选「Remember caption selection」在当前应用进程内记住字幕选择，与 AI 开关独立，完整重启后重置。
+- 字幕语言完全由 YouTube 原生字幕菜单与官方 Captions 补丁（包括「Preferred caption language」）决定；本源不再保存另一套目标语言。
 - 视频已自带所选目标语言的字幕时，直接以 AI 字幕样式显示，不发起翻译请求。上传字幕保留作者原有的换行和双行排版；只有自动生成字幕会在本地优化分句与翻页。
 - 视频有多条字幕轨道时，优先翻译口述语言的轨道（人工优先于自动，其次为人工英语），而不是 YouTube 预选的那一条。
 
@@ -31,10 +31,10 @@
 1. 安装 [Morphe Manager](https://github.com/MorpheApp/morphe-manager/releases/latest)，在设置中启用「专家模式」。
 2. 点击[添加到 Morphe](https://morphe.software/add-source?github=YYDarlinker/morphe-ai-caption-translator)，或在「补丁源→添加→远程」粘贴 `https://github.com/YYDarlinker/morphe-ai-caption-translator`。
 3. 加载上表中的**原始、未打补丁 YouTube APK**，优先21.20.405。
-4. 保留对应官方默认补丁组合，包含其字幕、设置、播放器接缝支持。在本项目源内选择 **AI caption translator**；需要记忆字幕选择时，再选 **Remember caption selection**。
+4. 保留对应官方默认补丁组合，包含其字幕、设置、播放器接缝支持。在本项目源内只选择 **AI caption translator**；字幕语言由 YouTube 原生菜单/官方 Captions 补丁决定，本源不提供单独的语言记忆补丁。
 5. 由 Morphe 完成补丁、签名与安装；若官方补丁要求 GmsCore，按其指引设置。
 
-不要同时选择旧AI字幕addon或其他重叠的字幕记忆补丁。本源需要与官方补丁组合，不替代官方源。`.mpp` 是补丁包，不能直接作为 YouTube APK 安装。
+不要同时选择旧AI字幕addon或其他重叠的字幕记忆补丁。官方 Captions 补丁保持语言决定权；本源只跟随原生选择，不凭空添加目标语言。本源需要与官方补丁组合，不替代官方源。`.mpp` 是补丁包，不能直接作为 YouTube APK 安装。
 
 ## 配置与使用
 

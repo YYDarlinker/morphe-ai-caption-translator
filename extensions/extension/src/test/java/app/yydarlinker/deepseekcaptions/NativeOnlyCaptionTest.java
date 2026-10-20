@@ -1,0 +1,227 @@
+package app.yydarlinker.deepseekcaptions;
+
+import android.app.Activity;
+import android.content.Context;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import app.yydarlinker.caption.contracts.CaptionContracts.*;
+
+import static org.junit.Assert.*;
+
+/**
+ * The addon must follow YouTube's native caption selection. It must not persist a target, add a
+ * target to a source request, or select a native track of its own.
+ */
+@RunWith(RobolectricTestRunner.class)
+@Config(
+        sdk = 28,
+        manifest = Config.NONE,
+        shadows = {
+            NativeOnlyCaptionTest.Flags.class,
+            NativeOnlyCaptionTest.Tracks.class,
+            NativeOnlyCaptionTest.Core.class
+        })
+public class NativeOnlyCaptionTest {
+    enum Origin { PREFERRED_TRACK, DEFAULT }
+
+    private static final String VIDEO = "abcdefghijk";
+    private static final String SOURCE =
+            "https://www.youtube.com/api/timedtext?v=" + VIDEO + "&lang=en";
+    private static final String TRANSLATED =
+            "https://www.youtube.com/api/timedtext?v=" + VIDEO + "&lang=en&tlang=zh-Hans";
+
+    static final List<Track> translated = new ArrayList<>();
+    static final List<Track> nativeTracks = new ArrayList<>();
+    static final List<String> activations = new ArrayList<>();
+    static final List<String> sources = new ArrayList<>();
+    static String currentVideo = "";
+
+    static final class Track {
+        final String language, url, vss;
+
+        Track(String language, String url, String vss) {
+            this.language = language;
+            this.url = url;
+            this.vss = vss;
+        }
+    }
+
+    @Implements(CaptionAddonSupport.class)
+    public static class Flags {
+        @Implementation
+        public static boolean aiInstalled() {
+            return true;
+        }
+    }
+
+    @Implements(NativeCaptionBridge.class)
+    public static class Tracks {
+        @Implementation
+        public static String language(Object track) {
+            return ((Track) track).language;
+        }
+
+        @Implementation
+        public static String url(Object track) {
+            return ((Track) track).url;
+        }
+
+        @Implementation
+        public static String vss(Object track) {
+            return ((Track) track).vss;
+        }
+
+        @Implementation
+        public static List<?> translatedTracks(Object manager) {
+            return translated;
+        }
+
+        @Implementation
+        public static List<?> nativeTracks(Object manager) {
+            return nativeTracks;
+        }
+
+        @Implementation
+        public static CharSequence displayName(Object track) {
+            return ((Track) track).language;
+        }
+    }
+
+    @Implements(CaptionActions.class)
+    public static class Core {
+        @Implementation
+        public static void activate(Context context, String url) {
+            activations.add(url);
+        }
+
+        @Implementation
+        public static void activate(Context context, String url, boolean original, boolean show) {
+            // Invisible prewarm is not the visible session under test.
+        }
+
+        @Implementation
+        public static void activateSource(Context context, String url) {
+            sources.add(url);
+        }
+
+        @Implementation
+        public static String currentVideoIdSnapshot() {
+            return currentVideo;
+        }
+
+        @Implementation
+        public static boolean isVisibleActive() {
+            return false;
+        }
+
+        @Implementation
+        public static boolean ownsNativeTrack() {
+            return false;
+        }
+
+        @Implementation
+        public static void refreshConfiguration(Context context) {}
+    }
+
+    private Activity activity;
+
+    @Before
+    public void before() throws Exception {
+        activity = Robolectric.buildActivity(Activity.class).setup().get();
+        CaptionAddonSupport.initialize(activity);
+        java.lang.reflect.Field context = NativeCaptionBridge.class.getDeclaredField("context");
+        context.setAccessible(true);
+        context.set(null, activity.getApplicationContext());
+        CaptionActions.install(
+                new CaptionPort() {
+                    public void command(Action action, String value) {
+                        if (action == Action.VIDEO) currentVideo = value == null ? "" : value;
+                    }
+
+                    public boolean active() {
+                        return false;
+                    }
+
+                    public boolean ownsNativeTrack() {
+                        return false;
+                    }
+
+                    public String restoreTarget(String url) {
+                        return url;
+                    }
+
+                    public String videoId() {
+                        return currentVideo;
+                    }
+
+                    public void playback(long time) {}
+                },
+                new CaptionActions.SettingsServices() {
+                    public String testApi() {
+                        return "fake";
+                    }
+
+                    public List<String> models(String endpoint) {
+                        return Collections.emptyList();
+                    }
+                });
+        CaptionChoice.reset();
+        translated.clear();
+        nativeTracks.clear();
+        activations.clear();
+        sources.clear();
+        currentVideo = VIDEO;
+        DeepSeekConfig.saveEnabled(activity, true);
+    }
+
+    @After
+    public void after() {
+        CaptionChoice.reset();
+        activity.finish();
+    }
+
+    @Test
+    public void sourceRequestsAreNeverGivenAFabricatedTarget() {
+        CaptionChoice.select("ja", true);
+        assertEquals(SOURCE, DeepSeekCaptionHook.rewriteUrl(null, SOURCE));
+    }
+
+    @Test
+    public void automaticNativeTranslationBecomesTheCurrentSessionTarget() {
+        Track zh = new Track("zh-Hans", TRANSLATED, "t.zh-Hans");
+        translated.add(zh);
+
+        NativeCaptionBridge.onNativeSelection(new Object(), zh, Origin.DEFAULT);
+
+        assertEquals("zh-Hans", CaptionChoice.language());
+        assertTrue(CaptionChoice.translates());
+        assertEquals("native translated selection starts the AI overlay", 1, activations.size());
+        assertTrue(activations.get(0), activations.get(0).contains("tlang=zh-Hans"));
+    }
+
+    @Test
+    public void nativeSourceSelectionDoesNotStartTranslation() {
+        Track en = new Track("en", SOURCE, ".en");
+        nativeTracks.add(en);
+
+        NativeCaptionBridge.onNativeSelection(new Object(), en, Origin.PREFERRED_TRACK);
+
+        assertEquals("en", CaptionChoice.language());
+        assertFalse(CaptionChoice.translates());
+        assertTrue(activations.isEmpty());
+        assertEquals(1, sources.size());
+    }
+}

@@ -1,6 +1,6 @@
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java
-@@ -1,1721 +1,1993 @@
+@@ -1,1721 +1,2164 @@
  package app.yydarlinker.deepseekcaptions;
  
 -import android.app.Activity;
@@ -309,6 +309,9 @@
 +        final CaptionLanguageContext languageContext;
 +        volatile String url;
 +        volatile boolean visible, cancelled, retired, loading, terminal;
++
++        /** The source evidence kind accepted for this generation; authored cue pages use it. */
++        volatile boolean authored;
 +        volatile long sourceRetry, position, providerRetry;
 +        long lastSeekAt = -1, prefetchPausedUntil;
 +        volatile long pausedDisplayPosition = -1;
@@ -532,6 +535,9 @@
 +         * not-yet-sent newest foreground job may be replaced by a later seek.
 +         */
 +        volatile boolean cancelled, sent, dispatched;
++
++        /** This attempt is a paid semantic/structural repair, not a transient retry. */
++        boolean repair;
 +
 +        private long httpStartedAt;
 +
@@ -1629,12 +1635,36 @@
 +            // planning run. Translation requests still wait for the full plan.
 +            render(s);
 +            RebuildSource source = RebuildSource.read(raw.body, raw.document, !s.sourceOnly);
++            // A coarse automatic track is exactly the case that needs a finer ASR reference. The
++            // old gate required native words first, so a completely coarse primary never tried the
++            // reference at all. A manually authored track keeps its cue-level timing and needs no
++            // second download.
++            boolean authoredTrack = authored(s);
 +            if (!s.sourceOnly
-+                    && (source.hasPartialTiming()
-+                            || source.nativeWordCount() < source.words.size()))
++                    && !authoredTrack
++                    && source.nativeWordCount() < source.words.size())
 +                source = alignedToReference(s, source, control);
-+            List<RebuildPlanner.Block> blocks = RebuildPlanner.plan(source, s.languageContext);
-+            String key = RebuildCache.identity(source, s.config, s.target, s.languageContext);
++            else if (!s.sourceOnly && !authoredTrack)
++                TranslationRuntime.mark(
++                        s.context,
++                        "REBUILD_SOURCE_REFERENCE_SKIPPED",
++                        "session="
++                                + s.id
++                                + ";native_words="
++                                + source.nativeWordCount()
++                                + ";words="
++                                + source.words.size()
++                                + ";reason=all_words_native");
++            // A manually authored track keeps its own segmentation: every authored cue is a display
++            // boundary, while consecutive cues may share one request block so the model sees the
++            // sentence around a fragment. Automatic tracks keep the sentence-sized blocks.
++            List<RebuildPlanner.Block> blocks =
++                    authoredTrack
++                            ? RebuildPlanner.planAuthored(source, s.languageContext)
++                            : RebuildPlanner.plan(source, s.languageContext);
++            String key =
++                    RebuildCache.identity(
++                            source, s.config, s.target, s.languageContext, authoredTrack);
 +            RebuildProtocol.Plan[] plans = new RebuildProtocol.Plan[blocks.size()];
 +            int[] states = new int[blocks.size()];
 +            boolean[] checked = new boolean[blocks.size()];
@@ -1670,6 +1700,7 @@
 +                    restored = 0;
 +                }
 +                s.source = source;
++                s.authored = authoredTrack;
 +                s.cacheKey = key;
 +                s.plans = plans;
 +                s.pendingPlans = new RebuildProtocol.Plan[plans.length];
@@ -1707,7 +1738,9 @@
 +                            + ";blocks="
 +                            + blocks.size()
 +                            + ";cache_hits="
-+                            + restored);
++                            + restored
++                            + ";precision="
++                            + source.precisionEvidence());
 +            TranslationAudit.recordUnitCacheOutcome(
 +                    Math.min(2, blocks.size() - focusIndex), restored);
 +            render(s);
@@ -2036,7 +2069,7 @@
 +     * job replaced before it is dispatched never consumes a translation attempt or a repair.
 +     */
 +    private static void markDispatched(Session s, Job job) {
-+        if (s.attempts[job.index] > 0) s.repairCount++;
++        if (job.repair) s.repairCount++;
 +        s.attempts[job.index]++;
 +        s.states[job.index] = RUNNING;
 +        job.dispatched = true;
@@ -2242,13 +2275,27 @@
 +                                                && s.repairCount < RebuildReview.MAX_SESSION_REPAIRS
 +                                        ? 3
 +                                        : 2;
++                boolean slowRetry = false;
 +                if (s.attempts[i] >= maxAttempts
 +                        || s.attempts[i] > 0
++                                && s.plans[i] != null
 +                                && s.repairCount >= RebuildReview.MAX_SESSION_REPAIRS) {
-+                    s.states[i] = s.plans[i] == null ? FAILED : READY;
-+                    continue;
++                    if (s.plans[i] != null) {
++                        s.states[i] = READY;
++                        continue;
++                    }
++                    // A block that never produced anything keeps a slow, bounded-rate retry
++                    // while it is still in front of the viewer, instead of disappearing for good.
++                    if (now < s.retryAt[i]) continue;
++                    s.attempts[i] = Math.max(0, maxAttempts - 1);
++                    slowRetry = true;
 +                }
 +                Job job = new Job(s, i, focus);
++                job.repair =
++                        !slowRetry
++                                && s.attempts[i] > 0
++                                && (s.plans[i] != null
++                                        || RebuildReview.structuralRetry(s.reasons[i]));
 +                s.jobs[i] = job;
 +                if (focus && focusDispatched >= MAX_FOCUS_CONCURRENCY) {
 +                    // Both foreground slots are busy: keep only this newest landing.
@@ -2879,7 +2926,10 @@
 +                            + ";review_risks="
 +                            + RebuildReview.score(accepted.issues)
 +                            + ";attempts="
-+                            + s.attempts[b.index]);
++                            + s.attempts[b.index]
++                            + (b.authored
++                                    ? ";" + RebuildCueContract.summary(s.source, b, accepted.events)
++                                    : ""));
 +        } catch (Exception e) {
 +            if (!current(s)) return;
 +            rejected(s, job, b, e);
@@ -2936,21 +2986,16 @@
 +                                code);
 +            }
 +            boolean filtered = failure != null && "content_filter".equals(failure.code);
-+            boolean structuralRetry =
-+                    s.plans[job.index] == null
-+                            && s.attempts[job.index] < 3
-+                            && RebuildReview.structuralRetry(code)
-+                            && s.repairCount < RebuildReview.MAX_SESSION_REPAIRS;
-+            s.states[job.index] =
-+                    fatal
-+                                    || filtered
-+                                    || (!structuralRetry && s.attempts[job.index] >= 2)
-+                                    || s.attempts[job.index] >= 3
-+                                    || s.repairCount >= RebuildReview.MAX_SESSION_REPAIRS
-+                            ? FAILED
-+                            : WAITING;
++            // Only a provider refusal or a configuration error ends a block for good. Network,
++            // timeout, malformed-output and structural failures stay retryable; the view falls
++            // back to the source line while a slow retry keeps trying.
++            s.states[job.index] = fatal || filtered ? FAILED : WAITING;
 +            long delay = failure != null ? failure.delay : 0;
-+            s.retryAt[job.index] = SystemClock.elapsedRealtime() + Math.max(1200, delay);
++            long backoff =
++                    s.attempts[job.index] >= 3
++                            ? 15000
++                            : s.attempts[job.index] >= 2 ? 5000 : 1200;
++            s.retryAt[job.index] = SystemClock.elapsedRealtime() + Math.max(backoff, delay);
 +            if (code.equals("http_429") || code.startsWith("http_5"))
 +                s.providerRetry =
 +                        Math.max(
@@ -3071,6 +3116,89 @@
 +        }
 +    }
 +
++    /** True when the source track is manually authored rather than machine generated. */
++    private static boolean authored(Session s) {
++        return TranslationRuntime.authoredTrack(s.url);
++    }
++
++    /**
++     * One display unit per authored cue. The model may return several events inside a cue; those
++     * events are concatenated into the cue page. The page window is the cue window, not an
++     * estimated event time.
++     */
++    private static List<RebuildDisplayGroups.Unit> authoredUnits(
++            Session s, int index, RebuildProtocol.Plan plan) {
++        RebuildPlanner.Block block = s.blocks.get(index);
++        try {
++            List<RebuildDisplayGroups.Unit> units =
++                    RebuildCueContract.units(
++                            index, s.source, block, plan.events, s.languageContext);
++            return units;
++        } catch (RebuildProtocol.Invalid invalid) {
++            // A cached/old plan could predate the contract. Never fabricate a page from it; the
++            // block stays blank and the next request/repair can produce a conforming plan.
++            if (s.plans[index] == plan)
++                TranslationRuntime.mark(
++                        s.context,
++                        "REBUILD_CUE_CONTRACT_REJECTED",
++                        "session="
++                                + s.id
++                                + ";block="
++                                + index
++                                + ";reason="
++                                + invalid.code
++                                + ";"
++                                + invalid.detail);
++            return Collections.emptyList();
++        }
++    }
++
++    /** Diagnostic view of the authored cue contract: cue count and events per cue. */
++    private static String authoredSummary(
++            RebuildSource source, RebuildPlanner.Block block, RebuildProtocol.Plan plan) {
++        return RebuildCueContract.summary(source, block, plan.events);
++    }
++
++    /**
++     * Real speech boundaries inside one display unit: a word end followed by a pause or a clause
++     * mark. Page turns use these instead of character counts when the source has word timing.
++     */
++    private static long[] pageAnchors(Session s, RebuildDisplayGroups.Unit unit) {
++        if (s == null || s.source == null || unit == null || unit.end <= unit.start) return null;
++        java.util.List<Long> anchors = new java.util.ArrayList<>();
++        int from = Math.max(0, unit.from), to = Math.min(s.source.words.size() - 1, unit.to);
++        long last = -1;
++        for (int i = from; i <= to && anchors.size() < 64; i++) {
++            RebuildSource.Word word = s.source.words.get(i);
++            boolean pause =
++                    i > from && word.start - s.source.words.get(i - 1).end >= 220;
++            boolean clause = word.text != null && endsClauseMark(word.text.trim());
++            if (!pause && !clause) continue;
++            long at = word.end;
++            if (at <= unit.start + RebuildPageLayout.MIN_PAGE_MS
++                    || at >= unit.end - RebuildPageLayout.MIN_PAGE_MS
++                    || at <= last + 80) continue;
++            anchors.add(at);
++            last = at;
++        }
++        if (anchors.isEmpty()) return null;
++        long[] out = new long[anchors.size()];
++        for (int i = 0; i < out.length; i++) out[i] = anchors.get(i);
++        return out;
++    }
++
++    private static boolean endsClauseMark(String text) {
++        if (text == null || text.isEmpty()) return false;
++        char last = text.charAt(text.length() - 1);
++        return "，。！？；：,!?;:".indexOf(last) >= 0 || RebuildSource.terminal(text);
++    }
++
++    private static List<RebuildDisplayGroups.Unit> authoredPartialUnits(
++            Session s, int index, RebuildProtocol.Plan plan) {
++        return RebuildCueContract.partialUnits(
++                index, s.source, s.blocks.get(index), plan.events, s.languageContext);
++    }
++
 +    private static List<RebuildDisplayGroups.Unit> displayUnits(
 +            Session s, int index, RebuildProtocol.Plan plan) {
 +        CaptionRenderSpec spec = s.languageContext.renderSpec;
@@ -3092,18 +3220,52 @@
 +        DisplayLayout cached = s.displayLayouts[index];
 +        if (cached != null && cached.plan == plan && cached.geometry.equals(geometry))
 +            return cached.units;
++        // A manually authored track is shown cue by cue. Events inside one cue are concatenated;
++        // no event may leave its cue, and the cue window is the page window.
++        boolean authoredTrack = s.blocks.get(index).authored;
++        if (authoredTrack) {
++            boolean partial = s.provisional != null && s.provisional[index] == plan;
++            List<RebuildDisplayGroups.Unit> units =
++                    partial
++                            ? authoredPartialUnits(s, index, plan)
++                            : authoredUnits(s, index, plan);
++            TranslationRuntime.mark(
++                    s.context,
++                    "REBUILD_UNIT_MODE",
++                    "session="
++                            + s.id
++                            + ";block="
++                            + index
++                            + ";authored=true;partial="
++                            + partial
++                            + ";units="
++                            + units.size()
++                            + ";"
++                            + authoredSummary(s.source, s.blocks.get(index), plan)
++                            + ";url="
++                            + s.url);
++            if (!units.isEmpty()) s.displayLayouts[index] = new DisplayLayout(plan, geometry, units);
++            return units;
++        }
++        TranslationRuntime.mark(
++                s.context,
++                "REBUILD_UNIT_MODE",
++                "session="
++                        + s.id
++                        + ";block="
++                        + index
++                        + ";authored=false;url="
++                        + s.url);
++        // A joined unit may use the two lines the box has, so a fragment the model cut in half can
++        // be completed inside one unit; the page planner still shows it as one-line clauses.
 +        Predicate<String> fits =
 +                budget == null
 +                        ? null
 +                        : value -> measured.fits(value, budget.preferredPx, budget.width, 2);
++        // Advisory concerns are logged, not a reason to withhold a complete translation.
 +        List<RebuildDisplayGroups.Unit> units =
 +                RebuildDisplayGroups.partition(
-+                        index,
-+                        plan.events,
-+                        s.source,
-+                        s.languageContext,
-+                        fits,
-+                        event -> RebuildReview.blocked(plan, event));
++                        index, plan.events, s.source, s.languageContext, fits, null);
 +        s.displayLayouts[index] = new DisplayLayout(plan, geometry, units);
 +        return units;
 +    }
@@ -3135,6 +3297,7 @@
 +        int generation;
 +        long revision, submission, selectedAt, observedAt;
 +        long eventStart = -1, eventEnd = -1;
++        long[] eventAnchors = null;
          synchronized (s) {
 -          if (!current(s) || s.jobs[job.index] != job) return;
 -          if (job.cancelled) { finishCancelled(s, job); return; }
@@ -3563,27 +3726,34 @@
 +                        eventId = unit.id();
 +                        eventStart = unit.start;
 +                        eventEnd = unit.end;
++                        eventAnchors = pageAnchors(s, unit);
 +                        text = unit.text;
 +                        if (text.isEmpty()) displayEmptyReason = "non_speech";
-+                        if (unit.blocked) {
-+                            text = "";
-+                            eventId = "source:" + eventId;
-+                            fallbackReason = "event_review";
-+                        } else if (!text.isEmpty()) s.display.shown(unit);
++                        if (!text.isEmpty()) s.display.shown(unit);
 +                    } else if (p == null || provisional) {
 +                        fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
-+                        // Waiting and blank failure displays keep each source cue's own window: a
-+                        // block-wide display must not announce a later cue before its onset.
++                        // Waiting displays keep each source cue's own window, so a block-wide
++                        // placeholder never announces a later cue before its onset. The video's own
++                        // line is never a substitute for a translation: only the neutral placeholder
++                        // may stand in while a reply can still arrive.
 +                        CaptionDocument.Cue cue = originalCue(s, selectedAt);
 +                        RebuildPlanner.Block block = s.blocks.get(i);
-+                        if (cue != null && cue.startMs < block.end && cue.endMs > block.start) {
++                        if (fallbackReason.equals("pending_translation")
++                                && cue != null
++                                && cue.startMs < block.end
++                                && cue.endMs > block.start) {
 +                            eventStart = Math.max(cue.startMs, block.start);
 +                            eventEnd = Math.min(cue.endMs, block.end);
 +                            if (eventStart <= selectedAt && selectedAt < eventEnd) {
-+                                text = s.states[i] == FAILED ? "" : translating;
-+                                eventId = "source:" + i + ":" + eventStart + "_" + eventEnd;
++                                text = translating;
++                                eventId = "waiting:" + i + ":" + eventStart + "_" + eventEnd;
 +                            }
 +                        }
++                    } else {
++                        // The plan is ready but this instant falls outside every display unit: the
++                        // estimated event timing found no translated page here. Hoping a source cue
++                        // covers it would show untranslated text, so the box stays empty.
++                        fallbackReason = "";
 +                    }
 +                }
 +            }
@@ -3604,15 +3774,13 @@
 +        String appliedIdentity = s.id + ":" + generation + ":" + eventId;
 +        long appliedStart = eventStart, appliedEnd = eventEnd;
 +        String appliedReason =
-+                fallbackReason.equals("event_review")
-+                        ? "semantic_blocked"
-+                        : fallbackReason.startsWith("failed:")
-+                                ? "translation_failed"
-+                                : fallbackReason.isEmpty()
-+                                        ? (displayEmptyReason.isEmpty()
-+                                                ? "source_gap"
-+                                                : displayEmptyReason)
-+                                        : "pending_translation";
++                fallbackReason.startsWith("failed:")
++                        ? "translation_failed"
++                        : fallbackReason.isEmpty()
++                                ? (displayEmptyReason.isEmpty()
++                                        ? "source_gap"
++                                        : displayEmptyReason)
++                                : "pending_translation";
 +        TranslationOutput.RenderGuard guard =
 +                new TranslationOutput.RenderGuard() {
 +                    @Override
@@ -3678,7 +3846,10 @@
 +                    eventStart,
 +                    eventEnd,
 +                    selectedAt,
-+                    s.languageContext.renderSpec);
++                    s.authored
++                            ? s.languageContext.renderSpec.withAuthored()
++                            : s.languageContext.renderSpec,
++                    eventAnchors);
 +        if (TranslationRuntime.debugEnabled(s.context))
 +            TranslationRuntime.mark(
 +                    s.context,
@@ -3697,7 +3868,7 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildApi.java
-@@ -1,352 +1,502 @@
+@@ -1,352 +1,523 @@
  package app.yydarlinker.deepseekcaptions;
  
 -import java.io.*;
@@ -3999,6 +4170,7 @@
 +    static String prompt(TranslationSettings cfg, String lang) {
 +        return RebuildProtocol.PROMPT
 +                + RebuildProtocol.FIDELITY_PROMPT
++                + RebuildGuidance.SENTENCE
 +                + " Target language: "
 +                + lang
 +                + ". User translation preferences: "
@@ -4031,15 +4203,34 @@
 +                + " not proven sentence boundaries.";
 +
 +    static String prompt(TranslationSettings cfg, String lang, CaptionLanguageContext context) {
-+        if (context.canApplyEnglishToChinese) return prompt(cfg, lang);
-+        return NEUTRAL_PROMPT
-+                + (context.englishSource ? ENGLISH_DEPENDENCY_PROMPT : "")
-+                + " Source language: "
-+                + context.sourceCode
-+                + ". Target language: "
-+                + context.targetCode
-+                + ". User translation preferences: "
-+                + context.preference(cfg);
++        return prompt(cfg, lang, context, null);
++    }
++
++    /**
++     * The same quality instructions for automatic and authored sources. An authored block only
++     * appends its fixed display-cue contract; it does not replace the sentence/quality guidance.
++     */
++    static String prompt(
++            TranslationSettings cfg,
++            String lang,
++            CaptionLanguageContext context,
++            RebuildPlanner.Block block) {
++        String base;
++        if (context.canApplyEnglishToChinese) base = prompt(cfg, lang);
++        else
++            base =
++                    NEUTRAL_PROMPT
++                            + (context.englishSource ? ENGLISH_DEPENDENCY_PROMPT : "")
++                            + RebuildGuidance.SENTENCE
++                            + " Source language: "
++                            + context.sourceCode
++                            + ". Target language: "
++                            + context.targetCode
++                            + ". User translation preferences: "
++                            + context.preference(cfg);
++        return block != null && block.authored
++                ? base + RebuildGuidance.displayCueRule(block)
++                : base;
 +    }
 +
 +    static RebuildProtocol.Plan translate(
@@ -4080,7 +4271,8 @@
 +                                    "note",
 +                                    "Measured width only; reference counters do not control"
 +                                        + " pagination in this policy."));
-+        String prompt = prompt(cfg, lang, context);
++        String prompt = prompt(cfg, lang, context, b);
++
 +        JSONObject request =
 +                ProviderRequestPolicy.request(
 +                        cfg,
@@ -4543,7 +4735,7 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java
-@@ -1,240 +1,264 @@
+@@ -1,240 +1,281 @@
  package app.yydarlinker.deepseekcaptions;
  
  import android.content.Context;
@@ -4817,6 +5009,20 @@
 +            TranslationSettings config,
 +            String target,
 +            CaptionLanguageContext context) {
++        return identity(source, config, target, context, false);
++    }
++
++    /**
++     * The authored flag and cue sequence are part of a cached plan's identity. A manual cue is a
++     * display boundary; a plan produced under another cue partition must not be restored as if it
++     * were the same page.
++     */
++    static String identity(
++            RebuildSource source,
++            TranslationSettings config,
++            String target,
++            CaptionLanguageContext context,
++            boolean authored) {
 +        StringBuilder b =
 +                new StringBuilder(RebuildProtocol.VERSION)
 +                        .append('|')
@@ -4826,8 +5032,9 @@
 +                        .append('|')
 +                        .append(hash(RebuildApi.prompt(config, target, context)));
 +        if (!context.canApplyEnglishToChinese) b.append('|').append(context.scope());
-+        if (!context.renderSpec.legacy) b.append('|').append(context.renderSpec.presentationPolicy);
-+        for (RebuildSource.Word w : source.words)
++        b.append('|').append(context.renderSpec.presentationPolicy);
++        if (authored) b.append('|').append(RebuildCueContract.VERSION).append("|authored=1");
++        for (RebuildSource.Word w : source.words) {
 +            b.append('\n')
 +                    .append(w.start)
 +                    .append(':')
@@ -4836,6 +5043,8 @@
 +                    .append(w.precision)
 +                    .append(':')
 +                    .append(w.text);
++            if (authored) b.append(':').append(w.cue);
++        }
 +        return hash(b.toString());
 +    }
 +
@@ -5520,7 +5729,7 @@
 +}
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSource.java
-@@ -1,677 +1,1184 @@
+@@ -1,677 +1,1241 @@
  package app.yydarlinker.deepseekcaptions;
 +
 +import org.json.JSONArray;
@@ -5989,16 +6198,34 @@
 +        StringBuilder b = new StringBuilder();
 +        for (int i = from; i <= to; i++) {
 +            String s = w.get(i).text;
-+            if (b.length() > 0 && !s.isEmpty()) {
-+                int l = b.codePointBefore(b.length()), q = s.codePointAt(0);
-+                if (!cjk(l)
-+                        && !cjk(q)
-+                        && Character.isLetterOrDigit(q)
-+                        && !"([{（【《“‘".contains(new String(Character.toChars(l)))) b.append(' ');
-+            }
++            if (b.length() > 0 && !s.isEmpty() && needsSpace(b, s)) b.append(' ');
 +            b.append(s);
 +        }
 +        return b.toString();
++    }
++
++    /**
++     * A space belongs between two spaced-script words, never after CJK punctuation: 「, 、 and 。
++     * are set tight against a following Latin word. The injected space used to make every quote
++     * the model was asked to copy differ from the text it actually read.
++     */
++    private static boolean needsSpace(StringBuilder prior, String next) {
++        int left = prior.codePointBefore(prior.length()), right = next.codePointAt(0);
++        if (cjk(left) || cjk(right) || compactPunctuation(left)) return false;
++        if (!Character.isLetterOrDigit(right)) return false;
++        return "([{（【《“‘".indexOf(new String(Character.toChars(left))) < 0;
++    }
++
++    /** Punctuation that CJK typography sets tight against what follows it. */
++    private static boolean compactPunctuation(int cp) {
++        return cp >= 0x3000 && cp <= 0x303F
++                || cp >= 0xFF00 && cp <= 0xFFEF
++                || cp == 0x2018
++                || cp == 0x2019
++                || cp == 0x201C
++                || cp == 0x201D
++                || cp == 0x2026
++                || cp == 0x2014;
 +    }
 +
 +    String text(int from, int to) {
@@ -6254,7 +6481,12 @@
 +        String raw = new String(body, StandardCharsets.UTF_8).trim();
 +        if (raw.startsWith("\uFEFF")) raw = raw.substring(1).trim();
 +        boolean webVtt = raw.startsWith("WEBVTT"), json3 = raw.startsWith("{");
-+        String formatEvidence = "";
++        boolean xml = raw.startsWith("<?xml")
++                || raw.startsWith("<transcript")
++                || raw.startsWith("<timedtext");
++        // Record the parsed format for every input, not only VTT/XML. A coarse JSON3/SRT body
++        // must be distinguishable in diagnostics from an XML/VTT body with native offsets.
++        String formatEvidence = parsed == null ? "" : parsed.timingCapabilities();
 +        List<Span> spans = new ArrayList<>();
 +        if (webVtt) {
 +            WebVttSourceReader.Result vtt = WebVttSourceReader.read(raw);
@@ -6271,6 +6503,31 @@
 +                                range.speakerOffsets));
 +        }
 +        if (json3) json3Spans(new JSONObject(raw).optJSONArray("events"), spans);
++        // XML/srv3 already gives CaptionDocument per-<s> onsets. The old generic fallback read
++        // only whole <p> cues, throwing those onsets away before the planner saw them. Use the
++        // parsed fragments whenever they carry native offsets (or whenever the payload is XML);
++        // text-only formats keep the cue fallback.
++        boolean nativeXml = false;
++        for (CaptionDocument.RawFragment fragment : parsed.rawFragments())
++            if (fragment.nativeOffset) {
++                nativeXml = true;
++                break;
++            }
++        if (spans.isEmpty() && (xml || nativeXml)) {
++            for (CaptionDocument.RawFragment fragment : parsed.rawFragments()) {
++                if (fragment.raw == null || fragment.raw.trim().isEmpty()) continue;
++                spans.add(
++                        new Span(
++                                fragment.raw,
++                                fragment.startMs,
++                                fragment.endMs,
++                                fragment.cue,
++                                fragment.nativeOffset,
++                                false,
++                                Collections.emptyList()));
++            }
++            formatEvidence = parsed.timingCapabilities();
++        }
 +        if (spans.isEmpty() && !webVtt) {
 +            int i = 0;
 +            for (CaptionDocument.Cue c : parsed.cues())
@@ -6306,6 +6563,9 @@
 +            if (!spanTokens.isEmpty()) observed.add(new TimeAnchor(first, span.start, onset));
 +            Set<Integer> speakerWords = new HashSet<>();
 +            if (span.speakerBreak) speakerWords.add(0);
++            // XML/srv3 carries a segment onset but no inner word offsets. Claim the first token at
++            // that onset; JSON3/VTT already have their own word-level spans and keep the old rule.
++            boolean claimFirst = xml && span.nativeOffset;
 +            if (span.speakerOffsets.isEmpty())
 +                addTokens(
 +                        out,
@@ -6314,7 +6574,8 @@
 +                        span.start,
 +                        end,
 +                        span.cue,
-+                        span.nativeOffset);
++                        span.nativeOffset,
++                        claimFirst);
 +            else {
 +                List<String> speech = new ArrayList<>();
 +                int from = 0;
@@ -6327,7 +6588,8 @@
 +                speech.addAll(tokens(span.text.substring(from).replace(' ', ' ')));
 +                if (end - span.start < speech.size())
 +                    throw new IllegalArgumentException("vtt_voice_time_capacity");
-+                addTokens(out, speech, span.text, span.start, end, span.cue, span.nativeOffset);
++                addTokens(
++                        out, speech, span.text, span.start, end, span.cue, span.nativeOffset, claimFirst);
 +            }
 +            if (!spanTokens.isEmpty())
 +                observed.add(new TimeAnchor(out.size(), end, AnchorKind.CUE_END_BOUND));
@@ -6953,10 +7215,13 @@
 +            long start,
 +            long end,
 +            int cue,
-+            boolean nativeOffset) {
++            boolean nativeOffset,
++            boolean claimFirst) {
 +        if (ts.isEmpty() || end <= start) return;
 +        if (end - start < ts.size()) {
-+            out.add(new Word(text.trim(), start, end, cue, Precision.ESTIMATED));
++            if (claimFirst)
++                out.add(new Word(text.trim(), start, end, cue, Precision.NATIVE));
++            else out.add(new Word(text.trim(), start, end, cue, Precision.ESTIMATED));
 +            return;
 +        }
 +        for (int i = 0; i < ts.size(); i++) {
@@ -6970,6 +7235,7 @@
 +                                b,
 +                                cue,
 +                                nativeOffset && ts.size() == 1
++                                                || claimFirst && i == 0
 +                                        ? Precision.NATIVE
 +                                        : Precision.ESTIMATED));
 +        }
@@ -7370,7 +7636,7 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlanner.java
-@@ -4,182 +4,324 @@
+@@ -4,182 +4,474 @@
  
  /** Network ownership blocks only. There is no second local subtitle segmentation pipeline. */
  final class RebuildPlanner {
@@ -7565,11 +7831,44 @@
 +    static final long MAX_SPAN = 30000;
 +
 +    static final class Block {
++        /** One authored cue inside a request block: a fixed display boundary. */
++        static final class CueRange {
++            final int index, from, to;
++            final long start, end;
++
++            CueRange(int index, int from, int to, long start, long end) {
++                this.index = index;
++                this.from = from;
++                this.to = to;
++                this.start = start;
++                this.end = end;
++            }
++        }
++
 +        final int index, from, to;
 +        final long start, end;
 +        final boolean continuedBefore, continuedAfter;
 +
++        /** True only for a manually authored track; [cues] is then its display contract. */
++        final boolean authored;
++
++        final List<CueRange> cues;
++
 +        Block(int i, int f, int t, RebuildSource s) {
++            this(i, f, t, s, false, Collections.emptyList());
++        }
++
++        Block(int i, int f, int t, RebuildSource s, List<CueRange> cueRanges) {
++            this(i, f, t, s, true, cueRanges);
++        }
++
++        private Block(
++                int i,
++                int f,
++                int t,
++                RebuildSource s,
++                boolean manual,
++                List<CueRange> cueRanges) {
 +            index = i;
 +            from = f;
 +            to = t;
@@ -7577,16 +7876,89 @@
 +            end = s.words.get(t).end;
 +            continuedBefore = f > 0 && !boundary(s, f - 1);
 +            continuedAfter = t + 1 < s.words.size() && !boundary(s, t);
++            authored = manual;
++            cues =
++                    cueRanges.isEmpty()
++                            ? Collections.emptyList()
++                            : Collections.unmodifiableList(new ArrayList<>(cueRanges));
 +        }
 +
 +        String id() {
 +            return "b" + index + "_" + from + "_" + to;
++        }
++
++        CueRange cue(int index) {
++            for (CueRange cue : cues) if (cue.index == index) return cue;
++            return null;
 +        }
 +    }
 +
 +    /** Explicit legacy entry for fixed English fixtures. */
 +    static List<Block> plan(RebuildSource s) {
 +        return plan(s, CaptionLanguageContext.LEGACY);
++    }
++
++    // A manually authored cue is a display boundary, not a sentence. A request block may hold a
++    // few consecutive cues so the model sees the sentence around a fragment, while the cue
++    // directive still requires exactly one event per cue. The caps keep one reply bounded.
++    private static final int MAX_AUTHORED_CUES = 4,
++            MAX_AUTHORED_CHARS = 600;
++    private static final long MAX_AUTHORED_SPAN = 20_000L;
++
++    /**
++     * Request blocks for a manually authored track: consecutive cues up to a sentence/hard break,
++     * a small cue count and bounded text/time. Every authored cue remains a display boundary; a
++     * reply still has to contain exactly one event per cue (see RebuildGuidance).
++     */
++    static List<Block> planAuthored(RebuildSource s, CaptionLanguageContext context) {
++        List<Block> blocks = new ArrayList<>();
++        int from = 0;
++        while (from < s.words.size()) {
++            int to = from, cues = 1, chars = s.words.get(from).text.length();
++            while (to + 1 < s.words.size()) {
++                RebuildSource.Word next = s.words.get(to + 1);
++                if (next.cue != s.words.get(to).cue) {
++                    // The previous cue ended a sentence, a hard gap or a speaker change: keep that
++                    // cue as the last one of this block.
++                    if (cues >= MAX_AUTHORED_CUES
++                            || chars + next.text.length() > MAX_AUTHORED_CHARS
++                            || next.start - s.words.get(from).start > MAX_AUTHORED_SPAN
++                            || boundary(s, to)
++                            || hardBreakBefore(s, to + 1)) break;
++                    cues++;
++                }
++                to++;
++                chars += next.text.length();
++            }
++            blocks.add(new Block(blocks.size(), from, to, s, cueRanges(s, from, to)));
++            from = to + 1;
++        }
++        return blocks;
++    }
++
++    /** The authored cue ranges owned by [from..to]; both endpoints are cue boundaries. */
++    static List<Block.CueRange> cueRanges(RebuildSource s, int from, int to) {
++        List<Block.CueRange> out = new ArrayList<>();
++        int start = from;
++        for (int i = from; i <= to; i++) {
++            if (i > from && s.words.get(i).cue != s.words.get(i - 1).cue) {
++                addCue(out, s, start, i - 1);
++                start = i;
++            }
++        }
++        addCue(out, s, start, to);
++        return out;
++    }
++
++    private static void addCue(
++            List<Block.CueRange> out, RebuildSource s, int from, int to) {
++        out.add(
++                new Block.CueRange(
++                        s.words.get(from).cue,
++                        from,
++                        to,
++                        s.words.get(from).start,
++                        s.words.get(to).end));
 +    }
 +
 +    static List<Block> plan(RebuildSource s, CaptionLanguageContext context) {
@@ -7676,7 +8048,13 @@
 +                    words("reduced|increased|announced|decided|said|argued|explained|aims|plans"),
 +            WEAK_END =
 +                    words(
-+                            "a|an|the|of|to|with|without|and|or|not|no|very|particularly|more|less|than|as");
++                            "a|an|the|of|to|with|without|and|or|not|no|very|particularly|more|less|than|as"),
++            CJK_DEPENDENT =
++                    words(
++                            "の|が|を|に|で|と|は|も|へ|や|から|まで|より|って|ば|たら|ながら|ので|のに|けど|けれど|"
++                                    + "しかし|そして|また|でも|だから|ところが|けれども|しかしながら|それで|つまり|すなわち|ただし|なお|一方|一方で|"
++                                    + "的|地|得|了|着|过|過|和|与|與|及|或|而|但|因为|因為|所以|如果|虽然|雖然|"
++                                    + "当|當|在|从|從|向|对|對|把|被|이|가|을|를|은|는|에|에서|와|과|로|으로|의|도|만|까지|부터");
 +    private static final String[]
 +            PIVOT =
 +                    {
@@ -7819,7 +8197,13 @@
 +    }
 +
 +    static boolean dependentEnding(RebuildSource s, int i, CaptionLanguageContext context) {
-+        return context.englishSource && dependentEnding(s, i);
++        if (context.englishSource) return dependentEnding(s, i);
++        if (i < 0 || i >= s.words.size() || RebuildSource.terminal(s.words.get(i).text))
++            return false;
++        // Function words that cannot end a complete clause. This is a small cross-script set, not
++        // a per-language planner: Japanese/Korean particles and the common Chinese particles are
++        // the same linguistic category and were previously not protected at all.
++        return CJK_DEPENDENT.contains(s.words.get(i).key);
 +    }
 +
 +    static boolean strongDependentEnding(RebuildSource s, int i, CaptionLanguageContext context) {
@@ -7828,6 +8212,38 @@
 +
 +    static boolean protectedCut(RebuildSource s, int i, CaptionLanguageContext context) {
 +        return context.englishSource && protectedCut(s, i);
++    }
++
++    /** A token that only introduces or links the next clause, never a page on its own. */
++    static boolean functionWord(String text) {
++        if (text == null) return false;
++        String key = RebuildSource.key(text);
++        return !key.isEmpty() && CJK_DEPENDENT.contains(key);
++    }
++
++    /**
++     * True when the whole string can be consumed by function words, longest first. The tokenizer
++     * splits Japanese kana one character at a time, so 「がしかし」 is four tokens but two words;
++     * this check keeps it a fragment page.
++     */
++    static boolean functionWordsOnly(String text) {
++        if (text == null) return false;
++        String rest = text.replaceAll("[\\s，,、。.!?！？；;：:]+", "");
++        if (rest.isEmpty()) return false;
++        List<String> words = new ArrayList<>(CJK_DEPENDENT);
++        words.sort((a, b) -> Integer.compare(b.length(), a.length()));
++        int guard = 0;
++        while (!rest.isEmpty() && guard++ < 16) {
++            boolean consumed = false;
++            for (String word : words)
++                if (!word.isEmpty() && rest.startsWith(word)) {
++                    rest = rest.substring(word.length());
++                    consumed = true;
++                    break;
++                }
++            if (!consumed) return false;
++        }
++        return rest.isEmpty();
 +    }
 +
 +    static boolean safeCut(RebuildSource s, int i, CaptionLanguageContext context) {
@@ -7875,7 +8291,7 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java
-@@ -1,382 +1,563 @@
+@@ -1,382 +1,656 @@
  package app.yydarlinker.deepseekcaptions;
  
 -import java.math.BigDecimal;
@@ -7887,6 +8303,7 @@
 +import org.json.JSONTokener;
 +
 +import java.util.ArrayList;
++import java.util.Arrays;
 +import java.util.Collections;
 +import java.util.List;
  
@@ -8253,6 +8670,13 @@
 -                "properties",
 +    // Pinned upstream protocol identity, independent of the embedding UI or package version.
 +    static final String VERSION = "1.4.0";
++
++    /**
++     * Source characters a reply may leave untranslated between two events (or at the end). A model
++     * sometimes drops a single particle or conjunction while splitting; refusing the whole block
++     * for that loses every other translation it did produce. Anything larger still fails closed.
++     */
++    static final int MAX_HOLE_CHARS = 4;
 +    static final String PROMPT =
 +            "You create faithful live subtitles. Read the complete source and read-only context"
 +                + " before translating. Preserve all spoken meaning, negation and its scope,"
@@ -8465,6 +8889,7 @@
 +            p.put("source_code", context.sourceCode)
 +                    .put("policy_version", CaptionLanguageContext.POLICY_VERSION)
 +                    .put("presentation_policy", "legacy_n26");
++        if (b.authored) RebuildCueContract.addPayload(p, s, b);
 +        if (repair != null && !repair.isEmpty())
 +            p.put(
 +                    "repair",
@@ -8509,7 +8934,7 @@
 +                        content,
 +                        s,
 +                        b,
-+                        !prefix && context.canApplyEnglishToChinese,
++                        !prefix,
 +                        0,
 +                        context,
 +                        prefix);
@@ -8571,9 +8996,17 @@
 +            JSONObject e = rows.optJSONObject(i);
 +            if (e == null) throw new Invalid("event_shape");
 +            int from = integer(e.opt("from")), to = integer(e.opt("to"));
-+            if (from != next || to < from || to > b.to) {
++            // A reply may leave a character or two it could not place (a lone conjunction or
++            // particle). Such a hole is tolerated, but never shown: every displayed line is still
++            // translated text, and the missing source words simply produce no caption. The first
++            // event must still start at the block start: a reply that begins late dropped content.
++            if (from < next
++                    || to < from
++                    || to > b.to
++                    || i == 0 && from != b.from
++                    || !withinHole(s, next, from)) {
 +                if (mayRebind) {
-+                    int changed = exactQuoteRebind(root, s, b);
++                    int changed = alignBySource(root, s, b);
 +                    if (changed > 0)
 +                        return parseInternal(root.toString(), s, b, false, changed, context);
 +                }
@@ -8590,12 +9023,7 @@
 +            String source = s.text(from, to);
 +            if (e.has("source")
 +                    && (!(e.opt("source") instanceof String)
-+                            || !source.replaceAll("\\s+", " ")
-+                                    .trim()
-+                                    .equals(
-+                                            e.getString("source")
-+                                                    .replaceAll("\\s+", " ")
-+                                                    .trim()))) {
++                            || !sameSource(source, e.getString("source")))) {
 +                Invalid mismatch =
 +                        new Invalid(
 +                                "source_quote_mismatch",
@@ -8603,7 +9031,7 @@
 +                // Only exact all-source recovery is allowed. No deletion, fuzzy matching, or free
 +                // retries.
 +                if (mayRebind) {
-+                    int changed = exactQuoteRebind(root, s, b);
++                    int changed = alignBySource(root, s, b);
 +                    if (changed > 0)
 +                        return parseInternal(root.toString(), s, b, false, changed, context);
 +                }
@@ -8611,8 +9039,9 @@
 +            }
 +            if (text.isEmpty() && !RebuildSource.nonSpeech(source))
 +                throw new Invalid("empty_translation");
-+            if (context.canApplyEnglishToChinese && text.length() > 600)
-+                throw new Invalid("paragraph");
++            RebuildSemantics.validateTarget(source, text, context);
++            // A long event is a presentation concern, not a reason to discard a translation;
++            // page planning can split it without changing its source ownership.
 +            if (text.contains("\"events\"") || text.startsWith("```"))
 +                throw new Invalid("protocol_leak");
 +            for (int k = from + 1; k <= to; k++)
@@ -8624,9 +9053,8 @@
 +            long a = s.words.get(from).start, z = s.words.get(to).end;
 +            // This is only a paragraph guard. Actual display fit is checked with Android
 +            // measurement.
-+            if (context.canApplyEnglishToChinese
-+                    && ((visible > (cj ? 60 : 155) && (z - a > 8500 || sentences(text) > 1))
-+                            || visible > (cj ? 100 : 260)))
++            if ((visible > (cj ? 60 : 155) && (z - a > 8500 || sentences(text) > 1))
++                    || visible > (cj ? 100 : 260))
 +                presentation.add(
 +                        new RebuildReview.Issue(
 +                                from,
@@ -8637,7 +9065,9 @@
 +                                true));
 +            RebuildNumbers.Result numeric = RebuildNumbers.compare(source, text, context);
 +            if (numeric == RebuildNumbers.Result.CONTRADICTED)
-+                throw new Invalid("numeric_substitution");
++                throw new Invalid(
++                        "numeric_substitution",
++                        RebuildNumbers.detail(from, to, source, text));
 +            if (!context.canApplyEnglishToChinese
 +                    && numeric == RebuildNumbers.Result.UNKNOWN
 +                    && (RebuildNumbers.hasDigits(source) || RebuildNumbers.hasDigits(text)))
@@ -8649,7 +9079,7 @@
 +                                "Numeric equivalence is unverified for this notation/language;"
 +                                    + " advisory only.",
 +                                false));
-+            if (!context.canApplyEnglishToChinese && visible > context.profile.referenceCpl * 2)
++            if (visible > context.profile.referenceCpl * 2)
 +                presentation.add(
 +                        new RebuildReview.Issue(
 +                                from,
@@ -8659,7 +9089,7 @@
 +                                    + " presentation_policy=legacy_n26.",
 +                                false));
 +            RebuildSemantics.validate(s, from, to, text, context);
-+            if (context.canApplyEnglishToChinese && to - from >= 8 && visible <= 1)
++            if (to - from >= 8 && visible <= 1)
 +                throw new Invalid("information_collapse");
 +            if (to < b.to && RebuildPlanner.strongDependentEnding(s, to, context))
 +                throw new Invalid("dependent_source_end");
@@ -8668,8 +9098,10 @@
 +            out.add(new Event(from, to, a, z, text));
 +            next = to + 1;
 +        }
-+        if (!prefix && next != b.to + 1) throw new Invalid("missing_source");
++        if (!prefix && next != b.to + 1 && !withinHole(s, next, b.to + 1))
++            throw new Invalid("missing_source");
 +        RebuildSemantics.validatePlan(s, b, out, context);
++        if (!prefix) RebuildCueContract.validate(s, b, out);
 +        presentation.addAll(RebuildReview.inspect(s, b, out, context));
 +        return new Plan(
 +                out, root.toString(), Collections.unmodifiableList(presentation), reboundEvents);
@@ -8713,15 +9145,31 @@
 +    }
 +
 +    /**
-+     * Recover only a complete, byte-for-byte (apart from spaces) partition of the original words.
-+     * Missing or changed source words, nonnumeric/out-of-block IDs, or changed numbers fail closed.
++     * Realign every event from its own source quote. Only a verbatim (whitespace-insensitive)
++     * substring of the block, starting at a token boundary, may define a range; consecutive quotes
++     * must cover the block in order and may leave at most {@link #MAX_HOLE_CHARS} characters
++     * untranslated between or after them. Missing text, reordered quotes, mid-token starts or a
++     * longer hole fail closed.
 +     */
-+    private static int exactQuoteRebind(JSONObject root, RebuildSource s, RebuildPlanner.Block b)
++    private static int alignBySource(JSONObject root, RebuildSource s, RebuildPlanner.Block b)
 +            throws Exception {
 +        JSONArray events = root.optJSONArray("events");
 +        if (events == null || events.length() == 0 || events.length() > b.to - b.from + 1) return 0;
-+        int cursor = b.from, changed = 0;
++        String block = compact(s.text(b.from, b.to));
++        int tokens = b.to - b.from + 1;
++        int[] starts = new int[tokens + 1];
++        int at = 0;
++        for (int i = 0; i < tokens; i++) {
++            starts[i] = at;
++            String word = compact(s.words.get(b.from + i).text);
++            // A token without visible characters has no usable boundary: never realign onto it.
++            if (word.isEmpty()) return 0;
++            at += word.length();
++        }
++        starts[tokens] = at;
++        if (at != block.length()) return 0;
 +        int[][] resolved = new int[events.length()][2];
++        int cursor = 0, moved = 0;
 +        for (int i = 0; i < events.length(); i++) {
 +            JSONObject event = events.optJSONObject(i);
 +            if (event == null || !(event.opt("source") instanceof String)) return 0;
@@ -8732,27 +9180,88 @@
 +            } catch (Invalid malformed) {
 +                return 0;
 +            }
-+            // The old IDs are untrusted hints; validate their type and bound, then derive actual
-+            // IDs only from all quotes.
++            // A claimed ID outside the block is a malformed reply, not a repairable shift.
 +            if (oldFrom < b.from || oldFrom > b.to || oldTo < b.from || oldTo > b.to) return 0;
-+            String quote = event.getString("source").replaceAll("\\s+", " ").trim();
++            String quote = compact(event.getString("source"));
 +            if (quote.isEmpty()) return 0;
-+            String[] quoted = quote.split(" ");
-+            if (cursor + quoted.length - 1 > b.to) return 0;
-+            for (int j = 0; j < quoted.length; j++)
-+                if (!quoted[j].equals(s.words.get(cursor + j).text)) return 0;
-+            resolved[i][0] = cursor;
-+            resolved[i][1] = cursor + quoted.length - 1;
-+            if (oldFrom != cursor || oldTo != resolved[i][1]) changed++;
-+            cursor += quoted.length;
++            int start = block.indexOf(quote, cursor);
++            if (start < 0 || start - cursor > MAX_HOLE_CHARS) return 0;
++            // The first quote must own the start of the block; a late start dropped its opening.
++            if (i == 0 && start != 0) return 0;
++            int end = start + quote.length();
++            int first = Arrays.binarySearch(starts, start), last = Arrays.binarySearch(starts, end);
++            if (first < 0 || last < 0 || last <= first) return 0;
++            resolved[i][0] = b.from + first;
++            resolved[i][1] = b.from + last - 1;
++            if (oldFrom != resolved[i][0] || oldTo != resolved[i][1]) moved++;
++            if (start > cursor) moved++;
++            cursor = end;
 +        }
-+        if (cursor != b.to + 1 || changed == 0) return 0;
++        if (block.length() - cursor > MAX_HOLE_CHARS) return 0;
++        if (cursor < block.length()) moved++;
++        if (moved == 0) return 0;
 +        for (int i = 0; i < events.length(); i++) {
 +            JSONObject event = events.getJSONObject(i);
 +            event.put("from", resolved[i][0]);
 +            event.put("to", resolved[i][1]);
 +        }
-+        return changed;
++        return moved;
++    }
++
++    /** Are the tokens from {@code next} up to (not including) {@code from} a negligible hole? */
++    static boolean withinHole(RebuildSource s, int next, int from) {
++        if (next == from) return true;
++        if (next > from || from > s.words.size() || next < 0) return false;
++        return compact(s.text(next, from - 1)).length() <= MAX_HOLE_CHARS;
++    }
++
++    /** The same visible characters in the same order; our own token joins may add spacing only. */
++    private static boolean sameSource(String expected, String quoted) {
++        String left = compact(expected), right = compact(quoted);
++        return left.equals(right) || identity(left).equals(identity(right));
++    }
++
++    /**
++     * Source identity without punctuation. A model may copy a cue with 「」/“”, ，/, or an added
++     * full stop without changing the words it owns. The token range still owns the exact source;
++     * punctuation-only differences must not discard an otherwise complete block. Letters, digits,
++     * marks and CJK characters still have to match exactly.
++     */
++    private static String identity(String value) {
++        StringBuilder out = new StringBuilder(value.length());
++        for (int at = 0; at < value.length(); ) {
++            int cp = value.codePointAt(at);
++            at += Character.charCount(cp);
++            if (Character.isWhitespace(cp) || punctuation(cp)) continue;
++            out.appendCodePoint(cp);
++        }
++        return out.toString();
++    }
++
++    private static boolean punctuation(int cp) {
++        switch (Character.getType(cp)) {
++            case Character.CONNECTOR_PUNCTUATION:
++            case Character.DASH_PUNCTUATION:
++            case Character.START_PUNCTUATION:
++            case Character.END_PUNCTUATION:
++            case Character.INITIAL_QUOTE_PUNCTUATION:
++            case Character.FINAL_QUOTE_PUNCTUATION:
++            case Character.OTHER_PUNCTUATION:
++                return true;
++            default:
++                return false;
++        }
++    }
++
++    /** The source comparison unit: every visible character in order, whitespace ignored. */
++    private static String compact(String value) {
++        StringBuilder out = new StringBuilder(value.length());
++        for (int at = 0; at < value.length(); ) {
++            int cp = value.codePointAt(at);
++            if (!Character.isWhitespace(cp)) out.appendCodePoint(cp);
++            at += Character.charCount(cp);
++        }
++        return out.toString();
 +    }
 +
 +    private static int integer(Object o) throws Invalid {
@@ -8816,7 +9325,7 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java
-@@ -1,254 +1,547 @@
+@@ -1,254 +1,575 @@
  package app.yydarlinker.deepseekcaptions;
  
 -import java.util.*;
@@ -9310,9 +9819,7 @@
 +                                "Tank fleet means the tanks as a force, not a naval fleet; preserve"
 +                                    + " the intended military unit and repair the wording.",
 +                                true));
-+            if (context.canApplyEnglishToChinese
-+                    && e.to < b.to
-+                    && RebuildPlanner.protectedCut(s, e.to, context))
++            if (e.to < b.to && RebuildPlanner.protectedCut(s, e.to, context))
 +                out.add(
 +                        new Issue(
 +                                e.from,
@@ -9322,6 +9829,23 @@
 +                                    + " Reassign coherent SOURCE ranges, then translate each whole"
 +                                    + " range; never divide target text to create times.",
 +                                true));
++            // The translation closes a sentence the source has not finished: this is how a long
++            // comparison loses its second half and comes out ungrammatical. Advisory only: the
++            // prompt now states the same rule, and a repair request costs a full block of tokens.
++            if (e.to < b.to && !RebuildSource.terminal(s.words.get(e.to).text)
++                    && endsSentence(text)
++                    && (continuesAfter(s, e.to)
++                            || RebuildPlanner.dependentEnding(s, e.to, context)
++                            || RebuildPlanner.protectedCut(s, e.to, context)))
++                out.add(
++                        new Issue(
++                                e.from,
++                                e.to,
++                                "invented_sentence_end",
++                                "The source sentence continues past this range, but the translation"
++                                    + " ends it here. Keep one event per complete source sentence,"
++                                    + " or split where each side keeps its subject and predicate.",
++                                false));
 +
 +            Matcher adjacent = Pattern.compile("\\b(\\d{1,3}) (\\d{1,2})\\b").matcher(source);
 +            if (adjacent.find()) {
@@ -9385,8 +9909,7 @@
 +        }
 +        int totalWords = Math.max(1, b.to - b.from + 1);
 +        double average = (double) totalWords / Math.max(1, events.size());
-+        if (context.canApplyEnglishToChinese
-+                && out.size() < 16
++        if (out.size() < 16
 +                && events.size() >= 9
 +                && average < 9.0
 +                && shortEvents * 100 >= events.size() * 60) {
@@ -9454,30 +9977,18 @@
 +
 +    static RebuildProtocol.Plan withLayoutReview(
 +            RebuildProtocol.Plan plan, TranslationBudget budget, CaptionLanguageContext context) {
-+        if (context.canApplyEnglishToChinese)
-+            return withLayoutReview(
-+                    plan, budget == null ? null : budget.withSpec(context.renderSpec));
 +        if (budget == null) return plan;
 +        List<Issue> all = new ArrayList<>(plan.issues);
 +        for (RebuildProtocol.Event e : plan.events)
 +            if (!budget.canPresent(e, context.renderSpec))
 +                all.add(
-+                        context.renderSpec.legacy
-+                                ? new Issue(
-+                                        e.from,
-+                                        e.to,
-+                                        "readability_observation",
-+                                        "Measured legacy_n26 presentation capacity exceeded;"
-+                                            + " advisory only; pagination policy is unchanged.",
-+                                        false)
-+                                : new Issue(
-+                                        e.from,
-+                                        e.to,
-+                                        "presentation_geometry_observation",
-+                                        "Preferred-font geometry is unresolved; retain accepted"
-+                                            + " source/text, no paid repair; remeasure at"
-+                                            + " presentation.",
-+                                        false));
++                        new Issue(
++                                e.from,
++                                e.to,
++                                "presentation_geometry_observation",
++                                "Preferred-font geometry is unresolved; retain accepted source/text,"
++                                    + " no paid repair; remeasure at presentation.",
++                                false));
 +        return new RebuildProtocol.Plan(
 +                plan.events, plan.json, Collections.unmodifiableList(all), plan.reboundEvents);
 +    }
@@ -9505,6 +10016,29 @@
 +                    && issue.from <= event.to
 +                    && issue.to >= event.from) return true;
 +        return false;
++    }
++
++    private static boolean endsSentence(String text) {
++        String value = text.trim();
++        int end = value.length();
++        while (end > 0 && "\"'”’」』）)]》".indexOf(value.charAt(end - 1)) >= 0) end--;
++        return end > 0 && "。！？!?؛؟.".indexOf(value.charAt(end - 1)) >= 0;
++    }
++
++    /** Source words that open a continuation rather than a sentence of their own. */
++    private static final java.util.Set<String> CONTINUATIONS =
++            new java.util.HashSet<>(
++                    java.util.Arrays.asList(
++                            "than", "then", "and", "but", "that", "which", "who", "whom", "whose",
++                            "where", "when", "while", "whereas", "because", "so", "as", "to", "of",
++                            "for", "with", "from", "by", "on", "in", "at", "if", "unless",
++                            "although", "though", "or", "nor", "yet", "despite", "during", "after",
++                            "before", "since", "until", "whether", "not", "also"));
++
++    private static boolean continuesAfter(RebuildSource source, int to) {
++        if (to + 1 >= source.words.size()) return false;
++        String next = source.words.get(to + 1).text.trim().toLowerCase(java.util.Locale.ROOT);
++        return CONTINUATIONS.contains(next);
 +    }
 +
 +    static int score(List<Issue> issues) {
@@ -9600,7 +10134,10 @@
 +                || code.equals("missing_source")
 +                || code.equals("crosses_source_break")
 +                || code.equals("block_identity")
-+                || code.equals("source_quote_required");
++                || code.equals("source_quote_required")
++                || code.equals("authored_cue_boundary")
++                || code.equals("authored_cue_coverage")
++                || code.equals("authored_cue_hole");
 +    }
 +
 +    static boolean shouldRepair(
@@ -9614,17 +10151,13 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java
-@@ -5,96 +5,171 @@
+@@ -5,96 +5,291 @@
  
  /** Limited contradiction checks, NOT a multilingual semantic equivalence judge. */
  final class RebuildSemantics {
 -  // Unmodified evidence is authoritative. Ambiguous ASR ("r b", "50 20") is never repaired here.
 -  static String normalized(String raw) { return raw == null ? "" : raw; }
-+    // Unmodified evidence is authoritative. Ambiguous ASR ("r b", "50 20") is never repaired here.
-+    static String normalized(String raw) {
-+        return raw == null ? "" : raw;
-+    }
- 
+-
 -  static final String[][] ANCHORS = {
 -      {"\\baircraft carriers?\\b", "航母|航空母舰|航空母艦|航艦"},
 -      {"\\b(?:fifth|5th)[ -]generation (?:fighters?|aircraft)\\b", "五代|第五代|第5代"},
@@ -9651,21 +10184,7 @@
 -    return context.canApplyEnglishToChinese ? evidence(concept,owned,all) : Evidence.UNKNOWN;
 -  }
 -  static boolean has(String pattern,String value){return Pattern.compile(pattern,Pattern.CASE_INSENSITIVE).matcher(value).find();}
-+    static final String[][] ANCHORS = {
-+        {"\\baircraft carriers?\\b", "航母|航空母舰|航空母艦|航艦"},
-+        {"\\b(?:fifth|5th)[ -]generation (?:fighters?|aircraft)\\b", "五代|第五代|第5代"},
-+        {"\\btanks?\\b", "坦克"},
-+        {"\\bmissiles?\\b", "导弹|飛彈"}
-+    };
-+    // Explicit Latin model IDs only. "armada" alone can mean a fleet, "tank" can store water.
-+    static final Pattern MODEL =
-+            Pattern.compile(
-+                    "(?i)(?<![a-z0-9])((?:[a-z]{1,4}(?=-))|(?:(?:t|j|su|mig|f|b|a)(?= )))[-"
-+                        + " ](\\d{1,3})s?(?![a-z0-9])");
-+    // Source lists can name a tank by its plural model alone (e.g. "10 000 t-62s").
-+    static final Pattern TANK_MODEL =
-+            Pattern.compile("(?i)\\bt-(?:14|34|54|55|62|64|72|80|90)s?\\b");
- 
+-
 -  static boolean supports(int concept, String owned) {
 -    if(concept==2 && has("\\b(?:water|fuel|storage|septic|fish)\\b",owned)) return false;
 -    if(has(ANCHORS[concept][0],owned)) return true;
@@ -9674,13 +10193,7 @@
 -    return concept==3 && has("\\bsams?\\b",owned)
 -        && has("\\b(?:chinese|military|missiles?|defen[sc]e|mainland|bases|surface-to-air)\\b",owned);
 -  }
-+    static Set<String> models(String x) {
-+        Set<String> out = new HashSet<>();
-+        Matcher m = MODEL.matcher(x);
-+        while (m.find()) out.add(m.group(1).toLowerCase(Locale.ROOT) + "-" + m.group(2));
-+        return out;
-+    }
- 
+-
 -  static boolean chinese(String text) {
 -    return text.codePoints().anyMatch(c->Character.UnicodeScript.of(c)==Character.UnicodeScript.HAN)
 -        && !text.codePoints().anyMatch(c->Character.UnicodeScript.of(c)==Character.UnicodeScript.HIRAGANA || Character.UnicodeScript.of(c)==Character.UnicodeScript.KATAKANA);
@@ -9692,19 +10205,7 @@
 -    for(int j=0;j<ANCHORS.length;j++)if(j!=concept&&supports(j,owned))return Evidence.CONTRADICTED;
 -    return Evidence.UNKNOWN;
 -  }
-+    /**
-+     * Literal hyphenated ASCII identifiers only; no translated aliases or space-to-hyphen
-+     * inference.
-+     */
-+    static Set<String> literalModels(String text) {
-+        Set<String> out = new HashSet<>();
-+        Matcher m =
-+                Pattern.compile("(?<![\\p{L}\\p{N}])([A-Za-z]{1,4}-[0-9]{1,3})(?![\\p{L}\\p{N}])")
-+                        .matcher(text);
-+        while (m.find()) out.add(m.group(1));
-+        return out;
-+    }
- 
+-
 -  /** Reject only positively observed cross-event transfers; omissions/synonyms are not proved locally. */
 -  static void validatePlan(RebuildSource source, RebuildPlanner.Block block, List<RebuildProtocol.Event> events)
 -      throws RebuildProtocol.Invalid {
@@ -9726,12 +10227,9 @@
 -        if(has(ANCHORS[i][1],e.text)&&evidence(i,owned,all)==Evidence.CONTRADICTED)
 -          throw new RebuildProtocol.Invalid("semantic_anchor_leak", "range="+e.from+"-"+e.to+"; incompatible explicit equipment anchor; source="+owned);
 -      }
-+    static Evidence evidence(
-+            int concept, String owned, String all, CaptionLanguageContext context) {
-+        return context.canApplyEnglishToChinese ? evidence(concept, owned, all) : Evidence.UNKNOWN;
-     }
+-    }
 -  }
- 
+-
 -  static void validate(RebuildSource source, int from, int to, String target) throws RebuildProtocol.Invalid {
 -    validate(source,from,to,target,CaptionLanguageContext.LEGACY);
 -  }
@@ -9747,10 +10245,56 @@
 -      // v1.3.5 release applies this exemption to the whole owned source range.
 -      if(has(reversed,target) && !has("\\b(?:to|through|between|and|range)\\b",raw))
 -        throw new RebuildProtocol.Invalid("numeric_range_invention");
+-    }
+-  }
++    // Unmodified evidence is authoritative. Ambiguous ASR ("r b", "50 20") is never repaired here.
++    static String normalized(String raw) {
++        return raw == null ? "" : raw;
++    }
++
++    static final String[][] ANCHORS = {
++        {"\\baircraft carriers?\\b", "航母|航空母舰|航空母艦|航艦"},
++        {"\\b(?:fifth|5th)[ -]generation (?:fighters?|aircraft)\\b", "五代|第五代|第5代"},
++        {"\\btanks?\\b", "坦克"},
++        {"\\bmissiles?\\b", "导弹|飛彈"}
++    };
++    // Explicit Latin model IDs only. "armada" alone can mean a fleet, "tank" can store water.
++    static final Pattern MODEL =
++            Pattern.compile(
++                    "(?i)(?<![a-z0-9])((?:[a-z]{1,4}(?=-))|(?:(?:t|j|su|mig|f|b|a)(?= )))[-"
++                        + " ](\\d{1,3})s?(?![a-z0-9])");
++    // Source lists can name a tank by its plural model alone (e.g. "10 000 t-62s").
++    static final Pattern TANK_MODEL =
++            Pattern.compile("(?i)\\bt-(?:14|34|54|55|62|64|72|80|90)s?\\b");
++
++    static Set<String> models(String x) {
++        Set<String> out = new HashSet<>();
++        Matcher m = MODEL.matcher(x);
++        while (m.find()) out.add(m.group(1).toLowerCase(Locale.ROOT) + "-" + m.group(2));
++        return out;
++    }
++
++    /**
++     * Literal hyphenated ASCII identifiers only; no translated aliases or space-to-hyphen
++     * inference.
++     */
++    static Set<String> literalModels(String text) {
++        Set<String> out = new HashSet<>();
++        Matcher m =
++                Pattern.compile("(?<![\\p{L}\\p{N}])([A-Za-z]{1,4}-[0-9]{1,3})(?![\\p{L}\\p{N}])")
++                        .matcher(text);
++        while (m.find()) out.add(m.group(1));
++        return out;
++    }
++
++    static Evidence evidence(
++            int concept, String owned, String all, CaptionLanguageContext context) {
++        return context.canApplyEnglishToChinese ? evidence(concept, owned, all) : Evidence.UNKNOWN;
++    }
++
 +    static boolean has(String pattern, String value) {
 +        return Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(value).find();
-     }
--  }
++    }
 +
 +    static boolean supports(int concept, String owned) {
 +        if (concept == 2 && has("\\b(?:water|fuel|storage|septic|fish)\\b", owned)) return false;
@@ -9850,10 +10394,130 @@
 +        validate(source, from, to, target, CaptionLanguageContext.LEGACY);
 +    }
 +
++    /**
++     * Target-script guard for every language pair, not only English to Chinese.
++     *
++     * <p>A provider may echo the source or answer in the wrong script. That is a deterministic
++     * failure even when a full semantic judge is unavailable. Keep the rule conservative: reject
++     * kana/hangul where the target cannot use them, an alphabetic echo where the target is CJK, and
++     * an exact source echo across different language families. Short names and numbers stay legal.
++     */
++    static void validateTarget(
++            String sourceText, String targetText, CaptionLanguageContext context)
++            throws RebuildProtocol.Invalid {
++        if (targetText == null || targetText.trim().isEmpty()) return;
++        String target = Locale.forLanguageTag(context.targetCode).getLanguage();
++        String source = Locale.forLanguageTag(context.sourceCode).getLanguage();
++        int kana = countScript(targetText, Character.UnicodeScript.HIRAGANA)
++                + countScript(targetText, Character.UnicodeScript.KATAKANA);
++        int hangul = countScript(targetText, Character.UnicodeScript.HANGUL);
++        int han = countScript(targetText, Character.UnicodeScript.HAN);
++        int letters = countLetters(targetText);
++        int sourceWords = sourceText == null ? 0 : sourceText.trim().split("\\s+").length;
++        if ("zh".equals(target)) {
++            if (kana > 0 || hangul > 0)
++                throw new RebuildProtocol.Invalid(
++                        "target_language_mismatch",
++                        "target=zh; found kana=" + kana + "; hangul=" + hangul);
++            if (sourceWords > 1 && letters > 4 && han == 0)
++                throw new RebuildProtocol.Invalid(
++                        "target_language_mismatch", "target=zh; no Han characters in translation");
++        } else if ("ja".equals(target)) {
++            if (hangul > 0)
++                throw new RebuildProtocol.Invalid(
++                        "target_language_mismatch", "target=ja; found hangul=" + hangul);
++            if (sourceWords > 1 && letters > 4 && han == 0 && kana == 0)
++                throw new RebuildProtocol.Invalid(
++                        "target_language_mismatch", "target=ja; no Japanese script in translation");
++        } else if ("ko".equals(target)) {
++            if (kana > 0)
++                throw new RebuildProtocol.Invalid(
++                        "target_language_mismatch", "target=ko; found kana=" + kana);
++            if (sourceWords > 1 && letters > 4 && han == 0 && hangul == 0)
++                throw new RebuildProtocol.Invalid(
++                        "target_language_mismatch", "target=ko; no Hangul in translation");
++        } else {
++            // Script guard for every other target. It is conservative: a translation that is
++            // clearly written in a different script from the selected target is rejected, while
++            // names, numbers and short replies stay legal. Latin-target languages cannot be told
++            // apart by script alone; they keep the universal source-echo check below.
++            int expected = CaptionScript.primary(context.targetCode);
++            int sourceScript = CaptionScript.primary(context.sourceCode);
++            int targetHits = expected < 0 ? 0 : countScript(targetText, expected);
++            int sourceHits =
++                    sourceScript < 0 ? 0 : countScript(targetText, sourceScript);
++            if (expected >= 0
++                    && expected != android.icu.lang.UScript.LATIN
++                    && letters > 8
++                    && targetHits == 0
++                    && sourceHits > 0
++                    && sourceScript != expected)
++                throw new RebuildProtocol.Invalid(
++                        "target_language_mismatch",
++                        "target="
++                                + target
++                                + "; no "
++                                + scriptName(expected)
++                                + " script in translation");
++        }
++        String visibleSource = compactVisible(sourceText);
++        String visibleTarget = compactVisible(targetText);
++        if (visibleSource.length() > 12
++                && !source.equals(target)
++                && visibleSource.equalsIgnoreCase(visibleTarget))
++            throw new RebuildProtocol.Invalid(
++                    "untranslated_source", "translation repeats the source across languages");
++    }
++
++    private static int countScript(String text, Character.UnicodeScript script) {
++        int count = 0;
++        for (int at = 0; at < text.length(); ) {
++            int cp = text.codePointAt(at);
++            at += Character.charCount(cp);
++            if (Character.UnicodeScript.of(cp) == script) count++;
++        }
++        return count;
++    }
++
++    private static int countScript(String text, int script) {
++        int count = 0;
++        for (int at = 0; at < text.length(); ) {
++            int cp = text.codePointAt(at);
++            at += Character.charCount(cp);
++            if (android.icu.lang.UScript.getScript(cp) == script) count++;
++        }
++        return count;
++    }
++
++    private static String scriptName(int script) {
++        String name = android.icu.lang.UScript.getShortName(script);
++        return name == null ? Integer.toString(script) : name;
++    }
++
++    private static int countLetters(String text) {
++        int count = 0;
++        for (int at = 0; at < text.length(); ) {
++            int cp = text.codePointAt(at);
++            at += Character.charCount(cp);
++            if (Character.isLetter(cp)) count++;
++        }
++        return count;
++    }
++
++    private static String compactVisible(String text) {
++        if (text == null) return "";
++        StringBuilder out = new StringBuilder(text.length());
++        for (int at = 0; at < text.length(); ) {
++            int cp = text.codePointAt(at);
++            at += Character.charCount(cp);
++            if (!Character.isWhitespace(cp)) out.appendCodePoint(cp);
++        }
++        return out.toString();
++    }
++
 +    static void validate(
 +            RebuildSource source, int from, int to, String target, CaptionLanguageContext context)
 +            throws RebuildProtocol.Invalid {
-+        if (!context.canApplyEnglishToChinese) return;
 +        String raw = source.text(from, to);
 +        Matcher adjacent =
 +                Pattern.compile("(?<![\\p{L}\\p{N}])(\\d{1,4}) (\\d{1,4})(?![\\p{L}\\p{N}])")
@@ -9873,15 +10537,26 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildNumbers.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildNumbers.java
-@@ -1,69 +1,118 @@
+@@ -1,69 +1,255 @@
  package app.yydarlinker.deepseekcaptions;
 +
 +import java.math.BigDecimal;
  import java.util.*;
  import java.util.regex.*;
 -import java.math.BigDecimal;
+-/** High-confidence date equivalence; unrecognized language is unknown, not a contradiction. */
 +
- /** High-confidence date equivalence; unrecognized language is unknown, not a contradiction. */
++/**
++ * Value-based numeric identity for one translated event.
++ *
++ * <p>The old gate compared literal decimal integers. That treats a correct reformulation such as
++ * "4 and a half times" → "4.5倍" as a substitution (4 vs 4.5), rejects the complete block, and
++ * leaves every cue in it on the placeholder. Numeric identity is a <em>value</em> question, not a
++ * spelling question: fractions, decimals, grouped thousands and full-width digits must compare by
++ * value, while dates retain their own equivalence. The gate stays deliberately conservative: it
++ * only contradicts a definite one-to-one value mismatch, never a change in notation or a number
++ * the translation legitimately omitted/kept implicit.
++ */
  final class RebuildNumbers {
 -  enum Result { EQUIVALENT, CONTRADICTED, UNKNOWN }
 -  static boolean hasDigits(String text) {
@@ -9898,11 +10573,7 @@
 -      int digit=Character.digit(cp,10);
 -      if(digit<0)return null;
 -      digits.append((char)('0'+digit));
-+    enum Result {
-+        EQUIVALENT,
-+        CONTRADICTED,
-+        UNKNOWN
-     }
+-    }
 -    int first=0;
 -    while(first+1<digits.length() && digits.charAt(first)=='0')first++;
 -    return digits.substring(first);
@@ -9944,41 +10615,21 @@
 -      if(a.isEmpty()||b.isEmpty())return true;
 -      source=ZH.matcher(EN.matcher(source).replaceAll(" ")).replaceAll(" ");
 -      target=ZH.matcher(EN.matcher(target).replaceAll(" ")).replaceAll(" ");
-+
-+    static boolean hasDigits(String text) {
-+        return text.codePoints()
-+                .anyMatch(c -> Character.getType(c) == Character.DECIMAL_DIGIT_NUMBER);
-     }
+-    }
 -    a=numbers(source);b=numbers(target);
 -    if(a.size()!=1||b.size()!=1||target.matches("(?s).*[万亿].*")||source.matches("(?is).*\\b(million|billion|thousand)\\b.*"))return true;
 -    return a.equals(b);
 -  }
-+
-+    /**
-+     * Whole Unicode decimal integers only. Units, dates, grouping, signs and prose are unverified.
-+     * This intentionally sacrifices recall to avoid hard rejection based on foreign lexicons.
-+     */
-+    private static String decimalInteger(String text) {
-+        String value = text.trim();
-+        if (value.isEmpty()) return null;
-+        StringBuilder digits = new StringBuilder();
-+        for (int cp : value.codePoints().toArray()) {
-+            if (Character.getType(cp) != Character.DECIMAL_DIGIT_NUMBER) return null;
-+            int digit = Character.digit(cp, 10);
-+            if (digit < 0) return null;
-+            digits.append((char) ('0' + digit));
-+        }
-+        int first = 0;
-+        while (first + 1 < digits.length() && digits.charAt(first) == '0') first++;
-+        return digits.substring(first);
++    enum Result {
++        EQUIVALENT,
++        CONTRADICTED,
++        UNKNOWN
 +    }
 +
-+    static Result compare(String source, String target, CaptionLanguageContext context) {
-+        if (context.canApplyEnglishToChinese)
-+            return safe(source, target) ? Result.UNKNOWN : Result.CONTRADICTED;
-+        String a = decimalInteger(source), b = decimalInteger(target);
-+        if (a == null || b == null) return Result.UNKNOWN;
-+        return a.equals(b) ? Result.EQUIVALENT : Result.CONTRADICTED;
++    static boolean hasDigits(String text) {
++        return text != null
++                && text.codePoints()
++                        .anyMatch(c -> Character.getType(c) == Character.DECIMAL_DIGIT_NUMBER);
 +    }
 +
 +    static final String MONTHS =
@@ -9991,6 +10642,132 @@
 +                    "(?<![0-9一二三四五六七八九十])([0-9]{1,2}|[一二三四五六七八九十]{1,3})月\\s*([0-9]{1,2}|[一二三四五六七八九十]{1,3})(?:日|号)");
 +    static final Pattern NUMBER =
 +            Pattern.compile("(?<![a-zA-Z0-9])[+-]?\\d+(?:,\\d{3})*(?:\\.\\d+)?");
++    private static final Pattern HALF_AFTER =
++            Pattern.compile(
++                    "(?i)(?<![a-z0-9])(\\d+(?:[.,]\\d+)?)\\s*(?:and\\s+(?:a|one)\\s+)?half\\b");
++    private static final Pattern ONE_AND_HALF =
++            Pattern.compile("(?i)(?<![a-z0-9])(?:one|a)\\s+and\\s+(?:a\\s+)?half\\b");
++    private static final Pattern HALF_BEFORE =
++            Pattern.compile("(?i)(?<![a-z0-9])(?:(?:a|one)\\s+half|half)\\b");
++    private static final Pattern CJK_HALF =
++            Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(?:个|個|つ)?\\s*半");
++    private static final Pattern VULGAR_HALF = Pattern.compile("(\\d+)\\s*½");
++    private static final Pattern SIMPLE_FRACTION =
++            Pattern.compile("(?<![\\d.])(\\d+)\\s*/\\s*(\\d+)(?![\\d.])");
++
++    /** A numeric value in the order it is spoken; notation is normalised, value is retained. */
++    static List<BigDecimal> values(String text) {
++        if (text == null || text.isEmpty()) return Collections.emptyList();
++        String value = normalize(text);
++        // Fractions first, so "4 and a half" becomes one value 4.5 rather than 4 and 0.5.
++        value = replace(HALF_AFTER, value, 0.5, true);
++        value = replace(VULGAR_HALF, value, 0.5, true);
++        value = replace(CJK_HALF, value, 0.5, true);
++        value = ONE_AND_HALF.matcher(value).replaceAll("1.5 ");
++        value = replaceSimpleFractions(value);
++        value = HALF_BEFORE.matcher(value).replaceAll("0.5 ");
++        List<BigDecimal> out = new ArrayList<>();
++        Matcher m = NUMBER.matcher(value);
++        while (m.find()) {
++            try {
++                BigDecimal base =
++                        new BigDecimal(m.group().replace(",", "")).stripTrailingZeros();
++                int after = m.end();
++                while (after < value.length() && Character.isWhitespace(value.charAt(after)))
++                    after++;
++                BigDecimal scale = scale(value, after);
++                out.add(scale == null ? base : base.multiply(scale).stripTrailingZeros());
++            } catch (NumberFormatException ignored) {
++                // A malformed token is not evidence of substitution.
++            }
++        }
++        return out;
++    }
++
++    /** Scale words that are part of the number: 1万, 3千, 10k, 2 million. */
++    private static BigDecimal scale(String text, int at) {
++        if (at >= text.length()) return null;
++        char c = text.charAt(at);
++        if (c == '万' || c == '萬') return BigDecimal.valueOf(10_000);
++        if (c == '亿' || c == '億') return BigDecimal.valueOf(100_000_000);
++        if (c == '千') return BigDecimal.valueOf(1_000);
++        if (c == '百') return BigDecimal.valueOf(100);
++        String rest = text.substring(at).toLowerCase(Locale.ROOT);
++        if (rest.startsWith("thousand")) return BigDecimal.valueOf(1_000);
++        if (rest.startsWith("million")) return BigDecimal.valueOf(1_000_000);
++        if (rest.startsWith("billion")) return BigDecimal.valueOf(1_000_000_000);
++        if (rest.startsWith("k") && wordEdge(rest, 1)) return BigDecimal.valueOf(1_000);
++        return null;
++    }
++
++    private static boolean wordEdge(String text, int at) {
++        return at >= text.length() || !Character.isLetter(text.charAt(at));
++    }
++
++    private static String normalize(String text) {
++        StringBuilder out = new StringBuilder(text.length());
++        for (int at = 0; at < text.length(); ) {
++            int cp = text.codePointAt(at);
++            at += Character.charCount(cp);
++            int digit = Character.digit(cp, 10);
++            if (digit >= 0 && Character.getType(cp) == Character.DECIMAL_DIGIT_NUMBER) {
++                // Arabic-Indic, Devanagari and full-width digits all name the same value.
++                out.append((char) ('0' + digit));
++            } else if (cp == 0xff0c || cp == 0x060c || cp == 0x066b) {
++                out.append(',');
++            } else if (cp == 0xff0e || cp == 0x066c || cp == 0x00a0) {
++                out.append(cp == 0x00a0 ? ' ' : '.');
++            } else {
++                out.appendCodePoint(cp);
++            }
++        }
++        return out.toString();
++    }
++
++    private static String replace(
++            Pattern pattern, String text, double add, boolean multiplyFirst) {
++        Matcher m = pattern.matcher(text);
++        StringBuffer out = new StringBuffer();
++        while (m.find()) {
++            String group = m.group(1);
++            BigDecimal base;
++            try {
++                base = new BigDecimal(group.replace(",", ""));
++            } catch (RuntimeException malformed) {
++                continue;
++            }
++            BigDecimal value = base.add(BigDecimal.valueOf(add));
++            m.appendReplacement(out, Matcher.quoteReplacement(value.stripTrailingZeros().toPlainString()));
++        }
++        m.appendTail(out);
++        return out.toString();
++    }
++
++    private static String replaceSimpleFractions(String text) {
++        Matcher m = SIMPLE_FRACTION.matcher(text);
++        StringBuffer out = new StringBuffer();
++        while (m.find()) {
++            try {
++                BigDecimal value =
++                        new BigDecimal(m.group(1))
++                                .divide(new BigDecimal(m.group(2)), 8, java.math.RoundingMode.HALF_UP)
++                                .stripTrailingZeros();
++                m.appendReplacement(
++                        out, Matcher.quoteReplacement(value.toPlainString()));
++            } catch (RuntimeException malformed) {
++                // Zero denominator: leave the text untouched.
++            }
++        }
++        m.appendTail(out);
++        return out.toString();
++    }
++
++    /** Literal digit values, kept for diagnostics and unit tests that need the raw spelling. */
++    static List<String> numbers(String text) {
++        List<String> out = new ArrayList<>();
++        for (BigDecimal value : values(text)) out.add(value.toPlainString());
++        return out;
++    }
 +
 +    static int integer(String s) {
 +        if (s.matches("[0-9]+")) return Integer.parseInt(s);
@@ -10021,36 +10798,63 @@
 +        return out;
 +    }
 +
-+    static List<String> numbers(String text) {
-+        List<String> out = new ArrayList<>();
-+        Matcher m = NUMBER.matcher(text);
-+        while (m.find())
-+            try {
-+                out.add(
-+                        new BigDecimal(m.group().replace(",", ""))
-+                                .stripTrailingZeros()
-+                                .toPlainString());
-+            } catch (NumberFormatException ignored) {
-+            }
-+        return out;
-+    }
-+
++    /**
++     * True when the two texts name the same numbers. It rejects only a definite one-to-one value
++     * mismatch (24 vs 25). Multiple numbers, missing numbers and unparsed notation stay safe: a
++     * partial reading is not proof of a substitution.
++     */
 +    static boolean safe(String source, String target) {
 +        List<String> a = dates(source), b = dates(target);
 +        if (!a.isEmpty() && !b.isEmpty() && !a.equals(b)) return false;
-+        // Never compare a partially decoded translated date with an ordinary quantity.
 +        if (!a.isEmpty() || !b.isEmpty()) {
 +            if (a.isEmpty() || b.isEmpty()) return true;
 +            source = ZH.matcher(EN.matcher(source).replaceAll(" ")).replaceAll(" ");
 +            target = ZH.matcher(EN.matcher(target).replaceAll(" ")).replaceAll(" ");
 +        }
-+        a = numbers(source);
-+        b = numbers(target);
-+        if (a.size() != 1
-+                || b.size() != 1
-+                || target.matches("(?s).*[万亿].*")
-+                || source.matches("(?is).*\\b(million|billion|thousand)\\b.*")) return true;
-+        return a.equals(b);
++        List<BigDecimal> left = values(source), right = values(target);
++        if (left.size() != 1 || right.size() != 1) return true;
++        return left.get(0).compareTo(right.get(0)) == 0;
++    }
++
++    static Result compare(String source, String target, CaptionLanguageContext context) {
++        if (datesContradict(source, target)) return Result.CONTRADICTED;
++        List<BigDecimal> left = values(source), right = values(target);
++        if (left.isEmpty() || right.isEmpty()) return Result.UNKNOWN;
++        if (left.size() == 1 && right.size() == 1)
++            return left.get(0).compareTo(right.get(0)) == 0
++                    ? Result.EQUIVALENT
++                    : Result.CONTRADICTED;
++        // More than one value on a side: order/multiplicity can legitimately change with grammar
++        // ("4 and a half" is one value, but "300 ... 500 ... a 56" is three). Compare multisets;
++        // a partial mismatch is not a proven substitution.
++        return multiset(left).equals(multiset(right)) ? Result.EQUIVALENT : Result.UNKNOWN;
++    }
++
++    private static boolean datesContradict(String source, String target) {
++        List<String> a = dates(source), b = dates(target);
++        return !a.isEmpty() && !b.isEmpty() && !a.equals(b);
++    }
++
++    private static Map<String, Integer> multiset(List<BigDecimal> values) {
++        Map<String, Integer> out = new TreeMap<>();
++        for (BigDecimal value : values)
++            out.merge(value.stripTrailingZeros().toPlainString(), 1, Integer::sum);
++        return out;
++    }
++
++    /** Diagnostics: the values the gate actually compared, never the whole private source. */
++    static String describe(String source, String target) {
++        return "source_values=" + values(source) + ";target_values=" + values(target);
++    }
++
++    /** One self-contained rejection detail; kept out of the pinned protocol literal surface. */
++    static String detail(int from, int to, String source, String target) {
++        return "range="
++                + from
++                + "-"
++                + to
++                + "; "
++                + describe(source, target);
 +    }
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/ProviderRequestPolicy.java
@@ -10278,7 +11082,11 @@
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPageLayout.java
-@@ -7,286 +7,332 @@
+@@ -3,290 +3,580 @@
+ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.List;
+-import java.util.function.Predicate;
  
  /** Presentation-only pages inside one accepted event; never changes source ownership. */
  final class RebuildPageLayout {
@@ -10565,7 +11373,6 @@
 -    return -1;
 -  }
 +    static final long MIN_PAGE_MS = 1200;
-+    static final int MAX_CPS = 8;
 +
 +    static final class Page {
 +        final String text;
@@ -10583,247 +11390,549 @@
 +            this.timingBasis = timingBasis;
 +        }
 +    }
++    /** Target-aware entry: one measured page planner for every target script. */
++    static List<Page> plan(
++            String text, long start, long end, TranslationBudget budget, CaptionRenderSpec spec) {
++        return plan(text, start, end, budget, spec, null);
++    }
 +
-+    private static List<Page> preferredLegacyPlan(
++    /**
++     * [sourceAnchors] are real speech boundaries (word ends before a pause or a clause mark) inside
++     * this unit, ascending. They let a page turn land on the pause the speaker actually made instead
++     * of a character-count estimate. Null/empty keeps the reading-weight fallback.
++     */
++    static List<Page> plan(
 +            String text,
 +            long start,
 +            long end,
-+            Predicate<String> fitsTwo,
-+            Predicate<String> fitsOne) {
-+        if (text == null || text.isEmpty() || fitsTwo == null || fitsOne == null || end <= start)
-+            return Collections.emptyList();
-+        long duration = end - start;
-+        int count = text.codePointCount(0, text.length());
-+        if (count * 1000L > duration * MAX_CPS) return Collections.emptyList();
-+        // Only the entire owned window may force a sub-1.2s translated page.
-+        if (duration < MIN_PAGE_MS)
-+            return fitsTwo.test(text)
-+                    ? Collections.singletonList(new Page(text, start, end))
-+                    : Collections.emptyList();
-+
-+        int[] offset = new int[count + 1];
-+        for (int i = 0; i < count; i++) offset[i + 1] = text.offsetByCodePoints(offset[i], 1);
-+        List<Integer> seams = semanticSeams(text, offset);
-+        List<Page> semantic = choose(text, start, end, fitsTwo, fitsOne, offset, seams, false);
-+        if (!semantic.isEmpty()) return semantic;
-+        // Only a failed punctuation-only plan may use a measured non-punctuation seam.
-+        return choose(
-+                text, start, end, fitsTwo, fitsOne, offset, expandedSeams(text, offset), true);
-+    }
-+
-+    /** Target-aware entry: preserve valid legacy cuts; otherwise use soft-rate Unicode capacity. */
-+    static List<Page> plan(
-+            String text, long start, long end, TranslationBudget budget, CaptionRenderSpec spec) {
++            TranslationBudget budget,
++            CaptionRenderSpec spec,
++            long[] sourceAnchors) {
 +        if (budget == null || spec == null || text == null || text.isEmpty() || end <= start)
 +            return Collections.emptyList();
 +        TranslationBudget measured = budget.withSpec(spec);
-+        if (spec.legacy) {
-+            // A complete event that fits the real two-line budget is one immutable page.
-+            if (CaptionLanguagePager.wellFormed(text, spec)
-+                    && spec.fits(text, measured.preferredPx, measured.width, 2))
-+                return Collections.singletonList(new Page(text, start, end, "SOURCE_EVENT"));
-+            // Preserve correct N26 cuts, not its rate/style rejection. No cache-policy change.
-+            java.util.Map<String, Integer> geometry = new java.util.HashMap<>();
-+            java.util.function.ToIntFunction<String> lines =
-+                    value ->
-+                            geometry.computeIfAbsent(
-+                                    value,
-+                                    key -> {
-+                                        android.text.StaticLayout layout =
-+                                                spec.layout(
-+                                                        key, measured.preferredPx, measured.width);
-+                                        return spec.fits(key, layout, measured.width, 2)
-+                                                ? layout.getLineCount()
-+                                                : 3;
-+                                    });
-+            List<Page> preferred =
-+                    preferredLegacyPlan(
-+                            text,
++        // One planner for every target language. The old Chinese-only `legacy` fork made Japanese,
++        // Korean, Arabic and every unlisted language take a different algorithm; script facts now
++        // live in CaptionScript and the page planner itself is language-neutral.
++        return CaptionLanguagePager.plan(text, start, end, measured, spec, sourceAnchors);
++    }
++
++    /**
++     * Page one display unit. A unit is the translation's own semantic span (one event, or a
++     * fragment joined to its continuation). Pages are built from <em>clauses</em> — the stretch
++     * between two punctuation marks — and packed to one measured line each:
++     *
++     * <ul>
++     *   <li>a page holds one or several complete clauses, never the first characters of a clause;
++     *   <li>a clause that is longer than one line gets the two-line exception; only a clause longer
++     *       than two lines is ever cut inside, by the measured fallback;
++     *   <li>a missing final full stop is not a problem: clause marks alone drive the packing, so an
++     *       unterminated tail is simply the last clause;
++     *   <li>an automatic unit whose text fits but whose window is much longer than its reading time
++     *       may be split on whole clauses, so a 5–7 s static page becomes two readable pages;
++     *   <li>an authored cue that fits two lines is one page; a cue that overflows is projected as
++     *       explicit {@code AUTHORED_OVERFLOW} sub-pages.
++     * </ul>
++     *
++     * <p>The unit's first and last page keep its exact source window; only the pages in between are
++     * placed by reading weight. Returns null when the unit needs the measured fallback.
++     */
++    static List<Page> unitPages(
++            String text, long start, long end, TranslationBudget budget, CaptionRenderSpec spec) {
++        return unitPages(text, start, end, budget, spec, null);
++    }
++
++    static List<Page> unitPages(
++            String text,
++            long start,
++            long end,
++            TranslationBudget budget,
++            CaptionRenderSpec spec,
++            long[] sourceAnchors) {
++        if (!CaptionLanguagePager.wellFormed(text, spec)) return null;
++        return unitPages(
++                text,
++                start,
++                end,
++                value -> spec.fits(value, budget.preferredPx, budget.width, 1),
++                value -> spec.fits(value, budget.preferredPx, budget.width, 2),
++                spec,
++                sourceAnchors);
++    }
++
++    /** Testable core: the two line fits are predicates, so packing is independent of a real font. */
++    static List<Page> unitPages(
++            String text,
++            long start,
++            long end,
++            java.util.function.Predicate<String> fitsOne,
++            java.util.function.Predicate<String> fitsTwo,
++            CaptionRenderSpec spec) {
++        return unitPages(text, start, end, fitsOne, fitsTwo, spec, null);
++    }
++
++    static List<Page> unitPages(
++            String text,
++            long start,
++            long end,
++            java.util.function.Predicate<String> fitsOne,
++            java.util.function.Predicate<String> fitsTwo,
++            CaptionRenderSpec spec,
++            long[] sourceAnchors) {
++        if (!CaptionLanguagePager.wellFormed(text, spec)) return null;
++        boolean twoLines = fitsTwo.test(text);
++        List<Integer> cuts = pageCuts(text);
++        if (!cuts.isEmpty() && cuts.get(cuts.size() - 1) == text.length())
++            cuts.remove(cuts.size() - 1);
++        // An authored cue is followed as written while it fits the two lines the box shows; only
++        // a cue that overflows gets the local clause rules. This is the one place where cue
++        // atomicity overrides pacing.
++        if (spec.authored && twoLines)
++            return Collections.singletonList(
++                    new Page(text, start, end, "AUTHORED_CUE"));
++        if (twoLines && (cuts.isEmpty() || !timeSplitWanted(text, start, end, spec)))
++            return Collections.singletonList(
++                    new Page(text, start, end, spec.authored ? "AUTHORED_CUE" : "SOURCE_EVENT"));
++        if (twoLines) {
++            int pages = targetPages(text, start, end, spec, cuts.size());
++            if (pages > 1) {
++                java.util.List<String> balanced =
++                        balancedPages(text, cuts, fitsOne, fitsTwo, spec, start, end, pages);
++                if (balanced != null && balanced.size() > 1) {
++                    for (String part : balanced) if (!fitsTwo.test(part)) return null;
++                    return allocate(
++                            balanced,
 +                            start,
 +                            end,
-+                            value -> lines.applyAsInt(value) <= 2,
-+                            value -> lines.applyAsInt(value) <= 1);
-+            if (validPreferred(text, start, end, preferred, measured, spec)) return preferred;
-+            if (CaptionLanguagePager.wellFormed(text, spec)
-+                    && spec.fits(text, measured.preferredPx, measured.width, 2))
-+                return Collections.singletonList(new Page(text, start, end, "SOURCE_EVENT"));
++                            spec,
++                            sourceAnchors,
++                            spec.authored ? "AUTHORED_OVERFLOW" : null);
++                }
++            }
++            return Collections.singletonList(
++                    new Page(text, start, end, spec.authored ? "AUTHORED_CUE" : "SOURCE_EVENT"));
 +        }
-+        return CaptionLanguagePager.plan(text, start, end, measured, spec);
++        // The text needs more than two lines: pack whole clauses, one measured line per page.
++        if (cuts.isEmpty())
++            // One clause and no place to turn a page: the two-line exception, or the fallback.
++            return null;
++        cuts.add(text.length());
++        java.util.Map<String, Boolean> measured = new java.util.HashMap<>();
++        int leadLimit = Math.max(4, spec.profile.referenceCpl / 2);
++        List<String> parts = pack(text, cuts, fitsOne, fitsTwo, measured, leadLimit);
++        if (parts == null) return null;
++        parts = foldTinyOrLeadPages(parts, fitsTwo, leadLimit);
++        for (String part : parts) if (!fitsTwo.test(part)) return null;
++        return allocate(
++                parts,
++                start,
++                end,
++                spec,
++                sourceAnchors,
++                spec.authored ? "AUTHORED_OVERFLOW" : null);
 +    }
 +
-+    private static boolean validPreferred(
-+            String text,
-+            long start,
-+            long end,
-+            List<Page> pages,
-+            TranslationBudget budget,
-+            CaptionRenderSpec spec) {
-+        if (pages.isEmpty() || !CaptionLanguagePager.wellFormed(text, spec)) return false;
-+        int[] boundaries = CaptionUnicode.characterBoundaries(text, spec.locale);
-+        boolean[] protectedCuts = CaptionLanguagePager.protectedOffsets(text);
-+        int offset = 0;
-+        long at = start;
-+        for (Page page : pages) {
-+            if (page.start != at
-+                    || page.end <= page.start
-+                    || pages.size() > 1 && page.end - page.start < MIN_PAGE_MS
-+                    || !spec.fits(page.text, budget.preferredPx, budget.width, 2)
-+                    || !text.startsWith(page.text, offset)) return false;
-+            offset += page.text.length();
-+            at = page.end;
-+            if (java.util.Arrays.binarySearch(boundaries, offset) < 0 || protectedCuts[offset])
-+                return false;
-+        }
-+        return offset == text.length() && at == end;
-+    }
-+
-+    private static List<Page> choose(
-+            String text,
-+            long start,
-+            long end,
-+            Predicate<String> fitsTwo,
-+            Predicate<String> fitsOne,
-+            int[] offset,
-+            List<Integer> seams,
-+            boolean fallback) {
-+        int count = offset.length - 1;
++    /**
++     * The page planner used to stop as soon as a translation fitted one/two lines, so a 32-character
++     * sentence spoken over 7.4 s stayed one static page. The standard is not punctuation alone:
++     * semantic completeness, line fit, sentence length and the time the page is on screen all
++     * matter. Split a fitting page only when it would sit much longer than its reading time.
++     */
++    private static boolean timeSplitWanted(String text, long start, long end, CaptionRenderSpec spec) {
++        if (spec.authored) return false;
 +        long duration = end - start;
-+        boolean minimumApplies = displayHalfCells(text) >= 16;
-+        int last = seams.size() - 1;
-+        long nominal = duration / MIN_PAGE_MS + (duration % MIN_PAGE_MS == 0 ? 0 : 1);
-+        int pageCap = (int) Math.min(last, nominal);
-+        @SuppressWarnings("unchecked")
-+        List<State>[][] states = new List[last + 1][pageCap + 1];
-+        states[0][0] = new ArrayList<>();
-+        states[0][0].add(new State(null, 0, 0, 0, 0));
-+        for (int at = 0; at < last; at++) {
-+            for (int pages = 0; pages < pageCap; pages++) {
-+                if (states[at][pages] == null) continue;
-+                for (int next = at + 1; next <= last; next++) {
-+                    int from = seams.get(at), to = seams.get(next);
-+                    String part = text.substring(offset[from], offset[to]);
-+                    if (minimumApplies && displayHalfCells(part) < 16) continue;
-+                    if (!fitsTwo.test(part)) continue;
-+                    long required = minimumMs(to - from);
-+                    int lines = fitsOne.test(part) ? 1 : 2;
-+                    long cost =
-+                            styleCost(to - from, lines)
-+                                    + (next == last
-+                                            ? 0
-+                                            : seamCost(text, offset[to])
-+                                                    + (fallback
-+                                                                    && !isPunctuationSeam(
-+                                                                            text, offset[to])
-+                                                            ? 5000
-+                                                            : 0));
-+                    for (State previous : states[at][pages]) {
-+                        long total = previous.required + required;
-+                        // Nominal ceil is only an enumeration cap: actual pages still need full
-+                        // minimums.
-+                        if (total > duration || (pages + 1L) * MIN_PAGE_MS > duration) continue;
-+                        State candidate =
-+                                new State(
-+                                        previous, next, pages + 1, total, previous.penalty + cost);
-+                        if (states[next][pages + 1] == null)
-+                            states[next][pages + 1] = new ArrayList<>();
-+                        addUndominated(states[next][pages + 1], candidate);
-+                    }
++        if (duration < 2 * MIN_PAGE_MS) return false;
++        // A short translation over a long source window is already easy to read; splitting it
++        // would create two very long pages with almost no text, not a better page turn.
++        long reading = Math.max(1, spec.readingUnits(text)) * 1000L
++                / Math.max(1, spec.profile.referenceCps);
++        if (reading < 2000) return false;
++        return duration > comfortMs(text, spec);
++    }
++
++    private static long comfortMs(String text, CaptionRenderSpec spec) {
++        int units = Math.max(1, spec.readingUnits(text));
++        int cps = Math.max(1, spec.profile.referenceCps);
++        long reading = units * 1000L / cps;
++        // Allow a page to stay a little past its reading time, but not several seconds past it.
++        return Math.max(3000, Math.min(5000, reading * 3 / 2));
++    }
++
++    private static int targetPages(
++            String text, long start, long end, CaptionRenderSpec spec, int cuts) {
++        long duration = end - start;
++        long comfort = comfortMs(text, spec);
++        int maxPages = cuts + 1;
++        int pages = (int) Math.min(maxPages, (duration + comfort - 1) / comfort);
++        int byMinimum = (int) Math.max(1, duration / MIN_PAGE_MS);
++        return Math.max(1, Math.min(pages, byMinimum));
++    }
++
++    /**
++     * A small balanced partition: each page is a run of whole clauses, fits the measured two
++     * lines, and carries roughly its share of the window's reading weight. A candidate that fits
++     * one line is preferred; a lead-in or a tiny tail is penalised, matching the clause packer.
++     */
++    private static List<String> balancedPages(
++            String text,
++            List<Integer> cuts,
++            java.util.function.Predicate<String> fitsOne,
++            java.util.function.Predicate<String> fitsTwo,
++            CaptionRenderSpec spec,
++            long start,
++            long end,
++            int pages) {
++        if (pages < 2 || cuts.isEmpty()) return null;
++        List<String> parts = new ArrayList<>(pages);
++        int from = 0;
++        int leadLimit = Math.max(4, spec.profile.referenceCpl / 2);
++        for (int page = 0; page < pages; page++) {
++            int remainingPages = pages - page;
++            if (remainingPages == 1) {
++                String tail = text.substring(from);
++                if (!fitsTwo.test(tail)) return null;
++                parts.add(tail);
++                break;
++            }
++            int first = -1;
++            for (int i = 0; i < cuts.size(); i++)
++                if (cuts.get(i) > from) {
++                    first = i;
++                    break;
++                }
++            if (first < 0) return null;
++            int lastAllowed = cuts.size() - (remainingPages - 1);
++            if (lastAllowed < first) return null;
++            double remainingWeight = Math.max(1, weight(text.substring(from)));
++            double target = remainingWeight / remainingPages;
++            int best = -1;
++            double bestCost = Double.MAX_VALUE;
++            for (int i = first; i <= lastAllowed; i++) {
++                String part = text.substring(from, cuts.get(i));
++                if (!fitsTwo.test(part)) continue;
++                double partWeight = Math.max(1, weight(part));
++                double cost = Math.abs(partWeight - target);
++                if (!fitsOne.test(part)) cost += target * 0.3;
++                if (leadClause(part, leadLimit)) cost += target * 0.6;
++                if (i == cuts.size() - 1) cost += target * 0.2;
++                if (cost < bestCost) {
++                    bestCost = cost;
++                    best = i;
 +                }
 +            }
++            if (best < 0) return null;
++            parts.add(text.substring(from, cuts.get(best)));
++            from = cuts.get(best);
 +        }
-+        List<Page> best = Collections.emptyList();
-+        long bestCost = Long.MAX_VALUE;
-+        for (int pages = 1; pages <= pageCap; pages++) {
-+            if (states[last][pages] == null) continue;
-+            for (State state : states[last][pages]) {
-+                int[] cuts = new int[pages + 1];
-+                cuts[pages] = count;
-+                State cursor = state;
-+                for (int i = pages - 1; i >= 0; i--) {
-+                    cursor = cursor.previous;
-+                    cuts[i] = seams.get(cursor.at);
++        if (parts.isEmpty() || parts.get(parts.size() - 1).length() == 0) return null;
++        // A split that creates a 1.5 s lead page and leaves a 6 s page is worse than the original
++        // page. Only accept a partition whose pages are all readable in their own right.
++        int totalWeight = 0;
++        int[] partWeights = new int[parts.size()];
++        for (int i = 0; i < parts.size(); i++) {
++            partWeights[i] = weight(parts.get(i));
++            totalWeight += partWeights[i];
++        }
++        long duration = end - start;
++        for (int i = 0; i < parts.size(); i++) {
++            long estimated = duration * partWeights[i] / Math.max(1, totalWeight);
++            if (estimated < 2200) return null;
++        }
++        return parts;
++    }
++
++    /**
++     * Ends of the clause spans a page may end on: every Unicode clause mark (CJK, Arabic,
++     * Devanagari, Latin) and the invisible join between two merged events (a zero-width space)
++     * when the model itself supplied no mark.
++     */
++    private static List<Integer> pageCuts(String text) {
++        int[] ends = CaptionClauses.of(text).ends();
++        List<Integer> cuts = new ArrayList<>(ends.length + 4);
++        for (int end : ends) if (end > 0 && end < text.length()) cuts.add(end);
++        for (int at = 0; at < text.length(); ) {
++            int cp = text.codePointAt(at);
++            at += Character.charCount(cp);
++            if (cp != 0x200b) continue;
++            int cut = at;
++            while (cut < text.length()
++                    && (Character.isWhitespace(text.codePointAt(cut))
++                            || text.codePointAt(cut) == 0x200b))
++                cut += Character.charCount(text.codePointAt(cut));
++            if (cut < text.length() && (cuts.isEmpty() || cut > cuts.get(cuts.size() - 1)))
++                cuts.add(cut);
++        }
++        Collections.sort(cuts);
++        return cuts;
++    }
++
++    /** Greedy clause packing: the longest run of whole clauses that still fits one line. */
++    private static List<String> pack(
++            String text,
++            List<Integer> cuts,
++            java.util.function.Predicate<String> fitsOne,
++            java.util.function.Predicate<String> fitsTwo,
++            java.util.Map<String, Boolean> measured,
++            int leadLimit) {
++        List<String> parts = new ArrayList<>();
++        int from = 0;
++        while (from < text.length()) {
++            int first = -1;
++            for (int i = 0; i < cuts.size(); i++)
++                if (cuts.get(i) > from) {
++                    first = i;
++                    break;
 +                }
-+                List<Page> proposed = allocate(text, offset, cuts, start, end);
-+                long score = state.penalty + pages * 100L + timingCost(proposed);
-+                if (score < bestCost) {
-+                    bestCost = score;
-+                    best = proposed;
++            if (first < 0) {
++                parts.add(text.substring(from));
++                break;
++            }
++            int best = -1;
++            for (int i = first; i < cuts.size(); i++) {
++                if (!oneLine(text.substring(from, cuts.get(i)), fitsOne, measured)) break;
++                best = i;
++            }
++            if (best < 0) {
++                // The first clause is wider than one line: it gets the two-line exception. If it is
++                // wider than two lines as well, split it at glyph boundaries instead of blanking
++                // the caption; this is the overflow fallback for a cue or clause with no clause
++                // break wide enough to help.
++                String clause = text.substring(from, cuts.get(first));
++                if (!fitsTwo.test(clause)) {
++                    List<String> emergency = splitToFit(clause, fitsTwo);
++                    if (emergency == null) return null;
++                    parts.addAll(emergency);
++                    from = cuts.get(first);
++                    continue;
++                }
++                parts.add(clause);
++                from = cuts.get(first);
++                continue;
++            }
++            // Never end a page on a clause that introduces what follows: step back to the last
++            // boundary that closes a thought, as long as the page keeps at least one clause.
++            int chosen = best;
++            for (int i = best; i >= first; i--) {
++                int start = i == first ? from : cuts.get(i - 1);
++                if (!leadClause(text.substring(start, cuts.get(i)), leadLimit)) {
++                    chosen = i;
++                    break;
 +                }
 +            }
++            parts.add(text.substring(from, cuts.get(chosen)));
++            from = cuts.get(chosen);
 +        }
-+        return best;
++        return parts;
 +    }
 +
-+    private static final class State {
-+        final State previous;
-+        final int at, pages;
-+        final long required, penalty;
++    /**
++     * Ends with a colon, or is a short clause ending on a comma ("当然，", "正如其名所示，"): it
++     * introduces the clause that follows rather than completing the one before.
++     */
++    private static boolean leadClause(String clause, int limit) {
++        String value = clause.replace("\u200b", "").trim();
++        if (value.isEmpty()) return false;
++        int last = value.codePointBefore(value.length());
++        if (last == '：' || last == ':') return true;
++        if (last != '，' && last != ',' && last != '、' && last != '،' && last != '؛') return false;
++        return visible(value) <= limit;
++    }
 +
-+        State(State prior, int index, int n, long min, long cost) {
-+            previous = prior;
-+            at = index;
-+            pages = n;
-+            required = min;
-+            penalty = cost;
++    /** Longest glyph-boundary prefix per page; used only when a clause exceeds two lines. */
++    private static List<String> splitToFit(
++            String clause, java.util.function.Predicate<String> fitsTwo) {
++        List<String> out = new ArrayList<>();
++        int from = 0, length = clause.length();
++        while (from < length) {
++            int best = -1;
++            for (int at = from; at < length; ) {
++                int cp = clause.codePointAt(at);
++                at += Character.charCount(cp);
++                if (fitsTwo.test(clause.substring(from, at))) best = at;
++                else break;
++            }
++            if (best <= from) {
++                // A single grapheme wider than the box cannot be shown by any page planner.
++                return null;
++            }
++            out.add(clause.substring(from, best));
++            from = best;
 +        }
++        return out;
 +    }
 +
-+    private static void addUndominated(List<State> choices, State candidate) {
-+        for (State existing : choices)
-+            if (existing.required <= candidate.required && existing.penalty <= candidate.penalty)
-+                return;
-+        choices.removeIf(
-+                existing ->
-+                        candidate.required <= existing.required
-+                                && candidate.penalty <= existing.penalty);
-+        choices.add(candidate);
-+    }
-+
-+    private static List<Integer> semanticSeams(String text, int[] offset) {
-+        List<Integer> seams = new ArrayList<>();
-+        seams.add(0);
-+        int count = offset.length - 1;
-+        for (int cut = 1; cut < count; cut++) {
-+            int before = text.codePointBefore(offset[cut]);
-+            if ("，。！？；：,!?;:".indexOf(before) < 0) continue;
-+            int after = text.codePointAt(offset[cut]);
-+            if (cut > 1
-+                    && Character.isDigit(text.codePointBefore(offset[cut - 1]))
-+                    && Character.isDigit(after)
-+                    && (before == ',' || before == ':')) continue;
-+            // Closing quotation marks belong to the clause just ended; retain exact text.
-+            int adjusted = cut;
-+            while (adjusted < count - 1
-+                    && "”’\"'）)]".indexOf(text.codePointAt(offset[adjusted])) >= 0) adjusted++;
-+            while (adjusted < count - 1
-+                    && Character.isWhitespace(text.codePointAt(offset[adjusted]))) adjusted++;
-+            if (adjusted < count && adjusted > seams.get(seams.size() - 1)) seams.add(adjusted);
++    private static boolean oneLine(
++            String text,
++            java.util.function.Predicate<String> fitsOne,
++            java.util.Map<String, Boolean> measured) {
++        Boolean known = measured.get(text);
++        if (known == null) {
++            known = fitsOne.test(text);
++            measured.put(text, known);
 +        }
-+        seams.add(count);
-+        return seams;
++        return known;
 +    }
 +
-+    private static List<Integer> expandedSeams(String text, int[] offset) {
-+        List<Integer> seams = new ArrayList<>();
-+        seams.add(0);
-+        int count = offset.length - 1;
-+        for (int cut = 1; cut < count; cut++) {
-+            int before = text.codePointBefore(offset[cut]);
-+            int after = text.codePointAt(offset[cut]);
-+            // Never divide an ASCII number or word merely to satisfy a page preference.
-+            if (before < 128
-+                    && after < 128
-+                    && Character.isLetterOrDigit(before)
-+                    && Character.isLetterOrDigit(after)) continue;
-+            seams.add(cut);
++    /**
++     * Safety net for what the packer could not rebalance: a page that is a bare lead ("当然，",
++     * "本质上，") or a page of two or three characters folds into its neighbour when the pair still
++     * fits two lines. A page that would otherwise show one word alone is the worse trade.
++     */
++    private static List<String> foldTinyOrLeadPages(
++            List<String> parts,
++            java.util.function.Predicate<String> fitsTwo,
++            int leadLimit) {
++        boolean changed = true;
++        while (changed && parts.size() > 1) {
++            changed = false;
++            for (int i = 0; i < parts.size(); i++) {
++                String part = parts.get(i).trim();
++                boolean lead = leadClause(part, leadLimit);
++                boolean tiny = visible(part) < 6;
++                // A unit that ends mid-clause leaves its tail as a flash of two or three words.
++                boolean tail = i == parts.size() - 1 && !endsClause(part) && visible(part) < 10;
++                if (!lead && !tiny && !tail) continue;
++                int other = i + 1 < parts.size() ? i + 1 : i - 1;
++                if (other < 0) break;
++                String merged =
++                        other > i ? parts.get(i) + parts.get(other) : parts.get(other) + parts.get(i);
++                if (!fitsTwo.test(merged)) continue;
++                int keep = Math.min(i, other);
++                parts.set(keep, merged);
++                parts.remove(Math.max(i, other));
++                changed = true;
++                break;
++            }
 +        }
-+        seams.add(count);
-+        return seams;
++        return parts;
 +    }
 +
-+    private static boolean isPunctuationSeam(String text, int offset) {
-+        return "，。！？；：,!?;:".indexOf(text.codePointBefore(offset)) >= 0;
++    private static boolean endsClause(String text) {
++        String value = text.replace("\u200b", "").trim();
++        return !value.isEmpty() && CaptionClauses.mark(value.codePointBefore(value.length()));
 +    }
++
++    private static int visible(String text) {
++        int count = 0;
++        for (int at = 0; at < text.length(); ) {
++            int cp = text.codePointAt(at);
++            at += Character.charCount(cp);
++            if (Character.isWhitespace(cp) || cp == 0x200b || cp == 0xfeff) continue;
++            if (Character.getType(cp) == Character.FORMAT) continue;
++            count++;
++        }
++        return count;
++    }
++
++    /**
++     * Time inside one unit's exact window: a clause's own length plus the pause its punctuation
++     * implies, so page turns land near the pauses in the voice. The outer bounds never move.
++     */
++    private static List<Page> allocate(
++            List<String> parts, long start, long end, CaptionRenderSpec spec) {
++        return allocate(parts, start, end, spec, null, null);
++    }
++
++    private static List<Page> allocate(
++            List<String> parts,
++            long start,
++            long end,
++            CaptionRenderSpec spec,
++            long[] sourceAnchors) {
++        return allocate(parts, start, end, spec, sourceAnchors, null);
++    }
++
++    private static List<Page> allocate(
++            List<String> parts,
++            long start,
++            long end,
++            CaptionRenderSpec spec,
++            long[] sourceAnchors,
++            String forcedBasis) {
++        if (parts.size() == 1)
++            return Collections.singletonList(
++                    new Page(
++                            parts.get(0),
++                            start,
++                            end,
++                            forcedBasis == null ? "SOURCE_EVENT" : forcedBasis));
++        long[] anchored = pageAnchorTimes(sourceAnchors, parts.size(), start, end);
++        int total = 0;
++        int[] weights = new int[parts.size()];
++        for (int i = 0; i < parts.size(); i++) {
++            weights[i] = weight(parts.get(i));
++            total += weights[i];
++        }
++        List<Page> pages = new ArrayList<>(parts.size());
++        long at = start;
++        int remaining = total;
++        String basis =
++                forcedBasis != null
++                        ? forcedBasis
++                        : anchored == null ? "ESTIMATED_PAGE_TIMING" : "SOURCE_PAUSE_ANCHOR";
++        for (int i = 0; i < parts.size(); i++) {
++            if (i == parts.size() - 1) {
++                pages.add(new Page(parts.get(i), at, end, basis));
++                break;
++            }
++            long next;
++            if (anchored != null) {
++                next = anchored[i];
++            } else {
++                long span = Math.max(1, (end - at) * weights[i] / Math.max(1, remaining));
++                next = Math.min(end - 1, at + span);
++            }
++            pages.add(new Page(parts.get(i), at, next, basis));
++            at = next;
++            remaining -= weights[i];
++        }
++        return Collections.unmodifiableList(pages);
++    }
++
++    /**
++     * One real source boundary per page turn, or null when the anchors cannot cover the pages
++     * monotonically. A page turn on an actual pause/word end is better than a character-count guess.
++     */
++    private static long[] pageAnchorTimes(
++            long[] anchors, int pages, long start, long end) {
++        if (anchors == null || anchors.length < pages - 1 || pages <= 1) return null;
++        long[] result = new long[pages - 1];
++        long prior = start;
++        for (int i = 1; i < pages; i++) {
++            int index;
++            if (pages == 2) {
++                index = (int) Math.round(anchors.length / 2.0);
++            } else {
++                index =
++                        1
++                                + (int)
++                                        Math.round(
++                                                (double) (i - 1)
++                                                        * (anchors.length - 1)
++                                                        / (pages - 2));
++            }
++            index = Math.min(anchors.length, Math.max(1, index));
++            long at = anchors[index - 1];
++            if (at <= prior || at >= end) return null;
++            result[i - 1] = at;
++            prior = at;
++        }
++        return result;
++    }
++
++    /** Reading weight of one clause: its visible characters plus the pause its mark implies. */
++    private static int weight(String part) {
++        int units = 0;
++        for (int at = 0; at < part.length(); ) {
++            int cp = part.codePointAt(at);
++            at += Character.charCount(cp);
++            if (Character.isWhitespace(cp)) continue;
++            units++;
++            if ("。！？!?；;".indexOf(cp) >= 0) units += 3;
++            else if ("，、：,:".indexOf(cp) >= 0) units += 1;
++        }
++        return Math.max(1, units);
++    } 
 +
 +    /** Approximate display width in half-CJK cells, without rounding up short pages. */
 +    static int displayHalfCells(String text) {
@@ -10835,67 +11944,11 @@
 +            at += Character.charCount(cp);
 +        }
 +        return whole * 2 + half;
-+    }
-+
-+    private static long styleCost(int length, int lines) {
-+        long outside = length < 12 ? 650L * (12 - length) : length > 18 ? 850L * (length - 18) : 0;
-+        // Avoid making a tiny introductory fragment its own page just to save a line.
-+        return outside
-+                + (length < 8 ? 30000 : 0)
-+                + (lines == 1 ? 0 : 18000)
-+                + 8L * Math.abs(length - 15);
-+    }
-+
-+    private static long seamCost(String text, int offset) {
-+        int prior = text.codePointBefore(offset);
-+        return "。！？；!?;".indexOf(prior) >= 0 ? 0 : 20;
-+    }
-+
-+    private static long timingCost(List<Page> pages) {
-+        long cost = 0;
-+        for (Page page : pages) {
-+            long ms = page.end - page.start;
-+            if (ms < 2000) cost += (2000 - ms) / 10;
-+            else if (ms > 3500) cost += (ms - 3500) / 10;
-+        }
-+        return cost;
-+    }
-+
-+    private static long minimumMs(int codePoints) {
-+        return Math.max(MIN_PAGE_MS, (codePoints * 1000L + MAX_CPS - 1) / MAX_CPS);
-+    }
-+
-+    private static List<Page> allocate(
-+            String text, int[] offset, int[] cuts, long start, long end) {
-+        int pages = cuts.length - 1;
-+        long[] spans = new long[pages];
-+        long minimum = 0;
-+        for (int i = 0; i < pages; i++) {
-+            spans[i] = minimumMs(cuts[i + 1] - cuts[i]);
-+            minimum += spans[i];
-+        }
-+        long extra = end - start - minimum;
-+        int total = offset.length - 1;
-+        long distributed = 0;
-+        for (int i = 0; i < pages - 1; i++) {
-+            long share = extra * (cuts[i + 1] - cuts[i]) / total;
-+            spans[i] += share;
-+            distributed += share;
-+        }
-+        spans[pages - 1] += extra - distributed;
-+        List<Page> result = new ArrayList<>(pages);
-+        long at = start;
-+        for (int i = 0; i < pages; i++) {
-+            long next = at + spans[i];
-+            result.add(new Page(text.substring(offset[cuts[i]], offset[cuts[i + 1]]), at, next));
-+            at = next;
-+        }
-+        return Collections.unmodifiableList(result);
-+    }
++    } 
  }
 --- extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java
 +++ translation-core/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagePager.java
-@@ -1,240 +1,367 @@
+@@ -1,240 +1,488 @@
  package app.yydarlinker.deepseekcaptions;
  
 -import android.text.StaticLayout;
@@ -11141,22 +12194,122 @@
 +
 +    static List<RebuildPageLayout.Page> plan(
 +            String text, long start, long end, TranslationBudget budget, CaptionRenderSpec spec) {
++        return plan(text, start, end, budget, spec, null);
++    }
++
++    static List<RebuildPageLayout.Page> plan(
++            String text,
++            long start,
++            long end,
++            TranslationBudget budget,
++            CaptionRenderSpec spec,
++            long[] sourceAnchors) {
 +        if (text == null || text.isEmpty() || end <= start || !wellFormed(text, spec))
 +            return Collections.emptyList();
-+        if (spec.fits(text, budget.preferredPx, budget.width, 2))
-+            return Collections.singletonList(
-+                    new RebuildPageLayout.Page(text, start, end, "SOURCE_EVENT"));
-+        if (end - start < 2 * MIN_PAGE_MS && !spec.fits(text, budget.preferredPx, budget.width, 2))
-+            return Collections.emptyList();
++        // A unit that already reads as one subtitle keeps its exact source window; only a unit
++        // holding several complete sentences is divided, and only between them.
++        List<RebuildPageLayout.Page> unit =
++                RebuildPageLayout.unitPages(text, start, end, budget, spec, sourceAnchors);
++        if (unit != null) return authoredLabel(unit, spec);
++        // Keeping the whole text is one of the candidates the search weighs: it is not granted for
++        // free, and no fixed duration forces a split. A plan only has to stay inside one clause at
++        // a time and remain comfortable to read.
 +        Seams seams = seams(text, budget, spec);
 +        List<RebuildPageLayout.Page> pages =
 +                choose(text, start, end, seams.cuts, seams.kinds, budget, spec);
-+        if (!pages.isEmpty()) return pages;
-+        // Seven seconds and reading/CPL references are watches, not independent reasons for
-+        // blanking.
-+        return spec.fits(text, budget.preferredPx, budget.width, 2)
-+                ? Collections.singletonList(new RebuildPageLayout.Page(text, start, end))
-+                : Collections.emptyList();
++        if (!pages.isEmpty()) return authoredLabel(pages, spec);
++        // Time shortage or an indivisible long unit is not a reason to hide captions. Split by
++        // measured line capacity and keep the whole translation visible.
++        return authoredLabel(fallback(text, start, end, budget, spec, seams.cuts), spec);
++    }
++
++    /** An authored cue that cannot fit the two-line box is an explicit overflow projection. */
++    private static List<RebuildPageLayout.Page> authoredLabel(
++            List<RebuildPageLayout.Page> pages, CaptionRenderSpec spec) {
++        if (!spec.authored || pages.size() <= 1) return pages;
++        List<RebuildPageLayout.Page> out = new ArrayList<>(pages.size());
++        for (RebuildPageLayout.Page page : pages)
++            out.add(
++                    new RebuildPageLayout.Page(
++                            page.text, page.start, page.end, "AUTHORED_OVERFLOW"));
++        return Collections.unmodifiableList(out);
++    }
++
++    /** Last-resort pages: longest measured prefix per page, proportional reading time. */
++    private static List<RebuildPageLayout.Page> fallback(
++            String text,
++            long start,
++            long end,
++            TranslationBudget budget,
++            CaptionRenderSpec spec,
++            int[] cuts) {
++        CaptionClauses clauses = CaptionClauses.of(text);
++        List<String> parts = new ArrayList<>();
++        int from = 0;
++        while (from < text.length()) {
++            int best = -1, firstAllowed = -1;
++            for (int cut : cuts) {
++                if (cut <= from) continue;
++                if (clauses.allows(from, cut)) {
++                    if (firstAllowed < 0) firstAllowed = cut;
++                    if (spec.fits(text.substring(from, cut), budget.preferredPx, budget.width, 2))
++                        best = cut;
++                }
++            }
++            if (best < 0) {
++                // A single clause (or an unpunctuated cue) can exceed the two-line box. The
++                // semantic cut is impossible, so take the longest measured prefix that still
++                // shows complete glyph clusters; blanking the page is never the fallback.
++                best = measuredPrefix(text, from, budget, spec);
++            }
++            if (best < 0) best = firstAllowed;
++            if (best <= from) best = from + Character.charCount(text.codePointAt(from));
++            parts.add(text.substring(from, best));
++            from = best;
++        }
++        long[] weights = new long[parts.size()];
++        long total = 0;
++        for (int i = 0; i < parts.size(); i++) {
++            weights[i] = Math.max(1, spec.readingUnits(parts.get(i)));
++            total += weights[i];
++        }
++        List<RebuildPageLayout.Page> result = new ArrayList<>(parts.size());
++        long at = start, remainingWeight = total;
++        for (int i = 0; i < parts.size(); i++) {
++            if (i + 1 == parts.size()) {
++                result.add(new RebuildPageLayout.Page(parts.get(i), at, end));
++                break;
++            }
++            long remaining = end - at;
++            if (remaining <= parts.size() - i) {
++                // Less than one millisecond per remaining part: show the remainder as one page
++                // rather than dropping text or creating an invalid window.
++                StringBuilder merged = new StringBuilder();
++                for (int k = i; k < parts.size(); k++) merged.append(parts.get(k));
++                result.add(new RebuildPageLayout.Page(merged.toString(), at, end));
++                break;
++            }
++            long span = Math.max(1, remaining * weights[i] / remainingWeight);
++            long next = Math.min(end - 1, at + span);
++            result.add(new RebuildPageLayout.Page(parts.get(i), at, next));
++            at = next;
++            remainingWeight -= weights[i];
++        }
++        return Collections.unmodifiableList(result);
++    }
++
++    /** Longest prefix from {@code from} that still fits the two-line box, on glyph boundaries. */
++    private static int measuredPrefix(
++            String text, int from, TranslationBudget budget, CaptionRenderSpec spec) {
++        int[] boundaries = CaptionUnicode.characterBoundaries(text, spec.locale);
++        int best = -1;
++        for (int boundary : boundaries) {
++            if (boundary <= from) continue;
++            if (spec.fits(text.substring(from, boundary), budget.preferredPx, budget.width, 2))
++                best = boundary;
++            else break;
++        }
++        return best;
 +    }
 +
 +    static boolean wellFormed(String text, CaptionRenderSpec spec) {
@@ -11308,6 +12461,7 @@
 +        TreeMap<Integer, Integer> ordinary = new TreeMap<>();
 +        ordinary.put(0, SENTENCE);
 +        ordinary.put(text.length(), SENTENCE);
++        int lastSeam = 0;
 +        for (int n : graphemes) {
 +            if (n == 0 || n == text.length() || !legal(text, n, blocked)) continue;
 +            int kind = evidence(text, n);
@@ -11327,7 +12481,15 @@
 +                    && punctuation > 0
 +                    && text.codePointBefore(punctuation) == '.'
 +                    && !sentence) kind = WORD;
-+            if (word || kind < WORD || sentence && kind == SENTENCE) ordinary.put(n, kind);
++            int mark = punctuation > 0 ? text.codePointBefore(punctuation) : -1;
++            // A colon introduces what follows, and a bare discourse marker ("当然，") belongs to
++            // the clause it introduces: neither may end a page.
++            if (mark == '：' || mark == ':') continue;
++            if (kind == CLAUSE && n - lastSeam <= 4) continue;
++            if (word || kind < WORD || sentence && kind == SENTENCE) {
++                ordinary.put(n, kind);
++                lastSeam = n;
++            }
 +        }
 +        TreeMap<Integer, Integer> all = new TreeMap<>(ordinary);
 +        List<Integer> units = new ArrayList<>(ordinary.keySet());
@@ -11378,25 +12540,31 @@
 +    }
 +
 +    private static final class Score implements Comparable<Score> {
-+        final int emergency, weak, pages, clauses;
++        final int emergency, weak, longPages, clauses, pages;
 +        final double balance;
 +
-+        Score(int e, int w, int p, int c, double b) {
++        Score(int e, int w, int longPages, int p, int c, double b) {
 +            emergency = e;
 +            weak = w;
++            this.longPages = longPages;
 +            pages = p;
 +            clauses = c;
 +            balance = b;
 +        }
 +
 +        public int compareTo(Score o) {
++            // Meaning first: an emergency cut (inside a word) or a weak one is worse than any
++            // pacing preference. Then a page held past the recommended wall time, then whether the
++            // cut landed on a clause instead of a sentence, then how many pages, then balance.
 +            int n = Integer.compare(emergency, o.emergency);
 +            if (n != 0) return n;
 +            n = Integer.compare(weak, o.weak);
 +            if (n != 0) return n;
-+            n = Integer.compare(pages, o.pages);
++            n = Integer.compare(longPages, o.longPages);
 +            if (n != 0) return n;
 +            n = Integer.compare(clauses, o.clauses);
++            if (n != 0) return n;
++            n = Integer.compare(pages, o.pages);
 +            return n != 0 ? n : Double.compare(balance, o.balance);
 +        }
 +    }
@@ -11413,10 +12581,11 @@
 +        long duration = end - start;
 +        int capacity = (int) Math.min(n - 1, duration / MIN_PAGE_MS);
 +        if (capacity < 1) return Collections.emptyList();
++        CaptionClauses clauses = CaptionClauses.of(text);
 +        Score[][] cost = new Score[capacity + 1][n];
 +        int[][] previous = new int[capacity + 1][n];
 +        for (int p = 0; p <= capacity; p++) Arrays.fill(previous[p], -1);
-+        cost[0][0] = new Score(0, 0, 0, 0, 0);
++        cost[0][0] = new Score(0, 0, 0, 0, 0, 0);
 +        int total = Math.max(1, spec.readingUnits(text));
 +        Map<String, Measured> measurements = new HashMap<>();
 +        for (int count = 0; count < capacity; count++)
@@ -11424,6 +12593,9 @@
 +                Score prior = cost[count][from];
 +                if (prior == null) continue;
 +                for (int to = from + 1; to < n; to++) {
++                    // A page may hold several complete clauses, or one long clause split on its
++                    // own; it never starts before a clause and ends inside it.
++                    if (!clauses.allows(cuts[from], cuts[to])) continue;
 +                    // Within this event/spec/geometry, identical complete parts have identical
 +                    // native layout.
 +                    String part = text.substring(cuts[from], cuts[to]);
@@ -11447,6 +12619,8 @@
 +                            new Score(
 +                                    prior.emergency + (kind == EMERGENCY ? 1 : 0),
 +                                    prior.weak + (kind == WORD ? 1 : 0),
++                                    prior.longPages
++                                            + (ms > spec.profile.softPageDurationMs ? 1 : 0),
 +                                    count + 1,
 +                                    prior.clauses + (kind == CLAUSE ? 1 : 0),
 +                                    prior.balance

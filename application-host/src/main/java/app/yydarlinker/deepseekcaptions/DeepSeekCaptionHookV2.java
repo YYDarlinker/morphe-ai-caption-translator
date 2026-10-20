@@ -33,8 +33,6 @@ public final class DeepSeekCaptionHookV2 {
     }
 
     public static void onVideoId(String videoId) {
-        // The old video's ON/OFF intent is observed before the controller tears its session down.
-        CaptionVideoHandoffV2.onVideoId(videoId);
         DeepSeekCaptionHook.onVideoId(videoId);
         CaptionMusicSuppressor.forceNativeRendererScan();
     }
@@ -96,34 +94,14 @@ public final class DeepSeekCaptionHookV2 {
     }
 
     public static String rewriteUrl(Object cronetEngine, String originalUrl) {
-        Context context = DeepSeekCaptionHook.context();
-        boolean aiEnabled = context != null && DeepSeekConfig.enabled(context);
-
-        // Only the cross-video default restoration is decided here; the native and source track
-        // authority is decided once, inside the hook. A long-press menu makes mayActivateAiTarget()
-        // false, so the handoff yields cleanly.
-        String selected =
-                aiEnabled
-                        ? CaptionVideoHandoffV2.restoreForNextVideo(context, originalUrl)
-                        : originalUrl;
-        String rewritten = DeepSeekCaptionHook.rewriteUrl(cronetEngine, selected);
+        // The target authority is the per-request policy inside the hook, not a one-shot handoff.
+        // Every translated request follows the explicit target of this launch, and a new video
+        // cannot fall back to YouTube's persisted default.
+        String rewritten = DeepSeekCaptionHook.rewriteUrl(cronetEngine, originalUrl);
         // The hook activates the visible session before it returns the loopback url, so the native
         // renderer is masked before FIRST_AI_READY instead of at the next player-time callback.
         CaptionMusicSuppressor.forceNativeRendererScan();
         CaptionMusicSuppressor.kick();
-
-        if (aiEnabled) {
-            String target = concreteAiUrl(selected, rewritten);
-            if (!target.isEmpty()) CaptionVideoHandoffV2.noteAiTarget(target);
-            if (originalUrl != null && !originalUrl.equals(selected)) {
-                TargetLanguage language = TargetLanguage.fromUrl(selected);
-                CaptionDiagnostics.mark(
-                        context,
-                        "VIDEO_DEFAULT_AI_RESTORED",
-                        "Default AI captions restored after switching videos"
-                                + (language == null ? "" : ";target=" + language.promptLabel()));
-            }
-        }
         return rewritten;
     }
 

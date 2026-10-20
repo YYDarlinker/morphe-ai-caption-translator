@@ -31,6 +31,7 @@ public final class NativeCaptionBridge {
 
     private static final Object SELECTION_LOCK = new Object();
     private static final AtomicBoolean drawObserved = new AtomicBoolean();
+    private static final AtomicBoolean captionsShownInFlight = new AtomicBoolean();
 
     private static volatile Context context;
     private static volatile Set<String> availableLanguages = Collections.emptySet();
@@ -40,7 +41,9 @@ public final class NativeCaptionBridge {
     /** The last selection per video, oldest first; guarded by {@link #SELECTION_LOCK}. */
     private static final LinkedHashMap<String, Selection> selections = new LinkedHashMap<>();
 
-    private static String lastTrackListMark = "", lastSourcePrewarm = "", visibleVideo = "";
+    private static String lastTrackListMark = "", visibleVideo = "";
+    /** The last native auto-translate code set observed, so a diagnostic is not repeated. */
+    private static String lastAvailableTracks = "";
     private static Object switchingManager;
 
     private NativeCaptionBridge() {}
@@ -122,6 +125,12 @@ public final class NativeCaptionBridge {
     }
 
     public static String translationLabel(String code) {
+        // Chinese variants are product labels, not native YouTube labels: the native menu can say
+        // "中文（繁体中文）" while the app and its settings say "中文（繁体）". Use the one localizer
+        // for both the inserted entry and its metadata so the menu cannot show two names.
+        String canonical = CaptionLanguageSelection.canonical(code);
+        if ("zh-Hans".equals(canonical) || "zh-Hant".equals(canonical))
+            return LanguageMenuOrder.label(canonical);
         String name = labelsCurrent() ? nativeLabels.get(code) : null;
         return name == null ? LanguageMenuOrder.label(code) : name;
     }
@@ -145,13 +154,44 @@ public final class NativeCaptionBridge {
             if (prototype == null) return original;
             List<Object> copy = new ArrayList<>(original);
             Collator collator = Collator.getInstance(LanguageMenuOrder.locale());
+            boolean changed = false;
             for (String code : chosen) {
-                if (!present.add(code)) continue;
+                if (!present.add(code)) {
+                    // The language is already native. A selected Chinese variant still needs the
+                    // product label; replace only the label on a copy that keeps the native URL,
+                    // vss and position.
+                    int at = indexOfCode(copy, code);
+                    if (at < 0 || !isChineseVariant(code)) continue;
+                    Object existing = copy.get(at);
+                    String before = displayName(existing).toString();
+                    if (!redundantChineseLabel(code, before)) continue;
+                    String wanted = translationLabel(code);
+                    if (before.equals(wanted)) continue;
+                    Object relabeled = relabelTranslation(existing, code);
+                    if (relabeled == null) continue;
+                    String after = displayName(relabeled).toString();
+                    if (before.equals(after)) continue;
+                    copy.set(at, relabeled);
+                    changed = true;
+                    mark(
+                            "LANGUAGE_MENU_RELABELED",
+                            "code="
+                                    + code
+                                    + ";from="
+                                    + before
+                                    + ";to="
+                                    + after
+                                    + ";position="
+                                    + at
+                                    + ";native_url_preserved=true");
+                    continue;
+                }
                 Object added = cloneTranslation(prototype, code);
                 if (added == null) continue;
                 String label = displayName(added).toString();
                 int at = insertionIndex(copy, label, collator);
                 copy.add(at, added);
+                changed = true;
                 mark(
                         "LANGUAGE_MENU_INSERTED",
                         "code="
@@ -162,6 +202,13 @@ public final class NativeCaptionBridge {
                                 + at
                                 + ";native_preserved=true");
             }
+            String tracks = availableTracks(copy);
+            if (!tracks.equals(lastAvailableTracks)) {
+                lastAvailableTracks = tracks;
+                mark(
+                        "LANGUAGE_TRACKS_AVAILABLE",
+                        "count=" + copy.size() + ";codes=" + tracks);
+            }
             mark(
                     "LANGUAGE_MENU_READY",
                     "selected="
@@ -170,11 +217,54 @@ public final class NativeCaptionBridge {
                             + copy.size()
                             + ";deduplicated=true;elapsed_us="
                             + (System.nanoTime() - started) / 1000);
-            return copy.size() == original.size() ? original : copy;
+            return changed ? copy : original;
         } catch (Exception failed) {
             mark("AI_MENU_INSERT_FAILED", failed.getClass().getSimpleName());
             return original;
         }
+    }
+
+    /** The runtime auto-translate code set, bounded and deduplicated for diagnostics. */
+    private static String availableTracks(List<Object> tracks) {
+        List<String> codes = new ArrayList<>();
+        for (Object track : tracks) {
+            if (codes.size() >= 160) break;
+            String code = language(track);
+            if (code == null || code.isEmpty() || codes.contains(code)) continue;
+            codes.add(code);
+        }
+        StringBuilder out = new StringBuilder();
+        for (String code : codes) {
+            if (out.length() > 0) out.append(',');
+            out.append(code);
+        }
+        return out.toString();
+    }
+
+    private static boolean isChineseVariant(String code) {
+        String canonical = CaptionLanguageSelection.canonical(code);
+        return "zh-Hans".equals(canonical) || "zh-Hant".equals(canonical);
+    }
+
+    /**
+     * Is this native label redundantly naming the script inside the language name?
+     * "中文（繁体中文）" is the observed case; "中文（台湾）" and "中文（繁体）" are not.
+     */
+    public static boolean redundantChineseLabel(String code, String label) {
+        String canonical = CaptionLanguageSelection.canonical(code);
+        if (label == null) return false;
+        String text = label.replaceAll("\\s+", "");
+        if ("zh-Hant".equals(canonical))
+            return text.contains("繁体中文") || text.contains("繁體中文");
+        if ("zh-Hans".equals(canonical))
+            return text.contains("简体中文") || text.contains("簡體中文");
+        return false;
+    }
+
+    private static int indexOfCode(List<Object> list, String code) {
+        for (int i = 0; i < list.size(); i++)
+            if (code.equals(CaptionLanguageSelection.canonical(language(list.get(i))))) return i;
+        return -1;
     }
 
     private static int insertionIndex(List<Object> list, String label, Collator collator) {
@@ -226,6 +316,7 @@ public final class NativeCaptionBridge {
             }
             if (owner.isEmpty()) return;
             boolean foreground = owner.equals(CaptionActions.currentVideoIdSnapshot());
+            boolean sourceReady = false;
             synchronized (SELECTION_LOCK) {
                 String markKey = owner + ":" + foreground;
                 if (!markKey.equals(lastTrackListMark)) {
@@ -243,45 +334,15 @@ public final class NativeCaptionBridge {
                                     + ";elapsed_realtime_ms="
                                     + SystemClock.elapsedRealtime());
                 }
-                if (foreground && sources.size() == 1) prewarmSource(owner, sourceUrl);
+                if (foreground && sources.size() == 1) sourceReady = true;
             }
+            if (sourceReady
+                    && CaptionButtonController.captionsKnownOn()
+                    && !CaptionActions.isVisibleActive())
+                CaptionButtonController.scheduleCaptionsShown();
         } catch (Exception failure) {
             mark("NATIVE_TRACK_LIST_FAILED", failure.getClass().getSimpleName());
         }
-    }
-
-    /**
-     * Fetches the source of the video that is about to play, if the user wants it translated, so
-     * the first page does not wait for the network. An explicit Off always wins; the remembered
-     * choice counts only while the new video has no current choice.
-     */
-    private static void prewarmSource(String owner, String sourceUrl) {
-        if (!enabled() || !DeepSeekConfig.isReady(context)) return;
-        boolean chosen = CaptionChoice.known();
-        boolean translate =
-                chosen
-                        ? CaptionChoice.isOn() && CaptionChoice.translates()
-                        : RememberedCaptionSelection.decision() == 1
-                                && RememberedCaptionSelection.translated();
-        if (!translate) return;
-        TargetLanguage language =
-                TargetLanguage.fromCode(
-                        chosen ? CaptionChoice.language() : RememberedCaptionSelection.language());
-        if (language == null) return;
-        String key = owner + "|" + SourceCaptionCache.key(sourceUrl) + "|" + language.code;
-        if (key.equals(lastSourcePrewarm)) return;
-        lastSourcePrewarm = key;
-        mark(
-                "NATIVE_SOURCE_PREWARM",
-                "video="
-                        + owner
-                        + ";intent="
-                        + (chosen ? "current" : "remembered")
-                        + ";elapsed_realtime_ms="
-                        + SystemClock.elapsedRealtime());
-        // Invisible sessions fetch the source but cannot schedule API translation.
-        CaptionActions.activate(
-                context, TargetLanguage.withCode(sourceUrl, language.code), false, false);
     }
 
     private static void publishSourceCatalog(Object manager) {
@@ -464,41 +525,44 @@ public final class NativeCaptionBridge {
                             + SystemClock.elapsedRealtime());
     }
 
-    /** Remembers the choice and starts, switches or stops the engine for the visible video. */
+    /** Follows the native selection: it is the only language authority. */
     private static void followNativeSelection(
             Selection value, Object track, String code, boolean explicit) {
         boolean off = value.off;
         if (!explicit && !off)
             SourceCatalog.defaultLanguage(
                     value.video, CaptionLanguageContext.observe(value.selectedUrl, "").sourceCode);
-        if (explicit && CaptionAddonSupport.memoryInstalled()) {
-            if (off) RememberedCaptionSelection.off();
-            else if (!code.endsWith("_OPTION"))
-                RememberedCaptionSelection.select(code, value.translated, value.asr);
-        }
-        // An explicit Off is the user's; an automatic reset of the caption model is a departure.
         if (off) {
             if (explicit) EngineResume.declined();
             else EngineResume.automaticReset();
+            applySelection(null, explicit);
+            return;
         }
-        applySelection(track, off || explicit || !CaptionChoice.known() || !CaptionChoice.isOn());
+        applySelection(track, explicit);
     }
 
     /** Starts the engine for a native track (or stops it for null/Off). */
-    static void applySelection(Object track, boolean remember) {
+    static void applySelection(Object track, boolean explicit) {
         if (!CaptionAddonSupport.aiInstalled()) return;
         try {
             String code = track == null ? DISABLE : language(track);
             if (AUTO_TRANSLATE.equals(code)) return;
             if (DISABLE.equals(code)) {
-                if (remember) CaptionChoice.toggle(false);
+                if (explicit) {
+                    CaptionChoice.toggle(false);
+                    CaptionChoice.markExplicitOff();
+                } else CaptionChoice.automaticOff();
                 if (enabled()) CaptionActions.deactivateFromNativeCaptionState();
                 return;
             }
             String selected = url(track);
             if (!DeepSeekCaptionHook.isYouTubeTimedTextUrl(selected)) return;
+            // A manual Off survives every automatic track rebuild. An explicit selection is
+            // allowed to replace it.
+            if (!explicit && (CaptionChoice.userOff() || CaptionChoice.explicitOff())) return;
             boolean translate = TargetLanguage.fromUrl(selected) != null;
-            if (remember) CaptionChoice.select(code, translate);
+            // The native selection is the session state; no separate language memory exists.
+            CaptionChoice.select(code, translate);
             if (!enabled()) return;
             startEngine(selected, translate);
             CaptionMusicSuppressor.kick();
@@ -527,16 +591,7 @@ public final class NativeCaptionBridge {
         synchronized (SELECTION_LOCK) {
             if (video.equals(visibleVideo)) return;
             visibleVideo = video;
-            CaptionChoice.reset();
-            Selection value = video.isEmpty() ? null : selections.get(video);
-            if (value == null) return;
-            if (value.off) {
-                CaptionChoice.toggle(false);
-                return;
-            }
-            Object track = currentTrack(value);
-            if (track != null) applySelection(track, true);
-            else if (canActivateSnapshot(value)) activateSnapshot(value, true);
+            mark("VIDEO_SWITCHED", "video=" + video);
         }
     }
 
@@ -628,77 +683,56 @@ public final class NativeCaptionBridge {
         }
     }
 
-    private static void activateSnapshot(Selection value, boolean updateChoice) {
-        if (updateChoice) CaptionChoice.select(value.language, value.translated);
-        if (!enabled()) return;
-        publishSourceCatalog(value.manager.get()); // References first, before the source worker.
-        Object fresh = currentTrack(value);
-        startEngine(fresh == null ? value.selectedUrl : url(fresh), value.translated);
-        CaptionMusicSuppressor.forceNativeRendererScan();
-        CaptionMusicSuppressor.kick();
-        mark("ENGINE_SNAPSHOT_ACTIVATED", "same_video=true;source_only=" + !value.translated);
-    }
-
-    /** Makes the native player show the selection again, so the hooks see it as a new one. */
+    /** Starts the engine for the current native selection, without changing that selection. */
     static Refresh refreshNativeTrack() {
         synchronized (SELECTION_LOCK) {
-            if (CaptionChoice.known() && !CaptionChoice.isOn()) return Refresh.CAPTIONS_OFF;
+            if (CaptionChoice.userOff()) return Refresh.CAPTIONS_OFF;
             Selection value = currentSelection();
             if (value == null) return Refresh.DEFERRED;
-            // AI startup must not wait for (or depend on) native null/reselect callbacks. This
-            // also recovers a collected Shorts manager without another network fetch.
-            if (enabled() && canActivateSnapshot(value)) {
-                activateSnapshot(value, !CaptionChoice.known());
-                if (!ownsManager(value) || value.origin == null || currentTrack(value) == null)
-                    return Refresh.AI_STARTED;
-            }
-            if (!ownsManager(value) || value.origin == null) return Refresh.DEFERRED;
             if (value.off) return Refresh.CAPTIONS_OFF;
-            Object track = currentTrack(value), manager = value.manager.get();
-            if (track == null || manager == null || !stillVisible(value)) return Refresh.DEFERRED;
-            publishSourceCatalog(manager);
-            try {
-                switchingManager = manager;
-                selectNative(manager, null, value.origin, value.reason);
-                // A video transition while the selector runs must not resurrect the old video.
-                if (!stillVisible(value)) return Refresh.DEFERRED;
-                selectNative(manager, track, value.origin, value.reason);
-            } finally {
-                switchingManager = null;
-            }
-            if (!stillVisible(value)) return Refresh.DEFERRED;
-            if (enabled()) applySelection(track, false);
-            return Refresh.APPLIED;
+            if (!enabled()) return Refresh.CAPTIONS_OFF;
+            if (!canActivateSnapshot(value)) return Refresh.DEFERRED;
+            CaptionChoice.select(value.language, value.translated);
+            startEngine(value.selectedUrl, value.translated);
+            CaptionMusicSuppressor.forceNativeRendererScan();
+            CaptionMusicSuppressor.kick();
+            mark(
+                    "ENGINE_NATIVE_ACTIVATED",
+                    "target="
+                            + value.language
+                            + ";translated="
+                            + value.translated);
+            return value.translated ? Refresh.AI_STARTED : Refresh.APPLIED;
         }
     }
 
-    private static boolean stillVisible(Selection value) {
-        String current = CaptionActions.currentVideoIdSnapshot();
-        return current.isEmpty() || current.equals(value.video);
-    }
-
-    // ---- Remembered selection ----
-
-    public static Object resolveRemembered(Object manager) {
-        publishSourceCatalog(manager);
-        if (!CaptionAddonSupport.memoryInstalled() || RememberedCaptionSelection.decision() != 1)
-            return null;
-        boolean translated = RememberedCaptionSelection.translated();
-        List<?> list = translated ? translatedTracks(manager) : nativeTracks(manager);
-        Object fallback = null;
-        if (list != null)
-            for (Object track : list)
-                if (RememberedCaptionSelection.language().equals(language(track))) {
-                    if (translated
-                            || vss(track).startsWith("a.") == RememberedCaptionSelection.asr())
-                        return track;
-                    fallback = track;
-                }
-        return fallback;
-    }
-
-    public static int restoreDecision() {
-        return CaptionAddonSupport.memoryInstalled() ? RememberedCaptionSelection.decision() : -1;
+    /**
+     * The native CC control turned on. The official Auto captions setting owns whether this
+     * happens; here the remembered language becomes the active one. If the player committed no
+     * track (the "never auto show" policy leaves captions off until a manual tap), the last signed
+     * source track of the foreground video is used to start the engine directly.
+     */
+    static void onCaptionsShown() {
+        if (!enabled()) return;
+        if (!captionsShownInFlight.compareAndSet(false, true)) return;
+        try {
+            Selection value = currentSelection();
+            if (value == null || value.off) return;
+            CaptionChoice.select(value.language, value.translated);
+            Refresh refreshed = refreshNativeTrack();
+            mark(
+                    "CAPTIONS_SHOWN",
+                    "target="
+                            + value.language
+                            + ";translated="
+                            + value.translated
+                            + ";native="
+                            + refreshed.name());
+        } catch (Exception failed) {
+            mark("CAPTIONS_SHOWN_FAILED", failed.getClass().getSimpleName());
+        } finally {
+            captionsShownInFlight.set(false);
+        }
     }
 
     // ---- Translation tracks ----
@@ -719,8 +753,6 @@ public final class NativeCaptionBridge {
     }
 
     // ---- Bound at patch time ----
-
-    public static void selectNative(Object manager, Object track, Object origin, int reason) {}
 
     /** The caption model's videoId, never the unrelated caption event playback identifier. */
     public static String nativeModelVideo(Object manager) {
@@ -757,5 +789,10 @@ public final class NativeCaptionBridge {
 
     public static Object cloneTranslation(Object track, String code) {
         return null;
+    }
+
+    /** A copy of an existing native translation with only its display label replaced. */
+    public static Object relabelTranslation(Object track, String code) {
+        return track;
     }
 }

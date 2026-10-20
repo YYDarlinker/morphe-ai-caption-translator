@@ -14,7 +14,13 @@ import java.util.function.Predicate;
  * hold only a short lead, and joined pages stay within the reading limits.
  */
 final class RebuildDisplayGroups {
-    static final long SHORT_EVENT_MS = 1000, MAX_UNIT_MS = 5000;
+    static final long SHORT_EVENT_MS = 1000;
+
+    /** Nominal page time for a joined unit; a fragment the speaker continues may run past it. */
+    static final long MAX_UNIT_MS = 7000;
+
+    /** Ceiling for such a continued fragment: long enough to finish the thought, not a soliloquy. */
+    static final long EXTENDED_UNIT_MS = 10500;
 
     /** Below the planner's hard source break, a pause does not split a joined unit. */
     static final long MAX_BRIDGE_MS = 650;
@@ -25,7 +31,7 @@ final class RebuildDisplayGroups {
     static final long HOLD_MS = 1000;
 
     private static final int MAX_GROUP = 6;
-    private static final String TERMINAL = "。！？!?；;．.؟।", CLOSING = "\"'”’」』）)]》";
+    private static final String TERMINAL = "。！？!?；;．.؟।॥۔׃።", CLOSING = "\"'”’」』）)]》";
 
     static final class Unit {
         final int block, from, to;
@@ -105,6 +111,9 @@ final class RebuildDisplayGroups {
             // and
             // a short tail that closes the sentence belongs with the open text before it.
             if (lead(left, spec)) breakCost[j] += 1;
+            // "……的人写的，毕竟" must not be a page: a connective that introduces the next
+            // clause carries the reader forward.
+            if (endsWithConnective(left.text)) breakCost[j] += 40;
             if (!clause && tail(right, j == n - 1, spec)) breakCost[j] += 1;
         }
         double[] best = new double[n + 1];
@@ -116,8 +125,16 @@ final class RebuildDisplayGroups {
                 if (j < i - 1 && !linked[j + 1]) break;
                 List<RebuildProtocol.Event> group = events.subList(j, i);
                 List<String> separators = separators(separator, j, i);
-                if (group.size() > 1 && !readable(group, separators, spec, fits)) {
-                    if (group.get(group.size() - 1).end - group.get(0).start > MAX_UNIT_MS) break;
+                // A group that starts with text the speaker obviously continues ("据该邮件显示，", a
+                // short lead like "而且") may run past the nominal page time: reading the fragment
+                // together with its continuation beats a page that stops mid-thought. A page
+                // planner may still split genuinely long text on punctuation.
+                long limit =
+                        completeUtterance(group.get(0).text) || sourceSentenceEnd(source, group.get(0))
+                                ? MAX_UNIT_MS
+                                : EXTENDED_UNIT_MS;
+                if (group.size() > 1 && !readable(group, separators, spec, fits, limit)) {
+                    if (group.get(group.size() - 1).end - group.get(0).start > limit) break;
                     continue;
                 }
                 double cost = best[j] + pageCost(group) + (i < n ? breakCost[i] : 0);
@@ -181,7 +198,10 @@ final class RebuildDisplayGroups {
 
     static boolean adjacent(
             RebuildSource source, RebuildProtocol.Event left, RebuildProtocol.Event right) {
-        return left.to + 1 == right.from
+        return left.to < right.from
+                // The reply left at most a particle untranslated between these two events; nothing
+                // is displayed for that hole, so the two still read as one page.
+                && RebuildProtocol.withinHole(source, left.to + 1, right.from)
                 && left.start < left.end
                 && right.start < right.end
                 && left.end <= right.start
@@ -247,11 +267,47 @@ final class RebuildDisplayGroups {
         return end > 0 && ".,?!;:。，、？！；：…".indexOf(text.charAt(end - 1)) >= 0;
     }
 
+    private static final String CONNECTIVES =
+            "毕竟,所以,而且,以及,但是,然后,因此,同时,另外,不过,并且,何况,况且,也就是说,比如,例如,即,还有";
+
+    /** True when the text stops on a connective that belongs to the clause after it. */
+    private static boolean endsWithConnective(String text) {
+        String value = text == null ? "" : text.trim();
+        while (!value.isEmpty() && "，,、；;：:".indexOf(value.charAt(value.length() - 1)) >= 0)
+            value = value.substring(0, value.length() - 1).trim();
+        if (value.isEmpty()) return false;
+        for (String connective : CONNECTIVES.split(",")) if (value.endsWith(connective)) return true;
+        return false;
+    }
+
     private static boolean sentenceEnd(String value) {
         String text = value.trim();
         int end = text.length();
         while (end > 0 && CLOSING.indexOf(text.charAt(end - 1)) >= 0) end--;
         return end > 0 && TERMINAL.indexOf(text.charAt(end - 1)) >= 0;
+    }
+
+    /**
+     * Can a page stop here without leaving the reader mid-thought? Terminal punctuation, or a
+     * sentence-final particle ("我们开始吧", "是这样的呢") closes an utterance; a bare noun or
+     * conjunct ("而且", "…关注") does not.
+     */
+    private static boolean completeUtterance(String value) {
+        String text = value.trim();
+        if (text.isEmpty() || sentenceEnd(text)) return true;
+        return FINAL_PARTICLES.indexOf(text.codePointBefore(text.length())) >= 0;
+    }
+
+    private static final String FINAL_PARTICLES =
+            "吧呢吗嘛啊呀哦噢啦呗哈哇咯哒嗯诶欸了么ねよなわさぞぜの요다까죠네";
+
+    /**
+     * The source ends a sentence here even when the translation has no final mark. A model that
+     * omits the full stop must not be mistaken for a sentence that runs on.
+     */
+    private static boolean sourceSentenceEnd(RebuildSource source, RebuildProtocol.Event event) {
+        if (source == null || event.to < 0 || event.to >= source.words.size()) return false;
+        return RebuildSource.terminal(source.words.get(event.to).text);
     }
 
     private static boolean clauseEnd(String value) {
@@ -263,17 +319,21 @@ final class RebuildDisplayGroups {
             List<RebuildProtocol.Event> group,
             List<String> separators,
             CaptionRenderSpec spec,
-            Predicate<String> fits) {
+            Predicate<String> fits,
+            long limit) {
         long duration = group.get(group.size() - 1).end - group.get(0).start;
         String text = text(group, separators);
         int units = spec.readingUnits(text);
-        // Chinese reference: 16 per line, 9/s, so 48 units and 12/s, the former pairwise join
-        // limits.
+        // A joined page has to stay one readable subtitle: it must fit the measured two lines, run
+        // no faster than a comfortable reading rate, and finish inside the wall time allowed for
+        // this boundary. Nothing else caps it; the page planner decides the final pages.
         return duration > 0
-                && duration <= MAX_UNIT_MS
-                && units <= spec.profile.referenceCpl * 3
+                && duration <= limit
                 && units * 3000L <= duration * spec.profile.referenceCps * 4
-                && (fits == null || fits.test(text));
+                && (fits != null
+                        ? fits.test(text)
+                        : RebuildPageLayout.displayHalfCells(text)
+                                <= spec.profile.referenceCpl * 4);
     }
 
     private static List<String> separators(String[] separator, int from, int to) {
@@ -300,24 +360,26 @@ final class RebuildDisplayGroups {
      * the source does not run on, so "排在第二位" + "见鬼，" does not read as one phrase while "俄罗斯拥有" +
      * "世界第二强大的军队" stays one sentence. Spaced scripts keep their word space.
      */
+    /**
+     * Chinese and Japanese need no gap between clauses: the clause join is carried by a zero-width
+     * space instead, which stays invisible on screen but tells the page planner where one event's
+     * range ends. A visible space there used to read as a hole in the middle of a sentence.
+     * Spaced scripts keep their word space.
+     */
     private static String separator(
             String left, String right, CaptionRenderSpec spec, boolean continuous) {
         if (left.isEmpty() || right.isEmpty()) return "";
-        boolean closingRight = punctuation(right.codePointAt(0)) && !opening(right.codePointAt(0));
-        boolean japanese = spec.profile.id.equals("ja");
-        if (spec.compactScript || japanese) {
-            if (punctuation(left.codePointBefore(left.length())) || closingRight) return "";
-            // A Latin word or number next to Chinese or Japanese text keeps its usual space.
-            if (latin(left.codePointBefore(left.length())) || latin(right.codePointAt(0)))
-                return " ";
-            if (continuous) return "";
-            return japanese ? "　" : " ";
+        int before = left.codePointBefore(left.length()), after = right.codePointAt(0);
+        boolean leftMark = punctuation(before), rightMark = punctuation(after);
+        if (leftMark || rightMark) {
+            // A spaced script keeps its word space after a comma; a compact script does not.
+            return !leftMark && rightMark ? "" : spec.compactScript ? "" : " ";
         }
-        return closingRight ? "" : " ";
-    }
-
-    private static boolean latin(int c) {
-        return c < 128 && Character.isLetterOrDigit(c);
+        if (CaptionScript.requiresSpace(before, after)) return " ";
+        // Compact scripts need no visible gap. A zero-width space still marks the event join as a
+        // legal page boundary when the source continues across it; it never reaches the screen.
+        if (spec.compactScript && !continuous) return "\u200b";
+        return "";
     }
 
     private static boolean opening(int c) {

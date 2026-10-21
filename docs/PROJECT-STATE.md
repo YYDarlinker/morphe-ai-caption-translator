@@ -4,9 +4,9 @@
 
 - 活动仓库：`E:\Projects\DeepSeek morphe-ai-caption-translator`
 - 分支：`dev/1.5.5-deepseek`
-- 基线：`2c96054` / `v1.5.4`（2026-10-14）；1.5.5 发布候选基于 `8ed5866` + N51 + 发布准备
+- 基线：`2c96054` / `v1.5.4`（2026-10-14）；1.5.5 发布提交 `40d5d58`，已合并 `origin/main`（`a42c593`）
 - 版本：1.5.5；`captionBuildId=release-1.5.5`；官方 Morphe Patches 1.47.0；推荐 YouTube 21.20.405，兼容 21.16.256 及 1.5.4 声明的实验目标
-- 发布状态：`patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表指向 1.5.5；本地已重建发布 MPP；尚未 commit/tag/push
+- 发布状态：`patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表指向 1.5.5；本地已重建发布 MPP；本地 tag `v1.5.5` 已创建；尚未 push
 - 模块：`caption-contracts`、`caption-shared`、`translation-core`、`infrastructure`、`application-host`、`presentation`、`ui`、`patches`、`ui-preview`
 - 开发环境：`.devenv/`（JDK 21、Python 3.12、Android SDK 35/36、Robolectric 均在 `work/toolchain/`；Gradle home 为 `work/gradle-home/`）
 
@@ -594,7 +594,10 @@
   `validate_morphe_metadata.py 1.5.5` OK；`verify_bundle.py 1.5.5` OK；
   `verifyIntegrationSources` `errors=[]`；MPP `build/n39/gradle/patches/libs/patches-1.5.5.mpp`
   **593,495 B**，SHA-256 `CB4D3135B9B483DAB1B098ACDEF720F612FD788BEA44B8E4C9229C14A35ACCFB`。
-- 发布计划：正式 tag `v1.5.5` 指向 release commit；上传 `patches-1.5.5.mpp`；
+- 发布计划：正式 tag `v1.5.5` 指向最终 release commit；上传 `patches-1.5.5.mpp`；
   Release 正文使用 CHANGELOG 的六条；不推 `v1.5.5-local`。
+- 本地提交：`40d5d58`（29 files，N51 + 1.5.5 元数据/文档）；随后合并 `origin/main`
+  为 `a42c593`（仅 README/中文 README 的 Qwen 推荐段），状态提交后创建 annotated tag `v1.5.5`。
+  尚未 push。
 - 边界：真机安装与 after 诊断未执行；`fillHoles` 仍未按 cue 截止；overlay 粘性空白未改；
-  事件页窗口可能略长/略短。准备阶段未 commit/tag/push。
+  事件页窗口可能略长/略短。

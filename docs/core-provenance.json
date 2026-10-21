@@ -2,7 +2,7 @@
   "repository": "https://github.com/YYDarlinker/morphe-ai-caption-translator",
   "branch": "main",
   "commit": "ac65fe803ec2b11821b1131040f807922a2b8505",
-  "local_head": "2c9605409cef4fc19c8c8cfff4086bb5b4dc7d62",
+  "local_head": "40d5d58a4109b634b2ec19c075157520ff25c52f",
   "files": [
     {
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",

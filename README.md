@@ -45,6 +45,12 @@ Do not select the old AI-caption addon or another overlapping caption patch at t
 
 Turning AI off returns translation to YouTube’s native behavior. Selecting an original/manual/auto-generated source track displays its original text without translation API requests; uploaded subtitles keep their authored line breaks, while auto-generated subtitles are re-paged locally without a network call or model. Bracketed furigana readings are removed from text sent for translation to avoid repetition. The menu toggle visibility settings for regular videos and Shorts are independent of the engine switch.
 
+### Personal model recommendation
+
+From the models I have tried, **Qwen3.7-Flash (`qwen3.7-flash`) seems to be the cheapest option** for this patch. In my experience, its subtitle translations even outperform some of the more expensive models I have tried.
+
+You can access it through [Alibaba Cloud Model Studio (international)](https://www.alibabacloud.com/product/modelstudio). As checked on **October 15, 2026**, the [official international pricing](https://www.alibabacloud.com/help/en/model-studio/model-pricing) for the **Singapore region, International deployment scope**, with **up to 32K input tokens per request**, is **US$0.03 per million input tokens** and **US$0.13 per million output tokens**. These are standard real-time API rates; longer requests use higher pricing tiers, and current prices are listed on the linked page.
+
 ## Costs, privacy and limits
 
 - The selected video’s subtitle text and limited surrounding context are sent to the **API provider you configure**. Translation and prefetch can consume paid tokens. This project supplies no API account or free quota.

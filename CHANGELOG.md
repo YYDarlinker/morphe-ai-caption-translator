@@ -6,6 +6,7 @@
 - Source timing from subtitle XML is used where available, so auto-generated caption pages land on real speech boundaries rather than only estimated positions.
 - Numeric, date and unit differences are advisory instead of a hard rejection, and CJK whitespace or Unicode composition differences no longer discard an otherwise valid event.
 - The separate **Remember caption selection** patch is removed. This source now ships only **AI caption translator**, which follows YouTube's native caption selection and the official Captions / **Preferred caption language** setting; it no longer invents or carries a target language across videos.
+- Captions no longer go blank while a translation is still on its way: the previous line stays up briefly, then a neutral placeholder appears until the new line arrives. Only the line you are watching is translated again instead of the whole section.
 
 ## [1.5.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.3...v1.5.4) (2026-10-14)
 

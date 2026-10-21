@@ -1,12 +1,15 @@
-# PROJECT-STATE — 1.5.5 正式版发布准备（N40–N48 修复；N49/N50 上游评估；N51 两层投影；1.5.5 发布元数据）
+# PROJECT-STATE — 1.5.5 正式版发布准备（N40–N48 修复；N49/N50 上游评估；N51 两层投影；N52 显示保证；1.5.5 发布元数据 + N52 重建）
 
 ## 1. 当前身份
 
 - 活动仓库：`E:\Projects\DeepSeek morphe-ai-caption-translator`
 - 分支：`dev/1.5.5-deepseek`
 - 基线：`2c96054` / `v1.5.4`（2026-10-14）；1.5.5 发布提交 `40d5d58`，已合并 `origin/main`（`a42c593`）
-- 版本：1.5.5；`captionBuildId=release-1.5.5`；官方 Morphe Patches 1.47.0；推荐 YouTube 21.20.405，兼容 21.16.256 及 1.5.4 声明的实验目标
-- 发布状态：`patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表指向 1.5.5；本地已重建发布 MPP；本地 tag `v1.5.5` 已创建；尚未 push
+- 版本：1.5.5；`captionBuildId=release-1.5.5`（N52 显示保证重建）；官方 Morphe Patches 1.47.0；
+  推荐 YouTube 21.20.405，兼容 21.16.256 及 1.5.4 声明的实验目标
+- 发布状态：`patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表均指向 1.5.5；
+  N52 发布 MPP 已重建（595,638 B / `0EB5D122…`）；tag `v1.5.5` 与 GitHub release 由本轮创建
+  （见 §24）；旧本地 1.5.5 资产（`CB4D3135…`）保留在证据目录
 - 模块：`caption-contracts`、`caption-shared`、`translation-core`、`infrastructure`、`application-host`、`presentation`、`ui`、`patches`、`ui-preview`
 - 开发环境：`.devenv/`（JDK 21、Python 3.12、Android SDK 35/36、Robolectric 均在 `work/toolchain/`；Gradle home 为 `work/gradle-home/`）
 
@@ -601,3 +604,45 @@
   尚未 push。
 - 边界：真机安装与 after 诊断未执行；`fillHoles` 仍未按 cue 截止；overlay 粘性空白未改；
   事件页窗口可能略长/略短。
+
+## 24. 2026-10-21 N52 显示保证（1.5.5 重建）
+
+- 输入：`D:\HONOR Share\Honor Share\caption-diagnostics-1.5.5-20261021-201213.txt`（7,806,332 B，
+  SHA-256 `FE33D6645265F409FE0B4FC9BF23B81DF664368D8EBE0315E7770B5D2B50C7FA`，导出 20:12:13）；
+  报告 `docs/N52-DISPLAY-GUARANTEE-20261021.md`；证据
+  `validation/runs/20261021-n52-display-guarantee/`（审计脚本、playback-aware 预算、时间线、
+  已发布 1.5.5 资产副本）。
+- 结论：N51 投影已生效（189 次 `REBUILD_CUE_PROJECTION`，cue/event 混合页），但“不显示”仍是
+  **闸门架构**问题：块请求、解析、发布、unit、排版、页窗各自可以独立 hide；请求/重试单位是
+  15–30 s 的块，显示单位是 2–5 s 的页，块级失败会吞掉多页。本诊断剩下的闸门：
+  `empty_translation` 整块失败（10 次，session 106 两个 3-token 块，5 次/块，1 次
+  `REBUILD_BLOCK_ABANDONED`）、salvage 空洞 `…`（1.92 s）、快速拖动占位（session 19 8.4 s，
+  focus 往返 2–3 s）、无 unit 空白（其中多数是源轨道无 cue 的**合法静默**：session 106
+  14.45/5.16/3.96/3.65 s，session 200 开头 9 s）、overlay 缝隙（0.2/0.1/0.15 s）、原生遮罩
+  未证实（418 次 scan miss / 10 次 mask / 13 次 fallback）。
+- 通用修复（与模型、语种、句子、切分无关）：
+  1. **时间线保证**：`render` 中若 `speechAt(t)` 且文本为空/`…`/块在等待，则保持上一页
+     （≤ `DISPLAY_HOLD_MS`=4 s，按 500 ms 量子延伸页窗）或显示中性占位；绝不空白；
+     记录 `DISPLAY_GAP`（`gate=hold|placeholder|marker|repair`，约 1 s 限流）。
+  2. **页级补请求**：按当前页（人工轨 cue group / 自动轨 `windowAt`）请求一次；去重
+     （generation+block+range）、每块 ≤4、块请求在途/流式前缀/terminal 时让位、无计划时
+     1.2 s 宽限；返回后 `mergeInto`；块无计划时先发布 `degraded` 全空洞计划；记录
+     `REBUILD_PAGE_REPAIRED` / `REBUILD_PAGE_REPAIR_FAILED` / `REBUILD_PAGE_REPAIR_EMPTY` /
+     `REBUILD_BLOCK_DEGRADED`。
+  3. **空/不可用回复不再整块失败**：`RebuildSalvage` 返回全空洞 partial（不再 null），删除
+     自动轨“覆盖 <1/3 判失败”规则；不再 5 次整块重试 + `BLOCK_ABANDONED`。
+  4. N51 投影仍是第一层；保证层只在“投影没有当前页”时介入。
+- 测试：新增 `N52DisplayRepairTest`（2，真实引擎 + MockWebServer：空回复、整块 HTTP 500 都会在
+  页级补请求后上屏，期间不空白）；`LanguageConformanceTest.anUntranslatedEchoIsStillDropped`
+  改为“不发布回显、整块空洞”；`:translation-core:testDebugUnitTest` **246 tests** 连续两次全绿、
+  `:extensions:extension:testDebugUnitTest` **264 tests**；本地化 243×14；
+  `verify_integration.py` `errors=[]`、pinned 字面量不变、core class 79、内嵌 MPE == 独立 MPE。
+- 产物：版本 **1.5.5**，`captionBuildId=release-1.5.5`；MPP
+  `build/n39/gradle/patches/libs/patches-1.5.5.mpp` **595,638 B**，SHA-256
+  `A4B04C537499F6D86DF99350297BBC2FBEB5DD99C835F140D9C2DFA314771E4E`。
+  按用户要求，本轮以该 MPP 发布 1.5.5（tag + GitHub release，上传同一文件）。旧本地 1.5.5 资产
+  （593,495 B / `CB4D3135…`）保留在 `validation/runs/20261021-n52-display-guarantee/`。
+  未签名、未安装、未连接手机。
+- 边界：provider 完全不可用或模型对同一页持续返回空/错误 → 4 次页补后保持上一页/占位，
+  不空白但无法凭空生成译文；源轨道没有 cue 的静默段不显示字幕（正确语义）；原生字幕遮罩
+  仍需真机录屏确认；未连接或写入手机。

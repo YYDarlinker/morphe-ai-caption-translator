@@ -8,7 +8,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "upstream_sha256": "bc5ba7aab1c61dc785742e8cb63b3d69a5d11142aaf817d66d280bc415a4a1e3",
-      "sha256": "044e55b575960f4ef89dd30940cc5613db272cbd11b92c653d6ad62e13d13121",
+      "sha256": "b24dc97cceff7d532c9cb66368edd513372a5d83ee30515bff1f44c9df056358",
       "snapshot": "translation-core/upstream/RebuildController.java.txt",
       "upstream_git_blob": "814922f06c539681e1471379faf61cb7c6651548"
     },
@@ -56,7 +56,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "upstream_sha256": "02b60c2313df406b91d2e97b449414954427ae57fb98e3c9a57dc9a86b35cb3b",
-      "sha256": "5a6dd9efd1759179b542fbf098af0afa792519af4029bf4dc4d5319a5a2edb1f",
+      "sha256": "b87ad08e332ccbf9c135e1cd25c5fd876fbcd3fd2d8a917f4437bf866aba737b",
       "snapshot": "translation-core/upstream/RebuildProtocol.java.txt",
       "upstream_git_blob": "d5dc8cc59c7db9b9411dbd90cfdfa4d725ec3f4c"
     },
@@ -64,7 +64,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
       "upstream_sha256": "1df47bbb596cb6cd6642cc5bb7825a71cad9258f848f1d3bbae1cc0b6a1af74d",
-      "sha256": "ceac24b24b03bf65e2f9df3c3395ee2f1d810a8638b13fe1391a6074fbf87d6c",
+      "sha256": "a174aa97b82eb001f139239f0608f7d392e35c72d04562226ab278a8464eb265",
       "snapshot": "translation-core/upstream/RebuildReview.java.txt",
       "upstream_git_blob": "2081df9674521637c84641d26e2a813478274745"
     },
@@ -151,12 +151,12 @@
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildGuidance.java",
-      "sha256": "3255f5f92c6b0eb6a177e367b43a5623767de969068efa018b0b80cee921ace1",
+      "sha256": "cb5dfecf47ecb5942a9ce58d9461bfb66569216975f2af50bb98b2412490cec6",
       "purpose": "request guidance for event sizing, sentence completeness and the authored display-cue contract, kept outside the pinned prompt literal"
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCueContract.java",
-      "sha256": "a6102b80d50d0e06515bb3030387c40424cbb8da56e96496a100593b90a1da58",
+      "sha256": "736d1c375a0c9a006a6c347c9bcb856bb1597f884c8e08df2c9fa7c4cee7ca74",
       "purpose": "authored cue display contract: cue ranges, one-to-one event/cue validation, cue-page display units and request payload"
     },
     {
@@ -166,8 +166,13 @@
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSalvage.java",
-      "sha256": "0fb7637570d1b534ff028c1f55833253719d37cfd767a7835ed8b6550cc1788d",
+      "sha256": "3e2931f6dea4f021189295cb023a4272c49739e867278fd1c6a532eb58d000bc",
       "purpose": "partial-plan salvage: per-segment identity checks, explicit holes, quality observations never withhold a usable event"
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCueProjection.java",
+      "sha256": "ef5108155c415f2ad92bcb038873b58e79dab5247ac604ae3b4d09b487a2ffa4",
+      "purpose": "Authored cue/event display projection (N51)"
     }
   ],
   "protected_abi": [

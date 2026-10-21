@@ -144,10 +144,11 @@ def spoiler(label, count, targets, tbl, expanded=False):
 
 def build_content(expanded=False):
     """Build the full generated patches section."""
+    noun = "patch" if total == 1 else "patches"
     lines = [
         f"> **[v{ver}](https://github.com/{owner}/{repo}/releases/tag/v{ver})**"
         f"&nbsp;&nbsp;•&nbsp;&nbsp;`{branch}`&nbsp;&nbsp;•&nbsp;&nbsp;"
-        f"{total} patches total"
+        f"{total} {noun} total"
     ]
 
     # One spoiler per app, in the order they appear in the JSON
@@ -180,7 +181,8 @@ raw_ver = data["version"]
 ver   = raw_ver.lstrip("v")
 total = sum(len(e["patches"]) for e in by_pkg.values()) + len(universal)
 
-readme = readme_path.read_text(encoding="utf-8")
+with open(readme_path, encoding="utf-8", newline="") as f:
+    readme = f.read()
 
 # Marker pattern — matches both <!-- PATCHES_START --> and <!-- PATCHES_START EXPANDED -->
 START_PATTERN = r"<!-- PATCHES_START(?:\s+EXPANDED)?\s*-->"
@@ -223,5 +225,6 @@ new_readme = re.sub(
     readme,
     flags=re.DOTALL,
 )
-readme_path.write_text(new_readme, encoding="utf-8")
-print(f"✅ Injected patches section into {readme_path} (v{ver}, branch={branch}, {total} patches, expanded={expanded})")
+with open(readme_path, "w", encoding="utf-8", newline="") as f:
+    f.write(new_readme)
+print(f"✅ Injected patches section into {readme_path} (v{ver}, branch={branch}, {total} {'patch' if total == 1 else 'patches'}, expanded={expanded})")

@@ -10,17 +10,17 @@ final class RebuildGuidance {
 
     /**
      * Appended only for a manually authored track. It does not replace {@link #SENTENCE}: the
-     * translation quality instructions stay the same as an automatic track. It only states that the
-     * author's cue ranges are fixed display boundaries, so the model must keep every event inside
-     * one cue while remaining free to use several natural events for a cue.
+     * translation quality instructions stay the same as an automatic track. It states that the
+     * author's cue ranges are the preferred display boundaries, while a sentence that the author
+     * cut in half may stay whole in one event: the display projection publishes such an event as
+     * its own page instead of discarding it.
      */
     static String displayCueRule(RebuildPlanner.Block block) {
-        return " Authored display groups are fixed page boundaries. The display_cues field lists"
-                + " each group's first-last owned token ids. Every event must lie inside exactly"
-                + " one group; several natural events per group are allowed; never merge two"
-                + " groups into one event and never move text across a group boundary. Cover every"
-                + " group completely. A group may contain several short author cues that only read"
-                + " together; keep the group as one display page.";
+        return " Authored display groups are the preferred page boundaries. The display_cues field"
+                + " lists each group's first-last owned token ids. Prefer keeping every event"
+                + " inside one group, and use several natural events for a group when that keeps"
+                + " the sentence intact. When the author's boundary cuts a sentence, a complete"
+                + " sentence wins: an event may span the boundary. Cover every group's text.";
     }
 
     /** Cue-sized requests need the sentence around them; the cue is the unit, not the context. */

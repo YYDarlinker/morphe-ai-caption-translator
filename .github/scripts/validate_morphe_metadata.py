@@ -93,9 +93,17 @@ def main() -> None:
     names = [patch.get("name") for patch in patches if isinstance(patch, dict)]
     if len(names) != len(patches) or len(set(names)) != len(names) or any(not isinstance(name, str) or not name for name in names):
         fail("patch names must be nonempty and unique")
-    if tuple(map(int, version.split("-")[0].split("."))) >= (1, 2, 0):
-        if set(names) != {"AI caption translator", "Remember caption selection"}:
-            fail("modular release must contain exactly the two declared public patches")
+    release = tuple(map(int, version.split("-")[0].split(".")))
+    expected_names = (
+        {"AI caption translator"}
+        if release >= (1, 5, 5)
+        else {"AI caption translator", "Remember caption selection"}
+    )
+    if release >= (1, 2, 0) and set(names) != expected_names:
+        fail(
+            "release must contain exactly the declared public patches: "
+            + ", ".join(sorted(expected_names))
+        )
 
     if not isinstance(bundle["description"], str):
         fail("description must be a string")

@@ -1,6 +1,6 @@
 # Compatibility
 
-Last checked: 2026-10-14. Official stable patch release: **1.47.0**. Recommended YouTube: **21.20.405**, Android 9+.
+Last checked: 2026-10-21 for the 1.5.5 release metadata; the YouTube target list was last checked against official **1.47.0** on 2026-10-14. Official stable patch release: **1.47.0**. Recommended YouTube: **21.20.405**, Android 9+.
 
 The addon declares these YouTube targets, newest first: **21.40.161, 21.39.522, 21.38.130, 21.28.208, 21.23.492** (experimental, as in official 1.47.0) and **21.20.405, 21.16.256** (stable). Releases 1.5.3 and later follow the official 1.47.0 list from 21.16 upward; 21.13.164 and 21.07.247 are no longer declared. It is an explicit list, not a continuous range and not a promise that future releases work automatically.
 
@@ -21,6 +21,8 @@ The official patch compatibility table describes the official bundle, not indepe
 
 Local tests, patch-composition audits, controlled Android layouts and physical phone observations are separate evidence. N37R2 controlled layout checks measured a maximum 0.5px centering error; its real YouTube/OEM centering after-check is not recorded as completed. Full semantic naturalness in fourteen languages and perfect audio synchronization are not certification claims.
 
-Choose both an official bundle and an APK from the same row. Use Expert mode, the compatible official default selection and this addon's AI patch. Caption language is owned by YouTube and the official Captions patch (including **Preferred caption language**); this addon follows that native selection and does not add a separate memory root. Do not select another addon shipping the same runtime namespace or overlapping caption-memory behavior.
+Choose both an official bundle and an APK from the same row. Use Expert mode, the compatible official default selection and this addon's AI patch. Caption language is owned by YouTube and the official Captions patch (including **Preferred caption language**); this addon follows that native selection and does not add a separate memory root. Do not select another addon shipping the same runtime namespace or overlapping caption behavior.
 
-Release 1.5.3 additionally ran the real patcher (official Morphe Patches 1.48.0-dev.6) on stock YouTube 21.16.256, 21.20.405, 21.23.492, 21.28.208, 21.40.161 and 21.41.525: every patch applied and all caption hooks were bound. 21.38.130 and 21.39.522 were not available for testing. YouTube 20.51.39 and 20.21.37 are not supported. 21.41.525 patches but is not declared until the official stable list includes it.
+Release 1.5.5 keeps the 1.5.4 target declaration. Its release preparation revalidated the metadata and packaged MPP; it does not add a new real-patcher or device/OEM compatibility claim.
+
+Release 1.5.3 additionally ran the real patcher with official Morphe Patches 1.48.0-dev.6 on stock YouTube 21.16.256, 21.20.405, 21.23.492, 21.28.208, 21.40.161 and 21.41.525: every patch applied and all caption hooks were bound. That development-bundle run is historical evidence, not the current stable recommendation. 21.38.130 and 21.39.522 were not available for testing. YouTube 20.51.39 and 20.21.37 are not supported. 21.41.525 patches but is not declared until the official stable list includes it.

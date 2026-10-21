@@ -4,6 +4,8 @@
 
 [English](../README.md) · [添加到 Morphe](https://morphe.software/add-source?github=YYDarlinker/morphe-ai-caption-translator) · [下载补丁](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases) · [反馈问题](https://github.com/YYDarlinker/morphe-ai-caption-translator/issues)
 
+当前版本：[v1.5.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.5)。
+
 ## 功能
 
 - 开启 AI 后，在 YouTube 字幕菜单的「自动翻译」中选择目标语言，使用你配置的服务翻译原字幕。
@@ -34,7 +36,7 @@
 4. 保留对应官方默认补丁组合，包含其字幕、设置、播放器接缝支持。在本项目源内只选择 **AI caption translator**；字幕语言由 YouTube 原生菜单/官方 Captions 补丁决定，本源不提供单独的语言记忆补丁。
 5. 由 Morphe 完成补丁、签名与安装；若官方补丁要求 GmsCore，按其指引设置。
 
-不要同时选择旧AI字幕addon或其他重叠的字幕记忆补丁。官方 Captions 补丁保持语言决定权；本源只跟随原生选择，不凭空添加目标语言。本源需要与官方补丁组合，不替代官方源。`.mpp` 是补丁包，不能直接作为 YouTube APK 安装。
+不要同时选择旧AI字幕addon或其他重叠的字幕补丁。官方 Captions 补丁保持语言决定权；本源只跟随原生选择，不凭空添加目标语言。本源需要与官方补丁组合，不替代官方源。`.mpp` 是补丁包，不能直接作为 YouTube APK 安装。
 
 ## 配置与使用
 

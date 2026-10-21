@@ -18,8 +18,9 @@ import java.util.List;
  * event. The returned plan is marked partial and carries the untranslated token ranges, so the
  * display can show a neutral marker over those ranges instead of an unexplained blank.
  *
- * <p>Authored tracks are not salvaged here: their display contract is one page per cue group and a
- * partial group set must go through the cue contract instead.
+ * <p>Authored tracks are salvaged like automatic ones: an event that leaves its cue is kept,
+ * because {@link RebuildCueProjection} can publish it as an event page. Cue alignment never
+ * decides whether a translated event is usable.
  */
 final class RebuildSalvage {
     /** Issue code for a numeric mismatch: advisory, the translation is still published. */
@@ -91,17 +92,6 @@ final class RebuildSalvage {
             Object textValue = e.opt("text");
             if (!(textValue instanceof String)) {
                 issues.add(issue(from, to, "salvage_text_type", "text is not a string; dropped"));
-                holes.add(new int[] {from, to});
-                next = to + 1;
-                continue;
-            }
-            if (!RebuildCueContract.withinOneGroup(s, b, from, to)) {
-                issues.add(
-                        issue(
-                                from,
-                                to,
-                                "salvage_authored_cue_boundary",
-                                "event crosses an authored cue; dropped"));
                 holes.add(new int[] {from, to});
                 next = to + 1;
                 continue;
@@ -212,8 +202,6 @@ final class RebuildSalvage {
         }
         if (accepted.isEmpty()) return null;
         if (next <= b.to) holes.add(new int[] {next, b.to});
-        if (b.authored
-                && RebuildCueContract.unitsPartial(0, s, b, accepted, context).isEmpty()) return null;
         int total = 0, covered = 0;
         for (int i = b.from; i <= b.to; i++)
             total += RebuildProtocol.compact(s.words.get(i).text).length();

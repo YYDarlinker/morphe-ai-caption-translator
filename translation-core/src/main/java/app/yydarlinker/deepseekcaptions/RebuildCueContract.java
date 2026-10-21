@@ -11,16 +11,23 @@ import org.json.JSONObject;
 /**
  * The authored-cue display contract.
  *
- * <p>A manually authored cue is a fixed display boundary. Translation quality is still decided on
- * sentence/clause events by the same protocol and review as an automatic track, but an accepted
- * plan must be projectable onto the author's cues: every event belongs to exactly one cue, every
- * cue is covered by at least one event, and the page is the cue (not the model's event).
+ * <p>A manually authored cue is the preferred display boundary. Translation quality is decided on
+ * sentence/clause events by the same protocol and review as an automatic track; the cue contract
+ * only decides whether the author's paging can be kept. {@link RebuildCueProjection} uses it as
+ * tier 1 and falls back to event pages when the reply does not tile every cue, so an event that
+ * leaves its cue is a presentation fact, never a reason to withhold text.
  *
  * <p>This is deliberately separate from {@link RebuildDisplayGroups}: automatic tracks may merge
- * and split events for readability, whereas an authored page may never leave its cue.
+ * and split events for readability, whereas an authored cue page never leaves its cue; an event
+ * that does leave it is published as its own event page instead.
  */
 final class RebuildCueContract {
-    static final String VERSION = "authored-cue-v2";
+    /**
+     * v3: cue pages are the preferred tier and event pages guarantee display, so a cached authored
+     * reply may now carry events that leave a cue; the request guidance also changed from "must"
+     * to "prefer". The version participates in the cache identity.
+     */
+    static final String VERSION = "authored-cue-v3";
 
     /**
      * A cue shorter than this cannot be a page of its own: the author split a conjunction, a
@@ -150,11 +157,12 @@ final class RebuildCueContract {
     }
 
     /**
-     * Fail closed when an accepted plan cannot be projected one-to-one onto the authored cues.
+     * Fail closed when a plan cannot be projected one-to-one onto the authored cues.
      *
-     * <p>Multiple events per cue are allowed; those events are concatenated into the one page for
-     * that cue. An event that crosses a cue, a cue with no event, a gap, and a skipped cue are
-     * protocol failures, not page-planner input.
+     * <p>This is the strict tier-1 check. Production display does not call it for acceptance:
+     * {@link RebuildCueProjection} keeps the cue pages it can build and publishes the remaining
+     * events as their own pages. Multiple events per cue are allowed; those events are
+     * concatenated into the one page for that cue.
      */
     static void validate(
             RebuildSource source,
@@ -316,14 +324,6 @@ final class RebuildCueContract {
         return Collections.unmodifiableList(units);
     }
 
-    /** True when [from,to] lies inside one authored cue group (or the block is not authored). */
-    static boolean withinOneGroup(
-            RebuildSource source, RebuildPlanner.Block block, int from, int to) {
-        if (!block.authored) return true;
-        RebuildPlanner.Block.CueRange group = groupAt(groups(source, block), from);
-        return group != null && to <= group.to;
-    }
-
     /**
      * Leading complete groups of a streamed authored reply. A prefix may stop inside a cue; that
      * cue and everything after it wait for the complete plan, while the already complete cues can
@@ -363,7 +363,8 @@ final class RebuildCueContract {
         return Collections.unmodifiableList(units);
     }
 
-    private static RebuildDisplayGroups.Unit unit(
+    /** One cue group page: several events concatenated, window = the group's own window. */
+    static RebuildDisplayGroups.Unit unit(
             int blockIndex,
             RebuildPlanner.Block.CueRange group,
             List<RebuildProtocol.Event> owned,

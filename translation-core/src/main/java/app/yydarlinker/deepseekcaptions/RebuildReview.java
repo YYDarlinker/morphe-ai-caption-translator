@@ -639,10 +639,7 @@ final class RebuildReview {
                 || code.equals("missing_source")
                 || code.equals("crosses_source_break")
                 || code.equals("block_identity")
-                || code.equals("source_quote_required")
-                || code.equals("authored_cue_boundary")
-                || code.equals("authored_cue_coverage")
-                || code.equals("authored_cue_hole");
+                || code.equals("source_quote_required");
     }
 
     static boolean shouldRepair(

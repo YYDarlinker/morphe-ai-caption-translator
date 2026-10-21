@@ -1,10 +1,11 @@
-## 1.5.5-local (2026-10-20)
+## [1.5.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.4...v1.5.5) (2026-10-21)
 
-- Local baseline for the upstream PR work. No 1.5.5 release asset is published; this is a local commit/tag only.
-- Remove the separate caption-language memory patch. YouTube's native Captions selection and the official Preferred caption language setting are the only language authority.
-- Keep one public patch: AI caption translator.
-- Carry the N40-N48 fixes: quote identity across CJK whitespace, block salvage and partial publication, numeric equivalence, authored-cue pages, all-language pagination, and failure without showing source text.
-- Add the N49 upstream-readiness assessment and the N50 implementation path under `docs/`.
+- Translated captions no longer disappear when the model's sentence boundary differs from an uploaded subtitle's cue boundary. Exact cue pages stay preferred; remaining translated events are shown as event pages, so the reproduced 14.5 s authored-caption block now stays translated for its full duration instead of showing “Translating…”.
+- Partial translation results are published instead of rejecting the whole block. One invalid event no longer hides the rest; missing ranges show a neutral `…`, slow retries stop after three attempts, and a failed block shows the neutral marker instead of source text.
+- Pagination now follows the writing system instead of a Chinese-only path: Korean spacing, RTL/CJK/Indic profiles, language punctuation, explicit overflow pages for authored cues longer than two lines, and time-balanced page turns.
+- Source timing from subtitle XML is used where available, so auto-generated caption pages land on real speech boundaries rather than only estimated positions.
+- Numeric, date and unit differences are advisory instead of a hard rejection, and CJK whitespace or Unicode composition differences no longer discard an otherwise valid event.
+- The separate **Remember caption selection** patch is removed. This source now ships only **AI caption translator**, which follows YouTube's native caption selection and the official Captions / **Preferred caption language** setting; it no longer invents or carries a target language across videos.
 
 ## [1.5.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.3...v1.5.4) (2026-10-14)
 

@@ -1,12 +1,12 @@
-# PROJECT-STATE — 1.5.5 维护状态（2026-10-19 N40/N41/N42 修复；N43 调查 + 2026-10-20 N45 持久记忆与官方自动字幕衔接；N44 P1/P2/P3 + P4；N49 官方 upstream 评估；N50 上游实现路径；1.5.5-local 基线）
+# PROJECT-STATE — 1.5.5 正式版发布准备（N40–N48 修复；N49/N50 上游评估；N51 两层投影；1.5.5 发布元数据）
 
 ## 1. 当前身份
 
 - 活动仓库：`E:\Projects\DeepSeek morphe-ai-caption-translator`
 - 分支：`dev/1.5.5-deepseek`
-- 基线：`2c96054` / `v1.5.4`（2026-10-14）；本地 1.5.5 基线见 tag `v1.5.5-local`
-- 版本：1.5.5-local；官方 Morphe Patches 1.47.0；推荐 YouTube 21.20.405，兼容 21.16.256 及 1.5.4 声明的实验目标
-- 发布状态：`patches-list.json`、`patches-bundle.json` 和 README 发布表仍指向最后发布的 1.5.4；1.5.5 没有发布资产
+- 基线：`2c96054` / `v1.5.4`（2026-10-14）；1.5.5 发布候选基于 `8ed5866` + N51 + 发布准备
+- 版本：1.5.5；`captionBuildId=release-1.5.5`；官方 Morphe Patches 1.47.0；推荐 YouTube 21.20.405，兼容 21.16.256 及 1.5.4 声明的实验目标
+- 发布状态：`patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表指向 1.5.5；本地已重建发布 MPP；尚未 commit/tag/push
 - 模块：`caption-contracts`、`caption-shared`、`translation-core`、`infrastructure`、`application-host`、`presentation`、`ui`、`patches`、`ui-preview`
 - 开发环境：`.devenv/`（JDK 21、Python 3.12、Android SDK 35/36、Robolectric 均在 `work/toolchain/`；Gradle home 为 `work/gradle-home/`）
 
@@ -506,3 +506,95 @@
   `AI caption translator`；N48 验证结果（238 + 264 tests、MPP 592,741 B）仍是本基线的最后完整验证。
 - 后续 upstream 工作区在 `E:\Projects` 独立复制本基线，不共享本仓库 `.git`；具体入口见该工作区的
   `START-HERE.md` / `UPSTREAM-STATUS.md`。
+
+## 21. 2026-10-20 N51 “译文字幕不显示”根因调查（只读 + 探针）
+
+- 输入：`D:\HONOR Share\Honor Share\caption-diagnostics-1.5.4-20261020-173353.txt`（531,749 B，
+  SHA-256 `D424CC470CA74D1DF10824AE1DB22627569A7653C3FA9D1C4B550A0DF5A561EF`，导出 17:33:53）；
+  报告 `docs/N51-NO-TRANSLATION-ROOT-CAUSE-20261020.md`；探针
+  `validation/runs/20261020-n51-no-translation-root-cause/`（probe、`probe-output.txt`、
+  `time-budget.txt`）。
+- 现场构建：`build/n39/gradle/patches/libs/patches-1.5.4.mpp` 592,741 B / SHA-256
+  `BB906F3EA60EABED517EB7FC7C8F2422547BD6838C2F015A22D96F31522A558D`（与 N48 记录一致），构建于
+  13:31，早于 14:07 的版本提升，因此诊断仍报 1.5.4；代码内容 = HEAD `8ed5866`。
+- 现象：块 4（`b4_268_374`，视频 44.250–58.750 s，4 条人工 cue）在 66 s 会话里占 **14.40 s**
+  “翻译中…”；全场约 22.9 s（34.7%）没有译文字幕（14.40 占位 + 3.28 `…` + 2.84 播放器/所有权抑制 +
+  1.63 `source_gap` + 0.59 首帧布局 + 0.15 页窗缝隙）。
+- 根因：模型把块内 107 个 token **全部连续译出**（3 事件，107/107 覆盖），但事件边界（token 24/48）
+  与作者 cue 边界不一致；`RebuildCueContract.validate` 以 `authored_cue_boundary` 拒绝整块
+  （请求 75/76/84/89，4/4 同错，后两次已把具体范围写进 `repair`）；`RebuildSalvage` 只接受“事件精确
+  铺满 cue”，**包含**（cue 16 在事件 0–23 内）与**部分覆盖**（cue 17 前缀 18–23 被事件 1 吞掉）都被
+  丢弃 → `unitsPartial` 空 → 块停在 `WAITING` → 按 cue 窗显示占位。第 4 次拒绝后 15 s 退避
+  （69.1 s）晚于块结束（58.75 s），重试在原理上不可能成功。
+- 结构性问题：显示是 plan-driven，页被绑定为作者 cue；“模型事件边界”被当作页的**身份/有效性**而非
+  文本投递格式，缺少“可用译文 → 当前页”的投影层。提示词同时要求“每条事件成句”和“不跨 cue”，当
+  cue 边界切在句子中间时两条互斥；HTTP 往返 2.1–3.6 s 与 cue 2.7–4.9 s 同量级，重试不能作为可用性
+  兜底。N41/N42 把页从事件改成 cue（修好半句翻页），但把“模型必须与作者切分一致”变成了显示前提；
+  N44 的 salvage 只覆盖“精确铺满”，本诊断的“包含/部分覆盖”不在内。
+- 探针（3 tests，0 failures）：同回复 107/107 覆盖；严格拒绝 `authored_cue_boundary`；salvage `null`；
+  1,894 种与已知 cue 16 边界一致的四 cue 切法中仅 28 种可发布，且全部要求事件边界恰好等于 cue 边界
+  （`accepted_elsewhere=0`）；同一回复按事件页投影为 3 页、覆盖 14,500/14,500 ms。
+- 附带：3.28 s `…`（块 1 整 cue 空洞，补洞未在 cue 结束前完成）、1.63 s `source_gap`（跨块静默缝）、
+  0.59 s 首帧 `preparing_layout` 空白；另有本轮未触发但同属“无译文”的 overlay 粘性空白
+  （排版失败后 `lastBlankIdentity` 去重使 watchdog 不再重试，`CaptionOverlayV2.java:936-943`）。
+- 修复方向（**已由 §22 实施**）：新增投影层（第一层 cue 页、第二层事件页），发布单位下沉到页，边界类
+  错误降为对齐评分，`WAITING` 占位只覆盖无页的 cue，洞级补请求按 cue 截止；验收为本诊断全块有页、
+  性质测试“覆盖 t ⇒ t 有页”、真机同段连续显示。明确不采用“只放宽检查 / 只加重试 / 只缩小块”。
+- 状态：调查阶段只读 + 离线探针，未改产品代码、未重建 MPP、未连接或写入手机。块内 cue 的 token 切分
+  除 cue 16 外为推断，探针遍历所有与已知边界一致的切法，结论不依赖具体推断。
+
+## 22. 2026-10-20 N51 实施：cue 边界不再阻止译文显示（1.5.5 本地构建）
+
+- 记录：`docs/N51-REPAIR-20261020.md`；新增
+  `translation-core/.../RebuildCueProjection.java`；真实 N51 回复现在发布为 3 个事件页覆盖 14.5 s。
+- 修复：
+  1. **两层投影**：第一层对“被事件精确铺满”的 cue 生成 cue 页（窗口 = cue 窗）；第二层把其余事件
+     各自成页（窗口 = 事件源时间）。页按源时间有序、不重叠；相邻空隙 < `RebuildDisplayGroups.HOLD_MS`
+     时延伸到下一页起点。不切分、不复制、不丢文本；两层由“事件不重叠”保证不重复。
+  2. **边界降为呈现**：`RebuildProtocol.parseInternal` 不再调用 `RebuildCueContract.validate`；
+     `RebuildSalvage` 不再丢弃跨 cue 事件、不再要求 authored `unitsPartial` 非空；
+     `RebuildReview.structuralRetry` 移除三类边界错误；`RebuildCueContract.VERSION` →
+     `authored-cue-v3`（参与缓存身份）。
+  3. **控制器**：authored 分支改用投影（流式前缀同）；新增 `REBUILD_CUE_PROJECTION`
+     （`groups/cue_pages/event_pages/events/partial`），`REBUILD_UNIT_MODE` 增加 `cue_pages/event_pages`；
+     删除 `authoredUnits`/`authoredPartialUnits`。
+  4. **提示词**：`displayCueRule` 改为 “preferred page boundaries / a complete sentence wins; an event may
+     span the boundary”；`display_cues` 与 `SENTENCE` 不变，pinned 字面量不动。
+- 测试：新增 `N51AuthoredProjectionTest`（5，含 300 轮随机切分性质测试）与
+  `N51AuthoredDisplayTest`（真实引擎端到端：跨 cue 回复在 0.5–6.5 s 各位置都有译文、无空白、无占位）；
+  更新 `AuthoredCueContractTest`、`N42RegressionTest`。`:translation-core:testDebugUnitTest` **244
+  tests**、`:extensions:extension:testDebugUnitTest` **264 tests**，0 failures/errors；本地化 243×14；
+  `tools/verify_integration.py` `errors=[]`、`prompt_and_protocol_literals_unchanged=true`、
+  `compiled_core_class_count=79`、内嵌 MPE 与独立 MPE 相同。
+- 产物：MPP `build/n39/gradle/patches/libs/patches-1.5.5.mpp` **593,498 B**，SHA-256
+  `5F14BBFAB678DD30ABCC70203F30A22372FBDA8CDFFBC083F60534253F96A954`；MPP 内已无 1.5.4 字符串，
+  诊断将报 `ui=1.5.5; engine=1.5.5; build=local-1.5.5`；`docs/core-provenance.json` /
+  `docs/core-upstream.patch` 已重录。**未发布**：patches-list/bundle 与 README 仍指 1.5.4，
+  未签名、未安装、未推送。
+- 未完成/边界：真机安装与 after 诊断待复验；`fillHoles` 仍按“最大洞、一次”处理，未按 cue 截止；
+  overlay 粘性空白（N51 报告 §6.8）未改；事件页窗口可能比作者 cue 略长/略短（完整句子优先的代价）。
+
+## 23. 2026-10-21 1.5.5 正式版发布准备（执行）
+
+- 目标：把 1.5.5 作为正式版发布，不再使用 `1.5.5-local` 作为 Release 版本或 tag。
+- 版本/构建：`gradle.properties` `version=1.5.5`、`captionBuildId=release-1.5.5`。
+- 文档/元数据：`CHANGELOG.md` 改为 `## [1.5.5]` 六条用户可见变更；`patches-list.json`
+  由 `:patches:generatePatchesList` 生成为 1.5.5 / 1 个公开补丁；`patches-bundle.json`
+  为 1.5.5、description 与 CHANGELOG 一致、下载 URL 指 `v1.5.5/patches-1.5.5.mpp`；
+  README 发布表由脚本重建为 1.5.5；中文 README 增加当前版本入口。
+- 发布合同：`validate_morphe_metadata.py` 对 1.5.5 及以后只接受 `AI caption translator`；
+  `verify_bundle.py` 检查 `RebuildCueProjection`、`REBUILD_CUE_PROJECTION`、`release-1.5.5`，
+  并拒绝 `RememberedCaptionSelection` / `CaptionTargetPolicy` / `Remember caption selection`；
+  `test_release_contract.py` 新增“第二公开补丁必须拒绝”的回归。
+- 文档一致性：README 删除“进程内记忆”旧条目；ARCHITECTURE 改为失败显示中性 `…`、不显示源文，
+  并记录 cue/event 两层投影；COMPATIBILITY 记录 1.5.5 沿用 1.5.4 目标声明且不新增真机/组合声明；
+  COMMUNITY 统一为 1.5.5、1.47.0、21.20.405、单补丁。
+- 验证：`:translation-core:testDebugUnitTest` **244 tests**、`:extensions:extension:testDebugUnitTest`
+  **264 tests**，0 failures/errors/skipped；本地化 243×14；`test_release_contract.py` 12 tests OK；
+  `validate_morphe_metadata.py 1.5.5` OK；`verify_bundle.py 1.5.5` OK；
+  `verifyIntegrationSources` `errors=[]`；MPP `build/n39/gradle/patches/libs/patches-1.5.5.mpp`
+  **593,495 B**，SHA-256 `CB4D3135B9B483DAB1B098ACDEF720F612FD788BEA44B8E4C9229C14A35ACCFB`。
+- 发布计划：正式 tag `v1.5.5` 指向 release commit；上传 `patches-1.5.5.mpp`；
+  Release 正文使用 CHANGELOG 的六条；不推 `v1.5.5-local`。
+- 边界：真机安装与 after 诊断未执行；`fillHoles` 仍未按 cue 截止；overlay 粘性空白未改；
+  事件页窗口可能略长/略短。准备阶段未 commit/tag/push。

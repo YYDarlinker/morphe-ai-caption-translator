@@ -316,8 +316,9 @@ final class RebuildProtocol {
      * echo, empty for speech, protocol leak, bad timing) is dropped and becomes an explicit hole,
      * so the rest of the block still reaches the screen.
      *
-     * <p>Authored tracks are not salvaged here: their display contract is one page per cue group,
-     * and a partial group set must go through the cue contract instead. They keep the strict path.
+     * <p>Authored tracks take the same path. Whether an event leaves the author's cue is a
+     * presentation question answered by {@link RebuildCueProjection}, not a validity condition of
+     * the reply: a complete translation whose sentence crosses a cue boundary is still displayed.
      */
     static Plan parseBestEffort(
             String content, RebuildSource s, RebuildPlanner.Block b, CaptionLanguageContext context)
@@ -488,7 +489,8 @@ final class RebuildProtocol {
         if (!prefix && next != b.to + 1 && !withinHole(s, next, b.to + 1))
             throw new Invalid("missing_source");
         RebuildSemantics.validatePlan(s, b, out, context);
-        if (!prefix) RebuildCueContract.validate(s, b, out);
+        // Cue alignment is not validated here: an event may leave its authored cue, and the
+        // display projection publishes it as an event page instead of rejecting the whole block.
         presentation.addAll(RebuildReview.inspect(s, b, out, context));
         return new Plan(
                 out, root.toString(), Collections.unmodifiableList(presentation), reboundEvents);

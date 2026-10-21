@@ -2045,38 +2045,18 @@ final class RebuildController {
     }
 
     /**
-     * One display unit per authored cue. The model may return several events inside a cue; those
-     * events are concatenated into the cue page. The page window is the cue window, not an
-     * estimated event time.
+     * Pages for an authored plan. The projection keeps the author's cue where the reply tiles it
+     * exactly and publishes the remaining events as their own pages, so a sentence that crosses a
+     * cue boundary is displayed instead of being withheld.
      */
-    private static List<RebuildDisplayGroups.Unit> authoredUnits(
+    private static RebuildCueProjection.Result authoredProjection(
             Session s, int index, RebuildProtocol.Plan plan) {
-        RebuildPlanner.Block block = s.blocks.get(index);
-        try {
-            List<RebuildDisplayGroups.Unit> units =
-                    plan.partial
-                            ? RebuildCueContract.unitsPartial(
-                                    index, s.source, block, plan.events, s.languageContext)
-                            : RebuildCueContract.units(
-                                    index, s.source, block, plan.events, s.languageContext);
-            return units;
-        } catch (RebuildProtocol.Invalid invalid) {
-            // A cached/old plan could predate the contract. Never fabricate a page from it; the
-            // block stays blank and the next request/repair can produce a conforming plan.
-            if (s.plans[index] == plan)
-                TranslationRuntime.mark(
-                        s.context,
-                        "REBUILD_CUE_CONTRACT_REJECTED",
-                        "session="
-                                + s.id
-                                + ";block="
-                                + index
-                                + ";reason="
-                                + invalid.code
-                                + ";"
-                                + invalid.detail);
-            return Collections.emptyList();
-        }
+        return RebuildCueProjection.project(
+                index,
+                s.source,
+                s.blocks.get(index),
+                plan.events,
+                s.languageContext);
     }
 
     /** Diagnostic view of the authored cue contract: cue count and events per cue. */
@@ -2119,12 +2099,6 @@ final class RebuildController {
         return "，。！？；：,!?;:".indexOf(last) >= 0 || RebuildSource.terminal(text);
     }
 
-    private static List<RebuildDisplayGroups.Unit> authoredPartialUnits(
-            Session s, int index, RebuildProtocol.Plan plan) {
-        return RebuildCueContract.partialUnits(
-                index, s.source, s.blocks.get(index), plan.events, s.languageContext);
-    }
-
     private static List<RebuildDisplayGroups.Unit> displayUnits(
             Session s, int index, RebuildProtocol.Plan plan) {
         CaptionRenderSpec spec = s.languageContext.renderSpec;
@@ -2146,15 +2120,30 @@ final class RebuildController {
         DisplayLayout cached = s.displayLayouts[index];
         if (cached != null && cached.plan == plan && cached.geometry.equals(geometry))
             return cached.units;
-        // A manually authored track is shown cue by cue. Events inside one cue are concatenated;
-        // no event may leave its cue, and the cue window is the page window.
+        // An authored track prefers the author's cue pages and falls back to event pages for any
+        // cue the reply does not tile exactly; text that arrived is never withheld for alignment.
         boolean authoredTrack = s.blocks.get(index).authored;
         if (authoredTrack) {
             boolean partial = s.provisional != null && s.provisional[index] == plan;
-            List<RebuildDisplayGroups.Unit> units =
-                    partial
-                            ? authoredPartialUnits(s, index, plan)
-                            : authoredUnits(s, index, plan);
+            RebuildCueProjection.Result projection = authoredProjection(s, index, plan);
+            List<RebuildDisplayGroups.Unit> units = projection.units;
+            TranslationRuntime.mark(
+                    s.context,
+                    "REBUILD_CUE_PROJECTION",
+                    "session="
+                            + s.id
+                            + ";block="
+                            + index
+                            + ";groups="
+                            + projection.groups
+                            + ";cue_pages="
+                            + projection.cuePages
+                            + ";event_pages="
+                            + projection.eventPages
+                            + ";events="
+                            + plan.events.size()
+                            + ";partial="
+                            + partial);
             TranslationRuntime.mark(
                     s.context,
                     "REBUILD_UNIT_MODE",
@@ -2166,6 +2155,10 @@ final class RebuildController {
                             + partial
                             + ";units="
                             + units.size()
+                            + ";cue_pages="
+                            + projection.cuePages
+                            + ";event_pages="
+                            + projection.eventPages
                             + ";"
                             + authoredSummary(s.source, s.blocks.get(index), plan)
                             + ";url="

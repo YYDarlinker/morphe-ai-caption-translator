@@ -126,7 +126,7 @@ public class AuthoredCueContractTest {
     }
 
     @Test
-    public void anEventThatCrossesACueIsRejected() throws Exception {
+    public void anEventThatCrossesACueIsPublishedAsAnEventPage() throws Exception {
         RebuildSource s = source("最近のニュースを見ました", "天気がいいので散歩します", "始めよう");
         RebuildPlanner.Block b = block(s);
         JSONArray events =
@@ -137,17 +137,27 @@ public class AuthoredCueContractTest {
                                         b.cues.get(0).from,
                                         b.cues.get(1).to,
                                         "合并了两个 cue"));
-        try {
-            RebuildProtocol.parseBound(reply(b, events), s, b, JA_ZH);
-            fail("cross-cue event accepted");
-        } catch (RebuildProtocol.Invalid expected) {
-            assertEquals("authored_cue_boundary", expected.code);
-        }
+        // The crossing is a presentation fact, not a protocol failure: the reply is accepted.
+        RebuildProtocol.Plan plan =
+                RebuildProtocol.parseBound(reply(b, events), s, b, JA_ZH);
+        assertEquals(1, plan.events.size());
+
+        RebuildCueProjection.Result projection =
+                RebuildCueProjection.project(0, s, b, plan.events, JA_ZH);
+        assertEquals("no cue is exactly tiled", 0, projection.cuePages);
+        assertEquals("the crossing event becomes one page", 1, projection.eventPages);
+        assertEquals(1, projection.units.size());
+        assertEquals("合并了两个 cue", projection.units.get(0).text);
+        assertTrue(
+                "the page starts with the conversation, not with nothing",
+                projection.units.get(0).covers(b.cues.get(0).start));
     }
 
     @Test
     public void aSkippedCueIsRejected() throws Exception {
-        RebuildSource s = source("甲のニュース", "あの話", "乙の話");
+        // The skipped text is longer than the tolerated hole: a genuine omission still fails
+        // closed, unlike a mere cue-boundary disagreement.
+        RebuildSource s = source("甲のニュース", "あの話題について詳しく説明します", "乙の話");
         RebuildPlanner.Block b = block(s);
         JSONArray events =
                 new JSONArray()
@@ -172,10 +182,11 @@ public class AuthoredCueContractTest {
         RebuildPlanner.Block b = block(s);
         String authored = RebuildApi.prompt(CFG, "zh-Hans", JA_ZH, b);
         String auto = RebuildApi.prompt(CFG, "zh-Hans", JA_ZH, null);
-        assertTrue(authored.contains("fixed page boundaries"));
+        assertTrue(authored.contains("preferred page boundaries"));
+        assertTrue("a sentence may span an author boundary", authored.contains("an event may span the boundary"));
         assertTrue(authored.contains("display_cues"));
         assertTrue(authored.contains(RebuildGuidance.SENTENCE));
-        assertFalse(auto.contains("fixed page boundaries"));
+        assertFalse(auto.contains("preferred page boundaries"));
 
         JSONObject payload;
         try {

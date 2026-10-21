@@ -104,7 +104,7 @@ public class N42RegressionTest {
     }
 
     @Test
-    public void anEventThatCrossesADisplayGroupIsStillRejected() throws Exception {
+    public void anEventThatCrossesADisplayGroupIsPublishedAsAnEventPage() throws Exception {
         RebuildSource s =
                 source(
                         "最近のニュースを見ました",
@@ -119,12 +119,13 @@ public class N42RegressionTest {
                                         0,
                                         b.cues.get(1).to,
                                         "我把两个独立的显示组并成了一个事件"));
-        try {
-            RebuildProtocol.parseBound(reply(b, events), s, b, JA_ZH);
-            fail("cross-group event accepted");
-        } catch (RebuildProtocol.Invalid expected) {
-            assertEquals("authored_cue_boundary", expected.code);
-        }
+        RebuildProtocol.Plan plan =
+                RebuildProtocol.parseBound(reply(b, events), s, b, JA_ZH);
+        RebuildCueProjection.Result projection =
+                RebuildCueProjection.project(0, s, b, plan.events, JA_ZH);
+        assertEquals("no display group is exactly tiled", 0, projection.cuePages);
+        assertEquals("the sentence becomes one event page", 1, projection.eventPages);
+        assertEquals("我把两个独立的显示组并成了一个事件", projection.units.get(0).text);
     }
 
     @Test

@@ -10,7 +10,6 @@
 - Lets you add selected languages to that menu, including Simplified Chinese. This changes the available choices; it does not translate every checked language in the background.
 - Displays captions with adjustable size, background opacity and vertical position. Caption placement uses the video’s physical center, independently of the app’s LTR/RTL interface direction.
 - Supports multiple API profiles, model selection, custom translation requirements, translation caching and exportable diagnostics. Its settings are localized into 14 languages.
-- Optionally remembers your caption selection across videos for the current app session, with or without AI translation.
 - When the video already has its own subtitles in the language you select, shows them directly in the AI caption style without a translation request. Uploaded subtitles keep their authored line breaks, including two-row subtitles; only auto-generated subtitles have sentence breaks and page turns optimized locally.
 - When a video has several subtitle tracks, translates the one in the spoken language first (human-made before automatic, then human-made English) rather than whichever track YouTube preselects.
 
@@ -34,7 +33,7 @@ The recommended combination is **official 1.47.0 + YouTube 21.20.405**; 21.16.25
 4. Keep the compatible official default patch selection, including its captions/settings/player support. In this source’s tab, select **AI caption translator**. Caption language is owned by YouTube’s native menu and the official Captions patch (including **Preferred caption language**); this source does not add a separate language-memory patch.
 5. Let Morphe patch, sign and install the app. Follow Morphe’s GmsCore instructions if your selected official patches require it.
 
-Do not select the old AI-caption addon or another overlapping caption-memory patch at the same time. The official Captions patch remains the language authority; this source follows the native selection and never fabricates a target. This is an additional patch source, not a replacement for the official bundle. A downloadable `.mpp` is a patch bundle, not an installable YouTube APK.
+Do not select the old AI-caption addon or another overlapping caption patch at the same time. The official Captions patch remains the language authority; this source follows the native selection and never fabricates a target. This is an additional patch source, not a replacement for the official bundle. A downloadable `.mpp` is a patch bundle, not an installable YouTube APK.
 
 ## Configure and translate
 
@@ -62,17 +61,15 @@ Turning AI off returns translation to YouTube’s native behavior. Selecting an 
 
 ## Available patches
 
-> This repository's 1.5.5 is a **local baseline**. The release table below still reflects the last published 1.5.4 asset; there is no 1.5.5 download yet.
-
 <!-- PATCHES_START EXPANDED -->
-> **[v1.5.4](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patch total
+> **[v1.5.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patch total
 <details open>
 <summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
 **🎯 Supported versions:**
 
-| 21.40.161 | 21.39.522 | 21.38.130 | 21.28.208 | 21.23.492 | 21.20.405 | 21.16.256 |
+| 🧪&nbsp;21.40.161 | 🧪&nbsp;21.39.522 | 🧪&nbsp;21.38.130 | 🧪&nbsp;21.28.208 | 🧪&nbsp;21.23.492 | 21.20.405 | 21.16.256 |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |

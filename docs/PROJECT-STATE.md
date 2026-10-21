@@ -7,9 +7,11 @@
 - 基线：`2c96054` / `v1.5.4`（2026-10-14）；1.5.5 发布提交 `40d5d58`，已合并 `origin/main`（`a42c593`）
 - 版本：1.5.5；`captionBuildId=release-1.5.5`（N52 显示保证重建）；官方 Morphe Patches 1.47.0；
   推荐 YouTube 21.20.405，兼容 21.16.256 及 1.5.4 声明的实验目标
-- 发布状态：`patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表均指向 1.5.5；
-  N52 发布 MPP 已重建（595,638 B / `0EB5D122…`）；tag `v1.5.5` 与 GitHub release 由本轮创建
-  （见 §24）；旧本地 1.5.5 资产（`CB4D3135…`）保留在证据目录
+- 发布状态：已发布 **1.5.5**：tag `v1.5.5` → `49f588f`，GitHub release
+  `https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.5`，资产
+  `patches-1.5.5.mpp` 595,638 B / `A4B04C53…`；`main` 已快进到 `49f588f`；
+  `patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表均指向 1.5.5；
+  旧本地 1.5.5 资产（`CB4D3135…`）保留在证据目录
 - 模块：`caption-contracts`、`caption-shared`、`translation-core`、`infrastructure`、`application-host`、`presentation`、`ui`、`patches`、`ui-preview`
 - 开发环境：`.devenv/`（JDK 21、Python 3.12、Android SDK 35/36、Robolectric 均在 `work/toolchain/`；Gradle home 为 `work/gradle-home/`）
 
@@ -646,3 +648,27 @@
 - 边界：provider 完全不可用或模型对同一页持续返回空/错误 → 4 次页补后保持上一页/占位，
   不空白但无法凭空生成译文；源轨道没有 cue 的静默段不显示字幕（正确语义）；原生字幕遮罩
   仍需真机录屏确认；未连接或写入手机。
+
+## 25. 2026-10-21 N52 发布（执行）
+
+- 用户要求：忽略其他会话在工作区的类似工作，独立按仓库现有做法把该版本推到 GitHub；版本仍为
+  **1.5.5**，说明保持简洁、体验向。
+- 提交：`ae355be` `fix: keep translated captions on screen while a page is on its way`
+  （N52 代码/测试/报告/`core-provenance`）；`49f588f` `chore: Release v1.5.5 [skip ci]`
+  （CHANGELOG、`patches-bundle.json`、本状态）；annotated tag `v1.5.5`（tag 对象 `c3d5f70`）→
+  `49f588f`。
+- 分支：`main` 从 `67dc37b` 快进到 `49f588f`。`dev/1.5.5-deepseek` 无法推送到远端同名分支：
+  远端已有 `refs/heads/dev`，Git 不允许 `dev` 与 `dev/1.5.5-deepseek` 同时存在（文件/目录冲突）；
+  工作已由 `main` 承载。
+- Release：`gh release create v1.5.5`，title `v1.5.5`，非 draft、非 prerelease；资产
+  `patches-1.5.5.mpp` **595,638 B**，SHA-256
+  `A4B04C537499F6D86DF99350297BBC2FBEB5DD99C835F140D9C2DFA314771E4E`；正文为 CHANGELOG 1.5.5
+  的 7 条（含“Captions no longer go blank…”）。
+- 验证：`gh release download` 的资产哈希与本地一致；匿名 HEAD 资产 200 / 595,638 B；匿名
+  `main/patches-bundle.json` version=1.5.5、download_url 指向 v1.5.5 资产、含新条目；匿名
+  `main/patches-list.json` version=1.5.5、唯一补丁 `AI caption translator`；README 表 v1.5.5；
+  `validate_morphe_metadata.py 1.5.5`、`verify_bundle.py 1.5.5`、`test_release_contract.py`
+  （12 tests）通过。
+- 边界：发布提交带 `[skip ci]`，`release.yml` 未触发，因此本次资产没有 CI 构建证明/attestation；
+  资产由本地构建并做了字节校验。已上传的 `patches-1.5.5.mpp` 不再替换；后续修正必须新版本。
+  发布前的旧本地 1.5.5 资产（`CB4D3135…`，593,495 B）作为历史字节保存在证据目录，未上传。

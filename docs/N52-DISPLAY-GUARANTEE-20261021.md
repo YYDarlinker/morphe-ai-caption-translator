@@ -212,10 +212,11 @@ N51 修好的是**一道**闸门（人工 cue 边界）；这份诊断证明“�
 | `tools/check_localization.py` | 243 keys × 14 locales 通过 |
 | `tools/verify_integration.py` | `errors=[]`、pinned prompt/protocol 不变、core class 79、内嵌 MPE == 独立 MPE |
 | MPP（1.5.5，`release-1.5.5`） | `build/n39/gradle/patches/libs/patches-1.5.5.mpp`，**595,638 B**，SHA-256 `A4B04C537499F6D86DF99350297BBC2FBEB5DD99C835F140D9C2DFA314771E4E` |
-| 已发布 1.5.5 资产 | 原样保留：`validation/runs/20261021-n52-display-guarantee/patches-1.5.5-release.mpp`（593,495 B，SHA-256 `CB4D3135B9B483DAB1B098ACDEF720F612FD788BEA44B8E4C9229C14A35ACCFB`） |
+| 本轮发布资产 | GitHub release `v1.5.5` 上传的同一文件：595,638 B，SHA-256 `A4B04C53…`（tag `v1.5.5` → `49f588f`） |
+| 发布前旧本地 1.5.5 资产 | 作为历史字节保留：`validation/runs/20261021-n52-display-guarantee/patches-1.5.5-release.mpp`（593,495 B，SHA-256 `CB4D3135…`），未上传 |
 
-版本仍为 **1.5.5**（按你的要求）；`captionBuildId` 使用 `release-1.5.5`，
-诊断里可凭 `build=` 区分本次构建与已发布资产。
+版本仍为 **1.5.5**（按你的要求）；`captionBuildId=release-1.5.5`。该文件已作为 GitHub release
+`v1.5.5` 的资产上传；下载哈希与本地一致。
 
 ---
 

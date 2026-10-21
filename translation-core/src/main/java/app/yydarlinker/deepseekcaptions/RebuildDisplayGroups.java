@@ -417,6 +417,11 @@ final class RebuildDisplayGroups {
             shownTo = -1;
         }
 
+        /** The unit currently on screen in this generation, or null before the first page. */
+        Unit shown() {
+            return shown;
+        }
+
         Unit select(int index, List<RebuildProtocol.Event> accepted, List<Unit> units, long time) {
             if (shown != null
                     && shown.block == index

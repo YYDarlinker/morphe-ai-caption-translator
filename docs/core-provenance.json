@@ -8,7 +8,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "upstream_sha256": "bc5ba7aab1c61dc785742e8cb63b3d69a5d11142aaf817d66d280bc415a4a1e3",
-      "sha256": "b24dc97cceff7d532c9cb66368edd513372a5d83ee30515bff1f44c9df056358",
+      "sha256": "3587331c746a3fb5cf20a258aa625c217987d58816f8f855929094dffc524df7",
       "snapshot": "translation-core/upstream/RebuildController.java.txt",
       "upstream_git_blob": "814922f06c539681e1471379faf61cb7c6651548"
     },
@@ -56,7 +56,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "upstream_sha256": "02b60c2313df406b91d2e97b449414954427ae57fb98e3c9a57dc9a86b35cb3b",
-      "sha256": "b87ad08e332ccbf9c135e1cd25c5fd876fbcd3fd2d8a917f4437bf866aba737b",
+      "sha256": "727cf859d78094bb097528429ca3f41cefa84d3f5244a8e4f03786639e8394f8",
       "snapshot": "translation-core/upstream/RebuildProtocol.java.txt",
       "upstream_git_blob": "d5dc8cc59c7db9b9411dbd90cfdfa4d725ec3f4c"
     },
@@ -136,7 +136,7 @@
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayGroups.java",
-      "sha256": "7d11c345f89bb9826ca909f17380f6efc615f7782c88bad1cc4725b832e4c07e",
+      "sha256": "23c327985658e2ace95463ac947729317cd10b8714fb8b4e5ea81c9464ded95f",
       "purpose": "display-only partition of accepted events into non-repeating caption units"
     },
     {
@@ -166,7 +166,7 @@
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSalvage.java",
-      "sha256": "3e2931f6dea4f021189295cb023a4272c49739e867278fd1c6a532eb58d000bc",
+      "sha256": "8b5509325fcd1972cba2c02b7290e0b03653e82a4eeea1cab048b60029837e90",
       "purpose": "partial-plan salvage: per-segment identity checks, explicit holes, quality observations never withhold a usable event"
     },
     {

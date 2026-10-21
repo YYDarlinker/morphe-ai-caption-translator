@@ -58,6 +58,22 @@ final class RebuildController {
      */
     static final int MAX_SLOW_RETRIES = 3;
 
+    /**
+     * Display guarantee (N52): a speech instant may never render an empty box. When no unit covers
+     * the instant, the last translated page is held for at most this long, then the neutral
+     * placeholder stands in while the page itself is requested.
+     */
+    static final long DISPLAY_HOLD_MS = 4000;
+
+    /** Quantization of the held/placeholder window, so the render signature changes rarely. */
+    static final long DISPLAY_QUANTUM_MS = 500;
+
+    /** Page-sized repair requests per block; each asks only for the uncovered page range. */
+    static final int MAX_PAGE_REPAIRS_PER_BLOCK = 4;
+
+    /** How long a page may wait for its block reply before the page itself is requested. */
+    static final long PAGE_REPAIR_GRACE_MS = 1200;
+
     private static final AtomicLong IDS = new AtomicLong();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ExecutorService SOURCE_IO = lane("CaptionSourceIO", 1);
@@ -166,6 +182,17 @@ final class RebuildController {
 
         /** Slow retries spent on a block that never produced a usable plan; capped per session. */
         int[] slowRetries;
+
+        /** Page ranges already asked for as a repair in this generation, and the per-block count. */
+        final Set<String> pageRepairs = Collections.synchronizedSet(new HashSet<>());
+
+        int[] pageRepairCount;
+
+        /** When the current page of a block first had no translation in this generation. */
+        long[] uncoveredSince;
+
+        /** Rate limit for the DISPLAY_GAP fallback record. */
+        volatile long lastDisplayGapAt;
 
         /**
          * The single newest foreground request selected but not handed to a lane yet. It exists
@@ -824,6 +851,9 @@ final class RebuildController {
         s.generation++;
         s.lastShown = "";
         s.display.reset();
+        s.pageRepairs.clear();
+        if (s.pageRepairCount != null) java.util.Arrays.fill(s.pageRepairCount, 0);
+        if (s.uncoveredSince != null) java.util.Arrays.fill(s.uncoveredSince, 0);
     }
 
     private static TranslationOutput.RenderGuard positionGuard(Session s) {
@@ -1135,6 +1165,9 @@ final class RebuildController {
                 s.jobs = new Job[blocks.size()];
                 s.cacheChecked = checked;
                 s.slowRetries = new int[blocks.size()];
+                s.pageRepairCount = new int[blocks.size()];
+                s.uncoveredSince = new long[blocks.size()];
+                s.pageRepairs.clear();
                 s.loading = false;
                 s.sourceJob = null;
                 s.status = "";
@@ -2227,11 +2260,221 @@ final class RebuildController {
         return null;
     }
 
+    /** True when [time] is inside a source window that carries speech. */
+    private static boolean speechAt(Session s, long time) {
+        if (s.source == null) return false;
+        RebuildSource.TimedWindow window = s.source.windowAt(time);
+        return window != null && !RebuildSource.nonSpeech(s.source.text(window.from, window.to));
+    }
+
+    /** Records, at most about once a second, which gate left a speech instant uncovered. */
+    private static void markDisplayGap(Session s, int index, String gate) {
+        long now = SystemClock.elapsedRealtime();
+        synchronized (s) {
+            if (now - s.lastDisplayGapAt < 900) return;
+            s.lastDisplayGapAt = now;
+        }
+        TranslationRuntime.mark(
+                s.context,
+                "DISPLAY_GAP",
+                "session="
+                        + s.id
+                        + ";block="
+                        + index
+                        + ";gate="
+                        + gate
+                        + ";position="
+                        + s.position);
+    }
+
+    /**
+     * Asks for exactly the page the viewer is on, once, when that page has no translation. This is
+     * the general repair for any cause (failed reply, empty translation, abandoned block, hole,
+     * uncovered estimated gap): the request is page-sized, so it is independent of whatever made
+     * the block-wide reply unusable.
+     */
+    private static void requestPageRepair(Session s, int index, long time) {
+        RebuildSource source = s.source;
+        if (source == null || s.blocks == null || index < 0 || index >= s.blocks.size()) return;
+        RebuildPlanner.Block parent = s.blocks.get(index);
+        int[] range = pageRange(parent, source, time);
+        if (range == null) return;
+        int from = range[0], to = range[1];
+        String key = s.generation + ":" + index + ":" + from + "-" + to;
+        synchronized (s) {
+            if (!current(s) || s.pageRepairs == null) return;
+            if (s.terminal) return;
+            // A reply that is still arriving is the cheapest source of this page; a provisional
+            // prefix is already text for it, and an in-flight block request must not be duplicated.
+            if (s.provisional != null && s.provisional[index] != null) return;
+            if (s.jobs != null && s.jobs[index] != null) return;
+            if (s.pageRepairs.contains(key)) return;
+            if (s.pageRepairCount != null
+                    && s.pageRepairCount[index] >= MAX_PAGE_REPAIRS_PER_BLOCK) return;
+            RebuildProtocol.Plan plan = s.plans[index];
+            if (plan != null && covered(plan, from, to)) return;
+            // While the block reply is still in flight, give it a short grace first: a pending
+            // block is usually cheaper than a second request. A hole or a failed block is repaired
+            // immediately.
+            if (plan == null && s.uncoveredSince != null && index < s.uncoveredSince.length) {
+                long since = s.uncoveredSince[index];
+                if (since > 0
+                        && SystemClock.elapsedRealtime() - since < PAGE_REPAIR_GRACE_MS) return;
+            }
+            if (s.pageRepairs.size() > 128) s.pageRepairs.clear();
+            s.pageRepairs.add(key);
+            if (s.pageRepairCount != null) s.pageRepairCount[index]++;
+        }
+        markDisplayGap(s, index, "repair");
+        final long generation = s.generation;
+        dispatch(true, () -> repairPage(s, index, from, to, generation));
+    }
+
+    /** The source range of the page at [time]: one authored cue group, or one source window. */
+    private static int[] pageRange(RebuildPlanner.Block parent, RebuildSource source, long time) {
+        if (parent.authored) {
+            for (RebuildPlanner.Block.CueRange group : RebuildCueContract.groups(source, parent))
+                if (time >= group.start && time < group.end)
+                    return new int[] {group.from, group.to};
+            return null;
+        }
+        RebuildSource.TimedWindow window = source.windowAt(time);
+        if (window == null) return null;
+        int from = Math.max(parent.from, window.from);
+        int to = Math.min(parent.to, window.to);
+        return to < from ? null : new int[] {from, to};
+    }
+
+    /** True when one event already covers the whole page range. */
+    private static boolean covered(RebuildProtocol.Plan plan, int from, int to) {
+        for (RebuildProtocol.Event event : plan.events)
+            if (event.from <= from && event.to >= to) return true;
+        return false;
+    }
+
+    /**
+     * One page-sized request. When the block has no plan at all, a degraded plan (every token a
+     * hole) is published first, so the repair has somewhere to merge into and the renderer stops
+     * treating the block as a hard failure.
+     */
+    private static void repairPage(Session s, int index, int from, int to, long generation) {
+        RebuildPlanner.Block parent;
+        RebuildPlanner.Block page;
+        synchronized (s) {
+            if (!current(s) || s.generation != generation || s.blocks == null) return;
+            parent = s.blocks.get(index);
+            page = pageBlock(parent, s.source, from, to);
+            if (page == null) return;
+            if (s.plans[index] == null) {
+                s.plans[index] = RebuildProtocol.degraded(parent);
+                s.states[index] = READY;
+                TranslationRuntime.mark(
+                        s.context,
+                        "REBUILD_BLOCK_DEGRADED",
+                        "session="
+                                + s.id
+                                + ";block="
+                                + index
+                                + ";reason=no_plan;range="
+                                + from
+                                + "-"
+                                + to);
+            }
+        }
+        Job job = new Job(s, index, true);
+        RebuildProtocol.Plan candidate;
+        try {
+            candidate =
+                    RebuildApi.translate(
+                            s.source,
+                            page,
+                            s.config,
+                            s.target,
+                            job,
+                            true,
+                            "Translate only this uncovered source range. Keep its complete meaning"
+                                    + " and return the complete range.",
+                            s.languageContext);
+        } catch (Exception failed) {
+            TranslationRuntime.mark(
+                    s.context,
+                    "REBUILD_PAGE_REPAIR_FAILED",
+                    "session="
+                            + s.id
+                            + ";block="
+                            + index
+                            + ";range="
+                            + from
+                            + "-"
+                            + to
+                            + ";reason="
+                            + (failed instanceof RebuildProtocol.Invalid
+                                    ? ((RebuildProtocol.Invalid) failed).code
+                                    : failed.getClass().getSimpleName()));
+            return;
+        }
+        RebuildProtocol.Plan merged;
+        synchronized (s) {
+            if (!current(s) || s.generation != generation) return;
+            RebuildProtocol.Plan current = s.plans[index];
+            if (current == null) current = RebuildProtocol.degraded(parent);
+            merged = RebuildReview.mergeInto(current, candidate, parent);
+            if (merged == current) {
+                TranslationRuntime.mark(
+                        s.context,
+                        "REBUILD_PAGE_REPAIR_EMPTY",
+                        "session="
+                                + s.id
+                                + ";block="
+                                + index
+                                + ";range="
+                                + from
+                                + "-"
+                                + to);
+                return;
+            }
+            s.plans[index] = merged;
+            s.states[index] = READY;
+        }
+        TranslationRuntime.mark(
+                s.context,
+                "REBUILD_PAGE_REPAIRED",
+                "session="
+                        + s.id
+                        + ";block="
+                        + index
+                        + ";range="
+                        + from
+                        + "-"
+                        + to
+                        + ";events="
+                        + candidate.events.size());
+        render(s);
+    }
+
+    /** The request block of one page: an automatic window, or exactly one authored cue group. */
+    private static RebuildPlanner.Block pageBlock(
+            RebuildPlanner.Block parent, RebuildSource source, int from, int to) {
+        if (source == null
+                || from < parent.from
+                || to > parent.to
+                || to < from
+                || from >= source.words.size()
+                || to >= source.words.size()) return null;
+        if (!parent.authored) return new RebuildPlanner.Block(parent.index, from, to, source);
+        for (RebuildPlanner.Block.CueRange group : RebuildCueContract.groups(source, parent))
+            if (group.from == from && group.to == to)
+                return new RebuildPlanner.Block(
+                        parent.index, from, to, source, Collections.singletonList(group));
+        return null;
+    }
+
     private static void render(Session s) {
         if (!current(s) || !s.visible) return;
         String translating = TranslationRuntime.message(s.context, "caption_translating");
         String text = "", fallbackReason = "", displayEmptyReason = "", eventId = "none";
         boolean status = false;
+        int guaranteeIndex = -1;
         int generation;
         long revision, submission, selectedAt, observedAt;
         long eventStart = -1, eventEnd = -1;
@@ -2267,6 +2510,7 @@ final class RebuildController {
                 status = true;
             } else {
                 int i = blockAt(s, selectedAt);
+                guaranteeIndex = i;
                 // A page held across the short pause after its block stays until the next speaks.
                 if (i >= 0
                         && (covers(s.blocks.get(i), selectedAt)
@@ -2290,7 +2534,10 @@ final class RebuildController {
                         eventAnchors = pageAnchors(s, unit);
                         text = unit.text;
                         if (text.isEmpty()) displayEmptyReason = "non_speech";
-                        if (!text.isEmpty()) s.display.shown(unit);
+                        if (!text.isEmpty()) {
+                            s.display.shown(unit);
+                            if (s.uncoveredSince != null) s.uncoveredSince[i] = 0;
+                        }
                     } else if (p == null || provisional) {
                         fallbackReason = unresolvedPhase(s.states[i], s.reasons[i]);
                         // Waiting displays keep each source cue's own window, so a block-wide
@@ -2348,6 +2595,67 @@ final class RebuildController {
                         fallbackReason = "";
                     }
                 }
+            }
+            // N52 display guarantee: speech never renders an empty box. The screen follows the
+            // source timeline, not a block's plan: an uncovered speech instant holds the last
+            // translated page (bounded) or shows the neutral placeholder, and the uncovered page
+            // itself is requested once, at page size. No gate may turn a missing page into a
+            // silent caption box.
+            if (!status
+                    && !s.sourceOnly
+                    && (text.isEmpty()
+                            || UNAVAILABLE_MARKER.equals(text)
+                            || fallbackReason.equals("pending_translation"))
+                    && speechAt(s, selectedAt)) {
+                if (s.uncoveredSince != null
+                        && guaranteeIndex >= 0
+                        && s.uncoveredSince[guaranteeIndex] == 0)
+                    s.uncoveredSince[guaranteeIndex] = SystemClock.elapsedRealtime();
+                boolean uncovered = text.isEmpty() || UNAVAILABLE_MARKER.equals(text);
+                RebuildDisplayGroups.Unit held = s.display.shown();
+                boolean holdable =
+                        held != null
+                                && !held.text.trim().isEmpty()
+                                && selectedAt < held.end + DISPLAY_HOLD_MS;
+                if (uncovered) {
+                    if (holdable) {
+                        long until =
+                                Math.max(
+                                        selectedAt + DISPLAY_QUANTUM_MS,
+                                        ((selectedAt / DISPLAY_QUANTUM_MS) + 1) * DISPLAY_QUANTUM_MS);
+                        text = held.text;
+                        eventStart = held.start;
+                        eventEnd = Math.max(until, held.end);
+                        // The quantum is part of the identity: the window itself is not part of
+                        // the render signature, so the held page must be re-issued as it grows.
+                        eventId =
+                                "hold:"
+                                        + guaranteeIndex
+                                        + ":"
+                                        + held.from
+                                        + "-"
+                                        + held.to
+                                        + ":"
+                                        + (eventEnd / DISPLAY_QUANTUM_MS);
+                        fallbackReason = "";
+                        displayEmptyReason = "";
+                        markDisplayGap(s, guaranteeIndex, "hold");
+                    } else if (text.isEmpty()) {
+                        RebuildSource.TimedWindow window = s.source.windowAt(selectedAt);
+                        eventStart = window == null ? selectedAt : Math.max(window.start, selectedAt);
+                        eventEnd = window == null ? selectedAt + DISPLAY_QUANTUM_MS : window.end;
+                        if (eventEnd <= eventStart) eventEnd = eventStart + DISPLAY_QUANTUM_MS;
+                        text = translating;
+                        fallbackReason = "pending_translation";
+                        eventId =
+                                "ensure:" + guaranteeIndex + ":" + (selectedAt / DISPLAY_QUANTUM_MS);
+                        markDisplayGap(s, guaranteeIndex, "placeholder");
+                    } else {
+                        // Nothing to hold yet: keep the neutral marker, but still ask for this page.
+                        markDisplayGap(s, guaranteeIndex, "marker");
+                    }
+                }
+                if (guaranteeIndex >= 0) requestPageRepair(s, guaranteeIndex, selectedAt);
             }
             String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
             if (signature.equals(s.lastShown) && s.appliedRenderRevision == s.renderRevision) {

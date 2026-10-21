@@ -117,6 +117,23 @@ final class RebuildProtocol {
         }
     }
 
+    /**
+     * A placeholder plan for a block whose reply produced nothing usable: every token is an
+     * explicit hole, so the display can keep the last page and request exactly the missing page
+     * instead of treating the whole block as a failure.
+     */
+    static Plan degraded(RebuildPlanner.Block block) {
+        List<int[]> holes = new ArrayList<>();
+        holes.add(new int[] {block.from, block.to});
+        return new Plan(
+                Collections.emptyList(),
+                "",
+                Collections.emptyList(),
+                0,
+                true,
+                holes);
+    }
+
     static final class Plan {
         final List<Event> events;
         final String json;

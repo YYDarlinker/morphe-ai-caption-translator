@@ -202,15 +202,13 @@ public class LanguageConformanceTest {
                         "zh-Hans",
                         "the budget phone costs three hundred dollars",
                         "the budget phone costs three hundred dollars");
-        try {
-            parse(echo);
-            fail("an English echo must not be published as a Chinese translation");
-        } catch (RebuildProtocol.Invalid expected) {
-            assertTrue(
-                    "unexpected rejection " + expected.code,
-                    expected.code.equals("target_language_mismatch")
-                            || expected.code.equals("untranslated_source"));
-        }
+        // N52: an unusable reply is not published, but it is also not a permanent block failure:
+        // every token becomes an explicit hole so the display holds the last page and repairs the
+        // current page instead of retrying the whole block.
+        RebuildProtocol.Plan plan = parse(echo);
+        assertTrue("the English echo is never published as Chinese", plan.events.isEmpty());
+        assertTrue("the block is a salvaged plan", plan.partial);
+        assertEquals("the whole block is one explicit hole", 1, plan.holes.size());
     }
 
     @Test

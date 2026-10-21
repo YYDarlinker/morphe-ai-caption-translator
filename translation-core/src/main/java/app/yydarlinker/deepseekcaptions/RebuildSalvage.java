@@ -200,15 +200,19 @@ final class RebuildSalvage {
             accepted.add(event);
             previousEnd = z;
         }
-        if (accepted.isEmpty()) return null;
+        if (accepted.isEmpty()) {
+            // The reply was well formed but carried no usable translation (empty text, echo, wrong
+            // script, bad timing). Do not fail the whole block: publish every token as an explicit
+            // hole so the display can keep the last page and request only the current page.
+            return new RebuildProtocol.Plan(
+                    Collections.emptyList(),
+                    root.toString(),
+                    issues,
+                    0,
+                    true,
+                    Collections.singletonList(new int[] {b.from, b.to}));
+        }
         if (next <= b.to) holes.add(new int[] {next, b.to});
-        int total = 0, covered = 0;
-        for (int i = b.from; i <= b.to; i++)
-            total += RebuildProtocol.compact(s.words.get(i).text).length();
-        for (RebuildProtocol.Event e : accepted)
-            for (int i = e.from; i <= e.to; i++)
-                covered += RebuildProtocol.compact(s.words.get(i).text).length();
-        if (!b.authored && total > 0 && covered * 3 < total) return null;
         List<int[]> merged = mergeHoles(holes);
         issues.addAll(RebuildReview.inspect(s, b, accepted, context));
         // Always marked salvaged, even when every token was recovered: the reply failed the strict

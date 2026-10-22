@@ -28,7 +28,8 @@ assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?",manifes
 assert datetime.fromisoformat(manifest["created_at"]).tzinfo is None
 assert manifest["download_url"]==f"https://github.com/{repo}/releases/download/v{v}/patches-{v}.mpp"
 expected_names={"AI caption translator"}
-if tuple(map(int,v.split("-")[0].split("."))) >= (1,2,0):
+release=tuple(map(int,v.split("-")[0].split(".")))
+if (1,2,0) <= release < (1,5,5):
     expected_names.update({"Remember caption selection"})
 assert listing["version"]==v and {p["name"] for p in listing["patches"]}==expected_names
 assert len(listing["patches"])==len(expected_names)

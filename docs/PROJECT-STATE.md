@@ -1,4 +1,4 @@
-# PROJECT-STATE — 1.5.6 本地构建（N40–N48 修复；N49/N50 上游评估；N51 两层投影；N52 显示保证；1.5.5 发布；N53 字幕图层/字号；N54 原生样式/分页评估；N55 动画双时钟；N56 回归修复/恢复拖动；N57 拖动/抖动根因；N58 稳定图层/触摸代理/视口档位；N59 Patcher 2.0.0/Morphe 1.48.0 适配与语言菜单功能删除；N60 Flyout VerifyError 修复；N61 字幕越界/档位/Shorts 字号图层；N62 评论区快速换档/AI 开关即刻生效/短字幕框宽；N63 评论区动画同步字号/AI 首视频遮挡原生样式；N64 官方 CC 显示权威/无 CC 不显示 AI 译文字幕）
+# PROJECT-STATE — 1.5.6 发布（N40–N48 修复；N49/N50 上游评估；N51 两层投影；N52 显示保证；1.5.5 发布；N53 字幕图层/字号；N54 原生样式/分页评估；N55 动画双时钟；N56 回归修复/恢复拖动；N57 拖动/抖动根因；N58 稳定图层/触摸代理/视口档位；N59 Patcher 2.0.0/Morphe 1.48.0 适配与语言菜单功能删除；N60 Flyout VerifyError 修复；N61 字幕越界/档位/Shorts 字号图层；N62 评论区快速换档/AI 开关即刻生效/短字幕框宽；N63 评论区动画同步字号/AI 首视频遮挡原生样式；N64 官方 CC 显示权威/无 CC 不显示 AI 译文字幕）
 
 ## 1. 当前身份
 
@@ -13,12 +13,13 @@
   N64 官方 CC 显示权威/无 CC 不显示 AI 译文字幕）；
   官方 Morphe Patches 1.48.0 / Patcher 2.0.0；YouTube 只声明 21.x 目标：21.42.241、21.41.525、
   21.28.208、21.23.492、21.20.405、21.16.256（按用户要求不再声明或适配 20.x）
-- 发布状态：已发布 **1.5.6**：tag `v1.5.6`，GitHub release
+- 发布状态：已发布 **1.5.6**：annotated tag `v1.5.6` → `2b96358`，GitHub release
   `https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.6`，资产
   `patches-1.5.6.mpp` 578,441 B / `E272FCE1…`；`main` 与 `dev` 已快进到该发布提交。
-  `patches-list.json`、`patches-bundle.json`、CHANGELOG、README 均已指向 1.5.6。旧的
-  1.6.0/1.6.1 只做过本地构建，按用户要求号段回到 1.5.6，不发布 1.6.x；旧本地 1.5.5 资产
-  （`CB4D3135…`）保留在证据目录
+  `patches-list.json`、`patches-bundle.json`、CHANGELOG、README 均已指向 1.5.6；匿名
+  raw → asset 校验通过（`verify_remote_source.py main 1.5.6`）。旧的 1.6.0/1.6.1 只做过本地
+  构建，按用户要求号段回到 1.5.6，不发布 1.6.x；旧本地 1.5.5 资产（`CB4D3135…`）保留在
+  证据目录
 - 模块：`caption-contracts`、`caption-shared`、`translation-core`、`infrastructure`、`application-host`、`presentation`、`ui`、`patches`、`ui-preview`
 - 开发环境：`.devenv/`（JDK 21、Python 3.12、Android SDK 35/36、Robolectric 均在 `work/toolchain/`；Gradle home 为 `work/gradle-home/`）
 

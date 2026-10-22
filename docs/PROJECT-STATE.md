@@ -1,17 +1,24 @@
-# PROJECT-STATE — 1.5.5 正式版发布准备（N40–N48 修复；N49/N50 上游评估；N51 两层投影；N52 显示保证；1.5.5 发布元数据 + N52 重建）
+# PROJECT-STATE — 1.5.6 本地构建（N40–N48 修复；N49/N50 上游评估；N51 两层投影；N52 显示保证；1.5.5 发布；N53 字幕图层/字号；N54 原生样式/分页评估；N55 动画双时钟；N56 回归修复/恢复拖动；N57 拖动/抖动根因；N58 稳定图层/触摸代理/视口档位；N59 Patcher 2.0.0/Morphe 1.48.0 适配与语言菜单功能删除；N60 Flyout VerifyError 修复；N61 字幕越界/档位/Shorts 字号图层；N62 评论区快速换档/AI 开关即刻生效/短字幕框宽；N63 评论区动画同步字号/AI 首视频遮挡原生样式；N64 官方 CC 显示权威/无 CC 不显示 AI 译文字幕）
 
 ## 1. 当前身份
 
 - 活动仓库：`E:\Projects\DeepSeek morphe-ai-caption-translator`
 - 分支：`dev/1.5.5-deepseek`
 - 基线：`2c96054` / `v1.5.4`（2026-10-14）；1.5.5 发布提交 `40d5d58`，已合并 `origin/main`（`a42c593`）
-- 版本：1.5.5；`captionBuildId=release-1.5.5`（N52 显示保证重建）；官方 Morphe Patches 1.47.0；
-  推荐 YouTube 21.20.405，兼容 21.16.256 及 1.5.4 声明的实验目标
-- 发布状态：已发布 **1.5.5**：tag `v1.5.5` → `49f588f`，GitHub release
-  `https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.5`，资产
-  `patches-1.5.5.mpp` 595,638 B / `A4B04C53…`；`main` 已快进到 `49f588f`；
-  `patches-list.json`、`patches-bundle.json`、CHANGELOG 和 README 发布表均指向 1.5.5；
-  旧本地 1.5.5 资产（`CB4D3135…`）保留在证据目录
+- 版本：1.5.6；发布构建为 `release-1.5.6`（N53–N58 的显示/图层修复 + N59 Patcher 2.0.0、
+  Morphe Patches 1.48.0 适配与自动翻译语言列表功能删除 + N60 Flyout VerifyError 修复 +
+  N61 详情页越界/档位稳定/Shorts 字号/单行行高/图层上移 +
+  N62 评论区快速换档/AI 开关即刻生效/短字幕框宽 +
+  N63 评论区动画同步字号/AI 首视频遮挡原生样式 +
+  N64 官方 CC 显示权威/无 CC 不显示 AI 译文字幕）；
+  官方 Morphe Patches 1.48.0 / Patcher 2.0.0；YouTube 只声明 21.x 目标：21.42.241、21.41.525、
+  21.28.208、21.23.492、21.20.405、21.16.256（按用户要求不再声明或适配 20.x）
+- 发布状态：已发布 **1.5.6**：tag `v1.5.6`，GitHub release
+  `https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.6`，资产
+  `patches-1.5.6.mpp` 578,441 B / `E272FCE1…`；`main` 与 `dev` 已快进到该发布提交。
+  `patches-list.json`、`patches-bundle.json`、CHANGELOG、README 均已指向 1.5.6。旧的
+  1.6.0/1.6.1 只做过本地构建，按用户要求号段回到 1.5.6，不发布 1.6.x；旧本地 1.5.5 资产
+  （`CB4D3135…`）保留在证据目录
 - 模块：`caption-contracts`、`caption-shared`、`translation-core`、`infrastructure`、`application-host`、`presentation`、`ui`、`patches`、`ui-preview`
 - 开发环境：`.devenv/`（JDK 21、Python 3.12、Android SDK 35/36、Robolectric 均在 `work/toolchain/`；Gradle home 为 `work/gradle-home/`）
 
@@ -672,3 +679,340 @@
 - 边界：发布提交带 `[skip ci]`，`release.yml` 未触发，因此本次资产没有 CI 构建证明/attestation；
   资产由本地构建并做了字节校验。已上传的 `patches-1.5.5.mpp` 不再替换；后续修正必须新版本。
   发布前的旧本地 1.5.5 资产（`CB4D3135…`，593,495 B）作为历史字节保存在证据目录，未上传。
+
+## 26. 2026-10-22 N53 字幕图层与字号契约（执行）
+
+- 输入：`caption-diagnostics-1.5.5-20261022-140858.txt`；截图 127/128；报告
+  `docs/N53-CAPTION-LAYER-AND-SIZE-20261022.md`。
+- 根因：块 `b105_1637_1677` 被供应商 `content_filter` 整块拒绝（页补请求 175/178 同样被拒）；
+  字幕 anchor 挂在 `android.R.id.content` 最后，压在评论面板之上；字号在 `videoWidth < 0.8×normal`
+  时随视频宽度缩小（1478/2247 → 36.5 px）。
+- 修复：`CaptionSurface` 新增 `renderedSurface`/`captionHost`/`relative`，字幕挂到视频 Surface 向上
+  第一个 FrameLayout；删除 `renderedGlyphHeightPx` 与 `normalVideoWidth`，字号只按模式/显示宽度；
+  `CaptionFontSize.modeRatio` 成为唯一模式比例。
+- 产物：MPP 596,221 B，SHA-256 `DD51262F3AD6A05D23EC202F4F7D95070B61D588B7DFE88C59BB76F925689AFF`；
+  `local-1.5.5-n53`；未发布。
+- 边界：未连接真机；该图层后来被 N58 替换为稳定 overlay 层；供应商拒绝的文本仍无译文。
+
+## 27. 2026-10-22 N54 原生字幕样式与分页借用评估（只读）
+
+- 报告：`docs/N54-NATIVE-CAPTION-STYLE-AND-PAGING-EVALUATION-20261022.md`。
+- 结论：原生 `SubtitleWindowView`/`Laohf` 渲染可借，分页不可借（`Lapco` 只按时间重叠合并 cue）；
+  推荐 A1 原生渲染器是可选后续，不在 1.5.5 实施。B 站可参考轨道/位置/字号元数据，不可参考分句。
+- 状态：只读，无产品代码/MPP 变更。
+
+## 28. 2026-10-22 N55 动画双时钟 + 原生安全线（历史）
+
+- 报告：`docs/N55-CAPTION-MOTION-ROOT-CAUSE-20261022.md`。
+- 结论：抽搐不是动画曲线，而是几何采样 10 Hz + 每次采样全量排版 + 位置是排版副作用；提出几何/内容
+  双时钟、停稳分页、原生安全线。S1/S2 最小实现（`local-1.5.5-n55`）后来被 N56 取代：
+  margin/translation 混用导致闪跳，安全线 clamp 让向下拖动无效。
+- 产物（历史）：MPP 599,398 B，`E2F020989C02DF907A26CA7D4F2716E04D711DC1FA1CAA3ABE6C798763D6A129`。
+
+## 29. 2026-10-22 N56 回归修复：绝对 translation、删除 UI 避让、拖动不重排（历史）
+
+- 报告：`docs/N56-CAPTION-MOTION-FOLLOWUP-20261022.md`。
+- 根因：`placeAt()` 同时改 margin 并清零 translation，下一帧布局前仍画旧位置；安全线 clamp
+  把默认底部字幕卡住；拖动走完整 `render()`。
+- 修复：`CaptionHorizontalPlacement.position()` 只用绝对 `translationX/Y`，margin 恒 0；删除原生
+  字幕几何/安全线；`drag()` 直接 `placeVisibleText()`，不重排；`relative()` 复用矩阵/矩形。
+- 产物（历史）：MPP 598,347 B，`C374D49ED6F5A90FCD3AA1553B038CF7608123F04157EE40655FC2538D065FCB`；
+  `local-1.5.5-n56`。
+
+## 30. 2026-10-22 N57 横屏拖动与抖动根因：内容/几何分离（历史）
+
+- 报告：`docs/N57-CAPTION-MOTION-AND-DRAG-20261022.md`。
+- 根因：拖动用旧内容矩形/方向键；分页 key 含精确几何；`currentVideoBounds` 回退播放器容器；
+  `isCompactType` 用子串把 `WATCH_WHILE_SLIDING_MINIMIZED_MAXIMIZED` 判成 compact。
+- 修复：拖动 DOWN 捕获实时矩形/方向并抢占父手势；`canReuseCommittedPage()` 放得下不重排；
+  `moving()` 120 ms 静默窗；`currentVideoBounds` 只读缓存 Surface；`isCompactType` 精确枚举。
+- 验证：core 246 / extension 281 tests；MPP 599,357 B，
+  `D6414AC051F1376589BB927F7FF463E7C716EABC7696171C589438C3453EE1B7`；`local-1.5.5-n57`。
+- 边界：停稳后仍会重排一次；触摸仍可能到不了 TextView（N58 处理）。
+
+## 31. 2026-10-22 N58 稳定图层、触摸代理、视口档位（1.5.5 本地构建）
+
+- 输入：用户复测（N57 仍抽搐、仍不能拖动、横屏评论动画卡顿、评论打开字号不变）；
+  `caption-diagnostics-1.5.5-20261022-201150.txt`（3,289,373 B，408 条 `REBUILD_DISPLAY_RESULT`）；
+  录屏 `SVID_20261022_201253_1.mp4`（15.29 s / 60.03 fps / 2736×1264）；
+  根因/设计 `docs/N58-CAPTION-OVERLAY-ARCHITECTURE-20261022.md`；实施
+  `docs/N58-REPAIR-20261022.md`；证据 `validation/runs/20261022-n58-overlay-evidence/`。
+- 现场结论：174/408 条 display 结果的 `laid_out_box_width_px` 落后 `desired` 一帧；
+  `caption_host_px` 出现 17 种尺寸，转场中 35–294 ms 连续换宿主（`2599x1201 → 1264x711`、
+  `1264x711 → 1579x888 → 2736x1264`）；字号/档位在宿主仍为 2599x1201 时已从 55.5 翻到 44.5。
+  录屏 6.2–6.8 s 打开评论、7.3 s 翻页、7.6–8.0 s 关闭评论、11.8–12.2 s 全屏→详情均可见
+  2–4 次离散提交。结论：抽搐 = 宿主重挂载 + 停稳后重排 + 一帧旧框 + 档位提前翻转，不是动画曲线。
+- 修复：
+  1. **稳定视觉层**：`CaptionSurface.stableCaptionHost()` 优先活动 player 内的
+     `inset_overlay_view_layout`（Shorts 用 `reel_player_overlay_root`），弱引用缓存；caption
+     anchor 插入 index 0（视频之上、控件之下、评论之下）。删除从 Surface 向上找 FrameLayout
+     的默认路径（保留 fallback）。
+  2. **独立触摸层**：`player_overlays_custom_views_container` 内全屏透明代理；DOWN 命中字幕
+     `getGlobalVisibleRect()` 才消费，否则透传；MOVE 只 translation，不 `render()`。TextView 的
+     旧监听保留为 fallback。
+  3. **视口档位**：新增 `CaptionPresentationClass`（FULL/REDUCED/DETAIL/SHORTS_FULL/
+     SHORTS_REDUCED，0.80/0.88 迟滞，短边 1264 绝对参考高度）。横屏评论打开 = REDUCED = 详情
+     字号 44.5 px；Shorts 评论打开 = SHORTS_REDUCED = 详情字号；全屏 = 55.5 px。档位只在跨阈值时
+     提交一次新 plan，停稳后 `canReuseCommittedPage()` 不再检查“当前页是否放得下”。
+  4. **稳定框**：每个 plan 取所有页最大行宽/最大行数，一次设定 TextView 宽与 `minHeight`；
+     anchor 宽 = 档位 frame 宽度，动画/翻页不再重设。
+  5. **性能清理**：删除 `CaptionText.onDraw()` 的每帧 `postInvalidateOnAnimation`、`beforeDraw`
+     双调用、WATCH 每 100 ms 全量 `render`、`bringToFront`、elevation、每次新建
+     `GradientDrawable`；页边界用 `nextPageAt` 调度；`render()` 只在 `b == null` 或
+     `surfaceDirty` 时 `CaptionSurface.refresh()`。新增 `CAPTION_PRESENTATION_CLASS`、
+     `CAPTION_TOUCH`、`CAPTION_TOUCH_PROXY` 诊断。
+- 验证：`:translation-core:testDebugUnitTest` **246 tests**、`:extensions:extension:testDebugUnitTest`
+  **292 tests**（55 个结果文件），0 failures / 0 errors / 0 skipped；本地化 243×14；
+  `tools/verify_integration.py` `errors=[]`、pinned 字面量不变、内嵌 MPE 与独立 MPE 相同。
+  新增 `CaptionPresentationClassTest` 7、`CaptionStableHostTest` 2、`CaptionTouchProxyTest` 2
+  （真实 `dispatchTouchEvent`）；更新 `CaptionLayerOverlayTest`（评论区打开 = 详情字号 + 一次重排）、
+  `CaptionMotionContractTest`（同档停稳不重排）。
+- 产物：MPP `build/n39/gradle/patches/libs/patches-1.5.5.mpp` **603,341 B**，SHA-256
+  `F0C632BC182B2CB7C561688D88D651C4396BE89559407FDF1FDD6400091386A3`；同一字节副本
+  `validation/runs/20261022-n58-overlay-evidence/patches-1.5.5-n58.mpp`；
+  `captionBuildId=local-1.5.5-n58`；内嵌 MPE 含 `local-1.5.5-n58`、`CaptionPresentationClass`、
+  `CAPTION_TOUCH_PROXY`、`stableCaptionHost`。未签名、未安装、未发布。
+- 边界：未连接真机；`inset_overlay_view_layout` 的实际可见性/alpha、Shorts 评论面板层级、
+  `player_overlays_custom_views_container` 的 z 序需真机 `CAPTION_LAYER`/`CAPTION_TOUCH_PROXY`
+  复核；若 `inset` 在该版本不可见会回退旧 Surface 宿主；稳定框会在短页留额外背景；
+  向下拖动仍受视频底边限制；`SHORTS_FULL` 用全屏字号，若偏大可将该档改为详情字号。
+
+## 32. 2026-10-22 N59 Patcher 2.0.0 / Morphe 1.48.0 适配与语言菜单功能删除（执行）
+
+- 输入：Morphe Patcher 2.0.0 对 1.12.0 构建补丁的兼容警告截图；`D:\HONOR Share\Honor Share\
+  patches-1.48.0.mpp`；`YouTube/` 下 21.41.525（SECONDARY）、21.28.208、21.23.492、21.40.161、
+  20.51.39、20.21.37 APK。用户要求按官方 patch 支持版本适配，且不再适配 20.x。
+- 构建链：`app.morphe.patches` 1.3.4 → 2.0.0；`morphe-patcher` 1.12.0（composition 1.14.1）→ 2.0.0；
+  smali `d92701d947` → `4220ae75f7`。Patcher 2.0.0 从 tag 源码发布到 Maven Local（本地构建关闭签名）；
+  `settings.gradle.kts` 增加 `mavenLocal()`。MPP manifest 现为 `Patcher-Version: 2.0.0`。
+- Patcher 2.0.0 语义适配：
+  1. `Fingerprint.strings` 由无序包含改为按声明顺序精确匹配；`PlayerTypeEnumFingerprint` 改用
+     `filters = [string(...)]` 的官方 1.48.0 顺序并以 `APUT_OBJECT` 结尾。
+  2. `BytecodePatchContext.getAllClassesWithString` 已隐藏，改用 `classDefByStrings`。
+  3. 资源按需解码：settings 页面探测改用会解码的 `get(path)`；loopback 配置先 `get` 再判断/写，
+     不再用 `copy=false` 后误判文件不存在。
+- 与官方 1.48.0 Captions 共存：
+  1. `findNativeList` 以 `AUTO_TRANSLATE_CAPTIONS_OPTION` 识别 direct-tracks getter，排除官方
+     Auto-translate 新增的同签名 List helper。
+  2. `findDefaultTrack` 先从 model-ready initializer 的 `IPUT_OBJECT` 推导 model field，再找被它
+     调用的默认轨方法，避免官方 Preferred 语言 helper 干扰候选。
+  3. 删除本项目对翻译 metadata 与 translated-track getter 的 hook；这些能力由官方
+     `AutoTranslateCaptionsPatch` 独家提供，不再重叠。
+- 删除“向自动翻译语言列表增加更多语言”功能（用户要求，官方已提供）：
+  - 补丁：settings 的 `CaptionLanguagesPreference` 行；`augmentTranslations`、`augmentMetadata`、
+    `cloneTranslation`、`relabelTranslation`、`hookTranslatedTrackList`、`hookLanguageMetadata`、
+    metadata 二进制 schema 常量与相应 stub 绑定。
+  - 扩展：`CaptionLanguageSelection`、`CaptionLanguageMetadata`、`CaptionLanguagesPreference`、
+    `LanguageMenuOrder`；`NativeCaptionBridge` 的 language-menu 区、`translationLabel/Url/Vss`、
+    `simplifiedVss` 与 `CaptionAddonSupport.simplifiedInstalled`；`CaptionApplication` 的无效
+    ASR remember 调用。
+  - 资源：`localization/catalog.json`、14 个 locale 的 `cap_languages_*`/`cap_language_zh_*`、
+    `source-keys.tsv`；本地化由 243 keys 降为 **232 keys × 14**。
+  - 测试/校验：删除 `N30LanguageMenuTest`；`N30LocalizationRuntimeTest`、`N33LocaleAndDataTest`、
+    `SecondaryMenusLocalizationTest`、`NativeOnlyCaptionTest` 去掉语言选择器/旧 ABI；
+    `CompositionHarness` 与 `CompositionDexAudit` 去掉语言菜单断言；测试 fixture 同步。
+- 目标版本：只声明官方 1.48.0 的 21.x 目标（21.42.241、21.41.525、21.28.208、21.23.492、
+  21.20.405、21.16.256），不再声明 20.x。
+- 验证：
+  - `:patches:generatePatchesList` 成功；MPP `build/n39/gradle/patches/libs/patches-1.6.0.mpp`
+    **574,617 B**，SHA-256 `9B433BA2DE2B5F5E7D3CB2EF31861C6FFCF03512F13900E2C9F0B5FB8C8591C6`；
+    同字节副本 `validation/runs/20261022-adaptation/patches-1.6.0-n59.mpp`；manifest
+    `Version: 1.6.0`、`Patcher-Version: 2.0.0`；`patches-list.json` 1.6.0，唯一补丁
+    `AI caption translator`，targets 为上述 6 个 21.x 版本。
+  - `verifyComposition`（官方 1.48.0 + 本项目，21.41.525）：`COMPOSITION_PASS`，产出
+    `validation/runs/20261022-adaptation/21.41.525-final2/patched-unsigned.apk`。
+  - `auditComposition`：`FEATURES={aiInstalled=1}`、`DEX_AUDIT_PASS classes=64553`、
+    `HOST_HOOKS` 中 `onMenu/observeMenuPath/suppressNativeDraw/consumePathCopy/rewriteUrl/
+    onNativeTrackApplied` 各 1，`AI_FINALIZER_COMPLETE`、`SHARED_APPLIED_DISPATCH_PASS`、
+    `NATIVE_VIDEO_OWNER_PROVENANCE_PASS`。
+  - 21.28.208、21.23.492：`STRUCTURE_PASS AI caption translator`。
+  - `aapt2 dump xmltree`：settings 视频页含 `morphe_vot_screen__ai_captions`，不含
+    `deepseek_caption_languages`；`aapt2 dump resources` 中 `cap_languages_*` 与
+    `cap_language_zh_*` 均为 0。
+  - `:translation-core:testDebugUnitTest` **246 tests**、`:extensions:extension:testDebugUnitTest`
+    **284 tests**，0 failures / 0 errors / 0 skipped；本地化 232×14；`verify_integration.py
+    --source-only` `errors=[]`；`core-provenance.json` 的 `protected_abi` 已按删除后的
+    `NativeCaptionBridge` 重录。
+- 产物：`build/n39/gradle/patches/libs/patches-1.6.0.mpp`；`captionBuildId=local-1.6.0-n59`；
+- 未完成/边界：未签名、未安装真机、未发布；21.42.241、21.20.405、21.16.256 本机没有 APK，
+  未逐一 composition；21.40.161 不在官方 1.48.0 目标内，未声明；20.x 按用户要求不再适配。
+
+
+## 33. 2026-10-22 N60 Flyout VerifyError 修复（1.6.1 本地构建）
+
+- 输入：用户 21.20.405 崩溃日志 `crash_app.morphe.android.youtube_2026-10-22_14-35-34.txt`：
+  `VerifyError: FlyoutUtils.addFlyoutElements(Object) [0x70] register v7 has type Boolean but
+  expected Reference java.lang.Object`。
+- 根因：官方 1.48.0 的 `FlyoutUtils` 在 divider 前新增 VideoDelay 行；`p0`（v7）在 0x65 被
+  `VideoDelayPatch.isPatchIncluded()` 的 `move-result v7` 覆盖成 Boolean。本项目的 quick-toggle
+  注入仍把 `p0` 当 panel，0x70 传给 `CaptionQuickToggle.onMenu(Object,int)`，ART 校验失败。
+- 修复：panel 寄存器不再取 `p0`，改为读 `addDivider` 调用的第一个参数寄存器；index 仍取
+  divider guard 的 `IF_LEZ` 寄存器。1.48.0 实测为 `{v1, v2}`（panel=v1，index=v2）。
+- 回归：`CompositionDexAudit` 新增 `QUICK_TOGGLE_REGISTERS_PASS`，校验 onMenu 的 panel 寄存器
+  等于 addDivider 的 panel 寄存器、index 寄存器等于 guard 寄存器；构建后字节码为
+  `invoke-static {v1, v2}, ...onMenu`、`if-lez v2`、`invoke-static {v1, v2}, ...addDivider`。
+- 验证：1.6.1 MPP `build/n39/gradle/patches/libs/patches-1.6.1.mpp` **574,827 B**，SHA-256
+  `90EEA3605D410D1D8E74571717E1EBFE2A3E77190E383E99F017E4C44FDF262E`；
+  `verifyComposition` 21.41.525 `COMPOSITION_PASS`；`auditComposition`
+  `QUICK_TOGGLE_REGISTERS_PASS panel=v1 index=v2`、`DEX_AUDIT_PASS classes=64553`。
+  21.28.208、21.23.492 的 1.6.1 composition 均 `STRUCTURE_PASS`；1.6.1 未改 1.6.0 的其他 hook。
+- 边界：本机没有 21.20.405 APK，未在该版本重跑 composition；`FlyoutUtils` 是官方扩展代码，
+  寄存器布局与 21.41.525 相同；未真机复验。
+
+## 34. 2026-10-22 N61 详情页越界、档位抖动、Shorts 字号/行高与图层（1.5.6 本地构建）
+
+- 输入诊断：`D:\HONOR Share\Honor Share\caption-diagnostics-1.6.1-20261022-230359.txt`
+  （2,450,118 B，`ui=1.6.1`、`build=local-1.6.1-n60`）；根因/修复记录
+  `docs/N61-CAPTION-OVERFLOW-STABILITY-20261022.md`。
+- 现场证据：
+  1. `1792680454531` 横屏转竖屏时 `CAPTION_PRESENTATION_CLASS class=DETAIL;video=231 0 2366 853;
+     screen=1264x2736;class_frame_width=1964`；31 ms 后
+     `caption_outer_rect=-350.0,538.0,1614.0,629.0`，而屏幕只有 1264 px。该 1964 一直保持到
+     详情页结束（“字幕框可能超出屏幕边缘”）。
+  2. 124 条档位记录里 121 次翻转；`1792681385–1792681403` 的 18 s 内 13 次 `FULL↔REDUCED`。
+     视频宽度恒为 2135，只有可见高度在 1009↔1118 间变；旧实现用 Surface 宽高比反推
+     `full_width`（2675↔2414），比例在 .798↔.884 间跨阈值。每次翻转都重新分页/布局，叠加在
+     评论动画上（“打开评论区非常卡顿”）。
+  3. Shorts `SHORTS_FULL` 使用 `text_size_px=60.717945 / glyph=55.5`；`stable_lines=2;lines=1`
+     的单行页（`1792681202356`、`1792681206850`）继承事件最大行数双行高度。
+  4. 视觉宿主仍是 `inset_overlay_view_layout`（控件之下），用户要求字幕在控件之上。
+- 修复：
+  1. `CaptionPresentationClass` 的全屏参考宽改为固定 16:9（`min(screenW, screenH×16/9)`），
+     不再由 Surface 当前宽高比推导；同一宽度下 letterbox 高度变化不改变档位。
+  2. 档位只在几何静止（120 ms）、播放器非 `SLIDING`、候选持续 220 ms 后提交；竖屏旋转帧若
+     画面仍宽于屏幕则保留上一档；`DETAIL/SHORTS` 的布局宽被屏幕宽夹住。
+  3. 有效框宽 = `min(classFrameWidth, video.width(), screenWidth)`；`placeVisibleText()`/
+     `computeTarget()`/`canReuseCommittedPage()` 统一使用该宽度；`REDUCED` 记忆宽度夹在
+     0.80×参考宽内，进入 `FULL` 时清空。
+  4. Shorts 始终 `SHORTS_FULL` + 详情字号 44.5，评论打开不换字号/框宽/计划；
+     `size_mode` 诊断改用 `detailSize()`。
+  5. 行高由当前页 `linePlan.line2Px` 决定，`stableTextLines` 每页更新；框宽仍取事件最大行宽。
+  6. 视觉层迁到 `player_overlays_custom_views_container`（Shorts 为
+     `reel_player_overlay_root`）末尾，字幕自己的 TextView 接收拖动；视觉/触摸同层时删除
+     全屏透明代理，保留旧宿主 fallback。
+- 验证：`:extensions:extension:testDebugUnitTest` **287 tests / 54 result files**，0 failures /
+  0 errors / 0 skipped；新增/更新 `CaptionPresentationClassTest`（旋转旧横向帧不判 DETAIL、letterbox
+  高度不翻转、Shorts 恒为详情字号）、`CaptionLayerOverlayTest`（单行页不继承双行高）、
+  `CaptionStableHostTest`（最上层宿主）等；`tools/verify_integration.py` `errors=[]`、
+  pinned prompt/protocol 字面量不变。
+- 产物：`build/n39/gradle/patches/libs/patches-1.5.6.mpp` **575,538 B**，SHA-256
+  `B015883167D6088A7B9C45CE254CFEEAB3723EE851F6DB6ABDAC653342FB72AC`；manifest
+  `Version: 1.5.6`、`Patcher-Version: 2.0.0`；内嵌 MPE 含 `local-1.5.6-n61`；
+  `captionBuildId=local-1.5.6-n61`；`patches-list.json`/`patches-bundle.json` 均为 1.5.6。
+  未签名、未安装、未发布。
+- 边界：未连接真机；真机 after 诊断（尤其 `CAPTION_LAYER` 宿主类名、`CAPTION_PRESENTATION_CLASS`
+  在详情页的 class_frame_width、Shorts 单行页高度）待用户复验。字幕在控件之上可能压住进度条/
+  时间文字，这是用户选择的取舍。`inset_overlay_view_layout` 兜底路径仍可能让字幕回到控件之下。
+
+## 35. 2026-10-23 N62 评论区快速换档、AI 开关即刻生效与短字幕框宽（1.5.6 本地构建）
+
+- 输入诊断：`caption-diagnostics-1.5.6-20261022-234413.txt`（657,955 B，自动翻译）与
+  `caption-diagnostics-1.5.6-20261022-234714.txt`（781,130 B，原文模式）；根因/修复记录
+  `docs/N62-CAPTION-SWITCH-AND-AI-TOGGLE-20261022.md`。
+- 现象一（评论区字号慢）根因：N61 的 `classTransitionAllowed()` 要求 `!moving(now)`，再加
+  `CLASS_SETTLE_MS=220`，档位只能在评论动画完全停稳后提交。修复：参考宽已固定为 16:9，
+  档位候选改为 **80 ms**、允许动画中提交；仅 `COMPACT`/`TRANSITIONING` 和官方 `SLIDING`
+  （全屏↔详情拖动）仍禁止；阈值 `ENTER=.80/EXIT=.82`；`FULL` 的 class 框宽固定取参考宽，
+  实际渲染仍夹到 `videoWidth × .92`。
+- 现象二（AI 开关不即刻生效/显示开但没开）根因：
+  1. `setEngine(true)` 未清 `CaptionChoice.userOff/explicitOff`，旧的 CC-Off 锁存让
+     `refreshNativeTrack()` 返回 `CAPTIONS_OFF`/`DEFERRED`。
+  2. `canActivateSnapshot()` 在原生 manager/track 重建时失败，但内存里的 signed selection
+     descriptor 仍可用于启动；旧实现直接 `DEFERRED`。
+  3. `onCaptionsShown()` 无 current selection 时直接返回；没有源目录 + 当前 native target
+     的兜底。
+  4. `DEFERRED` 没有重试。诊断证据：`ENGINE_MODE_SAVED enabled=true;native=DEFERRED`
+     连续四次（`1792683774078`/`79483`/`979146`），以及
+     `CAPTIONS_SHOWN ... native=DEFERRED`（`1792683809923`）。
+  修复：开启时清 CC-Off 锁存；descriptor fallback
+  （`NATIVE_REFRESH_DESCRIPTOR_FALLBACK`）；`refreshFromCatalog()` 用 `CaptionChoice` 当前
+  native target + `SourceCatalog` 源轨启动（`ENGINE_CATALOG_ACTIVATED`）；
+  `onCaptionsShown` 兜底；`CaptionQuickToggle` 120/450/1200 ms 重试
+  （`ENGINE_ACTIVATION_RETRY`）。原生选择为源轨（`translated=false`）时仍按契约显示原文，
+  不会凭空翻译。
+- 现象三（短字幕框仍最宽）根因：`stableTextWidth` 是事件所有页的最大行宽，背景又画在整个
+  TextView 上。修复：TextView 布局宽度保持稳定，背景改由 `CaptionText.onDraw()` 按当前页
+  `Layout.getLineWidth()` 最大值 + padding 绘制，短页只显示文字宽度。触摸区仍是稳定布局
+  宽度，本轮未改。
+- 验证：全量 `:extensions:extension:testDebugUnitTest` **287 tests / 54 result files**，
+  0 failures / 0 errors / 0 skipped；`verifyIntegrationSources` `errors=[]`；本地化
+  232×14；`CaptionPresentationClassTest`、`CaptionLayerOverlayTest`、
+  `QuickCaptionToggleTest`、`NativeOnlyCaptionTest` 通过。
+- 产物：`build/n39/gradle/patches/libs/patches-1.5.6.mpp` **577,186 B**，SHA-256
+  `6350FF8C78C38140C8D6F85F16317C7E4BEE696D6E9A98B296175408CBB50331`；manifest
+  `Version: 1.5.6`、`Patcher-Version: 2.0.0`；内嵌 MPE 含 `local-1.5.6-n62`；
+  `captionBuildId=local-1.5.6-n62`；`patches-list.json`/`patches-bundle.json` 均为 1.5.6。
+  未签名、未安装、未发布。
+- 边界：未连接真机；AI 目标语言仍必须由原生 Auto-translate 选择；原生源轨时显示原文是
+  设计契约；字幕背景收缩后触摸/拖动命中区仍是稳定最宽宽度；评论动画中的一次分页提交
+  是否在低端设备上可见掉帧，需真机复验。
+
+## 36. 2026-10-23 N63 评论区动画同步字号、AI 首视频遮挡原生样式（1.5.6 本地构建）
+
+- 输入诊断：`caption-diagnostics-1.5.6-20261023-001408.txt`（1,533,659 B）；根因/修复记录
+  `docs/N63-CAPTION-SHEET-SYNC-AND-AI-FIRST-VIDEO-20261023.md`。
+- 现象一（评论区字号仍在动画结束后才变）根因：`CaptionSurface.currentVideoBounds(host)` 返回
+  宿主局部坐标；YouTube 评论区动画是播放器容器缩放，逆矩阵把缩放抵消了，局部 `video` 宽度在
+  动画期间仍是 2422，只有动画结束、容器真正 layout 后才变 1510。N62 的候选/阈值再快也只能等
+  终点帧。修复：
+  1. `CaptionSurface.visibleVideoWidth()/visibleVideoHeight()` 用渲染 Surface 的
+     `getGlobalVisibleRect` 读屏幕上的真实画面；`classify()` 新增 observed width 参与横屏比例。
+  2. `CaptionOverlay.applyCommentScale()` 在横屏、非 Shorts、非 `SLIDING`、可见高度缩小或
+     宽度 < 参考宽 92% 时，按可见宽度计算 `progress`，连续设置 TextView 的
+     `scaleX/scaleY`（55.5↔44.5），不重排、不分页。
+  3. 二进制档位只在 `progress <= .02` 或 `>= .95` 的动画端点提交；提交时复位缩放，字号视觉
+     连续。`commentTransitionArmed` 保证关闭动画在高度先恢复时仍继续缩放；4:3/21:9 全屏
+     letterbox 静止时高度未缩小，不误判。
+  4. 端点渲染边距使用屏幕视频宽，避免局部矩形晚一帧导致二次重排。
+- 现象二（首视频先显示几秒原生字幕再切 AI）根因：`suppressNativeDraw()` 只在
+  `ownsNativeTrack()`/`isVisibleActive()` 为 true 时遮挡；AI 开启初期两者都是 false，原生
+  字幕先画。且 `CaptionButtonController.onVideoId()` 只在 `captionIntent==ON` 时启动，首视频
+  要等 CC 扫描。修复：
+  1. `suppressNativeDraw()` 改为 `enabled()`：AI 开关开即遮挡原生窗口，关即恢复原生。
+  2. `CaptionButtonController.onVideoId()` 在 `DeepSeekConfig.enabled` 时立即
+     `NativeCaptionBridge.onCaptionsShown()`；用该视频后台已捕获的 native selection 启动，
+     没有再走 `refreshFromCatalog()`/等待原生轨。
+- 验证：全量 `:extensions:extension:testDebugUnitTest` **288 tests / 54 result files**，
+  0 failures / 0 errors / 0 skipped；新增
+  `CaptionLayerOverlayTest.theReadingSizeFollowsTheSheetScaleBeforeTheClassCommits`
+  （1850 px 中间态：档位仍 FULL、scaleY 在 .8–.96；1478 px 端点：REDUCED、44.5、scale=1）。
+  `CaptionPresentationClassTest` 覆盖 observed width；本地化 232×14；
+  `verifyIntegrationSources` `errors=[]`。
+- 产物：`build/n39/gradle/patches/libs/patches-1.5.6.mpp` **578,359 B**，SHA-256
+  `3B18049DE92601E5058143D0D8DEF0B66665D032883861FEEBB471836F4ECCBB`；manifest
+  `Version: 1.5.6`、`Patcher-Version: 2.0.0`；内嵌 MPE 含 `local-1.5.6-n63`；
+  `captionBuildId=local-1.5.6-n63`；`patches-list.json`/`patches-bundle.json` 均为 1.5.6。
+  未签名、未安装、未发布。
+- 边界：未连接真机；连续缩放是 View 渲染变换，端点后恢复原生字号渲染；AI 目标语言仍必须由
+  原生 Auto-translate 选择，没有目标时不会伪造翻译，但原生样式已被遮挡；全屏↔详情 `SLIDING`
+  拖动仍不缩放。
+
+## 37. 2026-10-23 N64 官方 CC 显示权威与 1.5.6 发布
+
+- 用户复测：从有自动翻译的视频切到没有默认译文字幕且没有 Auto-translate 的视频时，官方 CC
+  策略是不打开译文，本补丁仍显示目标译文字幕。根因/修复记录
+  `docs/N64-OFFICIAL-CC-AUTHORITY-20261023.md`。
+- 根因：`CaptionChoice` 的目标语言跨视频保留；`CaptionButtonController.onVideoId()` 只要 AI
+  开关开就调用 `onCaptionsShown()`；`applySelection()` 对后台/默认 selection 直接启动；因此
+  AI 开关被误当成“显示字幕”，而不是“官方显示时用 AI 样式”。
+- 修复：
+  1. 换视频时 `captionIntent=UNKNOWN` + `CaptionChoice.reset()`，上一视频目标不泄漏。
+  2. `refreshNativeTrack()`、`refreshFromCatalog()`、`applySelection()` 都以
+     `CaptionButtonController.captionsKnownOn()` 为显示门禁；CC 未确认打开时只保存 selection，
+     不启动可见 AI。
+  3. `suppressNativeDraw()` 仍由 AI 开关选择绘制方式：AI 开不画原生，AI 关恢复原生；字幕是否
+     出现由官方 CC 决定，CC 关时两边都不显示。
+- 验证：全量 `:extensions:extension:testDebugUnitTest` **289 tests / 54 result files**，
+  0 failures / 0 errors / 0 skipped；新增
+  `NativeOnlyCaptionTest.aNativeTrackWhileTheCcControlIsOffDoesNotStartVisibleAiCaptions`。
+  本地化 232×14；`verifyIntegrationSources` `errors=[]`；
+  `validate_morphe_metadata.py 1.5.6`、`verify_bundle.py 1.5.6`、`test_release_contract.py`
+  均通过。
+- 1.5.6 发布产物：`build/n39/gradle/patches/libs/patches-1.5.6.mpp` **578,441 B**，SHA-256
+  `E272FCE127BF8B659BF83FDB77C5918D8A59A9B599FCEB60FB39438AE4DED1B1`；manifest
+  `Version: 1.5.6`、`Patcher-Version: 2.0.0`；内嵌 MPE 含 `release-1.5.6`；
+  `captionBuildId=release-1.5.6`。GitHub release `v1.5.6` 已上传同名资产；README 发布表
+  已由 `generate_patches_readme.py` 更新为 v1.5.6；`patches-bundle.json` 使用
+  `docs`/release notes 的 1.5.6 说明。
+- 边界：未连接真机；官方 CC 状态来自真实 CC 控件扫描，扫描前可能短暂空白；没有原生目标语言时
+  不会伪造翻译。

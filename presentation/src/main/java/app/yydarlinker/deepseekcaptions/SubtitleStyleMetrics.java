@@ -12,23 +12,15 @@ final class SubtitleStyleMetrics {
         return Math.round(255f * Math.max(0, Math.min(100, opacity)) / 100f);
     }
 
+    /**
+     * The one caption-size contract: glyph ink height is a function of the player mode and the
+     * display width only. The video plane may be letterboxed, scaled or covered while the mode
+     * stays the same (a comment sheet, a panel, a transition frame); none of that is a new reading
+     * size, so none of it scales the text. Geometry still decides the box width, line breaks and
+     * page projection, which is where a narrower video legitimately shows fewer columns.
+     */
     static float targetGlyphHeightPx(int tier, float screenWidthPx, boolean fullScreen) {
-        return screenWidthPx
-                * (fullScreen
-                        ? CaptionFontSize.fullScreenRatio(tier)
-                        : CaptionFontSize.detailRatio(tier));
-    }
-
-    static float renderedGlyphHeightPx(
-            int tier,
-            float screenWidthPx,
-            boolean fullScreen,
-            float videoWidthPx,
-            float normalVideoWidthPx) {
-        float target = targetGlyphHeightPx(tier, screenWidthPx, fullScreen);
-        if (normalVideoWidthPx > 0 && videoWidthPx < normalVideoWidthPx * .8f)
-            target *= videoWidthPx / normalVideoWidthPx;
-        return target;
+        return screenWidthPx * CaptionFontSize.modeRatio(tier, fullScreen);
     }
 
     /** Measure the active font (including CJK fallback) at a large em to limit pixel rounding. */

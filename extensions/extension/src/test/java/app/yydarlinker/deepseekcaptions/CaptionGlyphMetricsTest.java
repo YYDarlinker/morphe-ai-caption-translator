@@ -48,11 +48,15 @@ public class CaptionGlyphMetricsTest {
         }
     }
 
-    @Test public void contractionHasNoAbsoluteSizeFloorAndPreviewUsesFullscreenReference() {
+    @Test public void sizeComesFromTheModeAndDisplayWidthOnly() {
         assertEquals(44.5f,SubtitleStyleMetrics.targetGlyphHeightPx(2,1264,false),.0001f);
         assertEquals(55.5f,SubtitleStyleMetrics.targetGlyphHeightPx(2,2736,true),.0001f);
-        assertEquals(55.5f,SubtitleStyleMetrics.renderedGlyphHeightPx(2,2736,true,2188.8f,2736),.0001f);
-        assertEquals(11.1f,SubtitleStyleMetrics.renderedGlyphHeightPx(2,2736,true,547.2f,2736),.0001f);
+        // A narrower video rectangle inside the same mode (a comment sheet opening, a letterboxed
+        // surface) is not a smaller reading size: the same call has no video-width input at all.
+        assertEquals(55.5f,CaptionFontSize.modeRatio(2,true)*2736f,.0001f);
+        assertEquals(55.5f/44.5f,
+                SubtitleStyleMetrics.targetGlyphHeightPx(2,2736,true)
+                        /SubtitleStyleMetrics.targetGlyphHeightPx(2,1264,false),.00001f);
         assertEquals(55.5f/2736f*420,SubtitleStyleMetrics.previewGlyphHeightPx(2,420),.0001f);
     }
 }

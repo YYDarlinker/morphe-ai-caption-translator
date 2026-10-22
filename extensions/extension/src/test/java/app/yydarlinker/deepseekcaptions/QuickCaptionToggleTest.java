@@ -34,7 +34,7 @@ public class QuickCaptionToggleTest {
         @Implementation public static void activate(Context context,String url){} // No network in switch tests.
         @Implementation public static void refreshConfiguration(Context context){}
     }
-    @Before public void reset(){installFakePort();setVideo("");installed=true;top=false;shorts=false;validKey=true;rows=0;selections.clear();CaptionChoice.reset();}
+    @Before public void reset(){installFakePort();setVideo("");installed=true;top=false;shorts=false;validKey=true;rows=0;selections.clear();CaptionChoice.reset();CaptionQuickToggle.cancelActivationRetry();}
     @Test public void switchingEngineKeepsTheNativeSelection(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);DeepSeekConfig.saveEnabled(a,false);Track track=new Track();
         setVideo("abcdefghijk");Object manager=new Object();NativeCaptionBridge.onNativeSelectionWithReason(manager,track,Origin.PREFERRED_TRACK,17);assertTrue(CaptionChoice.translates());
@@ -55,7 +55,7 @@ public class QuickCaptionToggleTest {
     }
     @Test public void offCaptionsRemainOffWhenEngineChanges(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();DeepSeekConfig.saveEnabled(a,false);NativeCaptionBridge.onNativeSelection(new Object(),null,Origin.PREFERRED_TRACK);
-        assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));assertFalse(CaptionChoice.isOn());assertTrue(selections.isEmpty());a.finish();
+        assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));assertFalse(CaptionChoice.isOn());assertFalse("the user's new AI-on decision must clear the old CC-off latch",CaptionChoice.userOff());assertTrue(selections.isEmpty());a.finish();
     }
     @Test public void onlyRecognizedPlayerMenusReceiveAnEntry(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);Object panel=new Object();

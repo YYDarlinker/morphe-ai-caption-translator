@@ -72,12 +72,11 @@ public class N33LocaleAndDataTest {
         android.preference.PreferenceFragment fragment=new UnitFragment();activity.getFragmentManager().beginTransaction().add(fragment,"n33").commit();activity.getFragmentManager().executePendingTransactions();
         PreferenceScreen root=fragment.getPreferenceManager().createPreferenceScreen(activity);root.setKey("morphe_vot_screen__ai_captions");
         DeepSeekEnabledPreference enabled=new DeepSeekEnabledPreference(activity);root.addPreference(enabled);
-        CaptionLanguagesPreference languages=new CaptionLanguagesPreference(activity);languages.setKey("deepseek_caption_languages");root.addPreference(languages);
         CaptionLocaleSubscription subscription=CaptionLocaleSubscription.attach(enabled);assertNotNull(subscription);
         SharedPreferences values=ApiProfiles.values(activity);Map<String,?> before=new TreeMap<>(values.getAll());
         BaseSettings.MORPHE_LANGUAGE.save(AppLanguage.JA);assertNotEquals(CaptionTextResolver.string(activity,Locale.JAPANESE,"ai_title"),root.getTitle());
         Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(CaptionTextResolver.string(activity,Locale.JAPANESE,"ai_title"),root.getTitle());
-        assertEquals(CaptionTextResolver.string(activity,Locale.JAPANESE,"languages_summary"),languages.getSummary());assertEquals(before,values.getAll());subscription.close();
+        assertEquals(before,values.getAll());subscription.close();
     }
     @Test public void exactConstantMigrationDoesNotRewriteProviderOrUserSubstrings(){
         choose(AppLanguage.JA);String original="provider 原文：API 地址必须以 https:// 或 http:// 开头 / 用户翻译要求";

@@ -27,9 +27,5 @@ public final class CaptionAddonSupport {
 
     public static boolean aiInstalled() {
         return false;
-    } // Bound to selected roots at patch time.
-
-    public static boolean simplifiedInstalled() {
-        return false;
-    }
+    } // Bound to the selected patch at patch time.
 }

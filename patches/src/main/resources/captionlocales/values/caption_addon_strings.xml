@@ -223,19 +223,8 @@
     <string name="cap_ai_quick_toggle_on" formatted="false">"AI caption translation · On"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"AI caption translation · Off"</string>
     <string name="cap_ai_summary" formatted="false">"When enabled, choose a language in YouTube’s ‘Auto-translate’ list to translate captions in real time using your configured AI service."</string>
-    <string name="cap_languages_title" formatted="false">"Auto-translate languages"</string>
-    <string name="cap_languages_summary" formatted="false">"Add the selected languages to YouTube’s ‘Auto-translate’ language list. You can select multiple languages."</string>
-    <string name="cap_languages_count" formatted="false">"%1$d languages selected"</string>
-    <string name="cap_languages_save" formatted="false">"Save"</string>
-    <string name="cap_languages_existing" formatted="false">"Already available"</string>
-    <string name="cap_languages_new" formatted="false">"Added"</string>
-    <string name="cap_languages_unavailable" formatted="false">"Unavailable"</string>
-    <string name="cap_languages_empty" formatted="false">"No languages selected; the native menu is unchanged"</string>
-    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
     <string name="cap_model_empty" formatted="false">"The model ID cannot be empty"</string>
     <string name="cap_api_address_invalid" formatted="false">"Enter a valid HTTP(S) OpenAI-compatible base URL without embedded credentials or a fragment."</string>
-    <string name="cap_language_zh_hans" formatted="false">"Chinese (Simplified)"</string>
-    <string name="cap_language_zh_hant" formatted="false">"Chinese (Traditional)"</string>
     <string name="cap_paste" formatted="false">"Paste"</string>
     <string name="cap_select_all" formatted="false">"Select all"</string>
     <string name="cap_value_retained" formatted="false">"%1$s; keeping the last valid value"</string>

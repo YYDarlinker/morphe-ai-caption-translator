@@ -7,8 +7,9 @@
 ## What it does
 
 - Translates a video’s existing subtitles when you select a language from YouTube’s **Auto-translate** menu while AI captions are enabled.
-- Lets you add selected languages to that menu, including Simplified Chinese. This changes the available choices; it does not translate every checked language in the background.
-- Displays captions with adjustable size, background opacity and vertical position. Caption placement uses the video’s physical center, independently of the app’s LTR/RTL interface direction.
+- Follows YouTube’s native Auto-translate list and the official Captions patch. Language choices and sorting stay in the official patch, so there is no second language list to maintain.
+- Displays captions with adjustable size, background opacity and vertical position. Caption placement uses the video’s physical center, independently of the app’s LTR/RTL interface direction. Captions sit above the player controls, so the progress bar and time labels cannot cover them.
+- Uses one stable caption layer across the detail page, fullscreen, Shorts and the comments sheet. Size and pagination are derived from the real video viewport; the comments sheet scales the caption continuously with its animation instead of changing it after the animation ends.
 - Supports multiple API profiles, model selection, custom translation requirements, translation caching and exportable diagnostics. Its settings are localized into 14 languages.
 - When the video already has its own subtitles in the language you select, shows them directly in the AI caption style without a translation request. Uploaded subtitles keep their authored line breaks, including two-row subtitles; only auto-generated subtitles have sentence breaks and page turns optimized locally.
 - When a video has several subtitle tracks, translates the one in the spoken language first (human-made before automatic, then human-made English) rather than whichever track YouTube preselects.
@@ -19,11 +20,11 @@ You need a video with an available subtitle track and an API service that suppor
 
 | Component | Recommendation | Historical compatibility |
 | --- | --- | --- |
-| Official Morphe Patches | **1.47.0**, the latest stable release checked for this release | Compatibility scope starts at **1.42.0**; use an official version that supports your chosen YouTube APK |
-| Original YouTube APK | **21.20.405** | **21.16.256**; experimental: **21.40.161**, **21.39.522**, **21.38.130**, **21.28.208**, **21.23.492** |
-| Android | **9 or later** | minSdk 28 |
+| Official Morphe Patches | **1.48.0**, the latest stable release checked for this release | Requires **Patcher 2.0.0**; use an official version that supports your chosen YouTube APK |
+| Original YouTube APK | **21.20.405** | Stable: **21.16.256**; experimental: **21.42.241**, **21.41.525**, **21.28.208**, **21.23.492** |
+| Android | **9 or later** | minSdk 28; the 21.28+ experimental targets require Android 10 (minSdk 29) |
 
-The recommended combination is **official 1.47.0 + YouTube 21.20.405**; 21.16.256 is also stable. The experimental versions follow the experimental targets of official 1.47.0 and were checked with the real patcher (every patch applied and all caption hooks bound); they are not stable compatibility claims. YouTube 21.13.164 and 21.07.247 are no longer in the official stable list and are no longer declared. See [compatibility and verification boundaries](docs/COMPATIBILITY.md).
+The recommended combination is **official Morphe Patches 1.48.0 / Patcher 2.0.0 + YouTube 21.20.405**; 21.16.256 is also stable. The experimental versions follow the 21.x targets of official 1.48.0 and were checked with the real patcher (every patch applied and all caption hooks bound); they are not stable compatibility claims. YouTube 20.x targets are no longer declared, and 21.13.164 / 21.07.247 are no longer in the official list. See [compatibility and verification boundaries](docs/COMPATIBILITY.md).
 
 ## Install
 
@@ -39,9 +40,10 @@ Do not select the old AI-caption addon or another overlapping caption patch at t
 
 1. Open **YouTube → Settings → Morphe → Video → AI caption translation**.
 2. Set your API address, API key and model. Use **Test API** to check the configuration. You can save separate named profiles for different services.
-3. Open **Automatic translation languages** in the same settings page and check the languages you want to add to YouTube’s Auto-translate list.
-4. Enable AI captions. In a video’s subtitle menu, choose **Auto-translate → your target language**. If the video already has subtitles in that language, they are displayed directly; otherwise, your configured AI service translates the preferred source track.
-5. Adjust caption size and background using the live preview if needed. You can customize translation requirements; your custom text is preserved when the interface language changes.
+3. Enable AI captions. In a video’s subtitle menu, choose **Auto-translate → your target language**. If the video already has subtitles in that language, they are displayed directly; otherwise, your configured AI service translates the preferred source track.
+4. Adjust caption size and background using the live preview if needed. You can customize translation requirements; your custom text is preserved when the interface language changes.
+
+The AI switch is authoritative: while it is on, YouTube’s native subtitle view is not painted; the add-on shows its own overlay (or a short empty/loading gap while the native track and target are still arriving). Turning it off returns subtitle drawing to YouTube immediately.
 
 Turning AI off returns translation to YouTube’s native behavior. Selecting an original/manual/auto-generated source track displays its original text without translation API requests; uploaded subtitles keep their authored line breaks, while auto-generated subtitles are re-paged locally without a network call or model. Bracketed furigana readings are removed from text sent for translation to avoid repetition. The menu toggle visibility settings for regular videos and Shorts are independent of the engine switch.
 
@@ -61,26 +63,26 @@ You can access it through [Alibaba Cloud Model Studio (international)](https://w
 ## Troubleshooting and updates
 
 - **API test fails:** check the endpoint, key and model, then test again. Not every endpoint advertising OpenAI compatibility accepts the same request protocol.
-- **A language is missing:** add it in Automatic translation languages, then reopen the video’s subtitle menu.
+- **A language is missing:** choose it from YouTube’s native **Auto-translate** list (the official Captions patch owns that list), then reopen the video’s subtitle menu.
 - **No captions or a long wait:** check the video’s source subtitles, your API configuration and network. Export diagnostics from AI settings and report reproducible problems [here](https://github.com/YYDarlinker/morphe-ai-caption-translator/issues/new/choose).
 - **Updating:** refresh this remote source in Morphe, then patch YouTube again with the updated source. Updating a patch bundle does not modify an already installed app. Reuse your signing setup to install an update without discarding app data.
 
 ## Available patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.5.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patch total
+> **[v1.5.6](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patch total
 <details open>
 <summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
 **🎯 Supported versions:**
 
-| 🧪&nbsp;21.40.161 | 🧪&nbsp;21.39.522 | 🧪&nbsp;21.38.130 | 🧪&nbsp;21.28.208 | 🧪&nbsp;21.23.492 | 21.20.405 | 21.16.256 |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 🧪&nbsp;21.42.241 | 🧪&nbsp;21.41.525 | 🧪&nbsp;21.28.208 | 🧪&nbsp;21.23.492 | 21.20.405 | 21.16.256 |
+| :---: | :---: | :---: | :---: | :---: | :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
-| [AI caption translator](#ai-caption-translator) | Translates every YouTube Auto-translate language in real time through your OpenAI-compatible API. |  |
+| [AI caption translator](#ai-caption-translator) | Translates the selected YouTube Auto-translate language in real time through your OpenAI-compatible API. |  |
 
 </details>
 

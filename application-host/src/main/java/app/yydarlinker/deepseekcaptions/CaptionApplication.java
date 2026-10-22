@@ -75,11 +75,6 @@ final class CaptionApplication extends TranslationRuntime.Host
                 }
                 break;
             case SOURCE:
-                if (CaptionUrls.isTimedText(value))
-                    NativeAsrTrackReference.remember(
-                            RawCaptionSource.sourceLanguage(value),
-                            NativeCaptionBridge.simplifiedVss(""),
-                            value);
                 // The hook already gave YouTube an empty track for this selection, so the chosen
                 // original or auto-generated captions are shown by the AI overlay, untranslated.
                 remember(value, true);
@@ -349,7 +344,7 @@ final class CaptionApplication extends TranslationRuntime.Host
                 : new TranslationBudget(b.width, b.minimumPx, b.preferredPx, b.renderSpec);
     }
 
-    /** The overlay's view of a render guard; it also advances the prepared page before a draw. */
+    /** The overlay's view of a render guard. */
     private static CaptionOverlay.RenderGuard guard(TranslationOutput.RenderGuard value) {
         return new CaptionOverlay.RenderGuard() {
             public boolean isValid() {
@@ -358,10 +353,6 @@ final class CaptionApplication extends TranslationRuntime.Host
 
             public void onApplied() {
                 value.onApplied();
-            }
-
-            public void beforeDraw() {
-                CaptionOverlay.advancePreparedPage();
             }
 
             public long displayPosition(long supplied) {

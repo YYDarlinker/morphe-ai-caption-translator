@@ -223,19 +223,8 @@
     <string name="cap_ai_quick_toggle_on" formatted="false">"Traduction des sous-titres par IA · Activée"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"Traduction des sous-titres par IA · Désactivée"</string>
     <string name="cap_ai_summary" formatted="false">"Une fois la fonction activée, choisissez une langue dans la liste « Traduire automatiquement » de YouTube pour traduire les sous-titres en temps réel avec le service d’IA configuré."</string>
-    <string name="cap_languages_title" formatted="false">"Langues de traduction automatique"</string>
-    <string name="cap_languages_summary" formatted="false">"Ajoutez les langues sélectionnées à la liste « Traduire automatiquement » de YouTube. Vous pouvez sélectionner plusieurs langues."</string>
-    <string name="cap_languages_count" formatted="false">"%1$d langues sélectionnées"</string>
-    <string name="cap_languages_save" formatted="false">"Enregistrer"</string>
-    <string name="cap_languages_existing" formatted="false">"Déjà disponible"</string>
-    <string name="cap_languages_new" formatted="false">"Ajoutée"</string>
-    <string name="cap_languages_unavailable" formatted="false">"Indisponible"</string>
-    <string name="cap_languages_empty" formatted="false">"Aucune langue sélectionnée ; le menu natif reste inchangé"</string>
-    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
     <string name="cap_model_empty" formatted="false">"L’identifiant du modèle ne peut pas être vide"</string>
     <string name="cap_api_address_invalid" formatted="false">"Saisissez une URL de base HTTP(S) valide et compatible avec OpenAI, sans identifiants intégrés ni fragment."</string>
-    <string name="cap_language_zh_hans" formatted="false">"Chinois (simplifié)"</string>
-    <string name="cap_language_zh_hant" formatted="false">"Chinois (traditionnel)"</string>
     <string name="cap_paste" formatted="false">"Coller"</string>
     <string name="cap_select_all" formatted="false">"Tout sélectionner"</string>
     <string name="cap_value_retained" formatted="false">"%1$s ; dernière valeur valide conservée"</string>

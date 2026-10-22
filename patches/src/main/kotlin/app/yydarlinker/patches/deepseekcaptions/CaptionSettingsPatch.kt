@@ -5,7 +5,6 @@ import app.morphe.patcher.patch.ResourcePatchContext
 import app.morphe.patcher.patch.resourcePatch
 import org.w3c.dom.Document
 import org.w3c.dom.Element
-import java.io.File
 
 private const val PACKAGE = "app.yydarlinker.deepseekcaptions."
 private const val KEY = "android:key"
@@ -15,7 +14,7 @@ private const val KEY = "android:key"
  * app language's collator. The key of the screen is the key of "Voice over translation" plus a suffix, so the
  * collator puts it right after that row, in every language.
  */
-private const val VIDEO_PAGE_KEY = "morphe_settings_screen_12_video_sort_by_key"
+private const val VIDEO_PAGE_KEY = "morphe_settings_screen_12_video"
 private const val NARRATION_KEY = "morphe_vot_screen"
 private const val SCREEN_KEY = "${NARRATION_KEY}__ai_captions"
 
@@ -29,9 +28,6 @@ private class Row(val type: String, val key: String, val title: String, val summ
 private class Section(val title: String, val rows: List<Row>)
 
 private val ENABLED = Row("DeepSeekEnabledPreference", "deepseek_caption_enabled", "启用 AI 字幕翻译")
-private val LANGUAGES = Row(
-    "CaptionLanguagesPreference", "deepseek_caption_languages", "自动翻译语言", "选择要加入 YouTube 自动翻译菜单的语言",
-)
 private const val FLYOUT_SUMMARY = "在播放器弹出菜单中显示快捷开关；隐藏不关闭 AI 字幕，下次打开菜单生效"
 private val FLYOUT = Row(
     "CaptionFlyoutPreference", "deepseek_caption_flyout_menu", "普通视频弹出菜单中的 AI 字幕开关", FLYOUT_SUMMARY,
@@ -114,7 +110,7 @@ private fun Document.buildScreen(): Element {
     screen.setAttribute("android:summary", "@string/cap_ai_summary")
     screen.setAttribute("android:singleLineTitle", "false")
 
-    for (row in listOf(ENABLED, LANGUAGES, FLYOUT, SHORTS_FLYOUT)) {
+    for (row in listOf(ENABLED, FLYOUT, SHORTS_FLYOUT)) {
         screen.appendChild(preference(PACKAGE + row.type, row.title, row.summary, row.key))
     }
     for (section in SECTIONS) {
@@ -136,7 +132,7 @@ private fun Document.buildScreen(): Element {
  * that is in force.
  */
 private fun ResourcePatchContext.allowLoopbackTraffic() {
-    val xml = get("res/xml").apply { mkdirs() }
+    get("res/xml").mkdirs()
     var configName: String? = null
     document("AndroidManifest.xml").use { manifest ->
         val application = manifest.getElementsByTagName("application").item(0) as? Element
@@ -150,7 +146,8 @@ private fun ResourcePatchContext.allowLoopbackTraffic() {
         }
     }
     val name = configName ?: return
-    val file = File(xml, "$name.xml")
+    // Decode the existing config on request (Patcher 2.0.0): listing the folder does not decode it.
+    val file = get("res/xml/$name.xml")
     if (!file.exists()) {
         file.writeText(
             """<?xml version="1.0" encoding="utf-8"?>
@@ -184,16 +181,17 @@ private fun ResourcePatchContext.allowLoopbackTraffic() {
  */
 private fun ResourcePatchContext.addScreen() {
     val morphePages = listOf("morphe_prefs", "morphe_prefs_icons", "morphe_prefs_icons_bold").map { "res/xml/$it.xml" }
-    val found = morphePages.filter { get(it, copy = false).exists() }
+    // Decode on request (Patcher 2.0.0): asking for the file is what decodes it.
+    val found = morphePages.filter { get(it).exists() }
     for (path in found) {
         document(path).use { page ->
-            val videoPages = page.elements().filter { it.getAttribute(KEY) == VIDEO_PAGE_KEY }
+            val videoPages = page.elements().filter { it.getAttribute(KEY).startsWith(VIDEO_PAGE_KEY) }
             if (videoPages.size != 1) {
                 throw PatchException("$path has ${videoPages.size} '$VIDEO_PAGE_KEY' screens, expected exactly one")
             }
             val video = videoPages.single()
             val narration = (0 until video.childNodes.length).map { video.childNodes.item(it) }
-                .firstOrNull { (it as? Element)?.getAttribute(KEY) == NARRATION_KEY }
+                .firstOrNull { (it as? Element)?.getAttribute(KEY)?.startsWith(NARRATION_KEY) == true }
             // Right after "Voice over translation", or in its sorted place when that patch was not selected.
             video.insertBefore(page.buildScreen(), narration?.nextSibling)
         }
@@ -201,7 +199,7 @@ private fun ResourcePatchContext.addScreen() {
     if (found.isNotEmpty()) return
 
     val stockPages = listOf("settings_fragment", "settings_fragment_cairo").map { "res/xml/$it.xml" }
-        .filter { get(it, copy = false).exists() }
+        .filter { get(it).exists() }
     if (stockPages.isEmpty()) {
         throw PatchException("Could not find the settings XML of Morphe or YouTube. Select the settings patch of Morphe.")
     }

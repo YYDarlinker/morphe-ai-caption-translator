@@ -6,7 +6,7 @@ group = "app.yydarlinker"
 patches {
     about {
         name = "Anchored AI Captions"
-        description = "Real-time multilingual YouTube captions through a user-provided OpenAI-compatible API"
+        description = "Real-time translated YouTube captions through a user-provided OpenAI-compatible API"
         source = "https://github.com/YYDarlinker/morphe-ai-caption-translator"
         author = "YYDarlinker"
         contact = "https://github.com/YYDarlinker/morphe-ai-caption-translator/issues"
@@ -47,20 +47,20 @@ tasks {
 // An official distribution JAR can supply the same Patcher when GitHub Packages is unavailable.
 val compositionPatcherJar = providers.gradleProperty("composition.patcherJar")
 val localCompositionPatcherJar = compositionPatcherJar.orNull?.let { file(it) }
-    ?: rootProject.file(".verification/toolchain/morphe-patcher-1.14.1-all.jar").takeIf { it.isFile }
+    ?: rootProject.file(".verification/toolchain/morphe-patcher-2.0.0-all.jar").takeIf { it.isFile }
 localCompositionPatcherJar?.let { jar ->
     val version = ZipFile(jar).use { zip ->
         Properties().apply {
             zip.getInputStream(zip.getEntry("app/morphe/patcher/version.properties")).use { load(it) }
         }.getProperty("version")
     }
-    require(version == "1.14.1") { "Composition requires Patcher 1.14.1, got $version" }
+    require(version == "2.0.0") { "Composition requires Patcher 2.0.0, got $version" }
 }
 dependencies {
     if (localCompositionPatcherJar != null) {
         testImplementation(files(localCompositionPatcherJar))
     } else {
-        testImplementation("app.morphe:morphe-patcher:1.14.1") { version { strictly("1.14.1") } }
+        testImplementation("app.morphe:morphe-patcher:2.0.0") { version { strictly("2.0.0") } }
     }
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     testImplementation("com.android.tools.build:apkzlib:9.1.1")

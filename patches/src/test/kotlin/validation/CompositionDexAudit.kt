@@ -34,16 +34,6 @@ fun main(args:Array<String>){
         }
     } }
     println("HOST_HOOKS=$hostHooks")
-    if(flags["aiInstalled"]==1L || flags["simplifiedInstalled"]==1L) {
-        check((hostHooks["augmentTranslations"]?:0)>0){"N30 language menu hook missing"}
-        val bridge=classes.getValue("Lapp/yydarlinker/deepseekcaptions/NativeCaptionBridge;")
-        val clone=bridge.methods.singleOrNull { it.name=="cloneTranslation" && it.parameterTypes.map { p->p.toString() }==listOf("Ljava/lang/Object;","Ljava/lang/String;") } ?: error("N30 generic translation clone missing")
-        val refs=clone.implementation!!.instructions.filterIsInstance<ReferenceInstruction>().map { it.reference }
-        check(refs.filterIsInstance<MethodReference>().count { it.name=="translationUrl" }==1){"N30 generic target URL clone incomplete"}
-        check(refs.filterIsInstance<MethodReference>().count { it.name=="translationVss" }==1){"N30 generic VSS clone incomplete"}
-        check(refs.filterIsInstance<MethodReference>().count { it.name=="translationLabel" }==1){"N30 generic label clone incomplete"}
-        println("N30_MENU_BRIDGE_COMPLETE generic_clone=1 canonical_codes=14")
-    }
     if(flags["aiInstalled"]==1L) {
         val v2=classes.getValue("Lapp/yydarlinker/deepseekcaptions/DeepSeekCaptionHookV2;")
         val outer=v2.methods.single { it.name=="onPlayerType" }
@@ -60,6 +50,21 @@ fun main(args:Array<String>){
         val missing=required.filter { (hostHooks[it]?:0)!=1 }
         check(missing.isEmpty()) { "AI finalizer incomplete: missing/nonunique host hooks ${missing.map { it+"="+(hostHooks[it]?:0) }}" }
         check(flags["aiInstalled"]==1L) { "AI finalizer incomplete: immutable installation permission not published" }
+        // The quick-toggle hook must pass the live panel register and the index the divider uses.
+        // 1.48's VideoDelay row turns p0 into a Boolean scratch before this point, so p0 was wrong.
+        val flyout=classes.getValue("Lapp/morphe/extension/youtube/patches/utils/FlyoutUtils;")
+        val menuBody=flyout.methods.single { it.name=="addFlyoutElements" && it.parameterTypes.map { p->p.toString() }==listOf("Ljava/lang/Object;") }
+        val menuCode=menuBody.implementation!!.instructions.toList()
+        val onMenuIndex=menuCode.indexOfFirst { ins ->
+            ((ins as? ReferenceInstruction)?.reference as? MethodReference)?.let { it.name=="onMenu" && it.definingClass.startsWith("Lapp/yydarlinker/deepseekcaptions/") }==true
+        }
+        check(onMenuIndex>=0){"quick toggle onMenu hook missing"}
+        val onMenu=menuCode[onMenuIndex] as com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+        val guard=menuCode[onMenuIndex+2] as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+        val divider=menuCode[onMenuIndex+3] as com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+        check(onMenu.registerCount==2 && onMenu.registerC==divider.registerC){"quick toggle must pass the divider's panel register, not a clobbered p0"}
+        check(onMenu.registerD==guard.registerA){"quick toggle index register must be the divider guard register"}
+        println("QUICK_TOGGLE_REGISTERS_PASS panel=v${onMenu.registerC} index=v${onMenu.registerD}")
         val renderer=classes.getValue("Lcom/google/android/libraries/youtube/player/subtitles/ui/SubtitleWindowView;")
         val draw=renderer.methods.filter { it.name=="draw" && it.parameterTypes.map { t->t.toString() }==listOf("Landroid/graphics/Canvas;") && it.returnType=="V" }.singleOrNull()
         check(draw!=null) { "AI finalizer incomplete: SubtitleWindowView.draw missing/nonunique" }

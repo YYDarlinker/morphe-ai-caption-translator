@@ -1,12 +1,16 @@
 package app.yydarlinker.deepseekcaptions;
 
 import android.app.Activity;
+import android.graphics.Matrix;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.SystemClock;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.widget.FrameLayout;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
@@ -33,6 +37,7 @@ final class CaptionSurface {
 
     private static final WeakHashMap<View, WeakReference<View>> renderedSurfaces =
             new WeakHashMap<>();
+    private static WeakReference<View> renderedSurfaceView = new WeakReference<>(null);
 
     /** Any change of the player's layout makes the cached geometry stale. */
     private static final View.OnLayoutChangeListener GEOMETRY_LAYOUT =
@@ -44,6 +49,8 @@ final class CaptionSurface {
     private static WeakReference<View> shorts = new WeakReference<>(null);
     private static WeakReference<View> player = new WeakReference<>(null);
     private static WeakReference<View> observedRoot = new WeakReference<>(null);
+    private static WeakReference<FrameLayout> stableHostCache = new WeakReference<>(null);
+    private static WeakReference<FrameLayout> touchHostCache = new WeakReference<>(null);
     private static boolean geometryInvalid = true;
     private static long shortsProbeAt;
 
@@ -60,6 +67,9 @@ final class CaptionSurface {
     static void activity(Activity value) {
         stopObserving();
         invalidateGeometry();
+        renderedSurfaceView.clear();
+        stableHostCache.clear();
+        touchHostCache.clear();
         activity = new WeakReference<>(value);
         shorts = new WeakReference<>(null);
         player = new WeakReference<>(null);
@@ -122,9 +132,11 @@ final class CaptionSurface {
         if (!geometryInvalid && visible(player.get())) return player.get();
         geometryInvalid = false;
         refreshSearchCount++;
+        View previousPlayer = player.get();
 
         View shortView = discover(root, shortsIds(current));
         if (shortView != null) {
+            if (shortView != previousPlayer) clearHostCaches();
             player = new WeakReference<>(shortView);
             return shortView;
         }
@@ -146,8 +158,14 @@ final class CaptionSurface {
                 proven = hasSurface;
             }
         }
+        if (best != previousPlayer) clearHostCaches();
         player = new WeakReference<>(best);
         return best;
+    }
+
+    private static void clearHostCaches() {
+        stableHostCache.clear();
+        touchHostCache.clear();
     }
 
     static View player() {
@@ -193,48 +211,253 @@ final class CaptionSurface {
         return relative(shorts.get(), host);
     }
 
+    private static final Rect SCREEN_RECT = new Rect(), HOST_RECT = new Rect();
+    private static final int[] HOST_LOCATION = new int[2];
+    private static final Matrix HOST_TO_SCREEN = new Matrix(), SCREEN_TO_HOST = new Matrix();
+    private static final RectF LOCAL_SCREEN = new RectF(), LOCAL_HOST = new RectF();
+
     /** The visible part of [view] in the coordinates of [host], or null. */
     private static Rect relative(View view, View host) {
-        if (!visible(view) || host == null) return null;
-        Rect bounds = new Rect(), hostBounds = new Rect();
-        if (!view.getGlobalVisibleRect(bounds)
-                || !host.getGlobalVisibleRect(hostBounds)
-                || !bounds.intersect(hostBounds)) return null;
-        int[] origin = new int[2];
-        host.getLocationOnScreen(origin);
-        bounds.offset(-origin[0], -origin[1]);
-        return bounds;
+        if (view == null
+                || host == null
+                || !view.isAttachedToWindow()
+                || !view.isShown()
+                || view.getAlpha() <= .01f
+                || host.getWidth() <= 0
+                || host.getHeight() <= 0) return null;
+        if (!view.getGlobalVisibleRect(SCREEN_RECT)
+                || !host.getGlobalVisibleRect(HOST_RECT)) return null;
+        // The common player animation is a translation/resize, not a scale: subtracting the two
+        // screen origins avoids a matrix allocation and inversion on every frame.
+        boolean untransformed =
+                Math.abs(HOST_RECT.width() - host.getWidth()) <= 1
+                        && Math.abs(HOST_RECT.height() - host.getHeight()) <= 1;
+        Rect bounds;
+        if (untransformed) {
+            host.getLocationOnScreen(HOST_LOCATION);
+            SCREEN_RECT.offset(-HOST_LOCATION[0], -HOST_LOCATION[1]);
+            HOST_RECT.offset(-HOST_LOCATION[0], -HOST_LOCATION[1]);
+            bounds = SCREEN_RECT;
+        } else {
+            // A player transition may scale or translate its container. Map both on-screen
+            // rectangles back through the host's real matrix instead of subtracting two screen
+            // origins, so the caption keeps following the video inside a scaled surface.
+            HOST_TO_SCREEN.reset();
+            host.transformMatrixToGlobal(HOST_TO_SCREEN);
+            if (!HOST_TO_SCREEN.invert(SCREEN_TO_HOST)) return null;
+            LOCAL_SCREEN.set(SCREEN_RECT);
+            LOCAL_HOST.set(HOST_RECT);
+            SCREEN_TO_HOST.mapRect(LOCAL_SCREEN);
+            SCREEN_TO_HOST.mapRect(LOCAL_HOST);
+            bounds = round(LOCAL_SCREEN);
+            HOST_RECT.set(round(LOCAL_HOST));
+        }
+        return !bounds.isEmpty() && !HOST_RECT.isEmpty() && bounds.intersect(HOST_RECT)
+                ? new Rect(bounds)
+                : null;
     }
 
-    /** The bounds, inside [host], of the largest video surface under [root]. */
-    static Rect renderedBounds(View root, View host) {
-        if (root == null || host == null) return null;
+    private static Rect round(RectF value) {
+        return new Rect(
+                Math.round(value.left),
+                Math.round(value.top),
+                Math.round(value.right),
+                Math.round(value.bottom));
+    }
+
+    /**
+     * The largest rendered video surface under [root], cached per player root. This is the view the
+     * caption is layered with; it is never the activity's content view.
+     */
+    static View renderedSurface(View root) {
+        if (root == null) return null;
         WeakReference<View> cached = renderedSurfaces.get(root);
-        if (cached != null && visible(cached.get())) return relative(cached.get(), host);
+        if (cached != null && visible(cached.get())) return cached.get();
 
         renderedSearchCount++;
         View selected = null;
-        Rect best = null;
+        long selectedArea = 0;
         ArrayDeque<View> pending = new ArrayDeque<>();
         pending.add(root);
         for (int visited = 0; !pending.isEmpty() && visited < MAX_SURFACE_VIEWS; visited++) {
             View view = pending.remove();
-            if (!view.isShown() || view.getAlpha() <= .01) continue;
+            if (!view.isShown() || view.getAlpha() <= .01f) continue;
             if (view instanceof SurfaceView || view instanceof TextureView) {
-                Rect rect = relative(view, host);
-                if (rect != null && (best == null || area(rect) > area(best))) {
-                    best = rect;
-                    selected = view;
+                Rect rect = new Rect();
+                if (visible(view) && view.getGlobalVisibleRect(rect)) {
+                    long area = area(rect);
+                    if (selected == null || area > selectedArea) {
+                        selected = view;
+                        selectedArea = area;
+                    }
                 }
             }
             if (view instanceof ViewGroup) addChildren((ViewGroup) view, pending);
         }
         if (selected != null) {
             renderedSurfaces.put(root, new WeakReference<>(selected));
+            renderedSurfaceView = new WeakReference<>(selected);
             selected.removeOnLayoutChangeListener(GEOMETRY_LAYOUT);
             selected.addOnLayoutChangeListener(GEOMETRY_LAYOUT);
         }
-        return best;
+        return selected;
+    }
+
+    /** The bounds, inside [host], of the largest video surface under [root]. */
+    static Rect renderedBounds(View root, View host) {
+        View surface = renderedSurface(root);
+        return surface == null ? null : relative(surface, host);
+    }
+
+    /**
+     * The view that owns the video plane. The caption is a layer of this view, never of the
+     * activity: everything the app draws above the video (player controls, a comment sheet, a
+     * panel) then covers the caption, and a player transition that moves the video moves it too.
+     *
+     * <p>Preference order: the first FrameLayout from the video surface upwards, then the player
+     * itself, then nothing (the caller falls back to the activity content for a first frame). A
+     * player view that is not a FrameLayout cannot hold the overlay's layout params.
+     */
+    static FrameLayout captionHost(View player) {
+        if (player == null) return null;
+        for (View view = renderedSurface(player); view != null; view = parent(view)) {
+            if (view instanceof FrameLayout) return (FrameLayout) view;
+            if (view == player) break;
+        }
+        return player instanceof FrameLayout ? (FrameLayout) player : null;
+    }
+
+    static FrameLayout captionHost() {
+        FrameLayout stable = stableCaptionHost();
+        return stable != null ? stable : captionHost(player());
+    }
+
+    /**
+     * The stable caption host: the topmost player-overlay container. It is above the rendered
+     * video and above the player controls, below the engagement panel, and it is not the video
+     * Surface ancestor that YouTube rebuilds/reparents during fullscreen and comment transitions.
+     * Captions deliberately sit above the controls now: being below them let the progress bar and
+     * time labels cover the text. For Shorts the reel overlay root plays the same role. Returns
+     * null when neither exists, so the caller can use the legacy surface-ancestor fallback for the
+     * first frame.
+     */
+    static FrameLayout stableCaptionHost() {
+        FrameLayout cached = stableHostCache.get();
+        if (usableHost(cached)) return cached;
+        Activity current = activity.get();
+        if (current == null || current.getWindow() == null) return null;
+        View root = searchRoot(current);
+        View decor = current.getWindow().getDecorView();
+        FrameLayout host = overlayHost(current, root);
+        // The custom-views container is usually a sibling of the selected player container (and
+        // may be found only on the decor), never a child of it. The old key-first lookup missed
+        // it and left the caption on the controls layer.
+        if (!usableHost(host)) host = frame(root, current, "inset_overlay_view_layout");
+        if (!usableHost(host)) host = frame(decor, current, "inset_overlay_view_layout");
+        if (usableHost(host)) stableHostCache = new WeakReference<>(host);
+        return usableHost(host) ? host : null;
+    }
+
+    /** YouTube's topmost player-overlay container, searched under the player and then the decor. */
+    private static FrameLayout overlayHost(Activity current, View root) {
+        View decor = current.getWindow().getDecorView();
+        FrameLayout host = null;
+        if (isShorts() || shorts.get() != null) {
+            host = frame(root, current, "reel_player_overlay_root");
+            if (!usableHost(host)) host = frame(decor, current, "reel_player_overlay_root");
+        }
+        if (!usableHost(host))
+            host = frame(root, current, "player_overlays_custom_views_container");
+        if (!usableHost(host))
+            host = frame(decor, current, "player_overlays_custom_views_container");
+        return usableHost(host) ? host : null;
+    }
+
+    /** Search the active player first; duplicate ids exist when a miniplayer is still alive. */
+    private static View searchRoot(Activity current) {
+        View active = player();
+        return active != null && active.isAttachedToWindow()
+                ? active
+                : current.getWindow().getDecorView();
+    }
+
+    /** True when [host] is one of the pinned overlay hosts (children belong under the controls). */
+    static boolean pinnedHost(FrameLayout host) {
+        if (host == null) return false;
+        Activity current = activity.get();
+        if (current == null) return false;
+        int id = host.getId();
+        return id != 0
+                && (id == viewId(current, "inset_overlay_view_layout")
+                        || id == viewId(current, "reel_player_overlay_root")
+                        || id == viewId(current, "player_overlays_custom_views_container"));
+    }
+
+    /**
+     * True when [host] is YouTube's topmost player-overlay container. A caption there is above the
+     * controls, so it is appended last (not index 0) and receives its own touch events.
+     */
+    static boolean topmostOverlayHost(FrameLayout host) {
+        if (host == null) return false;
+        Activity current = activity.get();
+        if (current == null) return false;
+        int id = host.getId();
+        return id != 0
+                && (id == viewId(current, "player_overlays_custom_views_container")
+                        || id == viewId(current, "reel_player_overlay_root"));
+    }
+
+    /**
+     * The topmost transparent host used by the touch proxy. YouTube brings
+     * {@code player_overlays_custom_views_container} to the front of the player overlays; putting
+     * the proxy there means a DOWN inside the caption reaches us before the player's controls,
+     * while a DOWN outside it falls through to YouTube. Comments remain above the whole player.
+     */
+    static FrameLayout touchHost() {
+        FrameLayout cached = touchHostCache.get();
+        if (usableHost(cached)) return cached;
+        Activity current = activity.get();
+        if (current == null || current.getWindow() == null) return null;
+        View root = searchRoot(current);
+        FrameLayout host = overlayHost(current, root);
+        if (usableHost(host)) touchHostCache = new WeakReference<>(host);
+        return usableHost(host) ? host : null;
+    }
+
+    private static boolean usableHost(FrameLayout host) {
+        return host != null
+                && host.isAttachedToWindow()
+                && host.isShown()
+                && host.getWidth() > 0
+                && host.getHeight() > 0;
+    }
+
+    private static FrameLayout frame(View root, Activity current, String name) {
+        int id = viewId(current, name);
+        if (id == 0) return null;
+        View view = root.findViewById(id);
+        return view instanceof FrameLayout ? (FrameLayout) view : null;
+    }
+
+    private static WeakReference<Activity> idOwner = new WeakReference<>(null);
+    private static int insetId, customId, reelId;
+
+    private static int viewId(Activity current, String name) {
+        if (idOwner.get() != current) {
+            idOwner = new WeakReference<>(current);
+            insetId = current.getResources().getIdentifier("inset_overlay_view_layout", "id", current.getPackageName());
+            customId = current.getResources().getIdentifier("player_overlays_custom_views_container", "id", current.getPackageName());
+            reelId = current.getResources().getIdentifier("reel_player_overlay_root", "id", current.getPackageName());
+        }
+        if ("inset_overlay_view_layout".equals(name)) return insetId;
+        if ("player_overlays_custom_views_container".equals(name)) return customId;
+        if ("reel_player_overlay_root".equals(name)) return reelId;
+        return 0;
+    }
+
+    private static View parent(View view) {
+        ViewParent parent = view.getParent();
+        return parent instanceof View ? (View) parent : null;
     }
 
     /** Read-only direction evidence from the cached player; never triggers a search. */
@@ -243,9 +466,44 @@ final class CaptionSurface {
         return view == null ? View.LAYOUT_DIRECTION_INHERIT : view.getLayoutDirection();
     }
 
-    static Rect videoBounds(View host) {
-        View view = player();
-        Rect rendered = renderedBounds(view, host);
-        return rendered == null ? relative(view, host) : rendered;
+    /**
+     * The on-screen width of the rendered video, including a player-transition scale. The local
+     * rectangle deliberately cancels such a scale (the caption is placed inside the scaled host);
+     * this value is only for deciding how far a comments-sheet animation has progressed.
+     */
+    static int visibleVideoWidth() {
+        View surface = renderedSurfaceView.get();
+        if (surface == null) surface = renderedSurface(player());
+        if (surface == null) return 0;
+        Rect visible = new Rect();
+        return surface.getGlobalVisibleRect(visible) ? visible.width() : 0;
+    }
+
+    /** The on-screen height of the rendered video; used to tell a comments resize from a crop. */
+    static int visibleVideoHeight() {
+        View surface = renderedSurfaceView.get();
+        if (surface == null) surface = renderedSurface(player());
+        if (surface == null) return 0;
+        Rect visible = new Rect();
+        return surface.getGlobalVisibleRect(visible) ? visible.height() : 0;
+    }
+
+    /**
+     * The cached geometry of the one rendered surface. A surface that is momentarily hidden returns
+     * null so the caller keeps the last rectangle; substituting the player container here made the
+     * caption jump to the letterboxed player bounds for a frame whenever the surface was rebuilt.
+     */
+    static Rect currentVideoBounds(View host) {
+        View surface = renderedSurfaceView.get();
+        return surface == null ? null : relative(surface, host);
+    }
+
+    /**
+     * Discovers the rendered surface again and returns its real bounds, or null when there is no
+     * surface. Never substitutes the player container, so a rebuild cannot move the caption onto a
+     * different rectangle for one frame.
+     */
+    static Rect refreshedVideoBounds(View host) {
+        return renderedBounds(player(), host);
     }
 }

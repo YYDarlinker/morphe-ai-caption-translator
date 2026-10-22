@@ -23,7 +23,7 @@ private val PLAYER_TYPE_LISTENERS = listOf("/YouTubePlayerOverlaysLayout;", "/Yo
 @Suppress("unused")
 val aiCaptionTranslatorPatch = bytecodePatch(
     name = "AI caption translator",
-    description = "Translates every YouTube Auto-translate language in real time through your OpenAI-compatible API.",
+    description = "Translates the selected YouTube Auto-translate language in real time through your OpenAI-compatible API.",
     default = true,
 ) {
     compatibleWith(YOUTUBE)

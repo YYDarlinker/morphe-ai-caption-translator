@@ -14,6 +14,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.BuilderOffsetInstruction
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
@@ -95,6 +96,10 @@ internal fun BytecodePatchContext.prepareCaptionQuickToggle(): () -> Unit {
     val guard = (dividerCall - 1 downTo 0).firstOrNull { code[it].opcode == Opcode.IF_LEZ }
         ?: throw PatchException("AI captions: shared divider guard unavailable")
     val indexRegister = (code[guard] as OneRegisterInstruction).registerA
+    // The panel is the first argument of the divider call, not necessarily p0: since 1.48 the
+    // official VideoDelay row uses p0's register as a Boolean scratch before this point.
+    val panelRegister = (code[dividerCall] as? FiveRegisterInstruction)?.registerC
+        ?: throw PatchException("AI captions: divider panel register unavailable")
     val afterDivider = (code[guard] as? BuilderOffsetInstruction)?.target?.location?.instruction
         ?: throw PatchException("AI captions: divider guard target unavailable")
 
@@ -135,7 +140,7 @@ internal fun BytecodePatchContext.prepareCaptionQuickToggle(): () -> Unit {
         // Insert at the shared group's boundary, before its conditional divider and signal reset. The index is the
         // official inflater's next insertion position (the dialog and the popup differ). The labeled instruction is
         // replaced so that zero or hidden official buttons reach the hook too.
-        menuBody.replaceInstruction(guard, "invoke-static {p0, v$indexRegister}, $QUICK_TOGGLE->onMenu(${OBJECT}I)I")
+        menuBody.replaceInstruction(guard, "invoke-static {v$panelRegister, v$indexRegister}, $QUICK_TOGGLE->onMenu(${OBJECT}I)I")
         menuBody.addInstructionsWithLabels(
             guard + 1,
             "move-result v$indexRegister\nif-lez v$indexRegister, :after_divider",

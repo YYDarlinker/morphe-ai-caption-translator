@@ -39,32 +39,34 @@ final class CaptionHorizontalPlacement {
         return video.left + Math.round((video.width() - measuredOuterWidth) / 2f);
     }
 
-    static void place(
-            FrameLayout host, FrameLayout outer, Rect video, int width, int height, int top) {
+    /**
+     * The overlay's one placement primitive. The anchor stays at the host's padding origin and
+     * every move is a translation, so a content-width change never composes a new margin with an
+     * old translation (the one-frame jump the old margin/translation mix produced).
+     */
+    static void position(
+            FrameLayout host, FrameLayout outer, int left, int top, int width, int height) {
+        if (host == null || outer == null) return;
         if (outer.getLayoutDirection() != View.LAYOUT_DIRECTION_LTR)
             outer.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        // Never compose a translation with the new scene's coordinates.
-        if (outer.getTranslationX() != 0f) outer.setTranslationX(0f);
-        int margin = physicalLeft(video, width) - host.getPaddingLeft() + host.getScrollX();
         FrameLayout.LayoutParams p = (FrameLayout.LayoutParams) outer.getLayoutParams();
         int gravity = Gravity.TOP | Gravity.LEFT;
-        if (p.width != width
+        if (p == null
+                || p.width != width
                 || p.height != height
                 || p.gravity != gravity
-                || p.leftMargin != margin
-                || p.topMargin != top
+                || p.leftMargin != 0
+                || p.topMargin != 0
                 || p.rightMargin != 0
                 || p.isMarginRelative()) {
-            p.width = width;
-            p.height = height;
+            p = new FrameLayout.LayoutParams(width, height);
             p.gravity = gravity;
-            p.leftMargin = margin;
-            p.topMargin = top;
-            p.rightMargin = 0;
-            p.setMarginStart(Integer.MIN_VALUE);
-            p.setMarginEnd(Integer.MIN_VALUE);
             outer.setLayoutParams(p);
         }
+        float x = left - host.getPaddingLeft() + host.getScrollX();
+        float y = top - host.getPaddingTop() + host.getScrollY();
+        if (outer.getTranslationX() != x) outer.setTranslationX(x);
+        if (outer.getTranslationY() != y) outer.setTranslationY(y);
     }
 
     void observe(

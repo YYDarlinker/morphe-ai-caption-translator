@@ -1,4 +1,7 @@
 <resources>
 <item type="id" name="watch_player"/>
 <item type="id" name="player_overlays"/>
+<item type="id" name="inset_overlay_view_layout"/>
+<item type="id" name="player_overlays_custom_views_container"/>
+<item type="id" name="reel_player_overlay_root"/>
 </resources>

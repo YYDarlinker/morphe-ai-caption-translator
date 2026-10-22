@@ -142,8 +142,13 @@ final class CaptionButtonController {
                 longPressGesture = false;
                 endNativeMenu();
                 lastExactNativeState = CaptionIntentPolicy.UNKNOWN;
-                if (!CaptionActions.isVisibleActive()) captionIntent = CaptionIntentPolicy.UNKNOWN;
+                // A new video starts with no known caption intent. Keeping the previous video's
+                // ON (or OFF) was what made the AI overlay outlive the official CC setting.
+                captionIntent = CaptionIntentPolicy.UNKNOWN;
             }
+            // Do not carry the previous video's target/language into a video whose native
+            // selection has not been observed yet.
+            CaptionChoice.reset();
             MAIN.removeCallbacks(LONG_PRESS_ARM);
             MAIN.removeCallbacks(NATIVE_MENU_MONITOR);
         }

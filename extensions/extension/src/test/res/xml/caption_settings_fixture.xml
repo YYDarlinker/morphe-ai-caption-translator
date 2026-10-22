@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" android:title="@string/cap_ai_title">
 <app.yydarlinker.deepseekcaptions.DeepSeekEnabledPreference android:key="deepseek_caption_enabled" android:title="@string/cap_enable_ai" android:singleLineTitle="false" android:iconSpaceReserved="false" />
-<app.yydarlinker.deepseekcaptions.CaptionLanguagesPreference android:key="deepseek_caption_languages" android:title="@string/cap_languages_title" android:singleLineTitle="false" android:iconSpaceReserved="false" />
 <app.yydarlinker.deepseekcaptions.CaptionFlyoutPreference android:key="deepseek_caption_flyout_menu" android:title="@string/cap_flyout_title" android:singleLineTitle="false" android:iconSpaceReserved="false" />
 <app.yydarlinker.deepseekcaptions.CaptionShortsFlyoutPreference android:key="deepseek_caption_shorts_flyout_menu" android:title="@string/cap_shorts_flyout_title" android:singleLineTitle="false" android:iconSpaceReserved="false" />
 <app.yydarlinker.deepseekcaptions.CaptionSettingCategory android:title="@string/cap_api_config">

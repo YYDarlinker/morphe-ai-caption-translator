@@ -18,6 +18,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -43,8 +44,6 @@ final class CaptionOverlay {
         boolean isValid();
 
         default void onApplied() {}
-
-        default void beforeDraw() {}
 
         default long displayPosition(long supplied) {
             return supplied;
@@ -113,19 +112,66 @@ final class CaptionOverlay {
     // ---- Layout and render bookkeeping ----
 
     /** Immutable geometry; background translation can measure without touching Views. */
-    private static volatile CaptionPresentationBudget layoutBudget;
+    private static volatile CaptionPresentationBudget layoutBudget, planBudget;
 
     private static String desiredLayout = "", failedLayout = "";
     private static int measurementMismatch;
-    private static boolean dirty = true, reconcilingDisplayTime;
-    private static long lastScan, lastLayout, layoutHoldSince = -1;
+    private static boolean dirty = true, contentNow, reconcilingDisplayTime;
+    private static long lastScan, layoutHoldSince = -1;
     private static String lastBlankIdentity, lastNotice = "", lastDisplayResult = "";
     private static String lastPresentationNotice = "";
 
     private static final Rect previous = new Rect();
-    private static int previousScreenWidth, normalVideoWidth;
-    private static boolean previousShorts, previousFullScreen;
-    private static boolean referenceShorts, referenceLandscape;
+    private static int previousScreenWidth;
+    private static boolean previousShorts;
+    private static CaptionPresentationClass.Kind previousClass;
+
+    /**
+     * One presentation class per stable viewport. It decides glyph size, page width and the visible
+     * box; it is changed once when the viewport crosses a hysteresis threshold, never per frame.
+     */
+    private static CaptionPresentationClass.Kind presentationClass;
+
+    private static int classFrameWidth, reducedVideoWidth;
+    private static float classGlyphHeight;
+    private static int stableTextWidth, stableTextLines;
+    private static long nextPageAt;
+
+    /**
+     * A class change is a reading-size change, not a geometry frame. It commits as soon as a new
+     * class has been a real candidate for this long, even while the comments sheet is still
+     * animating: the fixed 16:9 reference and hysteresis keep that candidate stable, so one cheap
+     * commit replaces the old wait-until-the-animation-ends behaviour. Official slide transitions
+     * are still excluded (see {@link #classTransitionAllowed}).
+     */
+    private static final long CLASS_SETTLE_MS = 80;
+
+    private static CaptionPresentationClass.Kind classCandidate;
+    private static long classCandidateSince;
+    private static float commentScale = 1f;
+    private static boolean commentTransitionArmed;
+    private static GradientDrawable captionBackground;
+    private static View touchProxy, dragSource;
+    private static WeakReference<FrameLayout> touchHostRef = new WeakReference<>(null);
+    private static long lastTouchProxyAt;
+
+    /**
+     * Geometry only moves the committed box. A new page plan is requested when the content changes,
+     * when the mode or glyph size changes, or when the committed page no longer fits the new video
+     * rectangle. The rectangle has to be still for {@link #SETTLE_MS} before that check is made:
+     * YouTube's resizes arrive in steps much slower than a frame, so a "two changes close together"
+     * motion heuristic classified each step as a settled scene and replanned the caption mid-animation.
+     */
+    private static final long SETTLE_MS = 120;
+
+    private static final Rect videoGeometry = new Rect();
+    private static boolean geometryKnown;
+    private static long geometryChangedAt;
+    private static int boxWidth, boxHeight, nextLeft, nextTop;
+    /** Width of the visible text box; the anchor itself stays full width for centering. */
+    private static int contentWidth;
+    private static final Rect dragBounds = new Rect();
+    private static boolean dragLandscape, pressed;
 
     /** One frame-aligned UI request; never postpones model authority, clear or quarantine. */
     private static volatile long playerRenderEpoch;
@@ -143,16 +189,23 @@ final class CaptionOverlay {
                 render();
             };
 
+    /** The long press itself arms the drag; a finger that never moves still gets its haptic. */
+    private static final Runnable ARM_DRAG =
+            () -> {
+                if (!pressed) return;
+                dragging = true;
+                TextView text = textRef.get();
+                if (text != null) text.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            };
+
     private static final ViewTreeObserver.OnPreDrawListener WATCH =
             () -> {
-                advancePreparedPage();
-                long now = SystemClock.uptimeMillis();
-                if (now - lastLayout >= 100 && !blocked() && !nothingPending()) {
-                    lastLayout = now;
-                    render();
-                }
-                TextView pending = textRef.get();
-                return !anchorVisible() || pending == null || !pending.isLayoutRequested();
+                advancePreparedPageIfDue();
+                geometryFrame();
+                if (contentNow && !blocked() && !nothingPending()) render();
+                // The caption must never cancel the window draw: a layout request belongs to the
+                // next traversal, not to every other view on screen.
+                return true;
             };
 
     private CaptionOverlay() {}
@@ -201,7 +254,6 @@ final class CaptionOverlay {
                     if (activityRef.get() != a) {
                         invalidatePlayerRender();
                         detach();
-                        normalVideoWidth = 0;
                     }
                     activityRef = new WeakReference<>(a);
                     CaptionSurface.activity(a);
@@ -300,11 +352,15 @@ final class CaptionOverlay {
                     pendingEnd = end;
                     pendingPosition = g == null ? position : g.displayPosition(position);
                     pendingPages = Collections.emptyList();
+                    stableTextWidth = 0;
+                    stableTextLines = 0;
+                    nextPageAt = 0;
                     shownPage = -1;
                     pendingStatus = status;
                     pendingWaiting = waiting;
                     currentGuard = g;
                     dirty = true;
+                    contentNow = true;
                     render();
                     if (g != null) g.onApplied();
                 });
@@ -371,7 +427,6 @@ final class CaptionOverlay {
                     invalidatePlayerRender();
                     pendingStatus = false;
                     currentGuard = null;
-                    normalVideoWidth = 0;
                     hideView();
                 });
     }
@@ -385,9 +440,14 @@ final class CaptionOverlay {
         pendingSourceAnchors = null;
         pendingPages = Collections.emptyList();
         shownPage = -1;
+        stableTextWidth = 0;
+        stableTextLines = 0;
+        nextPageAt = 0;
         desiredLayout = "";
         failedLayout = "";
         measurementMismatch = 0;
+        contentNow = false;
+        resetGeometry();
     }
 
     static void position(long position, RenderGuard owner) {
@@ -423,6 +483,7 @@ final class CaptionOverlay {
                     // An explicit style refresh is not a player notification.
                     invalidatePlayerRender();
                     dirty = true;
+                    contentNow = true;
                     render();
                 });
     }
@@ -476,7 +537,6 @@ final class CaptionOverlay {
                                 applyStarted);
                         return;
                     }
-                    normalVideoWidth = 0;
                     CaptionSurface.invalidateGeometry();
                     dirty = true;
                     requestPlayerRender();
@@ -492,8 +552,8 @@ final class CaptionOverlay {
         if (ownerEpoch != CaptionPlayerAuthority.ownerEpoch()) return;
         invalidatePlayerRender();
         COMMAND.incrementAndGet();
-        dragging = false;
         TextView text = textRef.get();
+        stopDrag(text);
         if (text != null) {
             text.cancelPendingInputEvents();
             text.clearFocus();
@@ -515,7 +575,7 @@ final class CaptionOverlay {
         lastPresentationNotice = "";
         lastBlankIdentity = null;
         lastScan = -SCAN_INTERVAL_MS;
-        lastLayout = 0;
+
         reconcilingDisplayTime = false;
     }
 
@@ -583,6 +643,14 @@ final class CaptionOverlay {
     // ---- Attaching ----
 
     private static void hideView() {
+        resetCommentScale(textRef.get());
+        pressed = false;
+        dragging = false;
+        View source = dragSource;
+        dragSource = null;
+        release(source);
+        nextPageAt = 0;
+        MAIN.removeCallbacks(ARM_DRAG);
         layoutHoldSince = -1;
         if (horizontalPlacement != null) horizontalPlacement.cancel();
         lastBlankIdentity = null;
@@ -602,6 +670,7 @@ final class CaptionOverlay {
     }
 
     private static void detach() {
+        stopDrag(null);
         if (horizontalPlacement != null) horizontalPlacement.cancel();
         horizontalPlacement = null;
         FrameLayout h = hostRef.get(), a = anchorRef.get();
@@ -616,27 +685,92 @@ final class CaptionOverlay {
         hostRef = new WeakReference<>(null);
         anchorRef = new WeakReference<>(null);
         textRef = new WeakReference<>(null);
+        removeTouchProxy();
         previous.setEmpty();
         previousScreenWidth = 0;
+        previousClass = null;
+        presentationClass = null;
+        classFrameWidth = 0;
+        classGlyphHeight = 0;
+        reducedVideoWidth = 0;
+        classCandidate = null;
+        classCandidateSince = 0;
+        commentTransitionArmed = false;
+        commentScale = 1f;
         lastScan = -SCAN_INTERVAL_MS;
-        lastLayout = 0;
         lastNotice = "";
         lastBlankIdentity = null;
         layoutBudget = null;
+        planBudget = null;
         pendingPages = Collections.emptyList();
         desiredLayout = "";
         failedLayout = "";
         measurementMismatch = 0;
+        contentNow = false;
+        resetGeometry();
         shownPage = -1;
     }
 
+    /**
+     * The caption is a stable player-overlay layer, not a child of the video Surface ancestor. It
+     * lives in YouTube's topmost player-overlay container: above the video and above the player
+     * controls (a control may no longer cover the text), below the comment sheet, which remains a
+     * later sibling of the player. Pinning this host means a fullscreen or comment transition
+     * moves the already-laid-out box instead of re-attaching it to a rebuilt surface parent. The
+     * activity content is only a last-resort host for the first frame before a player overlay
+     * exists.
+     */
     private static boolean attach(Activity a) {
-        FrameLayout h = hostRef.get();
-        if (h != null && h.isAttachedToWindow() && anchorRef.get() != null) return true;
+        FrameLayout host = CaptionSurface.stableCaptionHost();
+        if (host == null) host = CaptionSurface.captionHost();
+        boolean videoLayer = host != null;
+        if (host == null) {
+            View content = a.findViewById(android.R.id.content);
+            if (!(content instanceof FrameLayout)) return false;
+            host = (FrameLayout) content;
+        }
+        boolean pinned = CaptionSurface.pinnedHost(host);
+        boolean topmost = CaptionSurface.topmostOverlayHost(host);
+        FrameLayout anchor = anchorRef.get();
+        if (anchor != null && anchor.getParent() == host && host.isAttachedToWindow()) {
+            ensureTouchProxy(a);
+            return true;
+        }
+        if (anchor != null && anchor.getParent() instanceof ViewGroup) {
+            // The player rebuilt its view tree. Keep the text and its view identity; move the
+            // already-laid-out box instead of destroying it and flashing a fresh GONE anchor.
+            if (!host.isAttachedToWindow()) return false;
+            FrameLayout oldHost = hostRef.get();
+            if (horizontalPlacement != null) horizontalPlacement.cancel();
+            if (oldHost != null && oldHost != host
+                    && oldHost.getViewTreeObserver().isAlive())
+                oldHost.getViewTreeObserver().removeOnPreDrawListener(WATCH);
+            ((ViewGroup) anchor.getParent()).removeView(anchor);
+            ViewGroup.LayoutParams params = anchor.getLayoutParams();
+            if (params == null) params = new FrameLayout.LayoutParams(1, 1);
+            if (topmost) host.addView(anchor, params);
+            else if (pinned) host.addView(anchor, 0, params);
+            else host.addView(anchor, params);
+            hostRef = new WeakReference<>(host);
+            TextView text = textRef.get();
+            horizontalPlacement = new CaptionHorizontalPlacement(host, anchor, text);
+            host.getViewTreeObserver().addOnPreDrawListener(WATCH);
+            Rect current = CaptionSurface.currentVideoBounds(host);
+            if (current == null) current = CaptionSurface.refreshedVideoBounds(host);
+            if (text != null && current != null && boxWidth > 0)
+                placeVisibleText(a, host, anchor, text, current, boxWidth);
+            geometryKnown = false;
+            geometryChangedAt = 0;
+            videoGeometry.setEmpty();
+            previous.setEmpty();
+            previousScreenWidth = 0;
+            dirty = true;
+            ensureTouchProxy(a);
+            return true;
+        }
         detach();
-        if (!(a.findViewById(android.R.id.content) instanceof FrameLayout)) return false;
-        h = (FrameLayout) a.findViewById(android.R.id.content);
-        FrameLayout anchor = new FrameLayout(a);
+        if (!host.isAttachedToWindow()) return false;
+        anchor = new FrameLayout(a);
         // A fresh overlay starts hidden: only a render that passed the authority, guard and
         // geometry checks may show it, so a transition can never expose an unverified overlay.
         anchor.setVisibility(View.GONE);
@@ -645,7 +779,6 @@ final class CaptionOverlay {
         anchor.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         anchor.setClipChildren(false);
         anchor.setClipToPadding(false);
-        anchor.setElevation(dp(a, 12));
         TextView text = new CaptionText(a);
         text.setTag("yydarlinker.deepseek.caption.overlay");
         text.setTextColor(Color.WHITE);
@@ -666,12 +799,30 @@ final class CaptionOverlay {
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         Gravity.TOP | Gravity.CENTER_HORIZONTAL));
-        h.addView(anchor, new FrameLayout.LayoutParams(1, 1));
-        hostRef = new WeakReference<>(h);
+        if (topmost) host.addView(anchor, new FrameLayout.LayoutParams(1, 1));
+        else if (pinned) host.addView(anchor, 0, new FrameLayout.LayoutParams(1, 1));
+        else host.addView(anchor, new FrameLayout.LayoutParams(1, 1));
+        hostRef = new WeakReference<>(host);
         anchorRef = new WeakReference<>(anchor);
         textRef = new WeakReference<>(text);
-        horizontalPlacement = new CaptionHorizontalPlacement(h, anchor, text);
-        h.getViewTreeObserver().addOnPreDrawListener(WATCH);
+        horizontalPlacement = new CaptionHorizontalPlacement(host, anchor, text);
+        host.getViewTreeObserver().addOnPreDrawListener(WATCH);
+        CaptionDiagnostics.mark(
+                a,
+                "CAPTION_LAYER",
+                "layer="
+                        + (videoLayer ? "video" : "activity")
+                        + ";host="
+                        + host.getClass().getSimpleName()
+                        + ";width="
+                        + host.getWidth()
+                        + ";height="
+                        + host.getHeight()
+                        + ";children="
+                        + host.getChildCount()
+                        + ";"
+                        + CaptionPlayerAuthority.shortId());
+        ensureTouchProxy(a);
         dirty = true;
         return true;
     }
@@ -685,14 +836,7 @@ final class CaptionOverlay {
         @Override
         protected void onDraw(Canvas canvas) {
             RenderGuard guard = currentGuard;
-            if (guard != null) guard.beforeDraw();
-            guard = currentGuard;
             long paintAt = positionOf(guard);
-            if (guard != null && pendingUnit != null && !pageOwns(paintAt)) {
-                guard.beforeDraw();
-                guard = currentGuard;
-                paintAt = positionOf(guard);
-            }
             if (guard != null
                     && (!guard.isValid()
                             || pendingUnit != null
@@ -703,11 +847,27 @@ final class CaptionOverlay {
                 hideView();
                 return;
             }
+            drawCaptionBackground(canvas);
             super.onDraw(canvas);
-            // Time-dependent content cannot rely on a 50 ms state tick to invalidate a cached
-            // display list: only a visible, owned caption stays on the compositor cadence.
-            if (currentGuard != null && currentGuard.isValid() && pendingUnit != null && isShown())
-                postInvalidateOnAnimation();
+        }
+
+        /**
+         * Draw the rounded background around this page's actual text, not around the stable
+         * maximum-width layout box. The View keeps one width across pages (no re-layout/flicker),
+         * but a short page must not show the longest page's empty background.
+         */
+        private void drawCaptionBackground(Canvas canvas) {
+            if (captionBackground == null || getLayout() == null || getText().length() == 0) return;
+            Layout layout = getLayout();
+            float content = 0;
+            for (int line = 0; line < layout.getLineCount(); line++)
+                content = Math.max(content, layout.getLineWidth(line));
+            float width = Math.min(getWidth(), content + getPaddingLeft() + getPaddingRight());
+            if (width <= 0) return;
+            float left = (getWidth() - width) / 2f;
+            captionBackground.setBounds(
+                    Math.round(left), 0, Math.round(left + width), getHeight());
+            captionBackground.draw(canvas);
         }
     }
 
@@ -727,6 +887,12 @@ final class CaptionOverlay {
 
     private static boolean pageOwns(long at) {
         return ownsDisplayPosition(at) && pageContains(at);
+    }
+
+    /** Height belongs to the page that is actually shown, never to the widest page in the plan. */
+    private static int pageLines(CaptionPageLayout.Page page) {
+        if (page == null || page.linePlan == null) return 0;
+        return page.linePlan.line2Px > 0 ? 2 : 1;
     }
 
     // ---- Holds ----
@@ -813,7 +979,26 @@ final class CaptionOverlay {
         return Collections.emptyList();
     }
 
-    /** Advances an already prepared page on paint entry, with the clock of frame selection. */
+    /** The scheduled page boundary; no per-frame clock read is needed to find it. */
+    private static void advancePreparedPageIfDue() {
+        if (nextPageAt <= 0 || SystemClock.uptimeMillis() < nextPageAt) return;
+        nextPageAt = 0;
+        advancePreparedPage();
+    }
+
+    private static void scheduleNextPage(long at) {
+        nextPageAt = 0;
+        if (currentGuard == null
+                || !currentGuard.isValid()
+                || pendingPages.isEmpty()
+                || shownPage < 0
+                || shownPage >= pendingPages.size()) return;
+        CaptionPageLayout.Page page = pendingPages.get(shownPage);
+        long delay = Math.max(0, page.end - at);
+        nextPageAt = SystemClock.uptimeMillis() + delay + 8;
+    }
+
+    /** Advances an already prepared page when its time arrives. */
     static void advancePreparedPage() {
         // Pages still being laid out belong to render(), which also holds the previous text.
         if (currentGuard == null
@@ -826,36 +1011,56 @@ final class CaptionOverlay {
         pendingPosition = at;
         TextView text = textRef.get();
         if (next < 0 || !ownsDisplayPosition(at)) {
-            if (holdingEnd(at)) return;
+            if (holdingEnd(at)) {
+                scheduleNextPage(at);
+                return;
+            }
             if (text != null) text.setText("");
             hideView();
             shownPage = -1;
             return;
         }
-        if (next == shownPage) return;
+        if (next == shownPage) {
+            scheduleNextPage(at);
+            return;
+        }
         CaptionPageLayout.Page page = pendingPages.get(next);
         CaptionPresentationBudget budget = layoutBudget;
         if (text == null || budget == null) return;
         final long applyStarted = SystemClock.uptimeMillis();
-        if (applyVisibleText(
+        stableTextLines = pageLines(page);
+        int applied =
+                applyVisibleText(
                         text,
                         page.text,
                         budget.preferredPx,
                         budget.width,
                         pendingRenderSpec,
-                        page.linePlan)
-                < 0) {
+                        page.linePlan,
+                        stableTextWidth,
+                        stableTextLines);
+        if (applied < 0) {
             text.setText("");
             hideView();
             return;
         }
+        contentWidth = applied;
+        Rect placement =
+                videoGeometry.isEmpty()
+                        ? CaptionSurface.currentVideoBounds(hostRef.get())
+                        : new Rect(videoGeometry);
+        if (placement == null) placement = new Rect(previous);
+        int planWidth = budget.width + text.getPaddingLeft() + text.getPaddingRight();
+        int anchorWidth = classFrameWidth > 0 ? classFrameWidth : planWidth;
+        anchorWidth = Math.min(anchorWidth, planWidth);
+        if (!placement.isEmpty()) anchorWidth = Math.min(anchorWidth, placement.width());
         placeVisibleText(
                 activityRef.get(),
                 hostRef.get(),
                 anchorRef.get(),
                 text,
-                previous,
-                budget.width + text.getPaddingLeft() + text.getPaddingRight());
+                placement,
+                anchorWidth);
         text.invalidate();
         displayResult(
                 activityRef.get(),
@@ -867,12 +1072,386 @@ final class CaptionOverlay {
                 "",
                 applyStarted);
         shownPage = next;
+        scheduleNextPage(at);
+    }
+
+    // ---- Geometry clock ----
+
+    /** True while the video rectangle has changed inside the settle window. */
+    private static boolean moving(long now) {
+        return geometryKnown && now - geometryChangedAt < SETTLE_MS;
+    }
+
+    private static void noteGeometry(Rect video, long now) {
+        if (!geometryKnown) {
+            // The first observation is the scene the caption is being placed in, not motion.
+            videoGeometry.set(video);
+            geometryKnown = true;
+            geometryChangedAt = now - SETTLE_MS;
+            return;
+        }
+        if (!video.equals(videoGeometry)) {
+            geometryChangedAt = now;
+            videoGeometry.set(video);
+        }
+    }
+
+    /** Reads the cached video rectangle and moves the existing box; only on layout/motion. */
+    private static void geometryFrame() {
+        Activity a = activityRef.get();
+        if (a == null || blocked() || nothingPending()) return;
+        if (touchProxy == null) {
+            long now = SystemClock.uptimeMillis();
+            if (now - lastTouchProxyAt >= 250) {
+                lastTouchProxyAt = now;
+                ensureTouchProxy(a);
+            }
+        }
+        FrameLayout host = hostRef.get(), anchor = anchorRef.get();
+        TextView text = textRef.get();
+        if (host == null
+                || anchor == null
+                || text == null
+                || !anchorVisible()
+                || host.getWidth() <= 0) return;
+        Rect video = CaptionSurface.currentVideoBounds(host);
+        if (video == null || video.width() < 50 || video.height() < 50) return;
+        long now = SystemClock.uptimeMillis();
+        noteGeometry(video, now);
+        if (updatePresentationClass(video, now)) {
+            contentNow = true;
+            dirty = true;
+            render();
+            return;
+        }
+        applyCommentScale(a, video, text);
+        followVisibleText(a, anchor, video);
+    }
+
+    private static boolean computeTarget(
+            Activity owner, Rect video, int width, int height, boolean landscape) {
+        if (owner == null || video == null || video.isEmpty() || width <= 0 || height <= 0)
+            return false;
+        float y =
+                CaptionSurface.isShorts()
+                        ? DeepSeekConfig.shortsPosition(owner)
+                        : DeepSeekConfig.captionPositionY(owner, landscape);
+        int top = video.top + Math.round(video.height() * y) - height / 2;
+        top = Math.max(video.top, Math.min(top, video.bottom - height));
+        int left = video.left + Math.round((video.width() - width) / 2f);
+        nextLeft = Math.max(video.left, Math.min(left, video.right - width));
+        nextTop = top;
+        return true;
+    }
+
+    private static void followVisibleText(Activity a, FrameLayout anchor, Rect video) {
+        int width = Math.min(boxWidth, video.width());
+        if (width <= 0
+                || boxHeight <= 0
+                || !computeTarget(
+                        a, video, width, boxHeight, video.width() > video.height()))
+            return;
+        FrameLayout host = hostRef.get();
+        if (host != null)
+            CaptionHorizontalPlacement.position(host, anchor, nextLeft, nextTop, width, boxHeight);
+    }
+
+    /**
+     * A committed page is a content fact, not a geometry fact. It can be reused while its own line
+     * plan and its already measured box still fit the new rectangle; only overflow asks the page
+     * planner for a new plan. This is what keeps a resize animation from changing the text or the
+     * box width when nothing about the reading task changed.
+     */
+    /**
+     * A committed page is a content fact. Once the presentation class is stable, a geometry change
+     * only moves the box; it never re-paginates because a transient rectangle is narrower. The
+     * class switch is the one event that asks for a new plan, and it is decided by the real video
+     * viewport with hysteresis.
+     */
+    private static boolean canReuseCommittedPage(
+            float preferred, CaptionRenderSpec spec, boolean ownedCaption, int inner) {
+        if (!ownedCaption
+                || layoutBudget == null
+                || planBudget != layoutBudget
+                || pendingPages.isEmpty()
+                || shownPage < 0
+                || shownPage >= pendingPages.size()
+                || contentWidth <= 0
+                || !shownText()) return false;
+        if (layoutBudget.preferredPx != preferred
+                || layoutBudget.width != inner
+                || !layoutBudget.renderSpec.measurementKey().equals(spec.measurementKey()))
+            return false;
+        CaptionPageLayout.Page page = pendingPages.get(shownPage);
+        return page.linePlan != null
+                && page.contains(pendingPosition)
+                && ownsDisplayPosition(pendingPosition);
+    }
+
+    private static void resetGeometry() {
+        geometryKnown = false;
+        geometryChangedAt = 0;
+        videoGeometry.setEmpty();
+        boxWidth = 0;
+        boxHeight = 0;
+        contentWidth = 0;
+        stableTextWidth = 0;
+        stableTextLines = 0;
+        nextPageAt = 0;
+    }
+
+    /**
+     * Classifies the current viewport and commits one new presentation class only after the
+     * viewport has been still and the player has left a sliding transition. The class frame width
+     * is captured from that settled frame, never from a rotation or sheet-animation frame, so a
+     * later frame can only translate the box.
+     */
+    private static boolean updatePresentationClass(Rect video, long now) {
+        Activity a = activityRef.get();
+        if (a == null || video == null) return false;
+        DisplayMetrics metrics = a.getResources().getDisplayMetrics();
+        int screenWidth = metrics.widthPixels, screenHeight = metrics.heightPixels;
+        boolean shorts = CaptionSurface.isShorts();
+        CaptionPresentationClass.Kind next =
+                CaptionPresentationClass.classify(
+                        presentationClass,
+                        video,
+                        CaptionSurface.visibleVideoWidth(),
+                        screenWidth,
+                        screenHeight,
+                        shorts);
+        boolean commentTransition = commentTransitionActive(screenWidth, screenHeight);
+        float progress = commentTransition ? commentProgress(screenWidth, screenHeight) : -1f;
+        boolean commentEndpoint =
+                commentTransition
+                        && progress >= 0f
+                        && (presentationClass == CaptionPresentationClass.Kind.FULL
+                                ? progress >= .98f
+                                : progress <= .02f);
+        if (commentTransition && !commentEndpoint) {
+            // The View is being scaled continuously by geometryFrame; do not replace the page
+            // plan or the binary class until the sheet has reached its own endpoint.
+            classCandidate = null;
+            return false;
+        }
+        if (commentEndpoint && next != presentationClass) {
+            // The animation has reached the full/reduced endpoint; commit the new plan now so the
+            // reset scale and the new text size happen on the same final frame.
+            return commitPresentationClass(a, next, video, screenWidth, screenHeight, shorts);
+        }
+        if (presentationClass == null)
+            return commitPresentationClass(a, next, video, screenWidth, screenHeight, shorts);
+        if (next == presentationClass) {
+            classCandidate = null;
+            if (next == CaptionPresentationClass.Kind.REDUCED && !moving(now)) {
+                int cap = reducedWidthCap(screenWidth, screenHeight);
+                if (video.width() > 0 && video.width() <= cap) reducedVideoWidth = video.width();
+                else if (reducedVideoWidth > cap) reducedVideoWidth = 0;
+            }
+            return false;
+        }
+        if (!classTransitionAllowed(now)) {
+            classCandidate = null;
+            return false;
+        }
+        if (next != classCandidate) {
+            classCandidate = next;
+            classCandidateSince = now;
+            return false;
+        }
+        if (now - classCandidateSince < CLASS_SETTLE_MS) return false;
+        return commitPresentationClass(a, next, video, screenWidth, screenHeight, shorts);
+    }
+
+    /** A reduced viewport is by definition no wider than the reduced threshold. */
+    private static int reducedWidthCap(int screenWidth, int screenHeight) {
+        return Math.max(
+                1,
+                Math.round(
+                        CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight)
+                                * CaptionPresentationClass.ENTER_REDUCED));
+    }
+
+    /**
+     * The reading class may not change while the rectangle is moving or while the official player
+     * reports a slide. Those are the two moments where the old code shrank the caption before the
+     * user had actually reached the detail page.
+     */
+    private static boolean classTransitionAllowed(long now) {
+        int state = CaptionPlayerAuthority.state();
+        if (state == CaptionPlayerAuthority.COMPACT
+                || state == CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR) return false;
+        String type = CaptionPlayerAuthority.playerType();
+        return type.isEmpty() || !type.contains("SLIDING");
+    }
+
+    /**
+     * A landscape FULL↔REDUCED change is normally the comments sheet. Its player animation is a
+     * scale on the player container, so the caption's local video rectangle does not change until
+     * the very end. The continuous scale below uses the on-screen video width instead, and the
+     * binary class commits only when the animation reaches an endpoint.
+     */
+    private static boolean commentTransitionActive(int screenWidth, int screenHeight) {
+        if (CaptionSurface.isShorts() || screenWidth <= screenHeight) return false;
+        int state = CaptionPlayerAuthority.state();
+        if (state == CaptionPlayerAuthority.COMPACT
+                || state == CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR) return false;
+        String type = CaptionPlayerAuthority.playerType();
+        if (!type.isEmpty() && type.contains("SLIDING")) return false;
+        boolean full = presentationClass == CaptionPresentationClass.Kind.FULL;
+        boolean reduced = presentationClass == CaptionPresentationClass.Kind.REDUCED;
+        if (!full && !reduced) return false;
+        // A comments sheet reduces the visible video height. A letterboxed 4:3/21:9 video at rest
+        // keeps its full height, so it must not be mistaken for an intermediate panel state.
+        int visibleHeight = CaptionSurface.visibleVideoHeight();
+        int visibleWidth = CaptionSurface.visibleVideoWidth();
+        boolean heightReduced = visibleHeight > 0 && visibleHeight < screenHeight * .95f;
+        boolean widthReduced =
+                visibleWidth > 0
+                        && visibleWidth
+                                < CaptionPresentationClass.referenceVideoWidth(
+                                                screenWidth, screenHeight)
+                                        * .92f;
+        if (full && (heightReduced || widthReduced)) commentTransitionArmed = true;
+        return reduced
+                ? commentTransitionArmed || heightReduced
+                : heightReduced || widthReduced;
+    }
+
+    /** 0 at the full viewport, 1 at the reduced (comments) viewport. */
+    private static float commentProgress(int screenWidth, int screenHeight) {
+        int full = CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight);
+        int reduced =
+                reducedVideoWidth > 0 ? reducedVideoWidth : Math.round(full * .66f);
+        if (reduced <= 0 || reduced >= full) return 1f;
+        int observed = CaptionSurface.visibleVideoWidth();
+        if (observed <= 0) return -1f;
+        float progress = (full - observed) / (float) (full - reduced);
+        return Math.max(0f, Math.min(1f, progress));
+    }
+
+    /**
+     * Keep the caption readable at an intermediate size for the whole comments animation. Only the
+     * View's rendering scale changes here; the page plan and box geometry wait for the endpoint.
+     * This is what makes the size change start and finish together with the sheet, without a
+     * re-pagination on every frame.
+     */
+    private static void applyCommentScale(Activity a, Rect video, TextView text) {
+        if (text == null || video == null || a == null) return;
+        DisplayMetrics metrics = a.getResources().getDisplayMetrics();
+        int screenWidth = metrics.widthPixels, screenHeight = metrics.heightPixels;
+        if (!commentTransitionActive(screenWidth, screenHeight)) {
+            resetCommentScale(text);
+            return;
+        }
+        float progress = commentProgress(screenWidth, screenHeight);
+        boolean endpoint =
+                presentationClass == CaptionPresentationClass.Kind.FULL
+                        ? progress >= .98f
+                        : progress <= .02f;
+        if (endpoint) {
+            resetCommentScale(text);
+            return;
+        }
+        int tier = DeepSeekConfig.displayStyle(a).captionSizeTier;
+        float fullGlyph =
+                CaptionPresentationClass.glyphHeightPx(
+                        tier, screenWidth, screenHeight, CaptionPresentationClass.Kind.FULL);
+        float detailGlyph =
+                CaptionPresentationClass.glyphHeightPx(
+                        tier, screenWidth, screenHeight, CaptionPresentationClass.Kind.DETAIL);
+        float baseGlyph =
+                CaptionPresentationClass.glyphHeightPx(
+                        tier, screenWidth, screenHeight, presentationClass);
+        float visualGlyph = fullGlyph + (detailGlyph - fullGlyph) * progress;
+        float scale = visualGlyph / Math.max(1f, baseGlyph);
+        scale = Math.max(.5f, Math.min(1.6f, scale));
+        if (Math.abs(text.getScaleX() - scale) > .002f) {
+            text.setPivotX(text.getWidth() / 2f);
+            text.setPivotY(text.getHeight() / 2f);
+            text.setScaleX(scale);
+            text.setScaleY(scale);
+        }
+        commentScale = scale;
+    }
+
+    private static void resetCommentScale(TextView text) {
+        if (text != null && (text.getScaleX() != 1f || text.getScaleY() != 1f)) {
+            text.setScaleX(1f);
+            text.setScaleY(1f);
+        }
+        commentScale = 1f;
+    }
+
+    private static boolean commitPresentationClass(
+            Activity a,
+            CaptionPresentationClass.Kind next,
+            Rect video,
+            int screenWidth,
+            int screenHeight,
+            boolean shorts) {
+        TextView text = textRef.get();
+        int padding =
+                text == null
+                        ? dp(a, 6) * 2
+                        : text.getPaddingLeft() + text.getPaddingRight();
+        // A new fullscreen viewport is the start of a new reduced-width observation; keeping the
+        // previous video's reduced width would make the first comments opening too narrow.
+        if (next == CaptionPresentationClass.Kind.FULL) reducedVideoWidth = 0;
+        // FULL is a stable target for the whole fullscreen class: capturing it from the first
+        // frame of a closing comments sheet would leave the caption permanently too narrow. The
+        // render path still caps the effective width by the displayed video.
+        int videoWidth =
+                next == CaptionPresentationClass.Kind.FULL
+                        ? CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight)
+                        : CaptionPresentationClass.layoutVideoWidth(
+                                next, video, screenWidth, screenHeight, reducedVideoWidth);
+        classFrameWidth = Math.max(1, Math.round(videoWidth * (shorts ? .78f : .92f)));
+        classGlyphHeight =
+                CaptionPresentationClass.glyphHeightPx(
+                        DeepSeekConfig.displayStyle(a).captionSizeTier,
+                        screenWidth,
+                        screenHeight,
+                        next);
+        presentationClass = next;
+        if (next == CaptionPresentationClass.Kind.FULL) commentTransitionArmed = false;
+        stableTextWidth = 0;
+        stableTextLines = 0;
+        classCandidate = null;
+        classCandidateSince = 0;
+        resetCommentScale(text);
+        CaptionDiagnostics.mark(
+                a,
+                "CAPTION_PRESENTATION_CLASS",
+                "class="
+                        + next
+                        + ";video="
+                        + video.flattenToString()
+                        + ";screen="
+                        + screenWidth
+                        + "x"
+                        + screenHeight
+                        + ";full_width="
+                        + CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight)
+                        + ";layout_video_width="
+                        + videoWidth
+                        + ";class_frame_width="
+                        + classFrameWidth
+                        + ";glyph_height_px="
+                        + classGlyphHeight
+                        + ";reduced_width="
+                        + reducedVideoWidth
+                        + ";padding="
+                        + padding);
+        return true;
     }
 
     // ---- Render ----
 
     private static void render() {
         final long applyStarted = SystemClock.uptimeMillis();
+        boolean forceContent = contentNow;
+        contentNow = false;
         Activity a = activityRef.get();
         if (guardInvalid()) {
             hideView();
@@ -912,37 +1491,58 @@ final class CaptionOverlay {
         TextView text = textRef.get();
         CaptionRenderSpec displaySpec = pendingRenderSpec;
         if (pendingStatus || pendingWaiting) {
-            String code = LanguageMenuOrder.locale().toLanguageTag();
+            String code = CaptionTextResolver.locale(a).toLanguageTag();
             displaySpec = new CaptionRenderSpec(code, CaptionLanguageProfile.fromCode(code), false);
         }
         displaySpec.apply(text);
-        long now = SystemClock.uptimeMillis();
-        if (now - lastScan >= SCAN_INTERVAL_MS) {
+        Rect b = CaptionSurface.currentVideoBounds(host);
+        if (b == null || CaptionPlayerAuthority.consumeSurfaceDirty()) {
+            // Rediscover a rebuilt surface, but never substitute the player container: that was a
+            // one-frame geometry jump. No surface at all keeps the verified page where it is.
             CaptionSurface.refresh();
-            lastScan = now;
+            lastScan = SystemClock.uptimeMillis();
+            b = CaptionSurface.currentVideoBounds(host);
+            if (b == null) b = CaptionSurface.refreshedVideoBounds(host);
         }
-        Rect b = CaptionSurface.videoBounds(host);
         if (b == null || b.width() < 50 || b.height() < 50) {
+            // A player rebuild can expose no surface for a frame. Keep the already-verified page
+            // in place instead of flashing it off; a real close/compact is handled by the
+            // authority before this point.
+            if (anchorVisible()) return;
             layoutBudget = null;
+            planBudget = null;
             hideView();
             return;
         }
         boolean shorts = CaptionSurface.isShorts();
         DisplayMetrics metrics = a.getResources().getDisplayMetrics();
-        int screenWidth = metrics.widthPixels;
-        // Mode callbacks can precede the orientation layout: current screen geometry decides the
-        // calibrated portrait-details / landscape-full-screen modes.
-        boolean fullScreen = !shorts && metrics.widthPixels > metrics.heightPixels;
+        int screenWidth = metrics.widthPixels, screenHeight = metrics.heightPixels;
+        long motionNow = SystemClock.uptimeMillis();
+        noteGeometry(b, motionNow);
+        boolean classChanged = updatePresentationClass(b, motionNow);
+        if (classChanged) {
+            forceContent = true;
+            contentNow = false;
+        }
+        if (!forceContent && !classChanged && moving(motionNow)) {
+            // Geometry owns this commit. Keep the old page and only translate it; a new page plan
+            // against every animation frame is exactly the churn this replaces.
+            previous.set(b);
+            followVisibleText(a, anchor, b);
+            return;
+        }
         if (!dirty
+                && !forceContent
+                && !classChanged
                 && b.equals(previous)
                 && screenWidth == previousScreenWidth
                 && shorts == previousShorts
-                && fullScreen == previousFullScreen
+                && presentationClass == previousClass
                 && (anchor.getVisibility() == View.VISIBLE
                         || anchor.getVisibility() == View.GONE
                                 && pendingIdentity.equals(lastBlankIdentity))) return;
         previousShorts = shorts;
-        previousFullScreen = fullScreen;
+        previousClass = presentationClass;
         dirty = false;
         previous.set(b);
         // A new surface is committed only outside a player transition.
@@ -952,36 +1552,58 @@ final class CaptionOverlay {
         }
         previousScreenWidth = screenWidth;
         DeepSeekConfig.Appearance cfg = DeepSeekConfig.displayStyle(a);
-        boolean landscapeHost = host.getWidth() > host.getHeight();
-        if (normalVideoWidth == 0
-                || shorts != referenceShorts
-                || landscapeHost != referenceLandscape) {
-            normalVideoWidth = b.width();
-            referenceShorts = shorts;
-            referenceLandscape = landscapeHost;
-        } else {
-            normalVideoWidth = Math.max(normalVideoWidth, b.width());
-        }
+        // Size belongs to the stable presentation class, not to the instantaneous rectangle. The
+        // class was captured when the viewport crossed its hysteresis threshold, so a sheet
+        // animation cannot rescale or re-paginate the text mid-flight.
         float targetGlyphHeight =
-                SubtitleStyleMetrics.renderedGlyphHeightPx(
-                        cfg.captionSizeTier, screenWidth, fullScreen, b.width(), normalVideoWidth);
+                CaptionPresentationClass.glyphHeightPx(
+                        cfg.captionSizeTier, screenWidth, screenHeight, presentationClass);
         float preferred =
                 SubtitleStyleMetrics.textSizePxForGlyphHeight(text.getPaint(), targetGlyphHeight);
         float minimum =
                 SubtitleStyleMetrics.textSizePxForGlyphHeight(
                         text.getPaint(),
-                        SubtitleStyleMetrics.renderedGlyphHeightPx(
-                                0, screenWidth, fullScreen, b.width(), normalVideoWidth));
-        int width = Math.max(1, Math.round(b.width() * (shorts ? .78f : .92f)));
-        int inner = Math.max(1, width - text.getPaddingLeft() - text.getPaddingRight());
+                        CaptionPresentationClass.glyphHeightPx(
+                                0, screenWidth, screenHeight, presentationClass));
+        int width =
+                classFrameWidth > 0
+                        ? classFrameWidth
+                        : Math.max(1, Math.round(b.width() * (shorts ? .78f : .92f)));
+        // The class width is a target, not a licence to draw past the video or the display. Cap
+        // the effective width by the same margin the class would use on this video, so a box
+        // captured on a wider video cannot hug a narrower one edge-to-edge.
+        // FULL always plans against the full-viewport reference: at the closing endpoint the local
+        // rectangle can still be one frame behind, and a narrower plan there would repaginate
+        // again. The video is already ~98% full at that point, so this does not overflow.
+        int marginWidth =
+                presentationClass == CaptionPresentationClass.Kind.FULL
+                        ? CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight)
+                        : b.width();
+        int frameLimit =
+                Math.max(1, Math.round(marginWidth * (shorts ? .78f : .92f)));
+        width = Math.max(1, Math.min(width, Math.min(frameLimit, screenWidth)));
+        int padding = text.getPaddingLeft() + text.getPaddingRight();
+        int inner = Math.max(1, width - padding);
         CaptionRenderSpec measuredSpec = displaySpec.withPaint(text);
-        layoutBudget = new CaptionPresentationBudget(inner, minimum, preferred, measuredSpec);
+        boolean ownedCaption = !pendingStatus && !pendingWaiting && !pendingText.isEmpty() && timed;
+        if (!forceContent
+                && !classChanged
+                && canReuseCommittedPage(preferred, measuredSpec, ownedCaption, inner)) {
+            // The video moved or resized inside the same presentation class. Keep its page plan,
+            // text width and line breaks; only the class-width centering anchor follows the video.
+            placeVisibleText(a, host, anchor, text, b, width);
+            if (anchor.getVisibility() != View.VISIBLE) {
+                anchor.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+                anchor.setVisibility(View.VISIBLE);
+            }
+            return;
+        }
+        planBudget = new CaptionPresentationBudget(inner, minimum, preferred, measuredSpec);
         float size = preferred;
         String shown = pendingText;
         String mode = pendingStatus ? "status" : "caption";
-        boolean ownedCaption = !pendingStatus && !pendingWaiting && !shown.isEmpty() && timed;
         pendingPages =
-                ownedCaption ? currentPlan(layoutBudget, measuredSpec) : Collections.emptyList();
+                ownedCaption ? currentPlan(planBudget, measuredSpec) : Collections.emptyList();
         shownPage =
                 pendingUnit != null && !ownsDisplayPosition(pendingPosition)
                         ? -1
@@ -992,6 +1614,26 @@ final class CaptionOverlay {
         } else if (!ownedCaption) {
             while (size > minimum && lineCount(shown, size, inner, measuredSpec) > 2)
                 size = Math.max(minimum, size - .5f);
+        }
+        stableTextLines = 0;
+        if (ownedCaption && !pendingPages.isEmpty()) {
+            // The box width is the widest line of this event, so a page change never changes the
+            // width. Its height is the current page's own line count: a one-line page must not
+            // inherit two-line padding from a different page of the same event.
+            int maxLine = 0;
+            for (CaptionPageLayout.Page page : pendingPages) {
+                if (page.linePlan == null) continue;
+                maxLine =
+                        Math.max(
+                                maxLine,
+                                (int)
+                                        Math.ceil(
+                                                Math.max(
+                                                        page.linePlan.line1Px,
+                                                        page.linePlan.line2Px)));
+            }
+            if (maxLine > 0) stableTextWidth = Math.min(inner, Math.max(1, maxLine + 2)) + padding;
+            if (shownPage >= 0) stableTextLines = pageLines(pendingPages.get(shownPage));
         }
         String reason = shown.isEmpty() && currentGuard != null ? currentGuard.blankReason() : "";
         if (ownedCaption
@@ -1033,7 +1675,9 @@ final class CaptionOverlay {
                             measuredSpec,
                             ownedCaption && shownPage >= 0
                                     ? pendingPages.get(shownPage).linePlan
-                                    : null);
+                                    : null,
+                            stableTextWidth,
+                            stableTextLines);
             if (compact < 0) {
                 shown = "";
                 mode = "overflow_status";
@@ -1053,12 +1697,14 @@ final class CaptionOverlay {
                                         size,
                                         targetGlyphHeight,
                                         screenWidth,
-                                        b.width(),
+                                        host,
                                         cfg.captionSizeTier,
-                                        fullScreen)
+                                        presentationClass)
                                 : "")
                         + ";available_width_px="
                         + inner
+                        + ";effective_frame_width_px="
+                        + (inner + padding)
                         + ";measured_width_px="
                         + Math.max(0, compact);
         if (shown.isEmpty()) {
@@ -1075,10 +1721,12 @@ final class CaptionOverlay {
             return;
         }
         lastBlankIdentity = null;
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(SubtitleStyleMetrics.alpha(cfg.backgroundOpacity) << 24);
-        bg.setCornerRadius(dp(a, 4));
-        text.setBackground(bg);
+        if (captionBackground == null) captionBackground = new GradientDrawable();
+        captionBackground.setColor(SubtitleStyleMetrics.alpha(cfg.backgroundOpacity) << 24);
+        captionBackground.setCornerRadius(dp(a, 4));
+        // The background is drawn by CaptionText.onDraw around the current page's real line
+        // widths, so a short page cannot inherit the event's widest page.
+        if (text.getBackground() != null) text.setBackground(null);
         // Time and owner are sampled again at UI application, after the potentially expensive
         // layout.
         if (currentGuard != null) {
@@ -1137,6 +1785,11 @@ final class CaptionOverlay {
                     page.end - page.start,
                     "");
         }
+        // The page and its measured box are now the committed content. A later geometry frame may
+        // move this box, but it may not re-wrap or re-paginate it while it still fits.
+        contentWidth = Math.max(0, compact);
+        layoutBudget = planBudget;
+        scheduleNextPage(pendingPosition);
         placeVisibleText(a, host, anchor, text, b, width);
         layoutHoldSince = -1;
         if (anchor.getVisibility() != View.VISIBLE) {
@@ -1150,7 +1803,11 @@ final class CaptionOverlay {
         horizontalPlacement.observe(
                 a,
                 b,
-                shorts ? "shorts" : fullScreen ? "fullscreen" : "detail",
+                shorts
+                        ? "shorts"
+                        : presentationClass == CaptionPresentationClass.Kind.FULL
+                                ? "fullscreen"
+                                : "detail",
                 appliedGuard == null ? "" : appliedGuard.session(),
                 appliedOwner,
                 appliedRender,
@@ -1195,6 +1852,7 @@ final class CaptionOverlay {
                 () -> {
                     if (identity.equals(pendingIdentity)) {
                         dirty = true;
+                        contentNow = true;
                         lastBlankIdentity = null;
                         render();
                     }
@@ -1208,10 +1866,13 @@ final class CaptionOverlay {
             float size,
             float targetGlyphHeight,
             int screenWidth,
-            int videoWidth,
+            FrameLayout host,
             int tier,
-            boolean fullScreen) {
+            CaptionPresentationClass.Kind kind) {
         CaptionPageLayout.Page page = shownPage >= 0 ? pendingPages.get(shownPage) : null;
+        Activity owner = activityRef.get();
+        boolean activityLayer =
+                owner != null && host == owner.findViewById(android.R.id.content);
         return ";text_size_px="
                 + size
                 + ";target_glyph_height_px="
@@ -1220,14 +1881,26 @@ final class CaptionOverlay {
                 + SubtitleStyleMetrics.measuredGlyphHeightPx(text.getPaint())
                 + ";screen_width_px="
                 + screenWidth
-                + ";video_width_px="
-                + videoWidth
-                + ";normal_video_width_px="
-                + normalVideoWidth
+                + ";caption_layer="
+                + (activityLayer ? "activity" : "video")
+                + ";caption_host_px="
+                + host.getWidth()
+                + "x"
+                + host.getHeight()
                 + ";size_tier="
                 + tier
+                + ";presentation_class="
+                + kind
                 + ";size_mode="
-                + (fullScreen ? "full_screen" : "detail")
+                + (kind == null || !CaptionPresentationClass.detailSize(kind)
+                        ? "full_screen"
+                        : "detail")
+                + ";class_frame_width_px="
+                + classFrameWidth
+                + ";stable_text_width_px="
+                + stableTextWidth
+                + ";stable_lines="
+                + stableTextLines
                 + ";lines="
                 + (shown.isEmpty() ? 0 : text.getLineCount())
                 + (page == null
@@ -1257,7 +1930,9 @@ final class CaptionOverlay {
             float size,
             int maximumInnerPx,
             CaptionRenderSpec spec,
-            CaptionLinePlan line) {
+            CaptionLinePlan line,
+            int fixedWidthPx,
+            int minLines) {
         boolean same =
                 CaptionSettingPreference.sameText(text.getText(), shown)
                         && text.getTextSize() == size
@@ -1276,19 +1951,34 @@ final class CaptionOverlay {
         if (text.getMaxEms() != Integer.MAX_VALUE) text.setMaxEms(Integer.MAX_VALUE);
         if (text.getMinWidth() != 0) text.setMinWidth(0);
         if (text.getMinimumWidth() != 0) text.setMinimumWidth(0);
+        if (text.getGravity() != Gravity.CENTER) text.setGravity(Gravity.CENTER);
         int padding = text.getPaddingLeft() + text.getPaddingRight();
+        int maximumBox = Math.max(1, maximumInnerPx) + padding;
+        int lines = line != null ? (line.line2Px > 0 ? 2 : 1) : minLines;
+        int minHeight =
+                lines > 0
+                        ? text.getLineHeight() * lines
+                                + text.getPaddingTop()
+                                + text.getPaddingBottom()
+                        : 0;
+        boolean heightSame = text.getMinHeight() == minHeight;
         float contentWidthPx =
                 line != null
                         ? Math.max(line.line1Px, line.line2Px)
                         : same && text.getLayout() != null && text.getLayout().getLineCount() == 1
                                 ? text.getLayout().getLineMax(0)
                                 : spec.actualWidth(spec.layout(shown, size, maximumInnerPx));
-        int boxWidthPx =
+        int naturalBox =
                 Math.min(maximumInnerPx, Math.max(1, (int) Math.ceil(contentWidthPx) + 2))
                         + padding;
+        int boxWidthPx =
+                fixedWidthPx > 0
+                        ? Math.min(maximumBox, Math.max(1, fixedWidthPx))
+                        : naturalBox;
         for (int pass = 0; pass < 3; pass++) {
             ViewGroup.LayoutParams params = text.getLayoutParams();
             if (same
+                    && heightSame
                     && !text.isLayoutRequested()
                     && params.width == boxWidthPx
                     && params.height == ViewGroup.LayoutParams.WRAP_CONTENT
@@ -1302,18 +1992,15 @@ final class CaptionOverlay {
                 params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
                 text.setLayoutParams(params);
             }
+            if (!heightSame) text.setMinHeight(minHeight);
             text.measure(
                     View.MeasureSpec.makeMeasureSpec(boxWidthPx, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
             if (spec.fits(shown, text.getLayout(), boxWidthPx - padding, 2)) return boxWidthPx;
-            if (boxWidthPx == maximumInnerPx + padding) break;
-            // The tight box re-wrapped differently from the page plan. Try the width the text
-            // itself wants before stretching the box to the whole frame: two-line captions used to
-            // jump straight to the maximum width.
-            float natural = spec.actualWidth(spec.layout(shown, size, maximumInnerPx));
-            int naturalBox =
-                    Math.min(maximumInnerPx, Math.max(1, (int) Math.ceil(natural) + 2)) + padding;
-            boxWidthPx = naturalBox > boxWidthPx ? naturalBox : maximumInnerPx + padding;
+            if (boxWidthPx == maximumBox) break;
+            // The stable box unexpectedly does not fit (font fallback or an extreme glyph run).
+            // Try the width the text wants before stretching to the whole frame.
+            boxWidthPx = naturalBox > boxWidthPx ? naturalBox : maximumBox;
             Activity owner = activityRef.get();
             if (owner != null && DeepSeekConfig.displayTextDebugEnabled(owner))
                 CaptionDiagnostics.mark(
@@ -1334,19 +2021,32 @@ final class CaptionOverlay {
             TextView text,
             Rect bounds,
             int anchorWidthPx) {
-        if (owner == null || host == null || anchor == null || bounds.isEmpty()) return;
+        placeVisibleText(
+                owner,
+                host,
+                anchor,
+                text,
+                bounds,
+                anchorWidthPx,
+                bounds != null && bounds.width() > bounds.height());
+    }
+
+    private static void placeVisibleText(
+            Activity owner,
+            FrameLayout host,
+            FrameLayout anchor,
+            TextView text,
+            Rect bounds,
+            int anchorWidthPx,
+            boolean landscape) {
+        if (owner == null || host == null || anchor == null || bounds == null || bounds.isEmpty())
+            return;
+        int width = Math.max(1, Math.min(anchorWidthPx, bounds.width()));
         int height = text.getMeasuredHeight();
-        float y =
-                CaptionSurface.isShorts()
-                        ? DeepSeekConfig.shortsPosition(owner)
-                        : DeepSeekConfig.captionPositionY(owner, bounds.width() > bounds.height());
-        int top =
-                Math.max(
-                        bounds.top,
-                        Math.min(
-                                bounds.bottom - height,
-                                bounds.top + Math.round(bounds.height() * y) - height / 2));
-        CaptionHorizontalPlacement.place(host, anchor, bounds, anchorWidthPx, height, top);
+        if (!computeTarget(owner, bounds, width, height, landscape)) return;
+        boxWidth = width;
+        boxHeight = height;
+        CaptionHorizontalPlacement.position(host, anchor, nextLeft, nextTop, boxWidth, boxHeight);
     }
 
     static int compactWidthPx(String value, float sizePx, int maximum, CaptionRenderSpec spec) {
@@ -1524,44 +2224,219 @@ final class CaptionOverlay {
 
     // ---- Dragging the caption vertically ----
 
+    /**
+     * The drag is a gesture over the current video rectangle, not over the last content commit. It
+     * captures the live rectangle once and uses that same rectangle and orientation for both the
+     * saved position and the placement, so a stale or newly migrated content rect cannot write the
+     * portrait key while the placement reads the landscape one.
+     */
     private static boolean drag(View v, MotionEvent e) {
-        Activity a = activityRef.get();
-        if (a == null || previous.height() <= 0 || !anchorVisible() || blocked()) {
-            dragging = false;
-            return false;
-        }
-        boolean landscape = previous.width() > previous.height();
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                downY = e.getRawY();
-                downAt = SystemClock.uptimeMillis();
-                dragging = false;
-                initial =
-                        CaptionSurface.isShorts()
-                                ? DeepSeekConfig.shortsPosition(a)
-                                : DeepSeekConfig.captionPositionY(a, landscape);
-                return true;
+                return beginDrag(v, e);
             case MotionEvent.ACTION_MOVE:
-                if (!dragging && SystemClock.uptimeMillis() - downAt >= DRAG_AFTER_MS) {
-                    dragging = true;
-                    v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                }
-                if (dragging) {
-                    float y = initial + (e.getRawY() - downY) / previous.height();
-                    y = Math.max(.08f, Math.min(.92f, y));
-                    if (CaptionSurface.isShorts()) DeepSeekConfig.saveShortsPosition(a, y);
-                    else DeepSeekConfig.saveCaptionPosition(a, landscape, y);
-                    dirty = true;
-                    render();
-                }
+                if (dragSource != v) return false;
+                moveDrag(e);
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                dragging = false;
+                if (dragSource == v) endDrag(v);
                 return true;
             default:
                 return false;
         }
+    }
+
+    private static boolean beginDrag(View source, MotionEvent e) {
+        Activity a = activityRef.get();
+        if (a == null || !anchorVisible() || blocked()) {
+            stopDrag(source);
+            return false;
+        }
+        Rect live = liveVideoBounds();
+        if (live == null || live.height() <= 0 || live.width() <= 0) {
+            stopDrag(source);
+            return false;
+        }
+        dragBounds.set(live);
+        dragLandscape = live.width() > live.height();
+        downY = e.getRawY();
+        downAt = SystemClock.uptimeMillis();
+        dragging = false;
+        pressed = true;
+        dragSource = source;
+        initial =
+                CaptionSurface.isShorts()
+                        ? DeepSeekConfig.shortsPosition(a)
+                        : DeepSeekConfig.captionPositionY(a, dragLandscape);
+        ViewParent parent = source.getParent();
+        if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
+        MAIN.removeCallbacks(ARM_DRAG);
+        MAIN.postDelayed(ARM_DRAG, DRAG_AFTER_MS);
+        touchLog("down", live);
+        return true;
+    }
+
+    private static void moveDrag(MotionEvent e) {
+        Activity a = activityRef.get();
+        if (a == null || !pressed) return;
+        if (!dragging && SystemClock.uptimeMillis() - downAt >= DRAG_AFTER_MS) {
+            MAIN.removeCallbacks(ARM_DRAG);
+            ARM_DRAG.run();
+        }
+        if (!dragging || dragBounds.height() <= 0) return;
+        float y = initial + (e.getRawY() - downY) / dragBounds.height();
+        y = Math.max(.08f, Math.min(.92f, y));
+        if (CaptionSurface.isShorts()) DeepSeekConfig.saveShortsPosition(a, y);
+        else DeepSeekConfig.saveCaptionPosition(a, dragLandscape, y);
+        FrameLayout host = hostRef.get(), anchor = anchorRef.get();
+        TextView text = textRef.get();
+        if (host != null && anchor != null && text != null) {
+            placeVisibleText(
+                    a,
+                    host,
+                    anchor,
+                    text,
+                    dragBounds,
+                    classFrameWidth > 0 ? classFrameWidth : boxWidth > 0 ? boxWidth : anchor.getWidth(),
+                    dragLandscape);
+        }
+    }
+
+    private static void endDrag(View source) {
+        touchLog("up", dragBounds);
+        stopDrag(source);
+    }
+
+    private static void stopDrag(View v) {
+        pressed = false;
+        dragging = false;
+        MAIN.removeCallbacks(ARM_DRAG);
+        View source = dragSource;
+        dragSource = null;
+        release(source);
+        if (source != v) release(v);
+    }
+
+    private static void release(View v) {
+        if (v == null) return;
+        ViewParent parent = v.getParent();
+        if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
+    }
+
+    /**
+     * The invisible proxy lives in YouTube's top player-overlay container. It consumes DOWN only
+     * inside the visible caption box; every other DOWN falls through to the player controls. This
+     * is independent of the visual layer's z-order, so the caption can stay below the player UI
+     * while still receiving the gesture.
+     */
+    private static void ensureTouchProxy(Activity a) {
+        FrameLayout visual = hostRef.get();
+        FrameLayout host = CaptionSurface.touchHost();
+        if (host == null || host == visual) {
+            // The caption itself now lives in the topmost player-overlay container (above the
+            // controls), so its own TextView is the drag target. A second full-screen proxy would
+            // only add another view to hit-test and draw on every comments-sheet frame.
+            removeTouchProxy();
+            return;
+        }
+        FrameLayout current = touchHostRef.get();
+        if (touchProxy != null && touchProxy.getParent() == host && current == host) return;
+        removeTouchProxy();
+        View proxy = new View(a);
+        proxy.setTag("yydarlinker.deepseek.caption.touch");
+        proxy.setBackgroundColor(Color.TRANSPARENT);
+        proxy.setClickable(false);
+        proxy.setFocusable(false);
+        proxy.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        proxy.setOnTouchListener(
+                (v, e) -> {
+                    switch (e.getActionMasked()) {
+                        case MotionEvent.ACTION_DOWN:
+                            if (!captionHit(e)) return false;
+                            if (!beginDrag(v, e)) return false;
+                            ViewParent parent = v.getParent();
+                            if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
+                            return true;
+                        case MotionEvent.ACTION_MOVE:
+                            if (dragSource != v) return false;
+                            moveDrag(e);
+                            return true;
+                        case MotionEvent.ACTION_UP:
+                        case MotionEvent.ACTION_CANCEL:
+                            if (dragSource != v) return false;
+                            endDrag(v);
+                            return true;
+                        default:
+                            return false;
+                    }
+                });
+        host.addView(
+                proxy,
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        touchProxy = proxy;
+        touchHostRef = new WeakReference<>(host);
+        lastTouchProxyAt = SystemClock.uptimeMillis();
+        CaptionDiagnostics.mark(
+                a,
+                "CAPTION_TOUCH_PROXY",
+                "host="
+                        + host.getClass().getSimpleName()
+                        + ";"
+                        + host.getWidth()
+                        + "x"
+                        + host.getHeight());
+    }
+
+    private static void removeTouchProxy() {
+        if (touchProxy != null && touchProxy.getParent() instanceof ViewGroup)
+            ((ViewGroup) touchProxy.getParent()).removeView(touchProxy);
+        touchProxy = null;
+        touchHostRef.clear();
+        lastTouchProxyAt = 0;
+    }
+
+    private static boolean captionHit(MotionEvent e) {
+        TextView text = textRef.get();
+        if (text == null || !anchorVisible()) return false;
+        Rect rect = new Rect();
+        if (!text.getGlobalVisibleRect(rect)) return false;
+        return rect.contains((int) e.getRawX(), (int) e.getRawY());
+    }
+
+    private static void touchLog(String action, Rect bounds) {
+        Activity a = activityRef.get();
+        if (a == null || !DeepSeekConfig.displayTextDebugEnabled(a)) return;
+        TextView text = textRef.get();
+        Rect rect = new Rect();
+        if (text != null) text.getGlobalVisibleRect(rect);
+        CaptionDiagnostics.mark(
+                a,
+                "CAPTION_TOUCH",
+                "action="
+                        + action
+                        + ";caption="
+                        + rect.flattenToString()
+                        + ";drag="
+                        + bounds.flattenToString()
+                        + ";landscape="
+                        + dragLandscape
+                        + ";pressed="
+                        + pressed
+                        + ";dragging="
+                        + dragging
+                        + ";class="
+                        + presentationClass);
+    }
+
+    /** The rectangle the finger is really dragging over; never the stale content snapshot. */
+    private static Rect liveVideoBounds() {
+        FrameLayout host = hostRef.get();
+        Rect live = host == null ? null : CaptionSurface.currentVideoBounds(host);
+        if (live == null && host != null) live = CaptionSurface.refreshedVideoBounds(host);
+        if (live != null) return live;
+        return videoGeometry.isEmpty() ? null : new Rect(videoGeometry);
     }
 
     private static int dp(Context c, float x) {

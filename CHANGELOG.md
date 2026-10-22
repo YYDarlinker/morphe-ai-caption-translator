@@ -1,3 +1,21 @@
+## [1.5.6](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.5...v1.5.6) (2026-10-22)
+
+- Fix caption boxes running past the screen edge on the detail page after returning from fullscreen. A presentation class captured while the display was still rotating kept the old landscape frame width; the effective frame is now capped by the displayed video and the display, and the class cannot change before the viewport has settled.
+- Keep the reading size stable during player transitions. Fullscreen → detail swipes no longer shrink the caption before the page actually changes; a comments-sheet animation commits one class change as it crosses the threshold, then only moves the box.
+- Shorts captions now use the detail reading size, based on the displayed video width. Opening Shorts comments no longer changes the size or rebuilds the page.
+- A one-line caption page no longer inherits the two-line height of another page from the same event.
+- Draw captions above YouTube's player controls, so the progress bar and time labels cannot cover them. The topmost player-overlay container also receives the drag directly, removing the extra full-screen touch proxy.
+- Scale the caption with the comments-sheet animation itself: the on-screen video width now drives the reading size continuously (55.5↔44.5), while the binary layout class commits at the animation endpoint. The size now starts and finishes with the sheet instead of changing after it; fullscreen→detail slide gestures still wait, so captions do not shrink before the page switch.
+- Never paint YouTube's native subtitle view while the AI switch is on. The engine also starts from the new video's already-captured native selection at video switch instead of waiting for a CC-button scan, so the first video no longer shows the native style for a few seconds before AI.
+- Make the AI caption switch take effect immediately. Turning it on now clears an earlier captions-off latch, starts from the current signed native selection even while the native manager is being rebuilt, falls back to the video's source catalogue plus the native target language, and retries a few times if the track list is still arriving.
+- Follow the official CC control completely. Captions only appear while YouTube's CC is on and a native track is selected; switching to a video whose CC is off, or which has no default translated track, shows no AI target captions even if the previous video used Auto-translate. The AI switch chooses the drawing style, not whether captions exist, and the previous video's target is cleared at video switch.
+- Draw the caption background around the current page's actual line width, so a short page no longer shows the widest page's empty box.
+- Rebuilt for Morphe Patcher 2.0.0 and Morphe Patches 1.48.0. The bundle declares `Patcher-Version: 2.0.0`, so it is no longer applied through the 1.x compatibility path with its older fingerprint rules.
+- Adapted the hooks to the official 1.48.0 Captions additions and to Patcher 2.0.0 (ordered exact string filters and on-request resource decoding), so the AI patch can be used together with the official Captions patch.
+- Removed the add-on's own Auto-translate language list and its menu/metadata hooks. YouTube's native list is used as-is; Morphe's official Captions options own adding and sorting languages.
+- YouTube compatibility now follows the 21.x targets of Morphe Patches 1.48.0: 21.42.241, 21.41.525, 21.28.208, 21.23.492, 21.20.405 and 21.16.256. 20.x targets are no longer declared.
+- Fix a `VerifyError` in the player flyout menu on Morphe Patches 1.48.0 / YouTube 21.20.405: the quick-toggle hook passed `p0` as the panel, but the new official VideoDelay row uses that register as a Boolean scratch before the divider. The hook now passes the panel register read from the divider call itself.
+
 ## [1.5.5](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.4...v1.5.5) (2026-10-21)
 
 - Translated captions no longer disappear when the model's sentence boundary differs from an uploaded subtitle's cue boundary. Exact cue pages stay preferred; remaining translated events are shown as event pages, so the reproduced 14.5 s authored-caption block now stays translated for its full duration instead of showing “Translating…”.

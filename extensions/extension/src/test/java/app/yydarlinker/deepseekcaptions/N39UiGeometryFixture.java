@@ -37,7 +37,7 @@ class N39UiGeometryFixture {
     }
 
     @Implementation
-    public static Rect videoBounds(View h) {
+    public static Rect currentVideoBounds(View h) {
       return bounds == null ? null : new Rect(bounds);
     }
   }

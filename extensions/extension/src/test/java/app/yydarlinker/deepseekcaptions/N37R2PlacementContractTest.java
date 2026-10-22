@@ -18,18 +18,21 @@ public class N37R2PlacementContractTest {
  @After public void done(){h.done();CaptionPlayerAuthority.resetForTests();}
  void layout(){h.awaitPreparedCaption();host.measure(1073743104,1073742824);host.layout(0,0,1280,1000);host.getViewTreeObserver().dispatchOnPreDraw();host.measure(1073743104,1073742824);host.layout(0,0,1280,1000);}
  void show(String value,String lang,String id){CaptionOverlay.showEvent(value,()->true,id,1000,61000,2000,CaptionLanguageContext.explicit("en",lang).renderSpec);layout();}
- void center()throws Exception{FrameLayout a=h.anchor();assertTrue(Math.abs(a.getLeft()+a.getTranslationX()+a.getWidth()/2f-host.getScrollX()-N39UiGeometryFixture.bounds.exactCenterX())<=1);assertEquals(0f,a.getTranslationX(),0f);}
+ void center()throws Exception{FrameLayout a=h.anchor();assertTrue(Math.abs(a.getLeft()+a.getTranslationX()+a.getWidth()/2f-host.getScrollX()-N39UiGeometryFixture.bounds.exactCenterX())<=1);}
  @Test public void exactHalfPixelRoundingAndOffCenterRectangle(){assertEquals(74,CaptionHorizontalPlacement.physicalLeft(new Rect(71,0,672,300),596));assertEquals(71,CaptionHorizontalPlacement.physicalLeft(new Rect(71,0,672,300),601));}
  @Test public void paddingScrollLogicalMarginsAndStaleTranslationAreReplaced()throws Exception{
   show("Short caption","en","old");FrameLayout a=h.anchor();FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)a.getLayoutParams();p.setMarginStart(201);p.setMarginEnd(143);p.gravity=Gravity.RIGHT|Gravity.TOP;p.rightMargin=101;a.setLayoutParams(p);a.setTranslationX(137);a.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);host.setPadding(17,0,31,0);host.scrollTo(9,0);
   show("Short caption","en","new");center();assertFalse(((FrameLayout.LayoutParams)a.getLayoutParams()).isMarginRelative());assertEquals(Gravity.TOP|Gravity.LEFT,((FrameLayout.LayoutParams)a.getLayoutParams()).gravity);
  }
  @Test public void identicalPlacementDoesNotRequestAnotherLayout()throws Exception{
-  show("Short caption","en","once");FrameLayout a=h.anchor();FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)a.getLayoutParams();assertFalse(a.isLayoutRequested());CaptionHorizontalPlacement.place(host,a,N39UiGeometryFixture.bounds,p.width,p.height,p.topMargin);assertFalse(a.isLayoutRequested());assertSame(p,a.getLayoutParams());
+  show("Short caption","en","once");FrameLayout a=h.anchor();FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)a.getLayoutParams();assertFalse(a.isLayoutRequested());
+  int left=Math.round(a.getTranslationX()+host.getPaddingLeft()-host.getScrollX());
+  int top=Math.round(a.getTranslationY()+host.getPaddingTop()-host.getScrollY());
+  CaptionHorizontalPlacement.position(host,a,left,top,p.width,p.height);assertFalse(a.isLayoutRequested());assertSame(p,a.getLayoutParams());
  }
  @Test public void appDirectionSwitchPreservesTextPlanFontAndVerticalPosition()throws Exception{
-  show("Caption 42 — مرحبا!","en","one");String before=h.text().getText().toString();float size=h.text().getTextSize();int top=((FrameLayout.LayoutParams)h.anchor().getLayoutParams()).topMargin;String pages=N39UiGeometryFixture.field("pendingPages").toString();
-  host.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);CaptionOverlay.refreshStyle(h.a);layout();center();assertEquals(before,h.text().getText().toString());assertEquals(size,h.text().getTextSize(),0f);assertEquals(top,((FrameLayout.LayoutParams)h.anchor().getLayoutParams()).topMargin);assertEquals(pages,N39UiGeometryFixture.field("pendingPages").toString());
+  show("Caption 42 — مرحبا!","en","one");String before=h.text().getText().toString();float size=h.text().getTextSize();int top=Math.round(h.anchor().getTranslationY()+host.getPaddingTop()-host.getScrollY());String pages=N39UiGeometryFixture.field("pendingPages").toString();
+  host.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);CaptionOverlay.refreshStyle(h.a);layout();center();assertEquals(before,h.text().getText().toString());assertEquals(size,h.text().getTextSize(),0f);assertEquals(top,Math.round(h.anchor().getTranslationY()+host.getPaddingTop()-host.getScrollY()));assertEquals(pages,N39UiGeometryFixture.field("pendingPages").toString());
  }
  @Test public void allScenesAndConsecutiveShortsUseFreshRectangleWithoutTextWidthJump()throws Exception{
   Rect[] scenes={new Rect(71,35,672,375),new Rect(113,20,1074,610),new Rect(149,50,650,920),new Rect(81,130,682,990),new Rect(117,10,1078,600),new Rect(93,35,694,375)};int i=0;

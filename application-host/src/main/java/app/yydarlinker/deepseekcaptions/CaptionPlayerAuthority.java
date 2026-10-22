@@ -281,15 +281,27 @@ final class CaptionPlayerAuthority {
         else if (!isCompactType(playerType)) moveTo(REGULAR);
     }
 
+    /**
+     * The official enum has two different meanings that share a word: a player that <em>is</em>
+     * minimized (miniplayer, PiP, hidden) and a regular player that is <em>sliding</em> between
+     * sizes. The sliding types are animation states of the regular player; treating them as compact
+     * retracts the caption in the middle of YouTube's own detail &lt;-&gt; fullscreen drag and leaves
+     * it hidden when the gesture is cancelled. Only the exact non-playing states are compact.
+     */
     static boolean isCompactType(String rawType) {
-        String type = normalized(rawType);
-        return !type.isEmpty()
-                && (type.equals("NONE")
-                        || type.equals("HIDDEN")
-                        || type.contains("MINIMAL")
-                        || type.contains("MINIMIZED")
-                        || type.contains("PICTURE_IN_PICTURE")
-                        || type.contains("DISMISSED"));
+        switch (normalized(rawType)) {
+            case "NONE":
+            case "HIDDEN":
+            case "WATCH_WHILE_MINIMIZED":
+            case "WATCH_WHILE_PICTURE_IN_PICTURE":
+            case "WATCH_WHILE_SLIDING_MINIMIZED_DISMISSED":
+            case "INLINE_MINIMAL":
+                return true;
+            default:
+                // WATCH_WHILE_SLIDING_MINIMIZED_MAXIMIZED and WATCH_WHILE_SLIDING_MAXIMIZED_
+                // FULLSCREEN are regular-player transitions, not the compact state.
+                return false;
+        }
     }
 
     private static void notifyListeners() {

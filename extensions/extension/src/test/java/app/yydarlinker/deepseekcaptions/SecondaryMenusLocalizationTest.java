@@ -39,7 +39,7 @@ public class SecondaryMenusLocalizationTest {
         }
         audit.put(new JSONObject().put("language",CaptionTextResolver.locale(activity).toLanguageTag()).put("menu",menu).put("keys",new JSONArray(Arrays.asList(keys))).put("actual_widgets",true));
     }
-    @Test public void allFourteenLanguagesCoverConfirmProfilesRenameDeleteAddClearKeyAndLanguagePicker()throws Exception{
+    @Test public void allFourteenLanguagesCoverConfirmProfilesRenameDeleteAddClearKey()throws Exception{
         for(AppLanguage language:AppLanguage.values())if(language!=AppLanguage.DEFAULT){choose(language);int[] confirmations={0};
             for(String kind:new String[]{"clear_diagnostics","profile_clear_key"}){
                 Dialog dialog=CaptionSettingsDialogs.confirm(activity,text(kind),text(kind.equals("clear_diagnostics")?"clear_diagnostics_confirm":"profile_clear_key_summary"),text(kind),()->confirmations[0]++);required(kind,"cancel",kind);
@@ -54,9 +54,7 @@ public class SecondaryMenusLocalizationTest {
             click("profile_delete");required("profile-delete","profile_keep","profile_confirm_delete");click("profile_keep");ShadowDialog.getLatestDialog().dismiss();
             profiles.showProfiles();click("profile_add");required("add-profile","profile_new_summary","cancel","profile_save");click("cancel");
             profiles.clearCurrentKey();required("clear-key","profile_clear_key_summary","cancel","profile_clear_key");click("cancel");ApiProfiles.delete(activity,extra);
-            AlertDialog languages=new CaptionLanguagesPreference(activity).showLanguages();assertEquals(text("cancel"),languages.getButton(DialogInterface.BUTTON_NEGATIVE).getText());assertEquals(text("languages_save"),languages.getButton(DialogInterface.BUTTON_POSITIVE).getText());assertEquals(language==AppLanguage.AR?View.LAYOUT_DIRECTION_RTL:View.LAYOUT_DIRECTION_LTR,languages.getWindow().getDecorView().getLayoutDirection());
-            required("language-picker","cancel","languages_save");languages.dismiss();
-        }assertEquals(126,audit.length());
+        }assertEquals(112,audit.length());
     }
     @Test public void modelMenusAndEditorActionsUseAddonLanguageAndKeepModelIdsVerbatim()throws Exception{
         for(AppLanguage language:AppLanguage.values())if(language!=AppLanguage.DEFAULT){choose(language);LinearLayout root=new LinearLayout(activity);((FrameLayout)activity.findViewById(android.R.id.content)).addView(root,new FrameLayout.LayoutParams(-1,100));

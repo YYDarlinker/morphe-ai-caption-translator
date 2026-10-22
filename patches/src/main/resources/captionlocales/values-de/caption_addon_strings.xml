@@ -223,19 +223,8 @@
     <string name="cap_ai_quick_toggle_on" formatted="false">"KI-Untertitelübersetzung · Ein"</string>
     <string name="cap_ai_quick_toggle_off" formatted="false">"KI-Untertitelübersetzung · Aus"</string>
     <string name="cap_ai_summary" formatted="false">"Wähle nach dem Aktivieren eine Sprache in der YouTube-Liste „Automatisch übersetzen“, um Untertitel mit deinem eingerichteten KI-Dienst in Echtzeit zu übersetzen."</string>
-    <string name="cap_languages_title" formatted="false">"Sprachen für automatische Übersetzung"</string>
-    <string name="cap_languages_summary" formatted="false">"Füge die ausgewählten Sprachen zur YouTube-Liste „Automatisch übersetzen“ hinzu. Du kannst mehrere Sprachen auswählen."</string>
-    <string name="cap_languages_count" formatted="false">"%1$d Sprachen ausgewählt"</string>
-    <string name="cap_languages_save" formatted="false">"Speichern"</string>
-    <string name="cap_languages_existing" formatted="false">"Bereits vorhanden"</string>
-    <string name="cap_languages_new" formatted="false">"Hinzugefügt"</string>
-    <string name="cap_languages_unavailable" formatted="false">"Nicht verfügbar"</string>
-    <string name="cap_languages_empty" formatted="false">"Keine Sprache ausgewählt; das native Menü bleibt unverändert"</string>
-    <string name="cap_languages_entry" formatted="false">"%1$s · %2$s"</string>
     <string name="cap_model_empty" formatted="false">"Die Modell-ID darf nicht leer sein"</string>
     <string name="cap_api_address_invalid" formatted="false">"Gib eine gültige OpenAI-kompatible HTTP(S)-Basis-URL ohne eingebettete Zugangsdaten oder Fragment ein."</string>
-    <string name="cap_language_zh_hans" formatted="false">"Chinesisch (vereinfacht)"</string>
-    <string name="cap_language_zh_hant" formatted="false">"Chinesisch (traditionell)"</string>
     <string name="cap_paste" formatted="false">"Einfügen"</string>
     <string name="cap_select_all" formatted="false">"Alles auswählen"</string>
     <string name="cap_value_retained" formatted="false">"%1$s; der letzte gültige Wert bleibt erhalten"</string>

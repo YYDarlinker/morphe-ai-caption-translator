@@ -32,7 +32,8 @@ import static org.junit.Assert.*;
         shadows = {
             NativeOnlyCaptionTest.Flags.class,
             NativeOnlyCaptionTest.Tracks.class,
-            NativeOnlyCaptionTest.Core.class
+            NativeOnlyCaptionTest.Core.class,
+            NativeOnlyCaptionTest.Cc.class
         })
 public class NativeOnlyCaptionTest {
     enum Origin { PREFERRED_TRACK, DEFAULT }
@@ -48,6 +49,7 @@ public class NativeOnlyCaptionTest {
     static final List<String> activations = new ArrayList<>();
     static final List<String> sources = new ArrayList<>();
     static String currentVideo = "";
+    static boolean ccOn = true;
 
     static final class Track {
         final String language, url, vss;
@@ -93,11 +95,6 @@ public class NativeOnlyCaptionTest {
         public static List<?> nativeTracks(Object manager) {
             return nativeTracks;
         }
-
-        @Implementation
-        public static CharSequence displayName(Object track) {
-            return ((Track) track).language;
-        }
     }
 
     @Implements(CaptionActions.class)
@@ -134,6 +131,14 @@ public class NativeOnlyCaptionTest {
 
         @Implementation
         public static void refreshConfiguration(Context context) {}
+    }
+
+    @Implements(CaptionButtonController.class)
+    public static class Cc {
+        @Implementation
+        public static boolean captionsKnownOn() {
+            return ccOn;
+        }
     }
 
     private Activity activity;
@@ -179,6 +184,7 @@ public class NativeOnlyCaptionTest {
                     }
                 });
         CaptionChoice.reset();
+        ccOn = true;
         translated.clear();
         nativeTracks.clear();
         activations.clear();
@@ -210,6 +216,18 @@ public class NativeOnlyCaptionTest {
         assertTrue(CaptionChoice.translates());
         assertEquals("native translated selection starts the AI overlay", 1, activations.size());
         assertTrue(activations.get(0), activations.get(0).contains("tlang=zh-Hans"));
+    }
+
+    @Test
+    public void aNativeTrackWhileTheCcControlIsOffDoesNotStartVisibleAiCaptions() {
+        ccOn = false;
+        Track zh = new Track("zh-Hans", TRANSLATED, "t.zh-Hans");
+        translated.add(zh);
+
+        NativeCaptionBridge.onNativeSelection(new Object(), zh, Origin.DEFAULT);
+
+        assertTrue("official CC off must keep the AI overlay inactive", activations.isEmpty());
+        assertEquals("the track remains available for a later CC-on event", "zh-Hans", CaptionChoice.language());
     }
 
     @Test

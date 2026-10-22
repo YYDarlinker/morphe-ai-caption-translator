@@ -21,10 +21,14 @@ fun main(args:Array<String>){
     var failure:Throwable?=null
     Patcher(PatcherConfig(apkFile=file("input"),temporaryFilesPath=scratch.resolve("patcher"),fileWorkspacePath=scratch.resolve("workspace"))).use { patcher ->
         val ai=names.contains("AI caption translator")
+        // APKMirror's SECONDARY builds append a suffix to the version name; the compatibility
+        // targets name the plain version.
+        val versionName=patcher.context.packageMetadata.versionName.substringBefore('-')
         // Native-only addons are intentionally exercised without selecting any official patch.
+        // Experimental targets are included: the newer APKs are published as experimental by Morphe.
         val selected=if(ai) official.filter { p->p.default && (p.compatibility?.any { pkg ->
             pkg.packageName==null || pkg.packageName==patcher.context.packageMetadata.packageName && pkg.targets.any { target ->
-                !target.isExperimental && (target.version==null||target.version==patcher.context.packageMetadata.versionName)
+                target.version==null||target.version==versionName
             }
         }?:true) }.toMutableList() else mutableListOf()
         if(ai)check(selected.any { it.name=="Captions" }) { "Official Captions missing" }
@@ -65,7 +69,7 @@ fun main(args:Array<String>){
             println("REAL_PATCHER_DEX_SERIALIZED ${output.resolve("serialized-dex.zip").absolutePath}")
         }
         val flags=bytecode.classDefBy("Lapp/yydarlinker/deepseekcaptions/CaptionAddonSupport;")
-        val expected=mapOf("aiInstalled" to ai,"simplifiedInstalled" to names.contains("Add Simplified Chinese to auto-translate"))
+        val expected=mapOf("aiInstalled" to ai)
         for((name,on) in expected){
             val method=flags.methods.single { it.name==name }
             val literal=method.implementation!!.instructions.filterIsInstance<com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction>().single().wideLiteral
@@ -91,8 +95,6 @@ fun main(args:Array<String>){
             }
             throw IllegalStateException("Patch failed; real partial state preserved",failure)
         }
-        check(((hooks["augmentTranslations"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include the generic language-menu seam"}
-        check(((hooks["augmentMetadata"]?:0)>0)==(ai || expected.getValue("simplifiedInstalled"))){"N30 AI root must include generic translation metadata"}
         check(((hooks["suppressNativeDraw"]?:0)>0)==ai)
         check((hooks["initialize"]?:0)==1){"Duplicate shared initialization"}
         check((hooks["onNativeTrackApplied"]?:0)==1){"Shared automatic/manual caption dispatcher must be hooked"}

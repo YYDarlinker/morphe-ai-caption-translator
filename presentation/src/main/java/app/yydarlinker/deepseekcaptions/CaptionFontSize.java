@@ -31,6 +31,15 @@ final class CaptionFontSize {
         return fullScreenGlyphHeightPx(tier) / FULL_SCREEN_WIDTH_PX;
     }
 
+    /**
+     * The glyph/display-width ratio of a player mode. Full screen and detail differ by 55.5/44.5 at
+     * their reference widths, which is the only size change a mode switch may cause; a transient
+     * video rectangle inside the same mode is not a mode.
+     */
+    static float modeRatio(int tier, boolean fullScreen) {
+        return fullScreen ? fullScreenRatio(tier) : detailRatio(tier);
+    }
+
     static int nearestTierForDetailGlyphHeight(float glyphHeightPx) {
         if (Float.isNaN(glyphHeightPx)) return DEFAULT_TIER;
         int nearest = 0;

@@ -31,12 +31,6 @@ private const val SETTINGS_FRAGMENT = "Lapp/morphe/extension/shared/settings/pre
 /** The name that the wrapped original of the settings fragment's long-press handler gets. */
 private const val ORIGINAL_LONG_CLICK = "aiCaptionOriginalLongClick"
 
-/** The wire schemas of YouTube's translation metadata and of one entry of it, as they were verified. */
-private const val METADATA_SCHEMA = "\u0001\u0007\u0000\u0001\u0001\u0007\u0007\u0000\u0004\u0004\u0001Л\u0002" +
-    "\u001b\u0003Л\u0004င\u0000\u0005ᐉ\u0001\u0006\u0016\u0007ᐉ\u0002"
-private const val TRANSLATION_ENTRY_SCHEMA = "\u0001\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0002\u0001\u0001" +
-    "ဈ\u0000\u0002ᐉ\u0001\u0003\u0016\u0004\u0016"
-
 /**
  * Binds the stubs of the extension's `NativeCaptionBridge` to the obfuscated caption classes of YouTube and hooks the
  * native track flow. It runs once, after every selected patch has executed, because the hooks depend on which
@@ -54,17 +48,11 @@ private class TrackModel(
     val track: ClassDef,
     val language: FieldReference,
     val vss: FieldReference,
-    val display: FieldReference,
     val url: FieldReference,
     /** The caption model's method that lists the tracks YouTube can translate. */
     val translatedList: Method,
+    /** The caption track builder, read only for the videoId property of the caption model. */
     val builder: ClassDef,
-    val copyConstructor: Method,
-    val languageSetter: Method,
-    val urlSetter: Method,
-    val vssSetter: Method,
-    val builderDisplay: FieldReference,
-    val build: Method,
 )
 
 private class NativeCaptionBridgeInstaller(
@@ -82,11 +70,6 @@ private class NativeCaptionBridgeInstaller(
         val selector = findTrackSelector(model.track)
 
         bindTrackAccessors(model)
-        if (translation) {
-            bindCloneTranslation(model)
-            bindRelabelTranslation(model)
-            hookTranslatedTrackList(model)
-        }
         hookTrackApplied(model, selector)
 
         val owner = context.classDefBy(selector.definingClass)
@@ -94,7 +77,6 @@ private class NativeCaptionBridgeInstaller(
         bindModelAccessors(model, owner, modelField)
         hookOriginalTrackList(model)
         if (translation) {
-            hookLanguageMetadata(model)
             quickToggle!!()
             hookNativeDraw(renderer!!)
             hookPathCopy(pathCopy!!.first, pathCopy.second)
@@ -106,7 +88,7 @@ private class NativeCaptionBridgeInstaller(
     // region Discovery
 
     private fun findTrackModel(): TrackModel {
-        val track = context.getAllClassesWithString("AUTO_TRANSLATE_CAPTIONS_OPTION")
+        val track = context.classDefByStrings("AUTO_TRANSLATE_CAPTIONS_OPTION")
             .map { context.classDefBy(it.type) }
             .filter { "Landroid/os/Parcelable;" in it.interfaces }
             .unique("caption model")
@@ -117,6 +99,7 @@ private class NativeCaptionBridgeInstaller(
         fun stringFields(method: Method) = method.code().mapNotNull { it.field() }
             .filter { it.definingClass == track.type && it.type == STRING }
         val language = (stringFields(sentinel).ifEmpty {
+            // The sentinel can compare through a getter instead of reading the field directly.
             val getters = sentinel.code().mapNotNull { it.call() }
                 .filter { it.definingClass == track.type && it.parameterTypes.isEmpty() && it.returnType == STRING }
                 .map { it.id() }
@@ -126,10 +109,7 @@ private class NativeCaptionBridgeInstaller(
             .flatMap { it.code().mapNotNull { instruction -> instruction.field() } }
             .filter { it.type == STRING }
             .distinctBy { it.id() }.unique("vss field")
-        val display = track.methods.filter { it.name == "toString" }
-            .flatMap { it.code().mapNotNull { instruction -> instruction.field() } }
-            .filter { it.type == "Ljava/lang/CharSequence;" }.unique("display field")
-        val translatedList = context.getAllClassesWithString("&tlang=")
+        val translatedList = context.classDefByStrings("&tlang=")
             .flatMap { context.classDefBy(it.type).methods.toList() }
             .filter { it.hasText("&tlang=") && it.parameterTypes.isEmpty() && it.returnType == LIST }
             .unique("translated track list")
@@ -142,46 +122,7 @@ private class NativeCaptionBridgeInstaller(
             .filter { it.isStatic() && it.parameterTypes.isEmpty() && it.returnType.startsWith("L") && it.returnType != track.type }
             .unique("track builder factory")
         val builder = context.classDefBy(builderFactory.returnType)
-        val copy = builder.methods
-            .filter { it.name == "<init>" && it.parameterNames() == listOf(track.type) }
-            .unique("immutable track copy constructor")
-
-        /** The builder field that the copy constructor fills from [field] of the track. */
-        fun builderField(field: FieldReference): FieldReference {
-            val code = copy.code()
-            return code.mapIndexedNotNull { index, instruction ->
-                if (instruction.field()?.id() == field.id()) code.getOrNull(index + 1)?.field() else null
-            }.filter { it.definingClass == builder.type }.unique("builder field ${field.name}")
-        }
-
-        fun setter(field: FieldReference): Method {
-            val target = builderField(field)
-            return builder.methods
-                .filter { method ->
-                    method.parameterNames() == listOf(STRING) && method.returnType == "V" &&
-                        method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == target.id() }
-                }
-                .unique("builder setter ${field.name}")
-        }
-
-        val languageSetter = setter(language)
-        val urlSetter = setter(url)
-        val vssSetter = setter(vss)
-        val builderDisplay = builderField(display)
-        val build = builder.methods.filter { it.parameterTypes.isEmpty() && it.returnType == track.type }
-            .unique("build track")
-
-        // The generated smali calls these from another class.
-        for (method in listOf(copy, languageSetter, urlSetter, vssSetter, build)) {
-            if (!AccessFlags.PUBLIC.isSet(method.accessFlags)) throw PatchException("AI captions: non-public builder")
-        }
-        if (!AccessFlags.PUBLIC.isSet(builder.fields.first { it.name == builderDisplay.name }.accessFlags)) {
-            throw PatchException("AI captions: private display field")
-        }
-        return TrackModel(
-            track, language, vss, display, url, translatedList,
-            builder, copy, languageSetter, urlSetter, vssSetter, builderDisplay, build,
-        )
+        return TrackModel(track, language, vss, url, translatedList, builder)
     }
 
     /**
@@ -189,22 +130,36 @@ private class NativeCaptionBridgeInstaller(
      * private helper is split off a public wrapper; the model-ready initializer calls the one that is hooked.
      */
     private fun findDefaultTrack(owner: ClassDef, model: TrackModel): Pair<Method, FieldReference> {
+        val modelType = model.translatedList.definingClass
         val candidates = owner.methods.filter { it.parameterTypes.isEmpty() && it.returnType == model.track.type }
-        val modelField = candidates.flatMap { it.code().mapNotNull { instruction -> instruction.field() } }
-            .first { it.definingClass == owner.type && it.type == model.translatedList.definingClass }
+        // The official preferred-language patch adds further no-argument track helpers, so the model
+        // field is read from the initializer that stores the model and calls the default selector.
         val initializer = owner.methods.filter { method ->
             method.returnType == "V" && method.parameterTypes.size == 2 &&
-                method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == modelField.id() } &&
+                method.code().any { instruction ->
+                    instruction.opcode == Opcode.IPUT_OBJECT && instruction.field()?.let { field ->
+                        field.definingClass == owner.type && field.type == modelType
+                    } == true
+                } &&
                 method.code().any { call -> candidates.any { it.id() == call.call()?.id() } }
         }.unique("caption model ready initializer")
         val called = candidates.filter { candidate -> initializer.code().any { it.call()?.id() == candidate.id() } }
+        val fields = initializer.code().filter { it.opcode == Opcode.IPUT_OBJECT }
+            .mapNotNull { it.field() }
+            .filter { it.definingClass == owner.type && it.type == modelType }
+            .distinctBy { it.id() }
+        // An initializer can hold more than one model-shaped field (for example a default and the
+        // current one). The default selector that the initializer calls reads the one in use.
+        val modelField = fields.singleOrNull() ?: fields.filter { field ->
+            called.any { candidate -> candidate.code().any { it.field()?.id() == field.id() } }
+        }.unique("caption model field")
         return called.unique("native default selector") to modelField
     }
 
     /** The method of the caption manager that selects a track for the "all captions" menu. */
     private fun findTrackSelector(track: ClassDef): Method {
         val log = "setSubtitleTrack name:%s languageCode:%s languageName:%s format:%d trackName:%s vssid:%s videoid:%s"
-        val logged = context.getAllClassesWithString(log)
+        val logged = context.classDefByStrings(log)
             .flatMap { context.classDefBy(it.type).methods.toList() }
             .filter { it.hasText(log) }
 
@@ -269,9 +224,16 @@ private class NativeCaptionBridgeInstaller(
         return fragment to handler
     }
 
-    /** The caption model's list of the tracks of the video, without the translations. */
+    /**
+     * The caption model's list of the tracks of the video, without the translations. The official
+     * Auto-translate patch also adds a no-argument List helper to this class, so the direct-tracks
+     * getter is identified by its AUTO_TRANSLATE sentinel instead of "the other List method".
+     */
     private fun findNativeList(model: TrackModel) = context.classDefBy(model.translatedList.definingClass).methods
-        .filter { it.parameterTypes.isEmpty() && it.returnType == LIST && it.name != model.translatedList.name }
+        .filter {
+            it.parameterTypes.isEmpty() && it.returnType == LIST && it.name != model.translatedList.name &&
+                it.hasText("AUTO_TRANSLATE_CAPTIONS_OPTION")
+        }
         .unique("native original track list")
 
     // endregion
@@ -287,59 +249,6 @@ private class NativeCaptionBridgeInstaller(
         bridge.bindStub("language", 3, read(model.language))
         bridge.bindStub("vss", 3, read(model.vss))
         bridge.bindStub("url", 3, read(model.url))
-        bridge.bindStub("displayName", 3, read(model.display))
-    }
-
-    /** The translation of a track: the copy of an original track with the language, label, URL and vss of the target. */
-    private fun bindCloneTranslation(model: TrackModel) {
-        bridge.bindStub(
-            "cloneTranslation",
-            3,
-            """
-                check-cast p0, ${model.track.type}
-                new-instance v0, ${model.builder.type}
-                invoke-direct {v0, p0}, ${model.copyConstructor.id()}
-                move-object v1, p1
-                invoke-virtual {v0, v1}, ${model.languageSetter.id()}
-                invoke-static {p1}, $BRIDGE->translationLabel($STRING)$STRING
-                move-result-object v1
-                iput-object v1, v0, ${model.builderDisplay.id()}
-                iget-object v1, p0, ${model.url.id()}
-                invoke-static {v1, p1}, $BRIDGE->translationUrl($STRING$STRING)$STRING
-                move-result-object v1
-                invoke-virtual {v0, v1}, ${model.urlSetter.id()}
-                iget-object v1, p0, ${model.vss.id()}
-                invoke-static {v1, p1}, $BRIDGE->translationVss($STRING$STRING)$STRING
-                move-result-object v1
-                invoke-virtual {v0, v1}, ${model.vssSetter.id()}
-                invoke-virtual {v0}, ${model.build.id()}
-                move-result-object v0
-                return-object v0
-            """,
-        )
-    }
-
-    /**
-     * A copy of an existing translation with the same language, URL and vss, and only the display
-     * label replaced. A selected native Chinese entry keeps its native object otherwise, but the
-     * menu must show the product label rather than YouTube's "中文（繁体中文）".
-     */
-    private fun bindRelabelTranslation(model: TrackModel) {
-        bridge.bindStub(
-            "relabelTranslation",
-            3,
-            """
-                check-cast p0, ${model.track.type}
-                new-instance v0, ${model.builder.type}
-                invoke-direct {v0, p0}, ${model.copyConstructor.id()}
-                invoke-static {p1}, $BRIDGE->translationLabel($STRING)$STRING
-                move-result-object v1
-                iput-object v1, v0, ${model.builderDisplay.id()}
-                invoke-virtual {v0}, ${model.build.id()}
-                move-result-object v0
-                return-object v0
-            """,
-        )
     }
 
     /** The caption model of the manager, and the lists of tracks it holds. */
@@ -420,14 +329,6 @@ private class NativeCaptionBridgeInstaller(
             // Replace the labeled instruction itself: branch targets must execute the hook.
             replaceInstruction(index, hook)
             addInstructions(index + 1, after)
-        }
-    }
-
-    /** The extension adds the translations that the user selected to the list of translated tracks. */
-    private fun hookTranslatedTrackList(model: TrackModel) {
-        mutable(model.translatedList).hookReturns { register ->
-            "invoke-static/range {v$register .. v$register}, $BRIDGE->augmentTranslations($LIST)$LIST" to
-                "move-result-object v$register\nreturn-object v$register"
         }
     }
 
@@ -520,108 +421,6 @@ private class NativeCaptionBridgeInstaller(
                 rendererIndex + 1,
                 "invoke-virtual {v${registers.registerC}, v${registers.registerD}, v${registers.registerE}}, ${renderer.call()!!.id()}",
             )
-        }
-    }
-
-    /**
-     * Adds the selected languages to the metadata that YouTube builds the "Auto-translate" menu from. Both the
-     * protobuf settings and the legacy CC rows read the same metadata field.
-     */
-    private fun hookLanguageMetadata(model: TrackModel) {
-        val listCode = model.translatedList.code()
-        val metadataField = listCode.mapNotNull { it.field() }
-            .first { it.definingClass == model.translatedList.definingClass && it.type.startsWith("L") }
-        val metadata = context.classDefBy(metadataField.type)
-        val metadataBase = context.classDefBy(metadata.superclass!!)
-        val schema = metadata.methods.flatMap { it.code() }.mapNotNull { it.text() }
-            .filter { it.startsWith("\u0001\u0007") }.unique("translation metadata schema")
-        if (schema != METADATA_SCHEMA) throw PatchException("AI captions: metadata wire schema changed")
-
-        // Field 3 of the verified schema holds the translations; it is bound through the schema's object table.
-        val schemaCode = metadata.methods.first { method -> method.code().any { it.text() == schema } }.code()
-        val schemaNames = schemaCode.mapNotNull { it.text() }.filter { name -> metadata.fields.any { it.name == name } }
-        val translationField = metadata.fields.firstOrNull { it.name == schemaNames.getOrNull(3) }
-            ?: throw PatchException("AI captions: translation field missing")
-        listCode.filter { it.opcode == Opcode.CHECK_CAST }
-            .map { (it as ReferenceInstruction).reference.toString() }.distinct()
-            .mapNotNull { context.classDefByOrNull(it) }
-            .filter { cls -> cls.methods.any { method -> method.code().any { it.text() == TRANSLATION_ENTRY_SCHEMA } } }
-            .unique("translation entry wire schema")
-
-        val parse = metadataBase.methods
-            .filter {
-                it.name == "parseFrom" && it.parameterNames() == listOf(metadataBase.type, "[B") &&
-                    AccessFlags.PUBLIC.isSet(it.accessFlags)
-            }
-            .unique("public metadata parser")
-        val default = metadata.fields.filter { it.type == metadata.type && AccessFlags.STATIC.isSet(it.accessFlags) }
-            .unique("metadata default")
-        bridge.bindStub(
-            "augmentMetadata",
-            3,
-            """
-                check-cast p0, ${metadata.type}
-                invoke-virtual {p0}, ${metadata.type}->toByteArray()[B
-                move-result-object v0
-                invoke-static {v0}, ${EXTENSION}CaptionLanguageMetadata;->addSimplified([B)[B
-                move-result-object v0
-                sget-object v1, ${default.id()}
-                invoke-static {v1, v0}, ${parse.id()}
-                move-result-object v0
-                return-object v0
-            """,
-        )
-
-        // Where the model stores the metadata.
-        val constructors = context.classDefBy(model.translatedList.definingClass).methods.filter { method ->
-            method.name == "<init>" && method.code().any { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == metadataField.id() }
-        }
-        if (constructors.isEmpty()) throw PatchException("AI captions: metadata constructor missing")
-        for (constructor in constructors) {
-            val writeIndex = constructor.code().indexOfFirst { it.opcode == Opcode.IPUT_OBJECT && it.field()?.id() == metadataField.id() }
-            val write = constructor.code()[writeIndex] as TwoRegisterInstruction
-            mutable(constructor).apply {
-                replaceInstruction(
-                    writeIndex,
-                    "invoke-static/range {v${write.registerA} .. v${write.registerA}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT",
-                )
-                addInstructions(
-                    writeIndex + 1,
-                    "move-result-object v${write.registerA}\ncheck-cast v${write.registerA}, ${metadata.type}\n" +
-                        "iput-object v${write.registerA}, v${write.registerB}, ${metadataField.id()}",
-                )
-            }
-        }
-
-        // Where the app reads the translation entries from it.
-        class Read(val method: Method, val index: Int, val destination: Int, val receiver: Int)
-
-        val reads = mutableListOf<Read>()
-        context.classDefForEach { cls ->
-            if (cls.type == metadata.type || cls.type.startsWith("Lapp/")) return@classDefForEach
-            for (method in cls.methods) {
-                method.code().forEachIndexed { index, instruction ->
-                    if (instruction.opcode == Opcode.IGET_OBJECT && instruction.field()?.id() == translationField.id()) {
-                        val read = instruction as TwoRegisterInstruction
-                        reads.add(Read(method, index, read.registerA, read.registerB))
-                    }
-                }
-            }
-        }
-        if (reads.isEmpty()) throw PatchException("AI captions: no translation metadata consumers")
-        for (hooks in reads.groupBy { it.method.id() }.values) {
-            val method = mutable(hooks.first().method)
-            for (hook in hooks.sortedByDescending { it.index }) {
-                method.replaceInstruction(
-                    hook.index,
-                    "invoke-static/range {v${hook.receiver} .. v${hook.receiver}}, $BRIDGE->augmentMetadata($OBJECT)$OBJECT",
-                )
-                method.addInstructions(
-                    hook.index + 1,
-                    "move-result-object v${hook.destination}\ncheck-cast v${hook.destination}, ${metadata.type}\n" +
-                        "iget-object v${hook.destination}, v${hook.destination}, ${translationField.id()}",
-                )
-            }
         }
     }
 

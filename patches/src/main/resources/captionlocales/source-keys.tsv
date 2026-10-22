@@ -146,8 +146,6 @@ As legendas soam naturais.	cap_preview
 कैप्शन सहज लगें।	cap_preview
 Subtitel terbaca wajar.	cap_preview
 Phụ đề đọc tự nhiên.	cap_preview
-自动翻译语言	cap_languages_title
-选择要加入 YouTube 自动翻译菜单的语言	cap_languages_summary
 Invalid API URL: use an HTTP(S) OpenAI-compatible base URL without credentials or fragments	cap_api_address_invalid
 模型不能为空	cap_model_empty
 Loading diagnostics…	cap_diagnostics_loading

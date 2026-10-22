@@ -69,21 +69,6 @@
       "bytes": 307
     },
     {
-      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguageMetadata.java",
-      "sha256": "1e2b9e1f8864f1d77001f76bef0c075239386572b01e296fa51a9c911c8bd002",
-      "bytes": 4814
-    },
-    {
-      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguageSelection.java",
-      "sha256": "238b13e4a818ac3727f79b8af0538890438cf5370f1f07d0d894c1ac03f624a6",
-      "bytes": 2135
-    },
-    {
-      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLanguagesPreference.java",
-      "sha256": "1d00286d73185f7460908beafbedd2dfd9e5ecd1dd96a9185cfe9d85ca30e2bd",
-      "bytes": 4132
-    },
-    {
       "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/CaptionLocaleSubscription.java",
       "sha256": "a259d780a513bee3adff28bc59d63a0811615b8684526220daa528430be29331",
       "bytes": 4772
@@ -187,11 +172,6 @@
       "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/InlineCaptionEditor.java",
       "sha256": "e0d9851da8511b2abb2b98300836ae0717415e6952af9bbd0881349115e4a7b2",
       "bytes": 6134
-    },
-    {
-      "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/LanguageMenuOrder.java",
-      "sha256": "bed8df11267376f8156be63152418de7f1f552a07ab8a5dd49a563d7b5bba65f",
-      "bytes": 2339
     },
     {
       "path": "ui/src/main/java/app/yydarlinker/deepseekcaptions/ProfileActionStrip.java",

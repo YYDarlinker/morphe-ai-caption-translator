@@ -8,13 +8,14 @@
 - 版本：1.5.7；发布构建 `release-1.5.7`（N65 评论区端点预排/字号与布局解耦 + N66–N68 AI 会话意图/恢复与滚动字幕重建）。
   官方 Morphe Patches 1.48.0 / Patcher 2.0.0；YouTube 只声明 21.x 目标：21.42.241、21.41.525、
   21.28.208、21.23.492、21.20.405、21.16.256（按用户要求不再声明或适配 20.x）
-- 发布状态：已发布 **1.5.7**：annotated tag `v1.5.7`，GitHub release
+- 发布状态：已发布 **1.5.7**：annotated tag `v1.5.7`，发布提交 `18c6141`；`main` 与 `dev`
+  已指向该提交。GitHub release
   `https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.7`，资产
   `patches-1.5.7.mpp` **587,256 B** /
-  `41D96E4B65ED9419854E02013BA71D73B884AD444683DDD559EC32E74DA77159`；
-  `patches-list.json`、`patches-bundle.json`、CHANGELOG、README 均已指向 1.5.7。
-  上一发布 1.5.6：tag `v1.5.6` → `2b96358`，资产 `patches-1.5.6.mpp` 578,441 B / `E272FCE1…`。
-  旧本地 1.5.5 资产（`CB4D3135…`）保留在证据目录
+  `41D96E4B65ED9419854E02013BA71D73B884AD444683DDD559EC32E74DA77159`；匿名下载校验通过
+  （大小与 SHA-256 一致）。`patches-list.json`、`patches-bundle.json`、CHANGELOG、README
+  均已指向 1.5.7。上一发布 1.5.6：tag `v1.5.6` → `2b96358`，资产
+  `patches-1.5.6.mpp` 578,441 B / `E272FCE1…`。旧本地 1.5.5 资产（`CB4D3135…`）保留在证据目录
 - 模块：`caption-contracts`、`caption-shared`、`translation-core`、`infrastructure`、`application-host`、`presentation`、`ui`、`patches`、`ui-preview`
 - 开发环境：`.devenv/`（JDK 21、Python 3.12、Android SDK 35/36、Robolectric 均在 `work/toolchain/`；Gradle home 为 `work/gradle-home/`）
 
@@ -1092,8 +1093,9 @@
   本地化 232×14；真实 6.7 MB JSON3 从 20,939 words 降到 **11,090 words**，开头与 58 s 文本不再
   重复/交错；`verifyIntegrationSources errors=[]`。
 - 发布：MPP `build/n39/gradle/patches/libs/patches-1.5.7.mpp` **587,256 B**，SHA-256
-  `41D96E4B65ED9419854E02013BA71D73B884AD444683DDD559EC32E74DA77159`；manifest
-  `Version: 1.5.7`、`Patcher-Version: 2.0.0`；内嵌 MPE 含 `release-1.5.7`；
+  `41D96E4B65ED9419854E02013BA71D73B884AD444683DDD559EC32E74DA77159`；发布提交
+  `18c6141` / tag `v1.5.7`；GitHub release 资产匿名下载为 587,256 B，SHA-256 与上述一致。
+  manifest `Version: 1.5.7`、`Patcher-Version: 2.0.0`；内嵌 MPE 含 `release-1.5.7`；
   `patches-list.json` / `patches-bundle.json` / CHANGELOG / README 均为 1.5.7；
   `validate_morphe_metadata.py 1.5.7`、`verify_bundle.py 1.5.7`、
   `test_release_contract.py` 均通过。README 的 1.5.7 说明只保留三条体验差异：

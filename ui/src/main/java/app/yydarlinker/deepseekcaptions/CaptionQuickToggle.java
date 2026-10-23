@@ -119,10 +119,19 @@ public final class CaptionQuickToggle {
             return false;
         }
         if (!CaptionSessionReconciler.onUserSwitched(context, enabled)) return false;
+        CaptionSessionIntent intent = CaptionSessionIntent.load(context);
+        // A switch-on without a target cannot start anything: the target only ever comes from
+        // YouTube's own caption menu. Roll the whole act back so an unusable switch cannot suppress
+        // the native captions either; the caller sees a switch-on that did not take effect.
+        if (enabled && !intent.hasTarget()) {
+            CaptionSessionIntent.userToggled(context, false);
+            DeepSeekConfig.saveEnabled(context, false);
+            toast(context, "choose_translation");
+            return false;
+        }
         CaptionActions.refreshConfiguration(context);
         CaptionMusicSuppressor.forceNativeRendererScan();
         CaptionMusicSuppressor.kick();
-        CaptionSessionIntent intent = CaptionSessionIntent.load(context);
         CaptionDiagnostics.mark(
                 context,
                 "ENGINE_MODE_SAVED",

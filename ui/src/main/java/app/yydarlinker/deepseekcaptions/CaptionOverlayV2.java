@@ -136,8 +136,39 @@ final class CaptionOverlay {
     private static CaptionPresentationClass.Kind presentationClass;
 
     private static int classFrameWidth, reducedVideoWidth;
+
+    /**
+     * The class width a presentation-class commit chose, before any stable-width re-plan. A
+     * narrower video re-plans against its own width but can never grow the box past this ceiling.
+     */
+    private static int classBaseWidth;
+
+    /**
+     * The last pre-draw video rectangle. The geometry is settled only after three consecutive
+     * samples with exactly the same width; one different sample starts the count again. A
+     * rectangle that alternates between two values therefore never settles, while the old
+     * "this frame equals the previous one" test settled on every second frame of such a flicker.
+     * No time constant is involved: the count is of samples, not of milliseconds.
+     */
+    private static final Rect previousGeometrySample = new Rect();
+
+    private static final int STABLE_GEOMETRY_SAMPLES = 3;
+    private static int stableGeometrySamples;
+
     private static int stableTextWidth, stableTextLines;
     private static long nextPageAt;
+
+    /**
+     * The glyph height actually painted. The size law's target can step in one frame when the video
+     * rectangle is a layout inset rather than an animation; the painted value moves to the new
+     * target linearly over {@link #GLYPH_TRANSITION_NANOS} on the frame clock.
+     */
+    private static float displayedGlyphPx;
+
+    private static float glyphFromPx, glyphToPx;
+    private static long glyphStartNanos = -1;
+    private static boolean glyphPending, glyphFrameScheduled;
+    private static final long GLYPH_TRANSITION_NANOS = 180_000_000L;
 
     /** Size tier and text-debug flag, resolved once per content commit. */
     private static int presentationTier = -1;
@@ -158,6 +189,8 @@ final class CaptionOverlay {
      */
     private static final Rect videoGeometry = new Rect();
     private static int boxWidth, boxHeight, nextLeft, nextTop;
+    /** The presentation class whose commit produced [boxWidth]; a later class is not fitted. */
+    private static CaptionPresentationClass.Kind boxClass;
     /** Width of the visible text box; the anchor itself stays full width for centering. */
     private static int contentWidth;
     private static final Rect dragBounds = new Rect();
@@ -187,6 +220,19 @@ final class CaptionOverlay {
                 if (touchProxy == null) ensureTouchProxy(owner);
                 advancePreparedPageIfDue();
                 if (contentNow) render();
+            };
+
+    /**
+     * The frame clock of the painted glyph transition. A step is advanced only by real frame times;
+     * no timer decides a visual parameter.
+     */
+    private static final Choreographer.FrameCallback GLYPH_FRAME =
+            frameTimeNanos -> {
+                glyphFrameScheduled = false;
+                advanceDisplayedGlyph(frameTimeNanos);
+                Activity owner = activityRef.get();
+                TextView text = textRef.get();
+                if (owner != null && text != null) applyCommentScale(owner, text);
             };
 
     private static final Runnable HOLD_EXPIRY =
@@ -713,6 +759,9 @@ final class CaptionOverlay {
         previousClass = null;
         presentationClass = null;
         classFrameWidth = 0;
+        classBaseWidth = 0;
+        previousGeometrySample.setEmpty();
+        stableGeometrySamples = 0;
         reducedVideoWidth = 0;
         lastScan = -SCAN_INTERVAL_MS;
         lastNotice = "";
@@ -777,6 +826,8 @@ final class CaptionOverlay {
             if (text != null && current != null && boxWidth > 0)
                 placeVisibleText(a, host, anchor, text, current, boxWidth);
             videoGeometry.setEmpty();
+            previousGeometrySample.setEmpty();
+            stableGeometrySamples = 0;
             previous.setEmpty();
             previousScreenWidth = 0;
             dirty = true;
@@ -1113,10 +1164,79 @@ final class CaptionOverlay {
             requestBeforeTraversal();
             return;
         }
+        if (replanForStableVideo(a, text, video)) {
+            contentNow = true;
+            dirty = true;
+            // The new box is a content fact for the page planner. The frame callback turns it into
+            // a plan before the next traversal; pre-draw only scales and translates meanwhile.
+            applyCommentScale(a, text);
+            requestBeforeTraversal();
+            return;
+        }
         applyCommentScale(a, text);
         // Pre-draw may only scale and translate. The committed box keeps its measured width and
         // height; a real content change is applied by render() before the next traversal.
-        followVisibleTextTranslation(a, anchor, video);
+        followVisibleTextTranslation(a, anchor);
+    }
+
+    /**
+     * Re-plans the box against a video that settled narrower than the presentation class's stable
+     * width, or back to the class width once the video is wide enough again.
+     *
+     * <p>The trigger is geometry, not time: three consecutive pre-draw samples must have exactly
+     * the same width, so the player/sheet animation has stopped and did not merely return to one
+     * of two alternating values. A difference of at most 2% is inside the class's own margin; a
+     * larger one means the class width no longer describes the viewport. The plan is requested
+     * through the existing frame callback, so pre-draw neither measures nor lays anything out.
+     */
+    private static boolean replanForStableVideo(Activity a, TextView text, Rect video) {
+        if (video.width() == previousGeometrySample.width()) stableGeometrySamples++;
+        else stableGeometrySamples = 1;
+        previousGeometrySample.set(video);
+        if (stableGeometrySamples < STABLE_GEOMETRY_SAMPLES
+                || text == null
+                || boxWidth <= 0
+                || classBaseWidth <= 0) return false;
+        float difference = Math.abs(video.width() - boxWidth) / (float) boxWidth;
+        if (difference <= .02f) return false;
+        int plan = stablePlanWidth(text, video.width());
+        if (plan == classFrameWidth) return false;
+        int previous = classFrameWidth;
+        classFrameWidth = plan;
+        // One re-plan per settled width: a further one needs a new run of three samples.
+        stableGeometrySamples = 0;
+        CaptionDiagnostics.mark(
+                a,
+                "CAPTION_STABLE_REPLAN",
+                "class="
+                        + presentationClass
+                        + ";video_width="
+                        + video.width()
+                        + ";class_width="
+                        + classBaseWidth
+                        + ";previous_width="
+                        + previous
+                        + ";plan_width="
+                        + plan
+                        + ";difference="
+                        + difference
+                        + ";padding="
+                        + (text.getPaddingLeft() + text.getPaddingRight()));
+        return true;
+    }
+
+    /**
+     * The box width for a stable video: the class's 92% reading margin, capped by the class width
+     * and quantized to 8 px so a sequence of inset endpoints cannot produce a different plan per
+     * pixel. When the video is wide enough that 92% reaches the class width, the class width is
+     * used unchanged - the fullscreen box is not re-quantized away from its established size.
+     */
+    private static int stablePlanWidth(TextView text, int videoWidth) {
+        int wide = Math.round(videoWidth * .92f);
+        if (wide >= classBaseWidth) return classBaseWidth;
+        int padding = text.getPaddingLeft() + text.getPaddingRight();
+        int inner = Math.max(8, ((wide - padding) / 8) * 8);
+        return Math.min(classBaseWidth, inner + padding);
     }
 
     private static boolean computeTarget(
@@ -1130,7 +1250,14 @@ final class CaptionOverlay {
         int top = video.top + Math.round(video.height() * y) - height / 2;
         top = Math.max(video.top, Math.min(top, video.bottom - height));
         int left = video.left + Math.round((video.width() - width) / 2f);
-        nextLeft = Math.max(video.left, Math.min(left, video.right - width));
+        // An unplanned box can still be wider than the video while the stable re-plan is being
+        // prepared. Centering it (instead of clamping its left edge to the video) keeps the fitted
+        // text on the video's center line; a left-aligned wider box is what put its right side
+        // under the comment panel.
+        nextLeft =
+                width > video.width()
+                        ? left
+                        : Math.max(video.left, Math.min(left, video.right - width));
         nextTop = top;
         return true;
     }
@@ -1140,14 +1267,24 @@ final class CaptionOverlay {
      * margins the last content commit gave it; changing them here would request a layout that can
      * only be applied by the next traversal.
      */
-    private static void followVisibleTextTranslation(Activity a, FrameLayout anchor, Rect video) {
-        if (boxWidth <= 0
-                || boxHeight <= 0
-                || !computeTarget(
-                        a, video, boxWidth, boxHeight, video.width() > video.height()))
+    private static void followVisibleTextTranslation(Activity a, FrameLayout anchor) {
+        if (boxWidth <= 0 || boxHeight <= 0 || anchor == null) return;
+        FrameLayout parent =
+                anchor.getParent() instanceof FrameLayout ? (FrameLayout) anchor.getParent() : null;
+        if (parent == null || parent != hostRef.get()) {
+            // Pre-draw must never add/remove views. Ask for the next frame instead: render()
+            // remounts the anchor and commits the new placement before that traversal.
+            contentNow = true;
+            dirty = true;
+            requestBeforeTraversal();
             return;
-        FrameLayout host = hostRef.get();
-        if (host != null) CaptionHorizontalPlacement.translate(host, anchor, nextLeft, nextTop);
+        }
+        // Placement is in the anchor's own parent coordinates. Reading the video against any
+        // other container (a stale hostRef) shifts the box by that container's inset.
+        Rect video = CaptionSurface.currentVideoBounds(parent);
+        if (video == null || video.isEmpty()) return;
+        if (!computeTarget(a, video, boxWidth, boxHeight, video.width() > video.height())) return;
+        CaptionHorizontalPlacement.translate(parent, anchor, nextLeft, nextTop);
     }
 
     /**
@@ -1178,8 +1315,11 @@ final class CaptionOverlay {
 
     private static void resetGeometry() {
         videoGeometry.setEmpty();
+        previousGeometrySample.setEmpty();
+        stableGeometrySamples = 0;
         boxWidth = 0;
         boxHeight = 0;
+        boxClass = null;
         contentWidth = 0;
         stableTextWidth = 0;
         stableTextLines = 0;
@@ -1341,8 +1481,22 @@ final class CaptionOverlay {
         // layout has been committed yet, so keep the existing "skip, do not set scale" semantics.
         float glyphLocalPx = layoutGlyphInkPx;
         if (!(glyphLocalPx > 0f)) return;
-        float scale = captionScale(glyphPx, glyphLocalPx, anchorScale);
-        if (scale <= 0f) return;
+        // The painted size follows displayedGlyphPx, not the instantaneous law target: a layout
+        // inset can move the target by tens of percent in one frame, and the box must not jump.
+        noteGlyphTarget(glyphPx);
+        // While a new plan is being prepared the committed text can still be wider than the video.
+        // A proportional draw-time fit keeps the already-laid-out text inside the video without
+        // changing its line count or requesting a layout. The fit disappears when the re-plan
+        // lands, because the new page plan is then narrower than the video.
+        float fit = 1f;
+        int videoWidth = videoGeometry.width();
+        int contentWidth = stableTextWidth;
+        if (boxClass == presentationClass
+                && contentWidth > 0
+                && videoWidth > 0
+                && videoWidth < contentWidth) fit = videoWidth / (float) contentWidth;
+        float scale = captionScale(displayedGlyphPx, glyphLocalPx, anchorScale) * fit;
+        if (!(scale > 0f) || Float.isNaN(scale) || Float.isInfinite(scale)) return;
         if (Math.abs(text.getScaleX() - scale) > .002f
                 || Math.abs(text.getScaleY() - scale) > .002f) {
             text.setPivotX(text.getWidth() / 2f);
@@ -1352,7 +1506,103 @@ final class CaptionOverlay {
         }
     }
 
+    /**
+     * Sets the target of the painted glyph. A change inside 2% is followed directly; a larger one
+     * starts one linear transition of {@link #GLYPH_TRANSITION_NANOS}. Starting a transition only
+     * records a frame callback; the value itself is advanced by {@link #advanceDisplayedGlyph} on
+     * frame times, never by a timer.
+     */
+    private static void noteGlyphTarget(float target) {
+        if (!(target > 0f)) return;
+        if (!(displayedGlyphPx > 0f)) {
+            displayedGlyphPx = target;
+            glyphStartNanos = -1;
+            glyphPending = false;
+            return;
+        }
+        if (Math.abs(target - displayedGlyphPx) / displayedGlyphPx <= .02f) {
+            displayedGlyphPx = target;
+            glyphStartNanos = -1;
+            glyphPending = false;
+            return;
+        }
+        // A transition already heading to this target (within the same 2% band) is not restarted:
+        // a stationary step must reach its endpoint, not be re-armed by every pre-draw.
+        if (glyphStartNanos >= 0
+                && Math.abs(target - glyphToPx) <= .02f * Math.abs(glyphToPx)) {
+            scheduleGlyphFrame();
+            return;
+        }
+        glyphFromPx = displayedGlyphPx;
+        glyphToPx = target;
+        glyphStartNanos = -1;
+        glyphPending = true;
+        scheduleGlyphFrame();
+    }
+
+    /**
+     * Advances the painted glyph by real frame time. The first frame after a step starts the clock
+     * and paints the old value; each later frame interpolates linearly; at 180 ms the target is
+     * exact. Returns true while a later frame is needed.
+     */
+    static boolean advanceDisplayedGlyph(long frameTimeNanos) {
+        if (glyphStartNanos < 0) {
+            if (!glyphPending) return false;
+            glyphStartNanos = frameTimeNanos;
+            glyphFromPx = displayedGlyphPx;
+            glyphPending = false;
+        }
+        float progress =
+                (frameTimeNanos - glyphStartNanos) / (float) GLYPH_TRANSITION_NANOS;
+        if (progress >= 1f) {
+            displayedGlyphPx = glyphToPx;
+            glyphStartNanos = -1;
+            return false;
+        }
+        displayedGlyphPx =
+                glyphFromPx + (glyphToPx - glyphFromPx) * Math.max(0f, progress);
+        scheduleGlyphFrame();
+        return true;
+    }
+
+    private static void scheduleGlyphFrame() {
+        if (glyphFrameScheduled) return;
+        glyphFrameScheduled = true;
+        Choreographer.getInstance().postFrameCallback(GLYPH_FRAME);
+    }
+
+    /** The painted glyph height, for the frame-clock tests and diagnostics. */
+    static float displayedGlyphPx() {
+        return displayedGlyphPx;
+    }
+
+    /** Starts a target without a View, so the frame-clock interpolation can be tested directly. */
+    static void noteGlyphTargetForTests(float target) {
+        noteGlyphTarget(target);
+    }
+
+    static void resetGlyphForTests() {
+        resetDisplayedGlyph();
+    }
+
+    private static void resetDisplayedGlyph() {
+        displayedGlyphPx = 0f;
+        glyphFromPx = 0f;
+        glyphToPx = 0f;
+        glyphStartNanos = -1;
+        glyphPending = false;
+        glyphFrameScheduled = false;
+    }
+
+    /** Ends a pending 180 ms step at its target; tests that assert final sizes use this. */
+    static void settleDisplayedGlyphForTests() {
+        displayedGlyphPx = glyphStartNanos >= 0 || glyphPending ? glyphToPx : displayedGlyphPx;
+        glyphStartNanos = -1;
+        glyphPending = false;
+    }
+
     private static void resetCommentScale(TextView text) {
+        resetDisplayedGlyph();
         if (text != null && (text.getScaleX() != 1f || text.getScaleY() != 1f)) {
             text.setScaleX(1f);
             text.setScaleY(1f);
@@ -1383,6 +1633,10 @@ final class CaptionOverlay {
                         : CaptionPresentationClass.layoutVideoWidth(
                                 next, video, screenWidth, screenHeight, reducedVideoWidth);
         classFrameWidth = Math.max(1, Math.round(videoWidth * (shorts ? .78f : .92f)));
+        classBaseWidth = classFrameWidth;
+        // A class commit is a new reading width: the previous video's stable re-plan is over.
+        previousGeometrySample.setEmpty();
+        stableGeometrySamples = 0;
         float classGlyph =
                 CaptionPresentationClass.glyphHeightPx(
                         DeepSeekConfig.displayStyle(a).captionSizeTier,
@@ -2080,14 +2334,70 @@ final class CaptionOverlay {
             Rect bounds,
             int anchorWidthPx,
             boolean landscape) {
-        if (owner == null || host == null || anchor == null || bounds == null || bounds.isEmpty())
-            return;
-        int width = Math.max(1, Math.min(anchorWidthPx, bounds.width()));
+        if (owner == null || anchor == null || text == null) return;
+        FrameLayout parent =
+                anchor.getParent() instanceof FrameLayout ? (FrameLayout) anchor.getParent() : null;
+        if (parent == null || parent != hostRef.get()) {
+            // The anchor was re-parented by a player rebuild. Placement must follow the real parent
+            // (and its inset), so remount once before reading coordinates.
+            if (!attach(owner)) return;
+            anchor = anchorRef.get();
+            text = textRef.get();
+            parent =
+                    anchor != null && anchor.getParent() instanceof FrameLayout
+                            ? (FrameLayout) anchor.getParent()
+                            : null;
+            if (anchor == null || text == null || parent == null) return;
+        }
+        // Place against the anchor's actual parent. CaptionSurface.currentVideoBounds(parent) is
+        // CaptionSurface.relative(surface, parent): using a stale hostRef here shifted the box by
+        // the difference between the two containers.
+        Rect video = CaptionSurface.currentVideoBounds(parent);
+        if (video == null || video.isEmpty()) return;
+        // Keep the committed/class width even when the video is temporarily narrower: shrinking
+        // the anchor to the video here would cancel the very difference the stable re-plan needs
+        // to see, and the draw-time fit already keeps the text inside the video until it lands.
+        int width = Math.max(1, anchorWidthPx);
         int height = text.getMeasuredHeight();
-        if (!computeTarget(owner, bounds, width, height, landscape)) return;
+        if (!computeTarget(owner, video, width, height, landscape)) return;
+        boolean sizeChanged = width != boxWidth || height != boxHeight;
         boxWidth = width;
         boxHeight = height;
-        CaptionHorizontalPlacement.position(host, anchor, nextLeft, nextTop, boxWidth, boxHeight);
+        boxClass = presentationClass;
+        CaptionHorizontalPlacement.position(parent, anchor, nextLeft, nextTop, boxWidth, boxHeight);
+        if (sizeChanged && DeepSeekConfig.displayTextDebugEnabled(owner)) {
+            FrameLayout currentHost = hostRef.get();
+            CaptionDiagnostics.mark(
+                    owner,
+                    "PLACEMENT",
+                    "video_screen="
+                            + screenRect(CaptionSurface.currentSurfaceView())
+                            + ";anchor_screen="
+                            + screenRect(anchor)
+                            + ";host="
+                            + (currentHost == null
+                                    ? "none"
+                                    : currentHost.getClass().getSimpleName())
+                            + ";parent="
+                            + parent.getClass().getSimpleName());
+        }
+    }
+
+    /** A view's on-screen rectangle, for the size-change placement diagnostic only. */
+    private static String screenRect(View view) {
+        if (view == null
+                || !view.isAttachedToWindow()
+                || view.getWidth() <= 0
+                || view.getHeight() <= 0) return "0,0,0,0";
+        int[] location = new int[2];
+        view.getLocationOnScreen(location);
+        return location[0]
+                + ","
+                + location[1]
+                + ","
+                + (location[0] + view.getWidth())
+                + ","
+                + (location[1] + view.getHeight());
     }
 
     static int compactWidthPx(String value, float sizePx, int maximum, CaptionRenderSpec spec) {

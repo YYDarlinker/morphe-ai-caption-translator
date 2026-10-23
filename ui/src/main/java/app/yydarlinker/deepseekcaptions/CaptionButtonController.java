@@ -171,6 +171,9 @@ final class CaptionButtonController {
     /**
      * Arms a quiet window around any player-shape transition. A transient CC accessibility OFF
      * state during rotation/fullscreen is not a user command and must not deactivate the AI track.
+     *
+     * <p>The window suppresses projection writes only. The session intent is applied by
+     * {@link CaptionSessionReconciler} on its own player tick; no transition may gate that.
      */
     static void onPlayerTransition(String rawType) {
         long now = SystemClock.uptimeMillis();

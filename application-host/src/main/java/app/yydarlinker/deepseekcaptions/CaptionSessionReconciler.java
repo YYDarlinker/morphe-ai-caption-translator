@@ -10,7 +10,8 @@ import android.content.Context;
  * player ticks and re-entrant callbacks cannot restart the engine. A teardown retires the key with
  * the session, so entering the same video again applies the same intent again - that re-entry is
  * the recovery the user sees, and it needs neither a remembered url nor a "was the video left"
- * heuristic.
+ * heuristic. A player tick is enough for that recovery: YouTube may re-enter the video without
+ * announcing its id again.
  *
  * <p>The intent is the only thing that decides whether captions are wanted and for which language.
  * Native observations reach this class through {@code NativeCaptionBridge.observe}; they can ask for
@@ -78,6 +79,9 @@ final class CaptionSessionReconciler {
             }
         }
         mark("INTENT_SESSION", "video=" + video + ";epoch=" + epoch + ";fresh=" + fresh);
+        // materialize() reads the signed source track from SourceCatalog and activate() submits the
+        // source load, so this call starts the fetch without waiting for a track list or a CC
+        // observation. If the catalogue is not ready yet, the next observation applies it.
         apply("video");
     }
 
@@ -102,11 +106,21 @@ final class CaptionSessionReconciler {
         if (enabled) {
             CaptionSessionIntent previous = CaptionSessionIntent.load(c);
             CaptionNativeProjection.Snapshot projection = CaptionNativeProjection.snapshot();
-            intent =
-                    previous.hasTarget() || !projection.hasTarget()
-                            ? CaptionSessionIntent.userToggled(c, true)
-                            : CaptionSessionIntent.userEnabledFor(
-                                    c, projection.language, projection.translated);
+            if (previous.hasTarget() || !projection.hasTarget()) {
+                intent = CaptionSessionIntent.userToggled(c, true);
+            } else {
+                // translateTarget means "prefer an existing track in the target language", not
+                // "never translate". The flag belongs to the video whose native track reported it,
+                // so only that video may donate it; another video (or no live session) only
+                // donates the language and keeps the translating default.
+                String video = sessionVideo();
+                boolean sameVideo = !video.isEmpty() && video.equals(projection.video);
+                intent =
+                        CaptionSessionIntent.userEnabledFor(
+                                c,
+                                projection.language,
+                                sameVideo ? projection.translated : true);
+            }
         } else {
             intent = CaptionSessionIntent.userToggled(c, false);
         }
@@ -204,25 +218,62 @@ final class CaptionSessionReconciler {
     }
 
     /**
-     * A player tick. It is a reconciliation pass, not a command: it does nothing unless the intent
-     * is not realised for this session (a deferred target, or a native reset that retired it).
+     * A player tick. It is a reconciliation pass, not a command: it rebuilds a session retired by a
+     * teardown (the same video may not be announced again), re-binds that session to the current
+     * player-owner epoch, and applies the intent only when it is not realised for this session (a
+     * deferred target, or a native reset that retired it).
      *
-     * <p>A tick also re-binds the session to the current player-owner epoch. Stopping and restarting
+     * <p>A tick re-binds the session to the current player-owner epoch. Stopping and restarting
      * the engine closes and re-opens the authority, so the session must follow that epoch; the
      * video is still the one on screen, and a stale epoch would otherwise silence every later
      * observation.
      */
     static void onPlayerRegular(Context c) {
         if (c == null) return;
+        context = c.getApplicationContext();
+        String resumedVideo = null;
+        long resumedEpoch = -1;
         synchronized (LOCK) {
             long current = CaptionPlayerAuthority.ownerEpoch();
-            if (session != null && session.epoch != current) {
+            if (session == null) {
+                // A teardown retires the session, but re-entering the same video does not
+                // necessarily re-announce its id: YouTube may keep the same player and only start
+                // ticking again. The tick is the recovery point, so it rebuilds the session from
+                // the video the player is showing now. A tick with no video id changes nothing.
+                String video = CaptionActions.currentVideoIdSnapshot();
+                if (video != null && !video.trim().isEmpty()) {
+                    session = new Session(video.trim(), current);
+                    appliedKey = "";
+                    resumedVideo = session.video;
+                    resumedEpoch = current;
+                }
+            } else if (session.epoch != current) {
                 session = new Session(session.video, current);
                 appliedKey = "";
             }
         }
+        if (resumedVideo != null)
+            mark(
+                    "INTENT_SESSION",
+                    "video="
+                            + resumedVideo
+                            + ";epoch="
+                            + resumedEpoch
+                            + ";fresh=true;reason=resume_tick");
+        // The applied key records an application that was requested, not one whose engine is
+        // still running. When the same session's key is still applied but nothing is on screen
+        // and no active session owns the native track, the intent has not converged: clear the
+        // key and apply once. ownsNativeTrack() is part of the test on purpose: a session that is
+        // still starting owns the native track, and clearing the key for it would restart the
+        // fetch on every tick.
+        if (needsResume(c)) {
+            synchronized (LOCK) {
+                appliedKey = "";
+            }
+            apply("resume_tick");
+            return;
+        }
         if (!needsApply(c)) return;
-        context = c.getApplicationContext();
         apply("player_tick");
     }
 
@@ -358,6 +409,22 @@ final class CaptionSessionReconciler {
         }
     }
 
+    /**
+     * True when the intent is wanted and cannot be seen in the engine: the applied key may still
+     * match because it only says the application was requested. A session that is visible or that
+     * owns the native track is running (or starting), so it is not resumed again.
+     */
+    private static boolean needsResume(Context c) {
+        synchronized (LOCK) {
+            if (session == null) return false;
+        }
+        CaptionSessionIntent intent = CaptionSessionIntent.load(c);
+        return intent.aiEnabled
+                && intent.hasTarget()
+                && !CaptionActions.isVisibleActive()
+                && !CaptionActions.ownsNativeTrack();
+    }
+
     /** The concrete url and mode for [intent] on [video], or null while it is not knowable yet. */
     private static Resolution materialize(Context c, String video, CaptionSessionIntent intent) {
         String target = intent.targetLanguage;
@@ -394,10 +461,12 @@ final class CaptionSessionReconciler {
         SourceCatalog.Snapshot catalog = SourceCatalog.snapshot(video);
         if (!catalog.complete || catalog.tracks.isEmpty()) return null;
         if (!translate) {
+            // translateTarget means "prefer an existing track in the target language", not "never
+            // translate". A video without such a track still gets a translated session instead of
+            // staying deferred forever.
             for (SourceSelection track : catalog.tracks)
                 if (SourceSelection.sameWritingLanguage(track.language, target))
                     return new Resolution(track.url, false, true);
-            return null;
         }
         return realize(c, TargetLanguage.withCode(catalog.tracks.get(0).url, target), true);
     }

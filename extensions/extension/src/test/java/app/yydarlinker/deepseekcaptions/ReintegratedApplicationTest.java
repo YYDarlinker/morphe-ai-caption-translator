@@ -27,7 +27,8 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
     @Implements(SecureApiKey.class) public static class Keys {@Implementation public static String load(Context c){return "fixture-key";}}
     static final String VIDEO="abcdefghijk";
     static final String SOURCE="https://www.youtube.com/api/timedtext?v="+VIDEO+"&lang=en";
-    MockWebServer server;Object previousCronet;AtomicInteger posts=new AtomicInteger();
+    enum Origin { PREFERRED_TRACK }
+    MockWebServer server;Object previousCronet;AtomicInteger posts=new AtomicInteger(),sourceGets=new AtomicInteger();
     CountDownLatch received=new CountDownLatch(1),release=new CountDownLatch(1);
     volatile boolean delayFirst;volatile String lastModel="";
     final String url="https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en&tlang=zh-Hans";
@@ -39,7 +40,7 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
         CaptionPlayerTransitionGuard.resetForTests();CaptionPlayerAuthority.resetForTests();super.setup();
         server=new MockWebServer();server.setDispatcher(new Dispatcher(){public MockResponse dispatch(RecordedRequest request){
             try {
-                if(request.getPath().startsWith("/source"))return new MockResponse().setHeader("Content-Type","application/json").setBody("{\"events\":[{\"tStartMs\":0,\"dDurationMs\":30000,\"segs\":[{\"utf8\":\"Hello \",\"tOffsetMs\":0},{\"utf8\":\"world.\",\"tOffsetMs\":1000}]}]}");
+                if(request.getPath().startsWith("/source")){sourceGets.incrementAndGet();return new MockResponse().setHeader("Content-Type","application/json").setBody("{\"events\":[{\"tStartMs\":0,\"dDurationMs\":30000,\"segs\":[{\"utf8\":\"Hello \",\"tOffsetMs\":0},{\"utf8\":\"world.\",\"tOffsetMs\":1000}]}]}");}
                 if(request.getPath().endsWith("/models"))return new MockResponse().setBody("{\"data\":[{\"id\":\"fixture-model\"}]}");
                 JSONObject root=new JSONObject(request.getBody().readUtf8());lastModel=root.getString("model");
                 int ordinal=posts.incrementAndGet();received.countDown();if(delayFirst&&ordinal==1)release.await(4,TimeUnit.SECONDS);
@@ -127,6 +128,24 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
         assertTrue(CaptionDiagnostics.history(a).contains("applied=true"));
     }
     /**
+     * Leaving the player reports the compact miniplayer. YouTube may reuse the same player when the
+     * video is opened again, so no second type callback is guaranteed. The player tick must ask the
+     * official current-player surface and lift the stale COMPACT quarantine.
+     */
+    @Test public void aCompactStateFromThePreviousVisitRecoversOnAReentryTick() throws Exception {
+        ownSession();await(this::translated);
+        CaptionPlayerAuthority.onNotification("WATCH_WHILE_MINIMIZED");
+        idle(250);
+        assertFalse("the compact state retracts the caption",translated());
+
+        CaptionPlayerAuthority.installCurrentPlayerTypeForTests(()->"WATCH_WHILE_MAXIMIZED");
+        CaptionActions.onVideoId(VIDEO);
+        CaptionActions.onVideoTime(5000);
+        await(this::translated);
+        assertTrue(CaptionActions.isVisibleActive());
+        assertEquals(CaptionPlayerAuthority.REGULAR,CaptionPlayerAuthority.state());
+    }
+    /**
      * YouTube resets its own caption model: the display stops, the intent does not. A player tick
      * used to reconcile only after a measured silence (EngineResume's 1200 ms gap); the intent now
      * decides, so the very next tick applies it again.
@@ -165,6 +184,42 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
         assertFalse(CaptionActions.isVisibleActive());
     }
 
+    /**
+     * The video id alone is enough: the signed url is already in the catalogue, so onVideo starts
+     * the source request before any native track list or CC observation exists.
+     */
+    @Test public void videoEntryStartsTheSourceRequestBeforeAnyNativeObservation() throws Exception {
+        SourceCatalog.register(VIDEO,Collections.singletonList(new SourceSelection(VIDEO,"en","en",SOURCE,SourceSelection.Kind.MANUAL,true,0,"")),true);
+        CaptionSessionIntent.userToggled(a,true);
+        CaptionSessionIntent.userSelected(a,"zh-Hans",true);
+        CaptionSessionReconciler.onVideo(a,VIDEO);
+        await(()->sourceGets.get()>0);
+        assertTrue("the source request is already in flight",sourceGets.get()>=1);
+        assertTrue("the first block request follows without any native observation",received.await(5,TimeUnit.SECONDS));
+        assertFalse("no native selection was observed",CaptionNativeProjection.snapshot().observed);
+    }
+    /** Prewarm is a fetch, not a display grant: it must not wait for a known CC state. */
+    @Test public void prewarmStartsTheSourceRequestWhileTheCcStateIsUnknown() throws Exception {
+        SourceCatalog.register(VIDEO,Collections.singletonList(new SourceSelection(VIDEO,"en","en",SOURCE,SourceSelection.Kind.MANUAL,true,0,"")),true);
+        CaptionSessionIntent.userToggled(a,true);
+        CaptionSessionIntent.userSelected(a,"zh-Hans",true);
+        assertEquals(CaptionNativeProjection.UNKNOWN,CaptionNativeProjection.ccState());
+        RebuildController.prewarm(a,SOURCE);
+        await(()->sourceGets.get()>0);
+        assertEquals("no CC observation was consulted",CaptionNativeProjection.UNKNOWN,CaptionNativeProjection.ccState());
+    }
+    /**
+     * The real port, not a test shadow: the caption menu's Off must write the USER_OFF intent and
+     * stop the session exactly like a tap on the CC control.
+     */
+    @Test public void theCaptionMenuOffWritesTheIntentThroughTheRealPort() throws Exception {
+        ownSession();await(this::translated);
+        assertTrue(CaptionSessionIntent.load(a).aiEnabled);
+        CaptionSessionReconciler.onPlayerRegular(a);
+        NativeCaptionBridge.onNativeAppliedEvent(new Object(),null,null,Origin.PREFERRED_TRACK,0,VIDEO);
+        assertFalse("the caption-menu Off is a USER_OFF",CaptionSessionIntent.load(a).aiEnabled);
+        assertFalse("the visible session is stopped",CaptionActions.isVisibleActive());
+    }
     @Test public void configurationChangeUsesTheNewModelAndRetiresTheOutstandingRequest() throws Exception {
         delayFirst=true;CaptionActions.activate(a,url);assertTrue(received.await(3,TimeUnit.SECONDS));
         DeepSeekConfig.saveModel(a,"fixture-model-new");CaptionActions.refreshConfiguration(a);release.countDown();

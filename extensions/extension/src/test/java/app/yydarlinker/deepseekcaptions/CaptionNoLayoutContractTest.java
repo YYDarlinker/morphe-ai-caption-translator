@@ -13,6 +13,7 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -34,11 +35,17 @@ public class CaptionNoLayoutContractTest {
 
     private Activity activity;
 
+    @Before
+    public void resetGlyph() {
+        CaptionOverlay.resetGlyphForTests();
+    }
+
     @After
     public void tearDown() {
         if (activity != null) activity.finish();
         CaptionPlayerAuthority.resetForTests();
         CaptionOverlay.layoutGlyphInkPx = 0f;
+        CaptionOverlay.resetGlyphForTests();
     }
 
     static final class CountingAnchor extends FrameLayout {

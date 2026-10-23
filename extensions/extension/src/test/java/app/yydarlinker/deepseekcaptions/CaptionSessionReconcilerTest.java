@@ -39,6 +39,8 @@ public class CaptionSessionReconcilerTest {
     private static final String VIDEO = "abcdefghijk";
     private static final String SOURCE =
             "https://www.youtube.com/api/timedtext?v=" + VIDEO + "&lang=en";
+    private static final String ZH_SOURCE =
+            "https://www.youtube.com/api/timedtext?v=" + VIDEO + "&lang=zh-Hans";
     private static final String TRANSLATED = SOURCE + "&tlang=zh-Hans";
 
     enum Origin {
@@ -49,6 +51,7 @@ public class CaptionSessionReconcilerTest {
     static final List<String> calls = new ArrayList<>();
     static String currentVideo = VIDEO;
     static boolean visible;
+    static boolean owns;
     static long epoch = 7L;
 
     static final class Track {
@@ -65,13 +68,13 @@ public class CaptionSessionReconcilerTest {
     public static class Core {
         @Implementation
         public static void activate(Context context, String url) {
-            calls.add("start:" + url);
+            calls.add("translate:" + url);
             visible = true;
         }
 
         @Implementation
         public static void activateSource(Context context, String url) {
-            calls.add("start:" + url);
+            calls.add("source:" + url);
             visible = true;
         }
 
@@ -83,6 +86,11 @@ public class CaptionSessionReconcilerTest {
         @Implementation
         public static boolean isVisibleActive() {
             return visible;
+        }
+
+        @Implementation
+        public static boolean ownsNativeTrack() {
+            return owns;
         }
 
         @Implementation
@@ -175,6 +183,7 @@ public class CaptionSessionReconcilerTest {
         calls.clear();
         currentVideo = VIDEO;
         visible = false;
+        owns = false;
         epoch = 7L;
         // The video's own signed source track: enough to materialise a translation target without
         // any native track callback, which is what a re-entry after a teardown must be able to do.
@@ -195,6 +204,7 @@ public class CaptionSessionReconcilerTest {
 
     @After
     public void after() {
+        CaptionButtonController.onPlayerStable();
         CaptionSessionReconciler.resetForTests();
         CaptionNativeProjection.resetForTests();
         CaptionSessionIntent.resetForTests(a);
@@ -209,7 +219,10 @@ public class CaptionSessionReconcilerTest {
 
     private static int starts() {
         int count = 0;
-        for (String call : calls) if (call.startsWith("start:")) count++;
+        for (String call : calls)
+            if (call.startsWith("start:")
+                    || call.startsWith("translate:")
+                    || call.startsWith("source:")) count++;
         return count;
     }
 
@@ -283,6 +296,56 @@ public class CaptionSessionReconcilerTest {
         assertEquals(key, CaptionSessionReconciler.appliedKey());
     }
 
+    /**
+     * The applied key records a requested application, not a running engine. A retained session
+     * whose key still matches but whose engine is no longer visible must converge on the next tick;
+     * this is the re-entry that announces no video id and no teardown.
+     */
+    @Test
+    public void aTickResumesARetainedSessionWhoseEngineIsNoLongerVisible() {
+        userChoseTarget();
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+        assertEquals(1, starts());
+        String key = CaptionSessionReconciler.appliedKey();
+        int applied = CaptionSessionReconciler.applications();
+
+        visible = false;
+        owns = false;
+        CaptionSessionReconciler.onPlayerRegular(a);
+
+        assertEquals("the retained session is applied once", 2, starts());
+        assertEquals("one new application", applied + 1, CaptionSessionReconciler.applications());
+        assertEquals("the same key is applied again", key, CaptionSessionReconciler.appliedKey());
+        assertTrue("the engine is visible after the resume", visible);
+
+        CaptionSessionReconciler.onPlayerRegular(a);
+        assertEquals("a visible engine is not applied again", 2, starts());
+        assertEquals(applied + 1, CaptionSessionReconciler.applications());
+    }
+
+    /**
+     * A session that is still starting already owns the native track; clearing its key on every tick
+     * would restart the source fetch. The ownership test is what makes the resume safe.
+     */
+    @Test
+    public void aTickDoesNotRestartASessionThatStillOwnsTheNativeTrack() {
+        userChoseTarget();
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+        assertEquals(1, starts());
+        String key = CaptionSessionReconciler.appliedKey();
+
+        visible = false;
+        owns = true;
+        for (int i = 0; i < 3; i++) CaptionSessionReconciler.onPlayerRegular(a);
+        assertEquals("a starting session must not be restarted by ticks", 1, starts());
+        assertEquals(key, CaptionSessionReconciler.appliedKey());
+
+        owns = false;
+        CaptionSessionReconciler.onPlayerRegular(a);
+        assertEquals("once it owns nothing it converges", 2, starts());
+        assertTrue("the resumed session is visible", visible);
+    }
+
     // 4
     @Test
     public void reenteringTheSameVideoAppliesTheSameIntentAgain() {
@@ -298,6 +361,28 @@ public class CaptionSessionReconcilerTest {
 
         assertEquals(2, starts());
         assertEquals(first, CaptionSessionReconciler.appliedKey());
+        assertEquals(2, CaptionSessionReconciler.applications());
+    }
+
+    // 5
+    @Test
+    public void aPlayerTickRebuildsTheSessionAfterTeardownWithoutANewVideoId() {
+        userChoseTarget();
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+        assertEquals(1, starts());
+        String key = CaptionSessionReconciler.appliedKey();
+
+        CaptionSessionReconciler.onTeardown(a);
+        assertEquals("the teardown retires the session", "", CaptionSessionReconciler.sessionVideo());
+        assertEquals("", CaptionSessionReconciler.appliedKey());
+
+        // Re-entering a video does not necessarily announce its id again: only the player ticks
+        // remain. The first tick must rebuild the session and apply the unchanged intent once.
+        for (int i = 0; i < 3; i++) CaptionSessionReconciler.onPlayerRegular(a);
+
+        assertEquals(VIDEO, CaptionSessionReconciler.sessionVideo());
+        assertEquals("one recovery application, not one per tick", 2, starts());
+        assertEquals(key, CaptionSessionReconciler.appliedKey());
         assertEquals(2, CaptionSessionReconciler.applications());
     }
 
@@ -324,10 +409,130 @@ public class CaptionSessionReconcilerTest {
                 calls.get(calls.size() - 1).contains("tlang=zh-Hans"));
     }
 
+    /**
+     * The quiet window around a player transition exists to keep a transient CC state out of the
+     * projection. It must not stop the reconciler from applying an intent that became ready while
+     * the window is armed.
+     */
+    @Test
+    public void aPlayerTransitionQuietWindowDoesNotBlockIntentApplication() {
+        CaptionSessionIntent.userToggled(a, true);
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+        assertEquals("no target yet, so nothing may start", 0, starts());
+
+        CaptionButtonController.onPlayerTransition("WATCH_WHILE_FULLSCREEN");
+        CaptionSessionIntent.userSelected(a, "zh-Hans", true);
+        CaptionSessionReconciler.onPlayerRegular(a);
+
+        assertEquals("the intent applies during the transition quiet window", 1, starts());
+        assertTrue(
+                "the target reached the engine",
+                calls.get(calls.size() - 1).contains("tlang=zh-Hans"));
+    }
+
+    /**
+     * translateTarget means "prefer an existing target-language track", not "never translate". A
+     * persisted source-language choice from another video must not leave this one deferred forever.
+     */
+    @Test
+    public void aStoredSourceTargetWithoutItsOwnTrackFallsBackToTranslation() {
+        CaptionSessionIntent.userToggled(a, true);
+        CaptionSessionIntent.userSelected(a, "zh-Hans", false);
+
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+
+        assertEquals(1, starts());
+        assertTrue(
+                "the session fell back to a translated url",
+                calls.get(0).startsWith("translate:"));
+        assertTrue("the target reached the request", calls.get(0).contains("tlang=zh-Hans"));
+    }
+
+    @Test
+    public void aStoredSourceTargetWithItsOwnTrackStillShowsThatTrack() {
+        SourceCatalog.register(
+                VIDEO,
+                Collections.singletonList(
+                        new SourceSelection(
+                                VIDEO,
+                                "zh",
+                                "zh-Hans",
+                                ZH_SOURCE,
+                                SourceSelection.Kind.MANUAL,
+                                true,
+                                0,
+                                "")),
+                true);
+        CaptionSessionIntent.userToggled(a, true);
+        CaptionSessionIntent.userSelected(a, "zh-Hans", false);
+
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+
+        assertEquals(1, starts());
+        assertTrue("the existing target-language track is shown", calls.get(0).startsWith("source:"));
+        assertTrue(calls.get(0).contains("lang=zh-Hans"));
+    }
+
+    @Test
+    public void aProjectionFromAnotherVideoDoesNotAdoptItsUntranslatedFlag() {
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+        CaptionNativeProjection.selection(
+                "other-video", "zh-Hans", ZH_SOURCE, false, false, true, epoch);
+
+        assertTrue(CaptionSessionReconciler.onUserSwitched(a, true));
+
+        CaptionSessionIntent intent = CaptionSessionIntent.load(a);
+        assertTrue(intent.aiEnabled);
+        assertEquals("the language is still adopted", "zh-Hans", intent.targetLanguage);
+        assertTrue("another video's untranslated flag is not adopted", intent.translateTarget);
+    }
+
+    @Test
+    public void aProjectionFromTheCurrentVideoKeepsItsUntranslatedFlag() {
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+        CaptionNativeProjection.selection(VIDEO, "zh-Hans", ZH_SOURCE, false, false, true, epoch);
+
+        assertTrue(CaptionSessionReconciler.onUserSwitched(a, true));
+
+        assertFalse(
+                "the current video's existing target-language track is still preferred",
+                CaptionSessionIntent.load(a).translateTarget);
+    }
+
+    @Test
+    public void withoutALiveSessionTheUntranslatedFlagIsNotAdopted() {
+        CaptionNativeProjection.selection(VIDEO, "zh-Hans", ZH_SOURCE, false, false, true, epoch);
+
+        assertTrue(CaptionSessionReconciler.onUserSwitched(a, true));
+
+        assertTrue(
+                "no live video means no untranslated flag to adopt",
+                CaptionSessionIntent.load(a).translateTarget);
+    }
+
+    /**
+     * An explicit selection in the CC menu is a user act: after a USER_OFF it turns the session
+     * back on and the next apply really starts the engine.
+     */
+    @Test
+    public void aMenuSelectionAfterAUserOffTurnsAiBackOnAndApplies() {
+        userChoseTarget();
+        CaptionSessionReconciler.onVideo(a, VIDEO);
+        assertEquals(1, starts());
+        CaptionSessionReconciler.onUserOff(a, "cc_button");
+        assertFalse(CaptionSessionIntent.load(a).aiEnabled);
+
+        CaptionNativeProjection.selection(
+                VIDEO, "zh-Hans", TRANSLATED, false, true, true, epoch);
+        CaptionSessionReconciler.onNativeSelection(a, epoch, true);
+
+        assertTrue("the menu selection is a user on act", CaptionSessionIntent.load(a).aiEnabled);
+        assertEquals("the selection applies the session again", 2, starts());
+    }
+
     // 6
     @Test
-    public void anOldEpochTrackListChangesNothing() {
-        userChoseTarget();
+    public void anOldEpochTrackListChangesNothing() {        userChoseTarget();
         CaptionSessionReconciler.onVideo(a, VIDEO);
         assertEquals(1, starts());
         String key = CaptionSessionReconciler.appliedKey();

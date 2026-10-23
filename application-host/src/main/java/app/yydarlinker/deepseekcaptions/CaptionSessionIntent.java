@@ -102,7 +102,7 @@ final class CaptionSessionIntent {
         CaptionSessionIntent previous = load(context);
         return write(
                 context,
-                previous.aiEnabled,
+                true,
                 target,
                 translateTarget,
                 previous.revision + 1,

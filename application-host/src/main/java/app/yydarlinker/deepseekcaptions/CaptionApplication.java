@@ -63,12 +63,18 @@ final class CaptionApplication extends TranslationRuntime.Host
                 RebuildController.stop();
                 break;
             case VIDEO:
-                video = value == null ? "" : value.trim();
+                String announced = value == null ? "" : value.trim();
+                boolean sameVideo = !announced.isEmpty() && announced.equals(video);
+                video = announced;
                 if (video.isEmpty()) {
                     // A teardown clears the session and only ends the display: it never writes the
                     // session intent, so re-entering the video applies the same intent again.
                     CaptionSessionReconciler.onTeardown(c);
                 } else {
+                    // The second visit to the same video may reuse the player and never announce a
+                    // new player type. A COMPACT state learned while leaving must not survive that
+                    // re-entry, so re-read the official current type at this known resume point.
+                    if (sameVideo) CaptionPlayerAuthority.reconcileCurrentPlayerTypeIfUnsettled();
                     RebuildController.video(video);
                     CaptionSessionReconciler.onVideo(c, video);
                 }
@@ -124,10 +130,18 @@ final class CaptionApplication extends TranslationRuntime.Host
 
     @Override
     public void playback(long at) {
-        // A tick is a reconciliation pass, not a command: unless the session intent is unrealised
-        // for this session (a deferred target, or a native reset that retired it) it does nothing.
+        // A tick is also the resume point after the player was minimized or the same video was
+        // opened again. Re-read the official type while display is unsettled: the type callback is
+        // not guaranteed to repeat on a reused player, and without this the COMPACT state learned
+        // on the way out would suppress every later frame of the new visit.
         Context c = context;
-        if (c != null) CaptionSessionReconciler.onPlayerRegular(c);
+        if (c != null) {
+            CaptionPlayerAuthority.reconcileCurrentPlayerTypeIfUnsettled();
+            // A tick is a reconciliation pass, not a command: unless the session intent is
+            // unrealised for this session (a deferred target, or a native reset that retired it)
+            // it does nothing.
+            CaptionSessionReconciler.onPlayerRegular(c);
+        }
         RebuildController.time(at);
     }
 

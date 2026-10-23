@@ -50,6 +50,7 @@ public class CaptionLayerOverlayTest {
         static Rect video = new Rect(0, 0, 2247, 1264);
         static int globalWidth = 2247;
         static int globalHeight = 1264;
+        static View surface;
 
         @Implementation
         public static FrameLayout captionHost() {
@@ -57,13 +58,15 @@ public class CaptionLayerOverlayTest {
         }
 
         @Implementation
-        public static int visibleVideoWidth() {
-            return globalWidth;
-        }
-
-        @Implementation
-        public static int visibleVideoHeight() {
-            return globalHeight;
+        public static View currentSurfaceView() {
+            if (surface != null) {
+                // The sheet animation is a uniform scale on the player container; the local
+                // surface keeps its measured size while its global short side shrinks.
+                float scale = globalWidth / 2247f;
+                surface.setScaleX(scale);
+                surface.setScaleY(scale);
+            }
+            return surface;
         }
 
         @Implementation
@@ -89,6 +92,8 @@ public class CaptionLayerOverlayTest {
 
     private Activity a;
     private FrameLayout content, watchPage, player, plane, sheet;
+    /** Makes page planning slow enough that the endpoint hold is observable, not a race. */
+    private volatile boolean slowPages;
 
     @Before
     public void setUp() {
@@ -114,6 +119,8 @@ public class CaptionLayerOverlayTest {
         Layer.video = new Rect(0, 0, 2247, 1264);
         Layer.globalWidth = 2247;
         Layer.globalHeight = 1264;
+        Layer.surface = new View(a);
+        Layer.surface.layout(0, 0, 2247, 1264);
         CaptionActions.install(
                 new app.yydarlinker.caption.contracts.CaptionContracts.CaptionPort() {
                     public void command(app.yydarlinker.caption.contracts.CaptionContracts.Action action, String value) {}
@@ -132,6 +139,13 @@ public class CaptionLayerOverlayTest {
                             long end,
                             CaptionPresentationBudget geometry,
                             CaptionRenderSpec spec) {
+                        if (slowPages) {
+                            try {
+                                Thread.sleep(180);
+                            } catch (InterruptedException interrupted) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }
                         return TranslationPresentation.pages(body, start, end, geometry, spec);
                     }
                 });
@@ -147,6 +161,7 @@ public class CaptionLayerOverlayTest {
         CaptionPlayerAuthority.resetForTests();
         CaptionSurface.invalidateGeometry();
         Layer.host = null;
+        Layer.surface = null;
         a.finish();
     }
 
@@ -292,7 +307,113 @@ public class CaptionLayerOverlayTest {
                 CaptionPresentationClass.Kind.REDUCED,
                 field("presentationClass", false));
         assertEquals("the endpoint commits the real detail font", 44.5f, measuredGlyphHeight(text()), 0.6f);
-        assertEquals("the temporary scale is reset at the endpoint", 1f, text().getScaleY(), .01f);
+        assertEquals(
+                "the painted page follows the continuous size law",
+                lawGlyphForGlobalWidth(1478),
+                paintedGlyphHeight(),
+                0.9f);
+    }
+
+    /**
+     * The endpoint is a content change, not a size change: while the new page is being planned the
+     * previous layout is still on screen, and it must already paint at the detail size. A scale
+     * reset at the commit would paint it at the full size for that whole latency.
+     */
+    @Test
+    public void theEndpointNeverPaintsTheOldLayoutAtItsOwnSizeWhileThePageIsPlanned()
+            throws Exception {
+        slowPages = true;
+        show("剧透一下：下一期我会分享一份指南。", "scale:hold");
+        awaitCaption();
+        assertEquals(55.5f, paintedGlyphHeight(), 0.8f);
+
+        Layer.globalWidth = 1850;
+        Layer.globalHeight = 1050;
+        layout();
+        pump();
+        assertTrue("the sheet must already be shrinking the text", text().getScaleY() < .96f);
+
+        Layer.globalWidth = 1478;
+        Layer.globalHeight = 831;
+        Layer.video = new Rect(0, 0, 1478, 831);
+        plane.setLayoutParams(new FrameLayout.LayoutParams(1478, 831));
+        player.setLayoutParams(new FrameLayout.LayoutParams(1478, 831));
+        layout();
+        pump();
+        assertEquals(
+                "the viewport endpoint commits the reduced class",
+                CaptionPresentationClass.Kind.REDUCED,
+                field("presentationClass", false));
+        assertTrue(
+                "the new page cannot be there yet: the planner is slow on purpose",
+                pages().isEmpty());
+        assertEquals(
+                "the old layout must already paint at the size law's endpoint",
+                lawGlyphForGlobalWidth(1478),
+                paintedGlyphHeight(),
+                0.9f);
+
+        awaitPlan(innerWidth(1478));
+        assertEquals(44.5f, measuredGlyphHeight(text()), 0.6f);
+        assertEquals(
+                "the law's correction is still valid after the real detail layout is applied",
+                lawGlyphForGlobalWidth(1478) / measuredGlyphHeight(text()),
+                text().getScaleY(),
+                .02f);
+        slowPages = false;
+    }
+
+    /** A pre-draw class commit must be rendered by the next frame callback, not by pre-draw. */
+    @Test
+    public void aClassCommitFromPreDrawRendersInTheNextAnimationPhase() throws Exception {
+        show("剧透一下：下一期我会分享一份指南。", "frame:callback");
+        awaitCaption();
+        Object before = field("desiredLayout", false);
+        Layer.video = new Rect(0, 0, 1478, 831);
+        Layer.globalWidth = 1478;
+        Layer.globalHeight = 831;
+        plane.setLayoutParams(new FrameLayout.LayoutParams(1478, 831));
+        player.setLayoutParams(new FrameLayout.LayoutParams(1478, 831));
+        layout();
+        java.lang.reflect.Field watchField = CaptionOverlay.class.getDeclaredField("WATCH");
+        watchField.setAccessible(true);
+        android.view.ViewTreeObserver.OnPreDrawListener watch =
+                (android.view.ViewTreeObserver.OnPreDrawListener) watchField.get(null);
+        watch.onPreDraw();
+        assertEquals(
+                "the model/geometry commit is decided in pre-draw",
+                CaptionPresentationClass.Kind.REDUCED,
+                field("presentationClass", false));
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20));
+        assertNotEquals(
+                "the content commit must have run in the frame callback",
+                before,
+                field("desiredLayout", false));
+    }
+
+    /** The speculative plan must be the plan the commit asks for, and must not be planned twice. */
+    @Test
+    public void aPrefetchedPlanIsReadyForTheRequestThatNeedsIt() throws Exception {
+        CaptionPageExecutor executor = (CaptionPageExecutor) field("LAYOUTS", false);
+        String key = "prefetch:test:" + System.nanoTime();
+        java.util.concurrent.atomic.AtomicInteger plans = new java.util.concurrent.atomic.AtomicInteger();
+        executor.prefetch(key, () -> {
+            plans.incrementAndGet();
+            return TranslationPresentation.pages(
+                    "预制的分页计划。", 0, 4000, slowBudget(), renderSpec());
+        });
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline && executor.get(key) == null) Thread.sleep(2);
+        assertNotNull("the speculative plan must land in the cache", executor.get(key));
+        assertFalse("a prefetch must cache a real plan", executor.get(key).isEmpty());
+        assertEquals("the planner runs once", 1, plans.get());
+
+        executor.prefetch(key, () -> {
+            plans.incrementAndGet();
+            return Collections.emptyList();
+        });
+        Thread.sleep(30);
+        assertEquals("a cached plan is not planned again", 1, plans.get());
     }
 
     @Test
@@ -315,6 +436,8 @@ public class CaptionLayerOverlayTest {
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200));
         layout();
         awaitPlan(innerWidth(1478));
+        // awaitPlan returns on the commit frame; the new box needs its own layout pass.
+        layout();
 
         assertTrue(
                 "a reduced landscape viewport must use the detail reading size",
@@ -417,5 +540,25 @@ public class CaptionLayerOverlayTest {
 
     private static float measuredGlyphHeight(TextView view) {
         return SubtitleStyleMetrics.measuredGlyphHeightPx(view.getPaint());
+    }
+
+    /** The size the user actually sees: the laid-out glyph height times the temporary scale. */
+    private float paintedGlyphHeight() throws Exception {
+        TextView view = text();
+        return measuredGlyphHeight(view) * view.getScaleY();
+    }
+
+    /** The continuous law at the surface scale this test's shadow derives from globalWidth. */
+    private static float lawGlyphForGlobalWidth(int globalWidth) {
+        return CaptionOverlay.glyphHeightPxForVideo(
+                2, 2736, 1264, 1264f * globalWidth / 2247f);
+    }
+
+    private static CaptionRenderSpec renderSpec() {
+        return CaptionLanguageContext.explicit("en", "zh-Hans").renderSpec;
+    }
+
+    private static CaptionPresentationBudget slowBudget() {
+        return new CaptionPresentationBudget(944, 40f, 48.68f, renderSpec());
     }
 }

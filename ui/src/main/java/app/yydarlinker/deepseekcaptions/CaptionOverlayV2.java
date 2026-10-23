@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -13,6 +14,7 @@ import android.os.SystemClock;
 import android.text.Layout;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
+import android.view.Choreographer;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
@@ -81,7 +83,7 @@ final class CaptionOverlay {
      * caption stays while the next unit's pages are laid out off the main thread. Explicit hides,
      * seeks, owner changes and longer pauses still clear the box at once.
      */
-    private static final long END_HOLD_MS = 800, LAYOUT_HOLD_MS = 1200;
+    private static final long END_HOLD_MS = 800;
 
     private static final long SCAN_INTERVAL_MS = 500, DRAG_AFTER_MS = 350;
 
@@ -127,46 +129,34 @@ final class CaptionOverlay {
     private static CaptionPresentationClass.Kind previousClass;
 
     /**
-     * One presentation class per stable viewport. It decides glyph size, page width and the visible
-     * box; it is changed once when the viewport crosses a hysteresis threshold, never per frame.
+     * One presentation class per reading mode. The PlayerType model decides it; geometry is only
+     * the fallback for the first frame and for sessions that never deliver a type. It changes once
+     * per model event, never per animation frame.
      */
     private static CaptionPresentationClass.Kind presentationClass;
 
     private static int classFrameWidth, reducedVideoWidth;
-    private static float classGlyphHeight;
     private static int stableTextWidth, stableTextLines;
     private static long nextPageAt;
 
+    /** Size tier and text-debug flag, resolved once per content commit. */
+    private static int presentationTier = -1;
+    private static boolean textDebug;
     /**
-     * A class change is a reading-size change, not a geometry frame. It commits as soon as a new
-     * class has been a real candidate for this long, even while the comments sheet is still
-     * animating: the fixed 16:9 reference and hysteresis keep that candidate stable, so one cheap
-     * commit replaces the old wait-until-the-animation-ends behaviour. Official slide transitions
-     * are still excluded (see {@link #classTransitionAllowed}).
+     * Glyph ink height of the layout currently on screen. Written only when a layout/page is
+     * committed; the per-frame size law reads this cache instead of measuring the Paint.
      */
-    private static final long CLASS_SETTLE_MS = 80;
-
-    private static CaptionPresentationClass.Kind classCandidate;
-    private static long classCandidateSince;
-    private static float commentScale = 1f;
-    private static boolean commentTransitionArmed;
+    static float layoutGlyphInkPx;
     private static GradientDrawable captionBackground;
     private static View touchProxy, dragSource;
     private static WeakReference<FrameLayout> touchHostRef = new WeakReference<>(null);
-    private static long lastTouchProxyAt;
 
     /**
      * Geometry only moves the committed box. A new page plan is requested when the content changes,
-     * when the mode or glyph size changes, or when the committed page no longer fits the new video
-     * rectangle. The rectangle has to be still for {@link #SETTLE_MS} before that check is made:
-     * YouTube's resizes arrive in steps much slower than a frame, so a "two changes close together"
-     * motion heuristic classified each step as a settled scene and replanned the caption mid-animation.
+     * when the mode model reports a new class, or when the committed plan cannot be reused. The
+     * sheet animation itself never asks for a plan: its size is a draw-time transform.
      */
-    private static final long SETTLE_MS = 120;
-
     private static final Rect videoGeometry = new Rect();
-    private static boolean geometryKnown;
-    private static long geometryChangedAt;
     private static int boxWidth, boxHeight, nextLeft, nextTop;
     /** Width of the visible text box; the anchor itself stays full width for centering. */
     private static int contentWidth;
@@ -182,6 +172,22 @@ final class CaptionOverlay {
     private static float downY, initial;
     private static long downAt;
     private static boolean dragging;
+
+    /**
+     * Content and box geometry are applied in the animation phase, before the traversal that will
+     * draw them. Pre-draw is kept for the draw-time transform only.
+     */
+    private static boolean beforeTraversalScheduled;
+
+    private static final Choreographer.FrameCallback BEFORE_TRAVERSAL =
+            frameTimeNanos -> {
+                beforeTraversalScheduled = false;
+                Activity owner = activityRef.get();
+                if (owner == null || blocked() || guardInvalid() || nothingPending()) return;
+                if (touchProxy == null) ensureTouchProxy(owner);
+                advancePreparedPageIfDue();
+                if (contentNow) render();
+            };
 
     private static final Runnable HOLD_EXPIRY =
             () -> {
@@ -200,13 +206,26 @@ final class CaptionOverlay {
 
     private static final ViewTreeObserver.OnPreDrawListener WATCH =
             () -> {
-                advancePreparedPageIfDue();
+                // Never measure, set text or change LayoutParams here: a layout started in
+                // pre-draw can only be applied by the next traversal. Pre-draw reads the current
+                // matrices and applies the draw-time scale/translation; content and box geometry
+                // are queued for the next frame's animation phase.
+                if (contentNow || nextPageDue()) requestBeforeTraversal();
                 geometryFrame();
-                if (contentNow && !blocked() && !nothingPending()) render();
                 // The caption must never cancel the window draw: a layout request belongs to the
                 // next traversal, not to every other view on screen.
                 return true;
             };
+
+    private static boolean nextPageDue() {
+        return nextPageAt > 0 && SystemClock.uptimeMillis() >= nextPageAt;
+    }
+
+    private static void requestBeforeTraversal() {
+        if (beforeTraversalScheduled) return;
+        beforeTraversalScheduled = true;
+        Choreographer.getInstance().postFrameCallback(BEFORE_TRAVERSAL);
+    }
 
     private CaptionOverlay() {}
 
@@ -538,6 +557,9 @@ final class CaptionOverlay {
                         return;
                     }
                     CaptionSurface.invalidateGeometry();
+                    // The model event is the earliest evidence of the next reading mode. Prefetch
+                    // the target page now, so the frame that commits the class finds it ready.
+                    prefetchPlayerClass(type);
                     dirty = true;
                     requestPlayerRender();
                 });
@@ -691,12 +713,7 @@ final class CaptionOverlay {
         previousClass = null;
         presentationClass = null;
         classFrameWidth = 0;
-        classGlyphHeight = 0;
         reducedVideoWidth = 0;
-        classCandidate = null;
-        classCandidateSince = 0;
-        commentTransitionArmed = false;
-        commentScale = 1f;
         lastScan = -SCAN_INTERVAL_MS;
         lastNotice = "";
         lastBlankIdentity = null;
@@ -759,8 +776,6 @@ final class CaptionOverlay {
             if (current == null) current = CaptionSurface.refreshedVideoBounds(host);
             if (text != null && current != null && boxWidth > 0)
                 placeVisibleText(a, host, anchor, text, current, boxWidth);
-            geometryKnown = false;
-            geometryChangedAt = 0;
             videoGeometry.setEmpty();
             previous.setEmpty();
             previousScreenWidth = 0;
@@ -827,7 +842,11 @@ final class CaptionOverlay {
         return true;
     }
 
-    /** The caption view: the page shown must still own the media time at the moment of painting. */
+    /**
+     * The caption view. A page that no longer owns the current media time is a content decision,
+     * taken before traversal; drawing only paints what the last committed plan put here. In
+     * particular, a draw must never clear the text or hide the view: that is a one-frame blank.
+     */
     private static final class CaptionText extends TextView {
         CaptionText(Context context) {
             super(context);
@@ -835,18 +854,6 @@ final class CaptionOverlay {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            RenderGuard guard = currentGuard;
-            long paintAt = positionOf(guard);
-            if (guard != null
-                    && (!guard.isValid()
-                            || pendingUnit != null
-                                    && !pageOwns(paintAt)
-                                    && layoutHoldSince < 0
-                                    && !holdingEnd(paintAt))) {
-                setText("");
-                hideView();
-                return;
-            }
             drawCaptionBackground(canvas);
             super.onDraw(canvas);
         }
@@ -871,22 +878,8 @@ final class CaptionOverlay {
         }
     }
 
-    private static long positionOf(RenderGuard guard) {
-        return guard == null ? pendingPosition : guard.displayPosition(pendingPosition);
-    }
-
     private static boolean ownsDisplayPosition(long at) {
         return pendingUnit != null && pendingUnit.audible(at);
-    }
-
-    private static boolean pageContains(long at) {
-        return shownPage >= 0
-                && shownPage < pendingPages.size()
-                && pendingPages.get(shownPage).contains(at);
-    }
-
-    private static boolean pageOwns(long at) {
-        return ownsDisplayPosition(at) && pageContains(at);
     }
 
     /** Height belongs to the page that is actually shown, never to the widest page in the plan. */
@@ -917,38 +910,45 @@ final class CaptionOverlay {
         return held;
     }
 
+    /**
+     * A pending plan keeps the last committed page. This only records that the previous version is
+     * being held; there is no timeout after which an empty box takes over.
+     */
     private static boolean holdingLayout() {
         if (!shownText()) return false;
-        long now = SystemClock.uptimeMillis();
-        if (layoutHoldSince < 0) {
-            layoutHoldSince = now;
-            MAIN.removeCallbacks(HOLD_EXPIRY);
-            MAIN.postDelayed(HOLD_EXPIRY, LAYOUT_HOLD_MS + 20);
-        }
-        return now - layoutHoldSince < LAYOUT_HOLD_MS;
+        if (layoutHoldSince < 0) layoutHoldSince = SystemClock.uptimeMillis();
+        return true;
     }
 
     // ---- Pages ----
 
+    /**
+     * The identity of one page plan: the event, the measurement contract, the box width and the
+     * reading size. Both the real request and the speculative player-type prefetch use it, so a
+     * plan prepared before a mode event is the exact plan that mode's commit asks for.
+     */
+    private static String planKey(CaptionPresentationBudget budget, CaptionRenderSpec spec) {
+        return pendingIdentity
+                + "|"
+                + pendingCanonicalHash
+                + "|"
+                + pendingStart
+                + "|"
+                + pendingEnd
+                + "|"
+                + spec.measurementKey()
+                + "|"
+                + budget.width
+                + "|"
+                + Float.floatToIntBits(budget.preferredPx)
+                + "|"
+                + java.util.Arrays.toString(pendingSourceAnchors);
+    }
+
     /** The pages of the pending event; laid out off the main thread, empty until they are ready. */
     private static List<CaptionPageLayout.Page> currentPlan(
             CaptionPresentationBudget budget, CaptionRenderSpec spec) {
-        String key =
-                pendingIdentity
-                        + "|"
-                        + pendingCanonicalHash
-                        + "|"
-                        + pendingStart
-                        + "|"
-                        + pendingEnd
-                        + "|"
-                        + spec.measurementKey()
-                        + "|"
-                        + budget.width
-                        + "|"
-                        + Float.floatToIntBits(budget.preferredPx)
-                        + "|"
-                        + java.util.Arrays.toString(pendingSourceAnchors);
+        String key = planKey(budget, spec);
         if (!key.equals(desiredLayout)) {
             desiredLayout = key;
             failedLayout = "";
@@ -1015,6 +1015,12 @@ final class CaptionOverlay {
                 scheduleNextPage(at);
                 return;
             }
+            if (next < 0 && shownText() && inWindow(at)) {
+                // A page boundary is a content change, not a reason to blank the box. The next
+                // page will land before traversal; until then the last page stays painted.
+                scheduleNextPage(at);
+                return;
+            }
             if (text != null) text.setText("");
             hideView();
             shownPage = -1;
@@ -1044,6 +1050,9 @@ final class CaptionOverlay {
             hideView();
             return;
         }
+        // The page was applied: cache the ink height this layout actually paints at. This is one
+        // of the only two places that may measure it.
+        layoutGlyphInkPx = SubtitleStyleMetrics.measuredGlyphHeightPx(text.getPaint());
         contentWidth = applied;
         Rect placement =
                 videoGeometry.isEmpty()
@@ -1077,36 +1086,14 @@ final class CaptionOverlay {
 
     // ---- Geometry clock ----
 
-    /** True while the video rectangle has changed inside the settle window. */
-    private static boolean moving(long now) {
-        return geometryKnown && now - geometryChangedAt < SETTLE_MS;
-    }
-
-    private static void noteGeometry(Rect video, long now) {
-        if (!geometryKnown) {
-            // The first observation is the scene the caption is being placed in, not motion.
-            videoGeometry.set(video);
-            geometryKnown = true;
-            geometryChangedAt = now - SETTLE_MS;
-            return;
-        }
-        if (!video.equals(videoGeometry)) {
-            geometryChangedAt = now;
-            videoGeometry.set(video);
-        }
+    private static void noteGeometry(Rect video) {
+        if (!video.equals(videoGeometry)) videoGeometry.set(video);
     }
 
     /** Reads the cached video rectangle and moves the existing box; only on layout/motion. */
     private static void geometryFrame() {
         Activity a = activityRef.get();
         if (a == null || blocked() || nothingPending()) return;
-        if (touchProxy == null) {
-            long now = SystemClock.uptimeMillis();
-            if (now - lastTouchProxyAt >= 250) {
-                lastTouchProxyAt = now;
-                ensureTouchProxy(a);
-            }
-        }
         FrameLayout host = hostRef.get(), anchor = anchorRef.get();
         TextView text = textRef.get();
         if (host == null
@@ -1116,16 +1103,20 @@ final class CaptionOverlay {
                 || host.getWidth() <= 0) return;
         Rect video = CaptionSurface.currentVideoBounds(host);
         if (video == null || video.width() < 50 || video.height() < 50) return;
-        long now = SystemClock.uptimeMillis();
-        noteGeometry(video, now);
-        if (updatePresentationClass(video, now)) {
+        noteGeometry(video);
+        if (updatePresentationClass(video)) {
             contentNow = true;
             dirty = true;
-            render();
+            // The size law has already moved the current layout to the new reading size; the
+            // content and box change belongs to the next frame, before its traversal.
+            applyCommentScale(a, text);
+            requestBeforeTraversal();
             return;
         }
-        applyCommentScale(a, video, text);
-        followVisibleText(a, anchor, video);
+        applyCommentScale(a, text);
+        // Pre-draw may only scale and translate. The committed box keeps its measured width and
+        // height; a real content change is applied by render() before the next traversal.
+        followVisibleTextTranslation(a, anchor, video);
     }
 
     private static boolean computeTarget(
@@ -1144,29 +1135,26 @@ final class CaptionOverlay {
         return true;
     }
 
-    private static void followVisibleText(Activity a, FrameLayout anchor, Rect video) {
-        int width = Math.min(boxWidth, video.width());
-        if (width <= 0
+    /**
+     * The only placement allowed in pre-draw: translation. The anchor keeps the width, height and
+     * margins the last content commit gave it; changing them here would request a layout that can
+     * only be applied by the next traversal.
+     */
+    private static void followVisibleTextTranslation(Activity a, FrameLayout anchor, Rect video) {
+        if (boxWidth <= 0
                 || boxHeight <= 0
                 || !computeTarget(
-                        a, video, width, boxHeight, video.width() > video.height()))
+                        a, video, boxWidth, boxHeight, video.width() > video.height()))
             return;
         FrameLayout host = hostRef.get();
-        if (host != null)
-            CaptionHorizontalPlacement.position(host, anchor, nextLeft, nextTop, width, boxHeight);
+        if (host != null) CaptionHorizontalPlacement.translate(host, anchor, nextLeft, nextTop);
     }
 
     /**
-     * A committed page is a content fact, not a geometry fact. It can be reused while its own line
-     * plan and its already measured box still fit the new rectangle; only overflow asks the page
-     * planner for a new plan. This is what keeps a resize animation from changing the text or the
-     * box width when nothing about the reading task changed.
-     */
-    /**
-     * A committed page is a content fact. Once the presentation class is stable, a geometry change
-     * only moves the box; it never re-paginates because a transient rectangle is narrower. The
-     * class switch is the one event that asks for a new plan, and it is decided by the real video
-     * viewport with hysteresis.
+     * A committed page is a content fact. When the presentation class is unchanged, a geometry
+     * change only moves the box; it never re-paginates because a transient rectangle is narrower.
+     * The class switch is the one event that asks for a new plan, and it follows a PlayerType
+     * notification (or the first-frame fallback) rather than the animation's current rectangle.
      */
     private static boolean canReuseCommittedPage(
             float preferred, CaptionRenderSpec spec, boolean ownedCaption, int inner) {
@@ -1189,8 +1177,6 @@ final class CaptionOverlay {
     }
 
     private static void resetGeometry() {
-        geometryKnown = false;
-        geometryChangedAt = 0;
         videoGeometry.setEmpty();
         boxWidth = 0;
         boxHeight = 0;
@@ -1201,66 +1187,49 @@ final class CaptionOverlay {
     }
 
     /**
-     * Classifies the current viewport and commits one new presentation class only after the
-     * viewport has been still and the player has left a sliding transition. The class frame width
-     * is captured from that settled frame, never from a rotation or sheet-animation frame, so a
-     * later frame can only translate the box.
+     * Classifies the current reading mode. A PlayerType notification is the model's own statement
+     * about the mode, so it is authoritative; geometry is only the fallback for the first frame and
+     * for tests/versions that never deliver a type. There is no candidate timer: a class commit is
+     * a consequence of the model event, not of the geometry having been still for N milliseconds.
      */
-    private static boolean updatePresentationClass(Rect video, long now) {
+    private static boolean updatePresentationClass(Rect video) {
         Activity a = activityRef.get();
         if (a == null || video == null) return false;
         DisplayMetrics metrics = a.getResources().getDisplayMetrics();
         int screenWidth = metrics.widthPixels, screenHeight = metrics.heightPixels;
         boolean shorts = CaptionSurface.isShorts();
-        CaptionPresentationClass.Kind next =
-                CaptionPresentationClass.classify(
-                        presentationClass,
-                        video,
-                        CaptionSurface.visibleVideoWidth(),
-                        screenWidth,
-                        screenHeight,
-                        shorts);
-        boolean commentTransition = commentTransitionActive(screenWidth, screenHeight);
-        float progress = commentTransition ? commentProgress(screenWidth, screenHeight) : -1f;
-        boolean commentEndpoint =
-                commentTransition
-                        && progress >= 0f
-                        && (presentationClass == CaptionPresentationClass.Kind.FULL
-                                ? progress >= .98f
-                                : progress <= .02f);
-        if (commentTransition && !commentEndpoint) {
-            // The View is being scaled continuously by geometryFrame; do not replace the page
-            // plan or the binary class until the sheet has reached its own endpoint.
-            classCandidate = null;
-            return false;
-        }
-        if (commentEndpoint && next != presentationClass) {
-            // The animation has reached the full/reduced endpoint; commit the new plan now so the
-            // reset scale and the new text size happen on the same final frame.
-            return commitPresentationClass(a, next, video, screenWidth, screenHeight, shorts);
-        }
+        CaptionPresentationClass.Kind next = playerTypeClass(screenWidth, screenHeight, shorts);
+        if (next == null)
+            next =
+                    CaptionPresentationClass.classify(
+                            presentationClass, video, screenWidth, screenHeight, shorts);
         if (presentationClass == null)
             return commitPresentationClass(a, next, video, screenWidth, screenHeight, shorts);
         if (next == presentationClass) {
-            classCandidate = null;
-            if (next == CaptionPresentationClass.Kind.REDUCED && !moving(now)) {
+            if (next == CaptionPresentationClass.Kind.REDUCED) {
                 int cap = reducedWidthCap(screenWidth, screenHeight);
                 if (video.width() > 0 && video.width() <= cap) reducedVideoWidth = video.width();
                 else if (reducedVideoWidth > cap) reducedVideoWidth = 0;
             }
             return false;
         }
-        if (!classTransitionAllowed(now)) {
-            classCandidate = null;
-            return false;
-        }
-        if (next != classCandidate) {
-            classCandidate = next;
-            classCandidateSince = now;
-            return false;
-        }
-        if (now - classCandidateSince < CLASS_SETTLE_MS) return false;
         return commitPresentationClass(a, next, video, screenWidth, screenHeight, shorts);
+    }
+
+    /**
+     * The reading class the player-type model currently asks for. Null means the model has no
+     * opinion (unknown, or sliding between two sizes), and geometry decides the first frame.
+     */
+    private static CaptionPresentationClass.Kind playerTypeClass(
+            int screenWidth, int screenHeight, boolean shorts) {
+        if (shorts) return CaptionPresentationClass.Kind.SHORTS_FULL;
+        if (screenWidth <= screenHeight) return CaptionPresentationClass.Kind.DETAIL;
+        String type = CaptionPlayerAuthority.playerType();
+        if (type.isEmpty()) return null;
+        if (type.contains("SLIDING")) return presentationClass;
+        if (type.contains("FULLSCREEN")) return CaptionPresentationClass.Kind.FULL;
+        if (type.contains("MAXIMIZED")) return CaptionPresentationClass.Kind.REDUCED;
+        return null;
     }
 
     /** A reduced viewport is by definition no wider than the reduced threshold. */
@@ -1273,106 +1242,114 @@ final class CaptionOverlay {
     }
 
     /**
-     * The reading class may not change while the rectangle is moving or while the official player
-     * reports a slide. Those are the two moments where the old code shrank the caption before the
-     * user had actually reached the detail page.
+     * The one continuous size law: r = on-screen video short side / screen short side.
+     *
+     * <p>At r = 1 (the video fills the short side) it is the full endpoint; at r = 9/16 it is the
+     * detail endpoint; in between it is linear in that ratio. Both endpoints are the existing
+     * reference sizes scaled from a 1264 px short side, so no class interpolation is needed and
+     * the same expression holds in landscape and portrait.
      */
-    private static boolean classTransitionAllowed(long now) {
-        int state = CaptionPlayerAuthority.state();
-        if (state == CaptionPlayerAuthority.COMPACT
-                || state == CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR) return false;
-        String type = CaptionPlayerAuthority.playerType();
-        return type.isEmpty() || !type.contains("SLIDING");
+    static float glyphHeightPxForVideo(
+            int tier, int screenWidth, int screenHeight, float videoShortOnScreen) {
+        int screenShort = Math.min(screenWidth, screenHeight);
+        if (screenShort <= 0) return 0f;
+        float density = screenShort / CaptionPresentationClass.REFERENCE_SHORT_SIDE_PX;
+        float full = CaptionFontSize.fullScreenGlyphHeightPx(tier) * density;
+        float detail = CaptionFontSize.detailGlyphHeightPx(tier) * density;
+        float r = videoShortOnScreen / (float) screenShort;
+        float t = clamp((1f - r) / (1f - 9f / 16f), 0f, 1f);
+        return full + (detail - full) * t;
+    }
+
+    /** The text scale that maps the current layout size to [glyphPx] on screen; 0 means skip. */
+    static float captionScale(float glyphPx, float glyphLocalPx, float anchorScale) {
+        if (!(glyphPx > 0f) || !(glyphLocalPx > 0f) || !(anchorScale > 0f)) return 0f;
+        float scale = glyphPx / (glyphLocalPx * anchorScale);
+        return Float.isNaN(scale) || Float.isInfinite(scale) ? 0f : scale;
+    }
+
+    private static float clamp(float value, float minimum, float maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static final Matrix ANCHOR_TO_GLOBAL = new Matrix(), SURFACE_TO_GLOBAL = new Matrix();
+    private static final float[] MATRIX_VALUES = new float[9];
+
+    /**
+     * sqrt(|det|) of a global transform. A degenerate matrix (the animation has collapsed the
+     * node) falls back to MSCALE_X; a non-positive result means "no evidence", not scale 1.
+     */
+    private static float matrixScale(Matrix matrix) {
+        matrix.getValues(MATRIX_VALUES);
+        float determinant =
+                MATRIX_VALUES[Matrix.MSCALE_X] * MATRIX_VALUES[Matrix.MSCALE_Y]
+                        - MATRIX_VALUES[Matrix.MSKEW_X] * MATRIX_VALUES[Matrix.MSKEW_Y];
+        float scale = (float) Math.sqrt(Math.abs(determinant));
+        if (!(scale > 0f) || Float.isNaN(scale) || Float.isInfinite(scale))
+            scale = MATRIX_VALUES[Matrix.MSCALE_X];
+        return scale > 0f && !Float.isNaN(scale) && !Float.isInfinite(scale) ? scale : 0f;
     }
 
     /**
-     * A landscape FULL↔REDUCED change is normally the comments sheet. Its player animation is a
-     * scale on the player container, so the caption's local video rectangle does not change until
-     * the very end. The continuous scale below uses the on-screen video width instead, and the
-     * binary class commits only when the animation reaches an endpoint.
+     * The whole visual-size calculation. The outer anchor supplies the scale this layer inherits;
+     * the surface supplies the video's current on-screen short side. The text's own scale is the
+     * correction, so it never feeds back into the anchor matrix.
      */
-    private static boolean commentTransitionActive(int screenWidth, int screenHeight) {
-        if (CaptionSurface.isShorts() || screenWidth <= screenHeight) return false;
-        int state = CaptionPlayerAuthority.state();
-        if (state == CaptionPlayerAuthority.COMPACT
-                || state == CaptionPlayerAuthority.TRANSITIONING_TO_REGULAR) return false;
-        String type = CaptionPlayerAuthority.playerType();
-        if (!type.isEmpty() && type.contains("SLIDING")) return false;
-        boolean full = presentationClass == CaptionPresentationClass.Kind.FULL;
-        boolean reduced = presentationClass == CaptionPresentationClass.Kind.REDUCED;
-        if (!full && !reduced) return false;
-        // A comments sheet reduces the visible video height. A letterboxed 4:3/21:9 video at rest
-        // keeps its full height, so it must not be mistaken for an intermediate panel state.
-        int visibleHeight = CaptionSurface.visibleVideoHeight();
-        int visibleWidth = CaptionSurface.visibleVideoWidth();
-        boolean heightReduced = visibleHeight > 0 && visibleHeight < screenHeight * .95f;
-        boolean widthReduced =
-                visibleWidth > 0
-                        && visibleWidth
-                                < CaptionPresentationClass.referenceVideoWidth(
-                                                screenWidth, screenHeight)
-                                        * .92f;
-        if (full && (heightReduced || widthReduced)) commentTransitionArmed = true;
-        return reduced
-                ? commentTransitionArmed || heightReduced
-                : heightReduced || widthReduced;
+    static void applyCommentScale(Activity a, TextView text) {
+        applyCommentScale(
+                a,
+                anchorRef.get(),
+                CaptionSurface.currentSurfaceView(),
+                text,
+                presentationTier);
     }
 
-    /** 0 at the full viewport, 1 at the reduced (comments) viewport. */
-    private static float commentProgress(int screenWidth, int screenHeight) {
-        int full = CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight);
-        int reduced =
-                reducedVideoWidth > 0 ? reducedVideoWidth : Math.round(full * .66f);
-        if (reduced <= 0 || reduced >= full) return 1f;
-        int observed = CaptionSurface.visibleVideoWidth();
-        if (observed <= 0) return -1f;
-        float progress = (full - observed) / (float) (full - reduced);
-        return Math.max(0f, Math.min(1f, progress));
-    }
-
-    /**
-     * Keep the caption readable at an intermediate size for the whole comments animation. Only the
-     * View's rendering scale changes here; the page plan and box geometry wait for the endpoint.
-     * This is what makes the size change start and finish together with the sheet, without a
-     * re-pagination on every frame.
-     */
-    private static void applyCommentScale(Activity a, Rect video, TextView text) {
-        if (text == null || video == null || a == null) return;
+    static void applyCommentScale(
+            Activity a, FrameLayout anchor, View surface, TextView text, int tier) {
+        if (text == null || a == null || anchor == null || surface == null) return;
+        if (tier < 0) return;
         DisplayMetrics metrics = a.getResources().getDisplayMetrics();
         int screenWidth = metrics.widthPixels, screenHeight = metrics.heightPixels;
-        if (!commentTransitionActive(screenWidth, screenHeight)) {
-            resetCommentScale(text);
-            return;
+        int screenShort = Math.min(screenWidth, screenHeight);
+        int localShort = Math.min(surface.getWidth(), surface.getHeight());
+        if (screenShort <= 0 || localShort <= 0) return;
+        ANCHOR_TO_GLOBAL.reset();
+        anchor.transformMatrixToGlobal(ANCHOR_TO_GLOBAL);
+        float anchorScale = matrixScale(ANCHOR_TO_GLOBAL);
+        if (anchorScale <= 0f) return;
+        SURFACE_TO_GLOBAL.reset();
+        surface.transformMatrixToGlobal(SURFACE_TO_GLOBAL);
+        float surfaceScale = matrixScale(SURFACE_TO_GLOBAL);
+        if (surfaceScale <= 0f) return;
+        float glyphPx;
+        if (CaptionSurface.isShorts()) {
+            // Shorts keeps the detail endpoint it has always used, now against the same density.
+            glyphPx =
+                    CaptionFontSize.detailGlyphHeightPx(tier)
+                            * screenShort
+                            / CaptionPresentationClass.REFERENCE_SHORT_SIDE_PX;
+        } else {
+            glyphPx =
+                    glyphHeightPxForVideo(
+                            tier,
+                            screenWidth,
+                            screenHeight,
+                            localShort * surfaceScale);
         }
-        float progress = commentProgress(screenWidth, screenHeight);
-        boolean endpoint =
-                presentationClass == CaptionPresentationClass.Kind.FULL
-                        ? progress >= .98f
-                        : progress <= .02f;
-        if (endpoint) {
-            resetCommentScale(text);
-            return;
-        }
-        int tier = DeepSeekConfig.displayStyle(a).captionSizeTier;
-        float fullGlyph =
-                CaptionPresentationClass.glyphHeightPx(
-                        tier, screenWidth, screenHeight, CaptionPresentationClass.Kind.FULL);
-        float detailGlyph =
-                CaptionPresentationClass.glyphHeightPx(
-                        tier, screenWidth, screenHeight, CaptionPresentationClass.Kind.DETAIL);
-        float baseGlyph =
-                CaptionPresentationClass.glyphHeightPx(
-                        tier, screenWidth, screenHeight, presentationClass);
-        float visualGlyph = fullGlyph + (detailGlyph - fullGlyph) * progress;
-        float scale = visualGlyph / Math.max(1f, baseGlyph);
-        scale = Math.max(.5f, Math.min(1.6f, scale));
-        if (Math.abs(text.getScaleX() - scale) > .002f) {
+        // gLocal is the ink height cached when the layout was committed. This method runs in
+        // pre-draw every frame and must not measure the Paint; a non-positive cache means no
+        // layout has been committed yet, so keep the existing "skip, do not set scale" semantics.
+        float glyphLocalPx = layoutGlyphInkPx;
+        if (!(glyphLocalPx > 0f)) return;
+        float scale = captionScale(glyphPx, glyphLocalPx, anchorScale);
+        if (scale <= 0f) return;
+        if (Math.abs(text.getScaleX() - scale) > .002f
+                || Math.abs(text.getScaleY() - scale) > .002f) {
             text.setPivotX(text.getWidth() / 2f);
             text.setPivotY(text.getHeight() / 2f);
             text.setScaleX(scale);
             text.setScaleY(scale);
         }
-        commentScale = scale;
     }
 
     private static void resetCommentScale(TextView text) {
@@ -1380,7 +1357,6 @@ final class CaptionOverlay {
             text.setScaleX(1f);
             text.setScaleY(1f);
         }
-        commentScale = 1f;
     }
 
     private static boolean commitPresentationClass(
@@ -1407,19 +1383,15 @@ final class CaptionOverlay {
                         : CaptionPresentationClass.layoutVideoWidth(
                                 next, video, screenWidth, screenHeight, reducedVideoWidth);
         classFrameWidth = Math.max(1, Math.round(videoWidth * (shorts ? .78f : .92f)));
-        classGlyphHeight =
+        float classGlyph =
                 CaptionPresentationClass.glyphHeightPx(
                         DeepSeekConfig.displayStyle(a).captionSizeTier,
                         screenWidth,
                         screenHeight,
                         next);
         presentationClass = next;
-        if (next == CaptionPresentationClass.Kind.FULL) commentTransitionArmed = false;
         stableTextWidth = 0;
         stableTextLines = 0;
-        classCandidate = null;
-        classCandidateSince = 0;
-        resetCommentScale(text);
         CaptionDiagnostics.mark(
                 a,
                 "CAPTION_PRESENTATION_CLASS",
@@ -1438,12 +1410,85 @@ final class CaptionOverlay {
                         + ";class_frame_width="
                         + classFrameWidth
                         + ";glyph_height_px="
-                        + classGlyphHeight
+                        + classGlyph
                         + ";reduced_width="
                         + reducedVideoWidth
                         + ";padding="
                         + padding);
         return true;
+    }
+
+    /**
+     * Plans the page the model's next reading mode will need. A PlayerType event is the earliest
+     * reliable statement of that mode, so this is the only speculative planning trigger; there is
+     * no timer and no per-frame probe. The key mirrors the width/glyph decisions of render(), so
+     * the commit asks for the plan this method already built.
+     */
+    private static void prefetchPlayerClass(String type) {
+        Activity a = activityRef.get();
+        if (a == null
+                || pendingStatus
+                || pendingWaiting
+                || pendingUnit == null
+                || pendingText.isEmpty()
+                || pendingStart < 0
+                || pendingEnd <= pendingStart) return;
+        DisplayMetrics metrics = a.getResources().getDisplayMetrics();
+        int screenWidth = metrics.widthPixels, screenHeight = metrics.heightPixels;
+        boolean shorts = CaptionSurface.isShorts();
+        CaptionPresentationClass.Kind target =
+                playerTypePrefetchClass(type, screenWidth, screenHeight, shorts);
+        if (target == null || target == presentationClass) return;
+        TextView text = textRef.get();
+        if (text == null) return;
+        FrameLayout host = hostRef.get();
+        Rect video = host == null ? null : CaptionSurface.currentVideoBounds(host);
+        if (video == null && !videoGeometry.isEmpty()) video = new Rect(videoGeometry);
+        if (video == null || video.width() <= 0) return;
+        int padding = text.getPaddingLeft() + text.getPaddingRight();
+        int videoWidth =
+                target == CaptionPresentationClass.Kind.FULL
+                        ? CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight)
+                        : CaptionPresentationClass.layoutVideoWidth(
+                                target, video, screenWidth, screenHeight, reducedVideoWidth);
+        int width = Math.max(1, Math.round(videoWidth * (shorts ? .78f : .92f)));
+        width = Math.min(width, screenWidth);
+        int inner = Math.max(1, width - padding);
+        int tier =
+                presentationTier >= 0
+                        ? presentationTier
+                        : DeepSeekConfig.displayStyle(a).captionSizeTier;
+        CaptionRenderSpec spec = pendingRenderSpec.withPaint(text);
+        float preferred =
+                SubtitleStyleMetrics.textSizePxForGlyphHeight(
+                        text.getPaint(),
+                        CaptionPresentationClass.glyphHeightPx(
+                                tier, screenWidth, screenHeight, target));
+        float minimum =
+                SubtitleStyleMetrics.textSizePxForGlyphHeight(
+                        text.getPaint(),
+                        CaptionPresentationClass.glyphHeightPx(
+                                0, screenWidth, screenHeight, target));
+        CaptionPresentationBudget budget =
+                new CaptionPresentationBudget(inner, minimum, preferred, spec);
+        String key = planKey(budget, spec);
+        String body = pendingText;
+        long start = pendingStart, end = pendingEnd;
+        long[] anchors = pendingSourceAnchors;
+        LAYOUTS.prefetch(
+                key,
+                () -> CaptionActions.displayPages(body, start, end, budget, spec, anchors));
+    }
+
+    /** The class a PlayerType event is heading to, including the destination of a slide. */
+    private static CaptionPresentationClass.Kind playerTypePrefetchClass(
+            String type, int screenWidth, int screenHeight, boolean shorts) {
+        if (shorts) return CaptionPresentationClass.Kind.SHORTS_FULL;
+        if (screenWidth <= screenHeight) return CaptionPresentationClass.Kind.DETAIL;
+        String name = type == null ? "" : type.toUpperCase(Locale.ROOT);
+        if (name.contains("FULLSCREEN")) return CaptionPresentationClass.Kind.FULL;
+        if (name.contains("MAXIMIZED")) return CaptionPresentationClass.Kind.REDUCED;
+        return null;
     }
 
     // ---- Render ----
@@ -1517,19 +1562,11 @@ final class CaptionOverlay {
         boolean shorts = CaptionSurface.isShorts();
         DisplayMetrics metrics = a.getResources().getDisplayMetrics();
         int screenWidth = metrics.widthPixels, screenHeight = metrics.heightPixels;
-        long motionNow = SystemClock.uptimeMillis();
-        noteGeometry(b, motionNow);
-        boolean classChanged = updatePresentationClass(b, motionNow);
+        noteGeometry(b);
+        boolean classChanged = updatePresentationClass(b);
         if (classChanged) {
             forceContent = true;
             contentNow = false;
-        }
-        if (!forceContent && !classChanged && moving(motionNow)) {
-            // Geometry owns this commit. Keep the old page and only translate it; a new page plan
-            // against every animation frame is exactly the churn this replaces.
-            previous.set(b);
-            followVisibleText(a, anchor, b);
-            return;
         }
         if (!dirty
                 && !forceContent
@@ -1552,6 +1589,9 @@ final class CaptionOverlay {
         }
         previousScreenWidth = screenWidth;
         DeepSeekConfig.Appearance cfg = DeepSeekConfig.displayStyle(a);
+        // Resolved once per commit, not once per frame: the pre-draw consults both.
+        presentationTier = cfg.captionSizeTier;
+        textDebug = DeepSeekConfig.displayTextDebugEnabled(a);
         // Size belongs to the stable presentation class, not to the instantaneous rectangle. The
         // class was captured when the viewport crossed its hysteresis threshold, so a sheet
         // animation cannot rescale or re-paginate the text mid-flight.
@@ -1569,19 +1609,9 @@ final class CaptionOverlay {
                 classFrameWidth > 0
                         ? classFrameWidth
                         : Math.max(1, Math.round(b.width() * (shorts ? .78f : .92f)));
-        // The class width is a target, not a licence to draw past the video or the display. Cap
-        // the effective width by the same margin the class would use on this video, so a box
-        // captured on a wider video cannot hug a narrower one edge-to-edge.
-        // FULL always plans against the full-viewport reference: at the closing endpoint the local
-        // rectangle can still be one frame behind, and a narrower plan there would repaginate
-        // again. The video is already ~98% full at that point, so this does not overflow.
-        int marginWidth =
-                presentationClass == CaptionPresentationClass.Kind.FULL
-                        ? CaptionPresentationClass.referenceVideoWidth(screenWidth, screenHeight)
-                        : b.width();
-        int frameLimit =
-                Math.max(1, Math.round(marginWidth * (shorts ? .78f : .92f)));
-        width = Math.max(1, Math.min(width, Math.min(frameLimit, screenWidth)));
+        // The committed class width is the stable reading width for this mode. A transition frame
+        // must not narrow the plan: that would re-paginate the caption while the player animates.
+        width = Math.min(width, screenWidth);
         int padding = text.getPaddingLeft() + text.getPaddingRight();
         int inner = Math.max(1, width - padding);
         CaptionRenderSpec measuredSpec = displaySpec.withPaint(text);
@@ -1638,9 +1668,13 @@ final class CaptionOverlay {
         String reason = shown.isEmpty() && currentGuard != null ? currentGuard.blankReason() : "";
         if (ownedCaption
                 && shownPage < 0
-                && pendingPages.isEmpty()
-                && !failedLayout.equals(desiredLayout)
-                && holdingLayout()) {
+                && shownText()
+                && ownsDisplayPosition(pendingPosition)) {
+            // The plan is still being built, or no page owns this audible instant yet. Keep the
+            // previous page exactly as it is: the timeout-then-clear path was the largest source
+            // of whole-box blank frames. A non-audible position is content, not a gap, and still
+            // falls through to the explicit clear below.
+            holdingLayout();
             displayResult(
                     a, "caption_hold", "preparing_layout", true, inner, size, "", applyStarted);
             return;
@@ -1683,6 +1717,13 @@ final class CaptionOverlay {
                 mode = "overflow_status";
                 reason = "measurement_mismatch";
                 if (ownedCaption && !retryLayout()) reason = "unprojectable_pixel_width";
+            } else {
+                // The layout commit is the only place that measures the ink height. The per-frame
+                // size law below reads the cached value, so it never calls getTextBounds.
+                layoutGlyphInkPx = SubtitleStyleMetrics.measuredGlyphHeightPx(text.getPaint());
+                // Apply the size law in the same frame as the new layout: the correction was
+                // computed from the old layout's own font size, so it is continuous at the swap.
+                applyCommentScale(a, text);
             }
         }
         String detail =
@@ -1690,7 +1731,7 @@ final class CaptionOverlay {
                         + pendingIdentity
                         + ";mode="
                         + mode
-                        + (DeepSeekConfig.displayTextDebugEnabled(a)
+                        + (textDebug
                                 ? debugDetail(
                                         text,
                                         shown,
@@ -2377,7 +2418,6 @@ final class CaptionOverlay {
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         touchProxy = proxy;
         touchHostRef = new WeakReference<>(host);
-        lastTouchProxyAt = SystemClock.uptimeMillis();
         CaptionDiagnostics.mark(
                 a,
                 "CAPTION_TOUCH_PROXY",
@@ -2394,7 +2434,6 @@ final class CaptionOverlay {
             ((ViewGroup) touchProxy.getParent()).removeView(touchProxy);
         touchProxy = null;
         touchHostRef.clear();
-        lastTouchProxyAt = 0;
     }
 
     private static boolean captionHit(MotionEvent e) {

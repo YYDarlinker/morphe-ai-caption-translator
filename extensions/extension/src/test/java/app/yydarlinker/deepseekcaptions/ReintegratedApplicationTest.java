@@ -8,6 +8,7 @@ import app.yydarlinker.caption.contracts.CaptionContracts.Action;
 import java.lang.reflect.Field;
 import java.net.*;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -24,6 +25,8 @@ import org.robolectric.annotation.*;
 @GraphicsMode(GraphicsMode.Mode.NATIVE) @LooperMode(LooperMode.Mode.PAUSED)
 public class ReintegratedApplicationTest extends N39UiGeometryFixture {
     @Implements(SecureApiKey.class) public static class Keys {@Implementation public static String load(Context c){return "fixture-key";}}
+    static final String VIDEO="abcdefghijk";
+    static final String SOURCE="https://www.youtube.com/api/timedtext?v="+VIDEO+"&lang=en";
     MockWebServer server;Object previousCronet;AtomicInteger posts=new AtomicInteger();
     CountDownLatch received=new CountDownLatch(1),release=new CountDownLatch(1);
     volatile boolean delayFirst;volatile String lastModel="";
@@ -48,33 +51,47 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
         }});server.start();
         Field engine=DeepSeekCaptionHook.class.getDeclaredField("youtubeCronetEngine");engine.setAccessible(true);previousCronet=engine.get(null);engine.set(null,new Cronet(server));
         DeepSeekConfig.saveEnabled(a,true);DeepSeekConfig.saveBaseUrl(a,server.url("/v1").toString());DeepSeekConfig.saveModel(a,"fixture-model");
-        EngineResume.reset();SourceCaptionCache.clear(a);RebuildCache.clear(a);RebuildApi.reset();TokenCostAudit.clear(a);
-        DeepSeekCaptionHookV2.setMainActivity(a);DeepSeekCaptionHookV2.onVideoId("abcdefghijk");CaptionChoice.select("zh-Hans",true);CaptionActions.onVideoTime(0);
+        SourceCaptionCache.clear(a);RebuildCache.clear(a);RebuildApi.reset();TokenCostAudit.clear(a);
+        SourceCatalog.clear();SourceTrackPolicy.reset();
+        CaptionNativeProjection.resetForTests();CaptionSessionIntent.resetForTests(a);CaptionSessionReconciler.resetForTests();
+        DeepSeekCaptionHookV2.setMainActivity(a);DeepSeekCaptionHookV2.onVideoId(VIDEO);CaptionActions.onVideoTime(0);
     }
     @After public void finish() throws Exception {
-        release.countDown();CaptionActions.command(Action.DEACTIVATE,"");
+        release.countDown();CaptionActions.command(Action.DEACTIVATE,"teardown");
         Field engine=DeepSeekCaptionHook.class.getDeclaredField("youtubeCronetEngine");engine.setAccessible(true);engine.set(null,previousCronet);
-        server.shutdown();super.done();CaptionChoice.reset();
+        server.shutdown();super.done();
+        CaptionSessionReconciler.resetForTests();CaptionNativeProjection.resetForTests();CaptionSessionIntent.resetForTests(a);SourceCatalog.clear();
     }
     void await(BooleanSupplier condition) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
         while(!condition.getAsBoolean()&&System.nanoTime()<deadline){Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(80));Thread.sleep(15);}
         assertTrue("application/display did not reach expected state",condition.getAsBoolean());
     }
+    void idle(long ms){Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms));}
     boolean showsOriginal(){try{TextView view=text();return CaptionOverlay.anchorVisible()&&view!=null&&view.getText().toString().contains("Hello world.");}catch(Exception e){return false;}}
     boolean translated(){try{TextView view=text();return CaptionOverlay.anchorVisible()&&view!=null&&view.getText().toString().contains("你好，世界。");}catch(Exception e){return false;}}
+    /**
+     * The user's own session: AI captions on, target zh-Hans, and the video's signed source track.
+     * The reconciler - not the test - starts the engine from that intent.
+     */
+    void ownSession(){
+        SourceCatalog.register(VIDEO,Collections.singletonList(new SourceSelection(VIDEO,"en","en",SOURCE,SourceSelection.Kind.MANUAL,true,0,"")),true);
+        CaptionSessionIntent.userToggled(a,true);
+        CaptionSessionIntent.userSelected(a,"zh-Hans",true);
+        CaptionSessionReconciler.onVideo(a,VIDEO);
+    }
     @Test public void localUiCommandUsesPinnedCoreAndDisplaysInTheActualRetainedView() throws Exception {
         CaptionActions.activate(a,url);await(this::translated);assertEquals(1,posts.get());assertTrue(CaptionActions.ownsNativeTrack());
         assertEquals("fixture-model",lastModel);assertEquals(2,text().getMaxLines());
         assertTrue(CaptionDiagnostics.history(a).contains("REBUILD_SOURCE_READY"));
         assertTrue(CaptionDiagnostics.history(a).contains("REBUILD_HTTP_RESPONSE"));
         DeepSeekConfig.saveCaptionSizeTier(a,4);DeepSeekConfig.saveBackgroundOpacity(a,35);CaptionActions.appearanceChanged();
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(250));assertEquals(1,posts.get());assertTrue(translated());
+        idle(250);assertEquals(1,posts.get());assertTrue(translated());
     }
     @Test public void stoppingThroughTheUiPortRejectsDelayedProviderOutput() throws Exception {
         delayFirst=true;CaptionActions.activate(a,url);assertTrue(received.await(3,TimeUnit.SECONDS));
-        CaptionActions.deactivateFromCaptionButton();release.countDown();
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));Thread.sleep(200);
+        CaptionActions.deactivateByUser();release.countDown();
+        idle(2000);Thread.sleep(200);
         assertFalse(CaptionActions.isVisibleActive());assertFalse(translated());assertEquals(1,posts.get());
     }
     @Test public void settingsApiTestAndModelCatalogUseTheApplicationServices() throws Exception {
@@ -86,48 +103,65 @@ public class ReintegratedApplicationTest extends N39UiGeometryFixture {
     }
     @Test public void nativeSourceSelectionShowsTheOriginalCaptionInTheOverlayWithoutTranslating() throws Exception {
         CaptionActions.activate(a,url);await(this::translated);
-        CaptionChoice.select("en",false);
+        CaptionSessionIntent.userToggled(a,true);
+        CaptionSessionIntent.userSelected(a,"en",false);
         // YouTube received an empty track for this selection, so the overlay shows the original text.
-        CaptionActions.activateSource(a,url.replace("&tlang=zh-Hans",""));
+        CaptionActions.activateSource(a,SOURCE);
         await(this::showsOriginal);
         assertTrue(CaptionActions.isVisibleActive());assertTrue("the native renderer stays masked",CaptionActions.ownsNativeTrack());
         assertFalse(translated());assertEquals("no translation request for source captions",1,posts.get());
     }
-    /** A Short that was left and entered again is not announced to the track selector: the session returns. */
+    /**
+     * The session that stopped with the departure is not remembered as a url: the same persistent
+     * intent is applied again by the next session of the same video.
+     */
     @Test public void aVideoShownAgainAfterItsDepartureGetsItsCaptionsBack() throws Exception {
-        CaptionActions.activate(a,url);await(this::translated);
+        ownSession();await(this::translated);assertTrue(CaptionActions.isVisibleActive());
         CaptionActions.onVideoId("");
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300));
+        idle(300);
         assertFalse(CaptionActions.isVisibleActive());
-        CaptionActions.onVideoId("abcdefghijk");
-        await(this::translated);assertTrue(CaptionActions.isVisibleActive());assertEquals("served from the cache",1,posts.get());
-        assertTrue(CaptionDiagnostics.history(a).contains("ENGINE_REENTRY_RESUMED"));
-    }
-    @Test public void playerTicksAfterAnAutomaticCaptionResetBringTheSessionBack() throws Exception {
-        CaptionActions.activate(a,url);await(this::translated);
-        // YouTube resets its caption model on its own as the Short is left.
-        EngineResume.automaticReset();CaptionActions.deactivateFromNativeCaptionState();
-        CaptionActions.onVideoTime(2000);Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300));
-        assertFalse(CaptionActions.isVisibleActive());
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));
-        CaptionActions.onVideoTime(100);
+        CaptionActions.onVideoId(VIDEO);
         await(this::translated);assertTrue(CaptionActions.isVisibleActive());
+        assertEquals("served from the cache",1,posts.get());
+        assertTrue(CaptionDiagnostics.history(a).contains("INTENT_APPLY"));
+        assertTrue(CaptionDiagnostics.history(a).contains("applied=true"));
+    }
+    /**
+     * YouTube resets its own caption model: the display stops, the intent does not. A player tick
+     * used to reconcile only after a measured silence (EngineResume's 1200 ms gap); the intent now
+     * decides, so the very next tick applies it again.
+     */
+    @Test public void playerTicksAfterAnAutomaticCaptionResetBringTheSessionBack() throws Exception {
+        ownSession();await(this::translated);
+        CaptionSessionIntent before=CaptionSessionIntent.load(a);
+        CaptionActions.deactivateAfterNativeReset();
+        idle(300);
+        assertFalse("the reset stops the display",CaptionActions.isVisibleActive());
+        assertEquals("an automatic reset never writes the intent",before.revision,CaptionSessionIntent.load(a).revision);
+        assertTrue(CaptionSessionIntent.load(a).aiEnabled);
+        assertEquals("the intent still owns the target",before.targetLanguage,CaptionSessionIntent.load(a).targetLanguage);
+        CaptionActions.onVideoTime(100);
+        await(this::translated);
+        assertTrue(CaptionActions.isVisibleActive());
     }
     @Test public void captionsTheUserTurnedOffStayOffWhenTheVideoIsShownAgain() throws Exception {
-        CaptionActions.activate(a,url);await(this::translated);
-        CaptionActions.deactivateFromCaptionButton();
-        CaptionActions.onVideoId("");CaptionActions.onVideoId("abcdefghijk");
-        CaptionActions.onVideoTime(2000);Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));CaptionActions.onVideoTime(100);
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));Thread.sleep(200);
+        ownSession();await(this::translated);
+        CaptionActions.deactivateByUser();
+        assertFalse("a user off is written to the intent",CaptionSessionIntent.load(a).aiEnabled);
+        CaptionActions.onVideoId("");CaptionActions.onVideoId(VIDEO);
+        CaptionActions.onVideoTime(2000);idle(3000);CaptionActions.onVideoTime(100);
+        idle(1000);Thread.sleep(200);
         assertFalse(CaptionActions.isVisibleActive());assertFalse(translated());
     }
     @Test public void aNativeMenuOffIsNotUndoneEither() throws Exception {
-        CaptionActions.activate(a,url);await(this::translated);
-        CaptionActions.deactivateFromNativeCaptionState();
-        assertFalse("native Off closes the caption choice",CaptionChoice.isOn());
-        CaptionActions.onVideoId("");CaptionActions.onVideoId("abcdefghijk");
-        CaptionActions.onVideoTime(2000);Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));CaptionActions.onVideoTime(100);
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));Thread.sleep(200);
+        ownSession();await(this::translated);
+        long epoch=CaptionPlayerAuthority.ownerEpoch();
+        CaptionNativeProjection.selection(VIDEO,"","",true,false,true,epoch);
+        CaptionSessionReconciler.onNativeSelection(a,epoch,true);
+        assertFalse("the explicit caption-menu Off is a user act",CaptionSessionIntent.load(a).aiEnabled);
+        CaptionActions.onVideoId("");CaptionActions.onVideoId(VIDEO);
+        CaptionActions.onVideoTime(2000);idle(3000);CaptionActions.onVideoTime(100);
+        idle(1000);Thread.sleep(200);
         assertFalse(CaptionActions.isVisibleActive());
     }
 

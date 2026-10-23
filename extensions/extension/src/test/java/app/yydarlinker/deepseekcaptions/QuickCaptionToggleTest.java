@@ -24,6 +24,7 @@ public class QuickCaptionToggleTest {
         @Implementation public static String language(Object t){return "fr";}
         @Implementation public static String vss(Object t){return "tfr.en";}
         @Implementation public static String url(Object t){return "https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en&tlang=fr";}
+        @Implementation public static String nativeModelVideo(Object m){return "abcdefghijk";}
     }
     @Implements(CaptionQuickToggle.class) public static class Menu {
         @Implementation public static boolean topMenu(){return top;}
@@ -33,14 +34,34 @@ public class QuickCaptionToggleTest {
     @Implements(CaptionActions.class) public static class Core {
         @Implementation public static void activate(Context context,String url){} // No network in switch tests.
         @Implementation public static void refreshConfiguration(Context context){}
+        // The real port writes the session intent on a user off; the fake port has no application,
+        // so the intent write is done here instead.
+        @Implementation public static void deactivateByUser(){CaptionSessionReconciler.onUserOff(CaptionAddonSupport.context(),"cc_button");}
+        @Implementation public static void deactivateAfterNativeReset(){}
     }
-    @Before public void reset(){installFakePort();setVideo("");installed=true;top=false;shorts=false;validKey=true;rows=0;selections.clear();CaptionChoice.reset();CaptionQuickToggle.cancelActivationRetry();}
+    @Before public void reset(){
+        installFakePort();setVideo("");installed=true;top=false;shorts=false;validKey=true;rows=0;selections.clear();
+        CaptionSessionIntent.resetForTests(CaptionAddonSupport.context());
+        CaptionSessionReconciler.resetForTests();
+        CaptionNativeProjection.resetForTests();
+    }
+    /** The application announces a video: that is what starts the caption session. */
+    private static void startVideo(Activity a,String video){
+        setVideo(video);
+        CaptionSessionReconciler.onVideo(a,video);
+    }
     @Test public void switchingEngineKeepsTheNativeSelection(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);DeepSeekConfig.saveEnabled(a,false);Track track=new Track();
-        setVideo("abcdefghijk");Object manager=new Object();NativeCaptionBridge.onNativeSelectionWithReason(manager,track,Origin.PREFERRED_TRACK,17);assertTrue(CaptionChoice.translates());
-        assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));assertTrue(DeepSeekConfig.enabled(a));assertEquals("fr",CaptionChoice.targetLanguage());
+        CaptionSessionIntent.resetForTests(a);startVideo(a,"abcdefghijk");Object manager=new Object();
+        NativeCaptionBridge.onNativeSelectionWithReason(manager,track,Origin.PREFERRED_TRACK,17);
+        CaptionSessionIntent chosen=CaptionSessionIntent.load(a);
+        assertTrue("the CC menu choice is the user's target",chosen.hasTarget());assertEquals("fr",chosen.targetLanguage);assertTrue(chosen.translateTarget);
+        assertFalse("the AI switch is still off",chosen.aiEnabled);
         assertTrue(selections.isEmpty());
-        assertTrue(CaptionQuickToggle.setEngine(a,false));assertFalse(DeepSeekConfig.enabled(a));assertTrue(selections.isEmpty());assertEquals("fr",CaptionChoice.targetLanguage());a.finish();
+        assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));assertTrue(DeepSeekConfig.enabled(a));assertEquals("fr",CaptionSessionIntent.load(a).targetLanguage);
+        assertTrue(selections.isEmpty());
+        assertTrue(CaptionQuickToggle.setEngine(a,false));assertFalse(DeepSeekConfig.enabled(a));assertTrue(selections.isEmpty());
+        assertEquals("turning AI off keeps its target","fr",CaptionSessionIntent.load(a).targetLanguage);a.finish();
     }
     @Test public void menuClickTogglesDirectlyWithoutDialog(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);DeepSeekConfig.saveEnabled(a,false);top=true;
@@ -53,9 +74,15 @@ public class QuickCaptionToggleTest {
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();DeepSeekConfig.saveEnabled(a,false);validKey=false;
         assertFalse(CaptionQuickToggle.setEngine(a,true));assertFalse(DeepSeekConfig.enabled(a));assertTrue(selections.isEmpty());a.finish();
     }
-    @Test public void offCaptionsRemainOffWhenEngineChanges(){
-        Activity a=Robolectric.buildActivity(Activity.class).setup().get();DeepSeekConfig.saveEnabled(a,false);NativeCaptionBridge.onNativeSelection(new Object(),null,Origin.PREFERRED_TRACK);
-        assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));assertFalse(CaptionChoice.isOn());assertFalse("the user's new AI-on decision must clear the old CC-off latch",CaptionChoice.userOff());assertTrue(selections.isEmpty());a.finish();
+    @Test public void anExplicitOffIsAUserActAndTheSwitchCanUndoIt(){
+        Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);
+        DeepSeekConfig.saveEnabled(a,false);CaptionSessionIntent.resetForTests(a);startVideo(a,"abcdefghijk");
+        NativeCaptionBridge.onNativeSelection(new Object(),null,Origin.PREFERRED_TRACK);
+        assertFalse("an explicit caption-menu Off is a user act",CaptionSessionIntent.load(a).aiEnabled);
+        assertTrue(String.valueOf(org.robolectric.shadows.ShadowToast.getTextOfLatestToast()),CaptionQuickToggle.setEngine(a,true));
+        assertTrue(CaptionSessionIntent.load(a).aiEnabled);
+        assertFalse("no target was ever chosen",CaptionSessionIntent.load(a).hasTarget());
+        assertTrue(selections.isEmpty());a.finish();
     }
     @Test public void onlyRecognizedPlayerMenusReceiveAnEntry(){
         Activity a=Robolectric.buildActivity(Activity.class).setup().get();CaptionAddonSupport.initialize(a);Object panel=new Object();

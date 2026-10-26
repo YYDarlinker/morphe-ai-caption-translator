@@ -12,6 +12,8 @@
 - Protects valid source-cache files when a replacement fails, and makes failure decisions and diagnostic provenance easier to understand.
 - Removes the unused loopback server, isolates the glyph-transition state and adds reproducible verification and maintenance guidance. See the [verification scope](docs/COMPATIBILITY.md) for what was actually checked.
 
+<a id="ai-caption-translator"></a>
+
 ## What it does
 
 - Translates a video’s existing subtitles when you select a language from YouTube’s **Auto-translate** menu while AI captions are enabled.
@@ -32,7 +34,7 @@ You need a video with an available subtitle track and an API service that suppor
 | Original YouTube APK | stable target declarations: **21.20.405, 21.16.256**; experimental: **21.42.241, 21.41.525, 21.28.208, 21.23.492** | discrete list; stable labels come from metadata, not current candidate device certification |
 | Android | minSdk 28; **21.42.241, 21.41.525, 21.28.208** require minSdk 29 | use the exact APK's minSdk/ABI and signature; other variants are separate inputs |
 
-Public release remains **1.5.7**. The local **1.5.8 / local-1.5.8-m7b / candidate-02** has finite local composition evidence on **21.41.525-SECONDARY** and **21.28.208**, and is accepted for that local scope. On 2026-10-26 the user reported no issues after the manual phone checklist; a device export confirms the m7b build. The reported phone environment is Manager 2.2.0 / YouTube 21.20.405 / official 1.48.0. This is a finite user observation, with retained limits in the [first-round acceptance](docs/maintenance/reviews/M7-FINAL-ACCEPTANCE.md), not a third desktop composition, a full device matrix or official certification. The old recommendation remains a metadata choice. See [compatibility and verification boundaries](docs/COMPATIBILITY.md) and the [candidate installation checklist](docs/maintenance/M7b-DEVICE-ACCEPTANCE.md). Local diagnostic exports distinguish build expectations from `unknown` runtime official/Patcher provenance.
+Public release: **[1.5.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.8)**, build **release-1.5.8**. The published bundle passed 876 application tests and finite real compositions on 21.41.525-SECONDARY and 21.28.208 with official 1.48.0/Patcher 2.0.0. A user's 21.20.405 observations apply to the accepted m7b behavior retained by this release, not a new universal device certification. See [compatibility](docs/COMPATIBILITY.md) and the [release verification record](docs/maintenance/results/RELEASE-1.5.8-RESULT.md). Runtime diagnostic official/Patcher fields remain explicitly unknown rather than guessed from build expectations.
 
 ## Install
 

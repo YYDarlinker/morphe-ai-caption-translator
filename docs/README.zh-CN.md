@@ -4,7 +4,7 @@
 
 [English](../README.md) · [添加到 Morphe](https://morphe.software/add-source?github=YYDarlinker/morphe-ai-caption-translator) · [下载补丁](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases) · [反馈问题](https://github.com/YYDarlinker/morphe-ai-caption-translator/issues)
 
-当前版本：[v1.5.7](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.7)。
+当前版本：[v1.5.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.8)，构建身份`release-1.5.8`。
 
 ## 1.5.8 更新
 
@@ -35,7 +35,7 @@
 | 原版 YouTube APK | 稳定声明：**21.20.405、21.16.256**；实验声明：**21.42.241、21.41.525、21.28.208、21.23.492** | 离散列表；稳定标记来自元数据，不是当前候选的设备认证 |
 | Android | minSdk 28；**21.42.241、21.41.525、21.28.208** 需 minSdk 29 | 还须核对实际 APK 的 ABI、签名及变体 |
 
-公开仍为 **1.5.7**。本地 **1.5.8 / local-1.5.8-m7b / candidate-02** 已有 **21.41.525-SECONDARY** 和 **21.28.208** 的有限电脑组合证据。2026-10-26用户对手机手动更新/观察清单反馈无问题，诊断确认m7b；报告环境为Manager2.2.0 / YouTube21.20.405 / 官方1.48.0。[首轮工程成熟化](maintenance/reviews/M7-FINAL-ACCEPTANCE.md)按规定范围验收。该单设备使用证据不冒充第三组电脑组合、全设备矩阵或官方认证；旧“推荐21.20.405”仍为稳定目标元数据选择。详见[兼容与验证边界](COMPATIBILITY.md)及[候选安装前/短设备清单](maintenance/M7b-DEVICE-ACCEPTANCE.md)。候选诊断将构建预期与运行时官方包/Patcher的 unknown 来源分开。
+当前公开 **1.5.8 / release-1.5.8** 已通过876项应用测试，并对正式下载包完成 **21.41.525-SECONDARY** 和 **21.28.208** /官方1.48.0/Patcher 2.0.0的有限真实组合。用户21.20.405的m7b反馈属于本版延续的已验收行为样本，不冒充新release在所有设备认证。[发布验证记录](maintenance/results/RELEASE-1.5.8-RESULT.md)及[兼容分层](COMPATIBILITY.md)列明实际边界；运行诊断仍如实区分unknown来源与构建预期。
 
 ## 安装
 

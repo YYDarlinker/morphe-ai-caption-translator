@@ -82,6 +82,15 @@ public class AttemptAdmissionTest {
         try { pending.get(3,TimeUnit.SECONDS);fail("retired attempt completed instead of refusing new POST"); }
         catch(ExecutionException e){assertTrue("unexpected failure: "+e.getCause(),e.getCause() instanceof InterruptedException);}
     }
+    /** Server dispatch and the client completion callback are independent observations. */
+    void awaitBodySent(RebuildController.Job job, Future<?> pending) throws Exception {
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+        while(!job.sent){
+            if(pending.isDone())pending.get(); // surface a transport failure instead of hiding it
+            if(System.nanoTime()>=deadline)fail("client bodySent not observed before retirement; timeline="+timeline);
+            java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
+        }
+    }
     void held(MockResponse first,boolean success,boolean stop) throws Exception {
         CountDownLatch arrived=new CountDownLatch(1),release=new CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger count=new java.util.concurrent.atomic.AtomicInteger();
@@ -99,7 +108,7 @@ public class AttemptAdmissionTest {
         ExecutorService executor=Executors.newSingleThreadExecutor();
         try {
             Future<RebuildProtocol.Plan> pending=executor.submit(()->call(old,job));
-            assertTrue(arrived.await(3,TimeUnit.SECONDS));assertTrue("first bodySent before retirement",job.sent);timeline.add("first_bodySent=true");
+            assertTrue(arrived.await(3,TimeUnit.SECONDS));awaitBodySent(job,pending);assertTrue("first bodySent before retirement",job.sent);timeline.add("first_bodySent=true");
             s.retire();timeline.add("retired");assertFalse(RebuildController.current(s));assertNull(s.publication.reserve());assertFalse(job.isCancelled());
             if(stop){s.cancel();timeline.add("STOPPED");assertTrue(job.isCancelled());}
             release.countDown();timeline.add("released");
@@ -120,6 +129,41 @@ public class AttemptAdmissionTest {
             assertEquals("fixture-new-model",new JSONObject(b.getBody().readUtf8()).getString("model"));
             fresh.cancel();
         } finally {release.countDown();s.cancel();executor.shutdownNow();assertTrue(executor.awaitTermination(3,TimeUnit.SECONDS));}
+    }
+    @Test public void serverReceiptCanLeadTheClientBodySentCallback() throws Exception {
+        CountDownLatch arrived=new CountDownLatch(1),callbackEntered=new CountDownLatch(1);
+        CountDownLatch markSent=new CountDownLatch(1),reply=new CountDownLatch(1);
+        RebuildController.Session s=session(config("fixture-key"),"server-leading");
+        RebuildController.Job job=new RebuildController.Job(s,0,true);
+        MockResponse good=ok();
+        server.setDispatcher(new Dispatcher(){public MockResponse dispatch(RecordedRequest request) throws InterruptedException {
+            assertEquals("POST",request.getMethod());assertEquals("/v1/chat/completions",request.getPath());
+            arrived.countDown();if(!reply.await(5,TimeUnit.SECONDS))throw new AssertionError("reply gate timeout");return good;
+        }});
+        class ObservedControl implements DeepSeekApiClient.RequestControl,RebuildStream.Early {
+            public boolean tryBeginAttempt(){return job.tryBeginAttempt();}
+            public boolean isCancelled(){return job.isCancelled();}
+            public void onConnection(HttpURLConnection c){job.onConnection(c);}
+            public void onRequestBodySent(){
+                callbackEntered.countDown();
+                try {if(!markSent.await(3,TimeUnit.SECONDS))throw new AssertionError("client gate timeout");}
+                catch(InterruptedException e){Thread.currentThread().interrupt();throw new AssertionError(e);}
+                job.onRequestBodySent();
+            }
+            public void onQualityEvidence(JSONObject source,String response,String metadata){job.onQualityEvidence(source,response,metadata);}
+            public void onProvisional(RebuildProtocol.Plan prefix){job.onProvisional(prefix);}
+        }
+        ExecutorService worker=Executors.newSingleThreadExecutor();
+        try {
+            Future<RebuildProtocol.Plan> pending=worker.submit(()->call(s.config,new ObservedControl()));
+            assertTrue(arrived.await(3,TimeUnit.SECONDS));assertTrue(callbackEntered.await(3,TimeUnit.SECONDS));
+            assertFalse("server receipt is not the client sent acknowledgement",job.sent);
+            assertTrue(RebuildController.current(s));assertEquals(1,server.getRequestCount());
+            markSent.countDown();awaitBodySent(job,pending);assertTrue(job.sent);
+            s.retire();assertFalse(RebuildController.current(s));assertNull(s.publication.reserve());
+            reply.countDown();assertNotNull(pending.get(3,TimeUnit.SECONDS));
+            assertEquals(1,server.getRequestCount());assertEquals(1,attempts);assertTrue(failures.isEmpty());
+        } finally {markSent.countDown();reply.countDown();s.cancel();worker.shutdownNow();assertTrue(worker.awaitTermination(3,TimeUnit.SECONDS));}
     }
     @Test public void retiredOptionalNegotiationRefusesSecondPost() throws Exception {held(error(400,"response_format unsupported"),false,false);}
     @Test public void retiredHttpStreamFallbackRefusesSecondPost() throws Exception {RebuildStream.fixtureHost=server.getHostName();held(error(400,"stream unsupported"),false,false);}

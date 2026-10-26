@@ -4,16 +4,6 @@
 
 [English](../README.md) · [添加到 Morphe](https://morphe.software/add-source?github=YYDarlinker/morphe-ai-caption-translator) · [下载补丁](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases) · [反馈问题](https://github.com/YYDarlinker/morphe-ai-caption-translator/issues)
 
-当前版本：[v1.5.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.8)，构建身份`release-1.5.8`。
-
-## 1.5.8 更新
-
-- 分清AI开关、原生CC和原生语言的职责，加强视频/会话归属及退出重入保护。
-- 正确保留服务端重试期限（含日期形式Retry-After），旧会话及page/hole补翻译遵守当前请求权限和等待条件。
-- 保留保存失败的编辑草稿，同步实际已保存字段；坏配置显示可理解错误，不静默丢弃凭据。
-- 缓存替换失败时保护已有有效源字幕，并让诊断说明实际失败决定和来源边界。
-- 退役未使用的回环服务、提取字号过渡状态，补齐可复跑验证和维护资料。实际验证范围见[兼容说明](COMPATIBILITY.md)。
-
 ## 功能
 
 - 开启 AI 后，在 YouTube 字幕菜单的「自动翻译」中选择目标语言，使用你配置的服务翻译原字幕。
@@ -35,7 +25,7 @@
 | 原版 YouTube APK | 稳定声明：**21.20.405、21.16.256**；实验声明：**21.42.241、21.41.525、21.28.208、21.23.492** | 离散列表；稳定标记来自元数据，不是当前候选的设备认证 |
 | Android | minSdk 28；**21.42.241、21.41.525、21.28.208** 需 minSdk 29 | 还须核对实际 APK 的 ABI、签名及变体 |
 
-当前公开 **1.5.8 / release-1.5.8** 已通过876项应用测试，并对正式下载包完成 **21.41.525-SECONDARY** 和 **21.28.208** /官方1.48.0/Patcher 2.0.0的有限真实组合。用户21.20.405的m7b反馈属于本版延续的已验收行为样本，不冒充新release在所有设备认证。[发布验证记录](maintenance/results/RELEASE-1.5.8-RESULT.md)及[兼容分层](COMPATIBILITY.md)列明实际边界；运行诊断仍如实区分unknown来源与构建预期。
+下载与更新内容见 [Releases](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases)，已验证组合及适用限制见[兼容说明](COMPATIBILITY.md)。
 
 ## 安装
 

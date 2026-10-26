@@ -1,9 +1,26 @@
 ## [1.5.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.7...v1.5.8) (2026-10-26)
 
-### 🐛 Bug Fixes
+### 中文
 
-* harden caption ownership, retries, configuration and cache recovery ([18b4b7e](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/18b4b7e98ad5e760da67b1f1f4020c4f2a30271d))
-* release AI caption translator 1.5.8 ([#8](https://github.com/YYDarlinker/morphe-ai-caption-translator/issues/8)) ([09d5384](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/09d5384059b0962f733ec8a2ce1e411fa1a1bcde))
+相比 1.5.7，本次主要改善异常情况下的字幕与设置体验：
+
+- **切换视频更稳：** 加强返回视频、关闭 AI 和切换字幕时的状态衔接，防止旧视频的迟到翻译影响当前字幕。
+- **服务繁忙时减少无效重试：** 翻译服务要求等待时，后续补翻译也会遵守等待时间；切换视频或 API 配置后，减少旧任务追加的不必要请求。
+- **设置保存失败后更容易继续编辑：** 保留未保存的输入与错误提示，重建设置页面时不会直接丢掉失败草稿；已经保存的部分会及时同步到实际运行配置。
+- **异常配置提示更清楚：** 改善损坏或无法读取的设置的错误处理，保留密钥供恢复使用；保存成功但同步失败时，可以单独重试同步。
+- **缓存更新失败时保护已有字幕：** 修复替换源字幕缓存失败却破坏旧缓存、或使字幕内容与格式不匹配的问题。
+- **排查问题更直观：** 诊断更清楚地区分配置错误、服务限流、暂时故障和内容过滤，并显示实际采用的等待与停止原因。
+
+### English
+
+Compared with 1.5.7, this release improves captions and settings when something goes wrong:
+
+- **More reliable video transitions:** strengthens caption state handling when returning to a video, turning AI off or changing subtitle selection, keeping late results from an old video out of the current captions.
+- **Fewer unnecessary retries:** follow the service's requested waiting period for follow-up translation requests too, and reduce extra requests from old tasks after switching videos or API profiles.
+- **Easier recovery from failed saves:** retain unsaved input and error messages when settings views are rebuilt, and apply fields that were successfully saved to the running configuration.
+- **Clearer configuration errors:** improve handling of damaged or unreadable settings while preserving credentials for recovery. If saving succeeds but synchronization fails, retry synchronization separately.
+- **Safer caption-cache updates:** fix failed source-cache replacement damaging an existing cache or leaving its caption text and format out of sync.
+- **Clearer troubleshooting:** diagnostics distinguish configuration problems, rate limits, temporary failures and content filtering, with the waiting or stopping decision actually applied.
 
 ## [1.5.7](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.6...v1.5.7) (2026-10-24)
 

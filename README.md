@@ -4,14 +4,6 @@
 
 [中文说明](docs/README.zh-CN.md) · [Add to Morphe](https://morphe.software/add-source?github=YYDarlinker/morphe-ai-caption-translator) · [Releases](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases) · [Report a problem](https://github.com/YYDarlinker/morphe-ai-caption-translator/issues)
 
-## What's new in 1.5.8
-
-- Keeps AI on/off, native CC and native language selection in their own roles, with stronger video/session ownership and re-entry handling.
-- Honors server retry deadlines, including date-form Retry-After, and prevents retired work or page/hole repair from starting requests outside the current permission and waiting rules.
-- Preserves failed configuration drafts and synchronizes settings that were actually saved; corrupted settings produce readable recovery errors without silently discarding credentials.
-- Protects valid source-cache files when a replacement fails, and makes failure decisions and diagnostic provenance easier to understand.
-- Removes the unused loopback server, isolates the glyph-transition state and adds reproducible verification and maintenance guidance. See the [verification scope](docs/COMPATIBILITY.md) for what was actually checked.
-
 <a id="ai-caption-translator"></a>
 
 ## What it does
@@ -34,7 +26,7 @@ You need a video with an available subtitle track and an API service that suppor
 | Original YouTube APK | stable target declarations: **21.20.405, 21.16.256**; experimental: **21.42.241, 21.41.525, 21.28.208, 21.23.492** | discrete list; stable labels come from metadata, not current candidate device certification |
 | Android | minSdk 28; **21.42.241, 21.41.525, 21.28.208** require minSdk 29 | use the exact APK's minSdk/ABI and signature; other variants are separate inputs |
 
-Public release: **[1.5.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.8)**, build **release-1.5.8**. The published bundle passed 876 application tests and finite real compositions on 21.41.525-SECONDARY and 21.28.208 with official 1.48.0/Patcher 2.0.0. A user's 21.20.405 observations apply to the accepted m7b behavior retained by this release, not a new universal device certification. See [compatibility](docs/COMPATIBILITY.md) and the [release verification record](docs/maintenance/results/RELEASE-1.5.8-RESULT.md). Runtime diagnostic official/Patcher fields remain explicitly unknown rather than guessed from build expectations.
+See [Releases](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases) for downloads and changes, and [compatibility](docs/COMPATIBILITY.md) for checked combinations and limitations.
 
 ## Install
 

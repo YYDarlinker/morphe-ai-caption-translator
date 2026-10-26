@@ -32,6 +32,8 @@ M0–M7各规定范围和[首轮最终验收](maintenance/reviews/M7-FINAL-ACCEP
 
 2026-10-26 发布说明整理：README中英文移除1.5.8更新列表及发布验收长段落，保留下载/兼容入口；Release和CHANGELOG的1.5.8条目改为相较1.5.7的用户体验改进，发布流程增加人工编辑说明。仅修改文档与Release正文，版本、tag、MPP及其SHA保持不变。证据位于`validation/runs/20261026-release-notes-135707/`。
 
+同日按用户纠正：1.5.8 Release与CHANGELOG移除擅加的中文和语言标题，沿用历史版本的简短英文列表。发布流程明确遵循该风格；下载包及tag不变。补正文案证据在`validation/runs/20261026-release-notes-english-01/`。
+
 ## 保留限制及后续
 
 远端Linux实际CI/在线依赖/正式发布已验证；不再笼统称远端CI未验，但不扩大成任意全新Windows空缓存首装认证。原共享Maven输入的发布commit、硬件Keystore/物理IO/帧时/内存/耗电、长期稳定、全部版本/选择集/OEM/供应商/14语母语质量/任意线程交错及真实账单未全面认证。配置多store/orphan、源缓存晚到窗口/跨文件断电/双IO、主线程启动严格读取等继续按合同披露。

@@ -8,7 +8,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildController.java",
       "upstream_sha256": "bc5ba7aab1c61dc785742e8cb63b3d69a5d11142aaf817d66d280bc415a4a1e3",
-      "sha256": "cf7187586eff5b36b77eaa477e07eb466d611340e3770d81eebfd8a63fc52c5a",
+      "sha256": "e28e2c8c09dd43fa96c9817d618aba5a22abcbef4a68ab35f915e397ee637ca6",
       "snapshot": "translation-core/upstream/RebuildController.java.txt",
       "upstream_git_blob": "814922f06c539681e1471379faf61cb7c6651548"
     },
@@ -24,7 +24,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCache.java",
       "upstream_sha256": "666003c97ceb810e9221389e5fa1ffea21bbb35e62a925f065dd00c7c9f9a5bd",
-      "sha256": "adb0aaefce861de59d8675f43349baf9860e0a352cd2a04e2b6dcfd96bbd83a3",
+      "sha256": "a917eb82e3bdc7ab7512ae0f1e0718ef8b9414f5c85ed2fba97860add78909a6",
       "snapshot": "translation-core/upstream/RebuildCache.java.txt",
       "upstream_git_blob": "91c68c7b87d4bc6241088c55b6608dd38dfa3fd2"
     },
@@ -56,7 +56,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildProtocol.java",
       "upstream_sha256": "02b60c2313df406b91d2e97b449414954427ae57fb98e3c9a57dc9a86b35cb3b",
-      "sha256": "727cf859d78094bb097528429ca3f41cefa84d3f5244a8e4f03786639e8394f8",
+      "sha256": "5f87cf94ec8e846c8a17166663f396f72a9a628ec09707e60465c576f94b87a6",
       "snapshot": "translation-core/upstream/RebuildProtocol.java.txt",
       "upstream_git_blob": "d5dc8cc59c7db9b9411dbd90cfdfa4d725ec3f4c"
     },
@@ -64,7 +64,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReview.java",
       "upstream_sha256": "1df47bbb596cb6cd6642cc5bb7825a71cad9258f848f1d3bbae1cc0b6a1af74d",
-      "sha256": "a174aa97b82eb001f139239f0608f7d392e35c72d04562226ab278a8464eb265",
+      "sha256": "3010babcd554f14d7b834ecf27c977e46a97f9674787930367acadbf3fa9427d",
       "snapshot": "translation-core/upstream/RebuildReview.java.txt",
       "upstream_git_blob": "2081df9674521637c84641d26e2a813478274745"
     },
@@ -72,7 +72,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSemantics.java",
       "upstream_sha256": "72618633fe3af40cc698e8190efac5808dd383e624db57af45fabc2659c8996f",
-      "sha256": "4a3979ac1671a0a59f730d29358d401ca77f246082d712b87cd4912d79136efd",
+      "sha256": "f98e244ed12c4e8a459b10eb55be124c3dff6068585150bb0790096f32c04398",
       "snapshot": "translation-core/upstream/RebuildSemantics.java.txt",
       "upstream_git_blob": "93a38c3242ca8656ef7cba00bd3ba346438f06ef"
     },
@@ -96,7 +96,7 @@
       "upstream": "extensions/extension/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java",
       "destination": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/DeepSeekApiClient.java",
       "upstream_sha256": "36254c73f2ea10a4f2771a09a03b682f67d67509dd3c713ed6ffc8e6fe694e73",
-      "sha256": "cbbcc1ae273d46ef27d1915fda3fcc89e9315065db0b40e0a69caa629e671389",
+      "sha256": "bddcb8d532132e630389316af7c583ce1fdfcafbce862558236aa5fea63716bf",
       "snapshot": "translation-core/upstream/DeepSeekApiClient.java.txt",
       "upstream_git_blob": "56820ce6380ac6b58ec73643fdcd1260dab7d974"
     },
@@ -127,7 +127,7 @@
   ],
   "snapshot_representation": "Exact Windows checkout bytes; .gitattributes disables conversion. upstream_git_blob identifies the canonical blob in the fixed Git commit.",
   "integration": "upstream-ac65fe8-latest-ui-r1",
-  "adaptation_scope": "platform, output and accounting port extraction; source-quote rebinding, clause-aware page boundaries, authored cue display contract and bounded slow retry added without changing the upstream prompt/protocol literals; M5b: provider uses shared RetryAfter delta/GMT-date parsing, saturates effective long waits and the direct block/provider/source elapsed deadlines; request, negotiation, terminal, backoff and repair policies preserved; M5c: separate per-HTTP-attempt admission from sent transport reading; Job requires current OPEN session before each POST including negotiation and stream fallback; preserve finishSent, cancellation, publication and accounting semantics; M5d: Session/parent logical admission for ordinary/page/hole calls, persistent parent filter eligibility independent of retained READY plans, shared child failure gates and queue-reservation refunds; existing kick resumes unspent deferred holes; preserve per-attempt lifecycle, quotas, protocol and cache identity; M5d-R1: common monotonic saturated parent wait updates for ordinary and child failures, cancellation/slot cleanup and successful semantic-review scheduling; preserve Session boundaries, provider maximum, quotas and publication; M6a: read-only failure-decision trace from the actual controller state, terminal/filter flags and elapsed gates; preserve legacy accounting, all request decisions, quotas, cache identity, protocol and prompt",
+  "adaptation_scope": "platform, output and accounting port extraction; source-quote rebinding, clause-aware page boundaries, authored cue display contract and bounded slow retry added without changing the upstream prompt/protocol literals; M5b: provider uses shared RetryAfter delta/GMT-date parsing, saturates effective long waits and the direct block/provider/source elapsed deadlines; request, negotiation, terminal, backoff and repair policies preserved; M5c: separate per-HTTP-attempt admission from sent transport reading; Job requires current OPEN session before each POST including negotiation and stream fallback; preserve finishSent, cancellation, publication and accounting semantics; M5d: Session/parent logical admission for ordinary/page/hole calls, persistent parent filter eligibility independent of retained READY plans, shared child failure gates and queue-reservation refunds; existing kick resumes unspent deferred holes; preserve per-attempt lifecycle, quotas, protocol and cache identity; M5d-R1: common monotonic saturated parent wait updates for ordinary and child failures, cancellation/slot cleanup and successful semantic-review scheduling; preserve Session boundaries, provider maximum, quotas and publication; M6a: read-only failure-decision trace from the actual controller state, terminal/filter flags and elapsed gates; preserve legacy accounting, all request decisions, quotas, cache identity, protocol and prompt; S3: single internal RebuildDisplayPlanning owner for display context, per-block plan/geometry/unit cache and source-time anchors; reuse existing projection/grouping with original cache keys, empty authored semantics and diagnostic ordering; Controller retains lifecycle, Cursor, plan acceptance, output budget, permissions, locks, scheduling and submission; D1: internal RebuildSourcePreparation owns parse, optional reference alignment, authored/automatic blocks, cache identity and ready facts; live URL read at original classification/reference stages; root retains raw early display, source Job/current/generation checks, bounded warm-cache IO, original locked installation and diagnostic sending; retire replaced source helpers, preserve algorithms, prompt/protocol, reference cancellation and cache semantics; D3: retire named case-specific quality and equipment dictionary rules, retain literal cross-event ID ownership, bounded negation and numeric observations; simplify only the named FIDELITY examples, preserving protocol schema, quotas and cache format; D4: session-local PlaybackSelection owns the selected pause donor and consumed seek serial; PresentationSelection owns cue, cursor, hold and planning selection using persistent read-only slot views; controller retains the sole clock, lifecycle, slot transactions, diagnostics, submission and live output guards without changing prompt, protocol or clock algorithms",
   "new_files": [
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/TranslationPresentation.java",
@@ -136,7 +136,7 @@
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayGroups.java",
-      "sha256": "23c327985658e2ace95463ac947729317cd10b8714fb8b4e5ea81c9464ded95f",
+      "sha256": "3ce2e3dc242c8f85056de8f768ed3026e03e2f55ed033fd1645dcfafefec3ab2",
       "purpose": "display-only partition of accepted events into non-repeating caption units"
     },
     {
@@ -166,13 +166,43 @@
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSalvage.java",
-      "sha256": "8b5509325fcd1972cba2c02b7290e0b03653e82a4eeea1cab048b60029837e90",
+      "sha256": "567c9881cb6e17ff273a199c5424ecea46d6f041510ee4af6a9543003dda5d5b",
       "purpose": "partial-plan salvage: per-segment identity checks, explicit holes, quality observations never withhold a usable event"
     },
     {
       "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildCueProjection.java",
       "sha256": "ef5108155c415f2ad92bcb038873b58e79dab5247ac604ae3b4d09b487a2ffa4",
       "purpose": "Authored cue/event display projection (N51)"
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildDisplayPlanning.java",
+      "sha256": "6f440e086371b34c6815c4bd72d2e3e05428fa04726e726a8b875020a7554c5f",
+      "purpose": "internal display planning context, per-block plan/geometry/unit cache and source-time anchors extracted from Controller; no lifecycle, platform, log or submission authority"
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildSourcePreparation.java",
+      "sha256": "3d08efc37fab0e73afb3fba09a83688c9353b960cdb5394d5b752e071528dd6c",
+      "purpose": "internal source parse/reference alignment, authored or automatic blocks, cache identity and ready facts; no Session, Publication, View or installation authority"
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildWorkSet.java",
+      "sha256": "37cb5f3497a204bff0f564889ac73436a54161bfa6193d098fb6380ba09ae196",
+      "purpose": "Internal per-slot task state, admission, selection and quota accounting; no session, context or publication authority. D4 exposes the existing slot as a persistent read-only content view and keeps content transactions under the session lock."
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildReplyPreparation.java",
+      "sha256": "9388b0c8a0bbef471a3917203bafdf1258a1306ea6d80fac42bbd31a1b2d93ba",
+      "purpose": "Internal request, review, range and cache preparation; the controller retains the real Job and sole publication authority."
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPlaybackSelection.java",
+      "sha256": "239cb0c1ee717c047f32900e72ee4e5b731f6a2ac08365c10b5a4a2416cf11e9",
+      "purpose": "Session-local observation, pause donor and seek-serial selection; no clock sampling, lifecycle or output authority."
+    },
+    {
+      "path": "translation-core/src/main/java/app/yydarlinker/deepseekcaptions/RebuildPresentationSelection.java",
+      "sha256": "faed9443aad5de537fae69f9a81c2376ab6fc5f34faa827ac6d50bd3f2e8cd77",
+      "purpose": "Session-local cue, cursor, layout, hold and marker selection; reads one persistent block view and has no session or output authority."
     }
   ],
   "protected_abi": [

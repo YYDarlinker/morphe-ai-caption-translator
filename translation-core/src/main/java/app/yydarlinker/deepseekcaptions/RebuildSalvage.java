@@ -172,12 +172,7 @@ final class RebuildSalvage {
                                 "quoted source differs; IDs are authoritative; translation kept"));
             RebuildProtocol.Event event = new RebuildProtocol.Event(from, to, a, z, text);
             try {
-                RebuildSemantics.validatePlan(s, b, Collections.singletonList(event), context);
-            } catch (RebuildProtocol.Invalid advisory) {
-                issues.add(issue(from, to, "advisory_" + advisory.code, advisory.detail));
-            }
-            try {
-                RebuildSemantics.validate(s, from, to, text, context);
+                RebuildSemantics.validatePlan(s, b, Collections.singletonList(event));
             } catch (RebuildProtocol.Invalid advisory) {
                 issues.add(issue(from, to, "advisory_" + advisory.code, advisory.detail));
             }

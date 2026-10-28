@@ -65,28 +65,23 @@ final class RebuildProtocol {
     static final String FIDELITY_PROMPT =
             " Before writing the final JSON, silently check each source predicate and its object,"
                 + " place, negation, modality and comparison direction against the translation."
-                + " Copying source does NOT satisfy meaning coverage. Never drop a conclusion such"
-                + " as a pace probably cannot continue just because an introductory clause mentions"
-                + " caveats. Read comparison continuations in context: 'more impressed with A ..."
-                + " than/then they are with B' describes a comparison, not people jointly"
-                + " participating with B. ASR then/than may be ambiguous; do not rewrite source. Do"
-                + " not attach a following subject to the previous sentence (growth that would"
-                + " follow / X reduced...). Use context to translate the grammatical function of an"
-                + " owned fragment, not to import new facts. Military SAM/SAMs may mean"
-                + " surface-to-air missiles, whereas a person's name Sam does not."
+                + " Copying source does NOT satisfy meaning coverage. Preserve conclusions and"
+                + " their negation, including its scope. Read comparison continuations in context"
+                + " and preserve comparison direction. ASR then/than may be ambiguous; do not"
+                + " rewrite source. Do not attach a following subject to the previous sentence. Use"
+                + " context to translate the grammatical function of an owned fragment, not to"
+                + " import new facts."
                 + " avoid_event_end_after contains soft source-dependency hints; choose a different"
                 + " coherent range when possible. Do not finish an event on a subject before its"
-                + " verb or inside a noun phrase. A tank fleet is a force of tanks, not a naval"
-                + " fleet. Licensed/unlicensed describes authorization, not automatically"
-                + " legal/illegal. Do not turn adjacent source numbers into a numeric range, model"
+                + " verb or inside a noun phrase. Do not turn adjacent source numbers into a numeric range, model"
                 + " designation, or unit relationship unless the source explicitly expresses it;"
                 + " preserve unresolved ASR ambiguity locally. For long multi-clause passages"
                 + " prefer multiple source-aligned events at the preferred font budget. Never"
                 + " shorten a translation to satisfy that budget. An actual complete utterance"
                 + " overrides lexical hints. Preserve trailing place/direction complements, and"
                 + " distinguish a following subject plus finite verb from the preceding relative"
-                + " clause. In not always, keep the negation over always, not over the main verb. A"
-                + " product of can mean depends on, not multiplication. When adjacent ASR numbers"
+                + " clause. In not always, keep the negation over always, not over the main verb."
+                + " When adjacent ASR numbers"
                 + " cannot be resolved from source, explicitly preserve uncertainty locally rather"
                 + " than silently dropping one or inventing a model. Keep list markers with their"
                 + " following clause. If the plan would contain many short events, consolidate them"
@@ -493,7 +488,6 @@ final class RebuildProtocol {
                                 "Reference CPL exceeded; advisory only;"
                                     + " presentation_policy=legacy_n26.",
                                 false));
-            RebuildSemantics.validate(s, from, to, text, context);
             if (to - from >= 8 && visible <= 1)
                 throw new Invalid("information_collapse");
             if (to < b.to && RebuildPlanner.strongDependentEnding(s, to, context))
@@ -505,7 +499,7 @@ final class RebuildProtocol {
         }
         if (!prefix && next != b.to + 1 && !withinHole(s, next, b.to + 1))
             throw new Invalid("missing_source");
-        RebuildSemantics.validatePlan(s, b, out, context);
+        RebuildSemantics.validatePlan(s, b, out);
         // Cue alignment is not validated here: an event may leave its authored cue, and the
         // display projection publishes it as an event page instead of rejecting the whole block.
         presentation.addAll(RebuildReview.inspect(s, b, out, context));
@@ -575,6 +569,7 @@ final class RebuildProtocol {
         starts[tokens] = at;
         if (at != block.length()) return 0;
         int[][] resolved = new int[events.length()][2];
+        boolean[] declaredCoverage = new boolean[tokens];
         int cursor = 0, moved = 0;
         for (int i = 0; i < events.length(); i++) {
             JSONObject event = events.optJSONObject(i);
@@ -588,6 +583,7 @@ final class RebuildProtocol {
             }
             // A claimed ID outside the block is a malformed reply, not a repairable shift.
             if (oldFrom < b.from || oldFrom > b.to || oldTo < b.from || oldTo > b.to) return 0;
+            for (int k = oldFrom; k <= oldTo; k++) declaredCoverage[k - b.from] = true;
             String quote = compact(event.getString("source"));
             if (quote.isEmpty()) return 0;
             int start = block.indexOf(quote, cursor);
@@ -606,6 +602,15 @@ final class RebuildProtocol {
         if (block.length() - cursor > MAX_HOLE_CHARS) return 0;
         if (cursor < block.length()) moved++;
         if (moved == 0) return 0;
+        // Preserve negligible ID mistakes under the existing hole allowance. A copied
+        // whole-block quote cannot turn a substantial unclaimed range into translated coverage.
+        int recoveredChars = 0;
+        for (int[] range : resolved)
+            for (int k = range[0]; k <= range[1]; k++)
+                if (!declaredCoverage[k - b.from]) {
+                    recoveredChars += compact(s.words.get(k).text).length();
+                    if (recoveredChars > MAX_HOLE_CHARS) return 0;
+                }
         for (int i = 0; i < events.length(); i++) {
             JSONObject event = events.getJSONObject(i);
             event.put("from", resolved[i][0]);

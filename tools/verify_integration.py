@@ -9,6 +9,90 @@ CORE_BANNED=['CaptionApplication','CaptionOverlay','CaptionActions','DeepSeekCon
 UI_BANNED=['RebuildController','RebuildApi','RebuildProtocol','RebuildPlanner','TranslationRuntime','TranslationAudit','ProviderRequestPolicy','MeaningTransport','MeaningWire','CaptionCore']
 DEAD=['app/yydarlinker/caption/core/CaptionCore','MeaningTransport','MeaningWire','MeaningPlannerWire','PlainMeaningWire','BatchMeaningWire','SourcePreparationWire','N39Application','RebuildSourcePlan','RebuildSemanticTimeline','RebuildSemanticStore','RebuildSupplyPolicy','RelationCandidate','FrozenDev3','CaptionSemanticUnit','CaptionRenderFrame','CaptionPageScheduler','CaptionPresentationCursor','CaptionPresentationState','MeaningPager','SentenceCandidate','TranslationRetryPolicy']
 def sha(data):return hashlib.sha256(data).hexdigest()
+
+# Source ownership, rather than a list of future helper names, defines these edges.
+# Host/infrastructure/UI still compile together; this is a lexical source guard, not an AST
+# or a claim about reflection. Every same-side helper is scanned, including unreferenced ones.
+SOURCE_AREAS = ('caption-contracts', 'caption-shared', 'translation-core',
+                'application-host', 'infrastructure', 'presentation', 'ui',
+                'extensions/extension', 'ui-preview', 'patches')
+SOURCE_FORBIDDEN = {
+    'translation-core': {'application-host', 'infrastructure', 'presentation', 'ui',
+                         'extensions/extension', 'ui-preview', 'patches'},
+    'caption-shared': {'translation-core', 'application-host', 'infrastructure',
+                       'presentation', 'ui', 'extensions/extension', 'ui-preview', 'patches'},
+    'caption-contracts': set(SOURCE_AREAS) - {'caption-contracts'},
+    'ui': {'translation-core'},
+    'presentation': {'translation-core'},
+}
+
+def source_code(text):
+    """Erase comments and literals in one pass, so URLs cannot eat following code.
+
+    Java/Kotlin strings, text blocks/raw strings, chars and nested Kotlin block comments
+    are ignored. Java Unicode escapes are expanded before tokenization (JLS ordering).
+    Kotlin interpolation/dynamic lookup is outside this lexical guard's scope.
+    """
+    text = re.sub(r'\\u+([0-9a-fA-F]{4})', lambda m: chr(int(m[1], 16)), text)
+    out = []; at = 0
+    token = re.compile(r'//[^\n]*|/\*|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
+    while (match := token.search(text, at)):
+        out.append(text[at:match.start()]); end = match.end()
+        if match.group() == '/*':
+            depth = 1
+            while depth and end < len(text):
+                if text.startswith('/*', end): depth += 1; end += 2
+                elif text.startswith('*/', end): depth -= 1; end += 2
+                else: end += 1
+        erased = text[match.start():end]
+        out.append(''.join('\n' if c == '\n' else ' ' for c in erased)); at = end
+    out.append(text[at:]); return ''.join(out)
+
+def source_dependencies(root):
+    """Discover top-level project types, then reject references across forbidden areas.
+
+    Imports (including static/wildcard and Kotlin aliases), qualified references and
+    same-package simple names are checked. Unknown external/generated types, ambiguous
+    shadowing and runtime/reflection edges require review or separate package checks.
+    """
+    units = []; owners = {}
+    for area in SOURCE_AREAS:
+        for language in ('java', 'kotlin'):
+            for path in sorted((root / area / 'src/main' / language).rglob('*')):
+                if path.suffix not in ('.java', '.kt'): continue
+                code = source_code(path.read_text(encoding='utf-8-sig'))
+                package = re.search(r'\bpackage\s+([\w.]+)', code)
+                package = package[1] if package else ''
+                depth = 0; types = []
+                for m in re.finditer(r'[{}]|\b(?:class|interface|enum|record|object|typealias)\s+(\w+)', code):
+                    if m.group() == '{': depth += 1
+                    elif m.group() == '}': depth -= 1
+                    elif depth == 0: types.append(m[1])
+                for name in types: owners.setdefault(package + '.' + name, set()).add(area)
+                units.append((path, area, package, code))
+    errors = []
+    for path, area, package, code in units:
+        forbidden = SOURCE_FORBIDDEN.get(area, set())
+        if not forbidden: continue
+        # Dotted tokens cover imports, nested types and static methods too.
+        refs = set(re.findall(r'\b[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*', code))
+        refs = {re.sub(r'\s+', '', value) for value in refs}
+        imports = re.findall(r'\bimport\s+(?:static\s+)?([\w.]+(?:\*)?)', code)
+        for fq, target_areas in owners.items():
+            if not target_areas.intersection(forbidden): continue
+            target_package, name = fq.rsplit('.', 1)
+            qualified = any(ref == fq or ref.startswith(fq + '.') for ref in refs)
+            imported = any(value == fq or value.startswith(fq + '.')
+                           or value == target_package + '.*' for value in imports)
+            local = package == target_package and any(ref == name or ref.startswith(name + '.') for ref in refs)
+            if qualified or imported or local:
+                errors.append(f'{path.relative_to(root).as_posix()} depends on {fq} '
+                              f'[{area} -> {",".join(sorted(target_areas.intersection(forbidden)))}]')
+        if area == 'translation-core' and re.search(r'\bandroid\.(app|view|widget)\.', code):
+            errors.append(f'{path.relative_to(root).as_posix()} references an Android UI component')
+    return dict(errors=sorted(set(errors)), source_files=len(units), project_types=len(owners),
+                scope='Lexical Java/Kotlin main-source ownership; no reflection/runtime reachability proof')
+
 def constants(path):
     data=long_path(path).read_bytes();assert data[:4]==b'\xca\xfe\xba\xbe'
     count=int.from_bytes(data[8:10],'big');at=10;i=1;out=[]
@@ -23,8 +107,94 @@ def constants(path):
         else:raise ValueError(f'unknown constant tag {tag}')
         i+=1
     return out
-# Literals of upstream code that is unused (an uncalled helper, an empty-string default) and was deleted.
-REMOVED_DEAD_LITERALS={'"HTTP_CONFIG"','""','"layout_overflow"','"paragraph"','","','" "',r'"\\s+"',r'"(?<![\\p{L}\\p{N}])[+-]?\\d+(?:,\\d{3})*(?:\\.\\d+)?"','"numeric_substitution"'}
+# Pinned, file-specific historical deletions with exact occurrence counts.
+# D3 adds exactly one complete FIDELITY prompt replacement; no other literal delta is allowed.
+REMOVED_DEAD_LITERALS = {
+    'RebuildApi': Counter({'"HTTP_CONFIG"': 1}),
+    'RebuildProtocol': Counter({
+        '" "': 4, r'"\\s+"': 3, '"paragraph"': 1,
+        '"numeric_substitution"': 1, '"layout_overflow"': 1,
+        r'"(?<![\\p{L}\\p{N}])[+-]?\\d+(?:,\\d{3})*(?:\\.\\d+)?"': 1,
+        '","': 1,
+    }),
+}
+D3_FIDELITY_OLD = (
+    '" Before writing the final JSON, silently check each source predicate and its object, place, '
+    'negation, modality and comparison direction against the translation. Copying source does NOT '
+    'satisfy meaning coverage. Never drop a conclusion such as a pace probably cannot continue just '
+    'because an introductory clause mentions caveats. Read comparison continuations in context: '
+    "'more impressed with A ... than/then they are with B' describes a comparison, not people "
+    'jointly participating with B. ASR then/than may be ambiguous; do not rewrite source. Do not '
+    'attach a following subject to the previous sentence (growth that would follow / X reduced...). '
+    'Use context to translate the grammatical function of an owned fragment, not to import new '
+    "facts. Military SAM/SAMs may mean surface-to-air missiles, whereas a person's name Sam does "
+    'not. avoid_event_end_after contains soft source-dependency hints; choose a different coherent '
+    'range when possible. Do not finish an event on a subject before its verb or inside a noun '
+    'phrase. A tank fleet is a force of tanks, not a naval fleet. Licensed/unlicensed describes '
+    'authorization, not automatically legal/illegal. Do not turn adjacent source numbers into a '
+    'numeric range, model designation, or unit relationship unless the source explicitly expresses '
+    'it; preserve unresolved ASR ambiguity locally. For long multi-clause passages prefer multiple '
+    'source-aligned events at the preferred font budget. Never shorten a translation to satisfy that'
+    ' budget. An actual complete utterance overrides lexical hints. Preserve trailing '
+    'place/direction complements, and distinguish a following subject plus finite verb from the '
+    'preceding relative clause. In not always, keep the negation over always, not over the main '
+    'verb. A product of can mean depends on, not multiplication. When adjacent ASR numbers cannot be'
+    ' resolved from source, explicitly preserve uncertainty locally rather than silently dropping '
+    'one or inventing a model. Keep list markers with their following clause. If the plan would '
+    'contain many short events, consolidate them into fewer clause-complete events while keeping '
+    'every source token and its source-owned time range. Resolve polysemous words by the subject '
+    'matter, and render colloquial interjections by their discourse function and intensity in the '
+    'target language. Attach time and degree modifiers to the action or thought they actually '
+    'modify, including in spoken asides. When a compressed or awkward explanatory statement would '
+    'repeat its abstract head noun on both sides of the verb in the target language, restate the '
+    'underlying action or relation idiomatically instead of producing an empty definition. Use '
+    'neighboring context to disambiguate, never to add facts or words outside the owned source '
+    "range. After selecting each event's IDs, copy every corresponding source token into that "
+    'event\'s source field in order; do not shift even a short conjunction into an adjacent event."'
+)
+D3_FIDELITY_NEW = (
+    '" Before writing the final JSON, silently check each source predicate and its object, place, '
+    'negation, modality and comparison direction against the translation. Copying source does NOT '
+    'satisfy meaning coverage. Preserve conclusions and their negation, including its scope. Read '
+    'comparison continuations in context and preserve comparison direction. ASR then/than may be '
+    'ambiguous; do not rewrite source. Do not attach a following subject to the previous sentence. '
+    'Use context to translate the grammatical function of an owned fragment, not to import new '
+    'facts. avoid_event_end_after contains soft source-dependency hints; choose a different coherent'
+    ' range when possible. Do not finish an event on a subject before its verb or inside a noun '
+    'phrase. Do not turn adjacent source numbers into a numeric range, model designation, or unit '
+    'relationship unless the source explicitly expresses it; preserve unresolved ASR ambiguity '
+    'locally. For long multi-clause passages prefer multiple source-aligned events at the preferred '
+    'font budget. Never shorten a translation to satisfy that budget. An actual complete utterance '
+    'overrides lexical hints. Preserve trailing place/direction complements, and distinguish a '
+    'following subject plus finite verb from the preceding relative clause. In not always, keep the '
+    'negation over always, not over the main verb. When adjacent ASR numbers cannot be resolved from'
+    ' source, explicitly preserve uncertainty locally rather than silently dropping one or inventing'
+    ' a model. Keep list markers with their following clause. If the plan would contain many short '
+    'events, consolidate them into fewer clause-complete events while keeping every source token and'
+    ' its source-owned time range. Resolve polysemous words by the subject matter, and render '
+    'colloquial interjections by their discourse function and intensity in the target language. '
+    'Attach time and degree modifiers to the action or thought they actually modify, including in '
+    'spoken asides. When a compressed or awkward explanatory statement would repeat its abstract '
+    'head noun on both sides of the verb in the target language, restate the underlying action or '
+    'relation idiomatically instead of producing an empty definition. Use neighboring context to '
+    'disambiguate, never to add facts or words outside the owned source range. After selecting each '
+    "event's IDs, copy every corresponding source token into that event's source field in order; do "
+    'not shift even a short conjunction into an adjacent event."'
+)
+
+LITERAL_REPLACEMENTS = {'RebuildProtocol': ((D3_FIDELITY_OLD, D3_FIDELITY_NEW, 1),)}
+
+def literal_contract(name, original, current):
+    before, after = Counter(original), Counter(current)
+    expected_removed = REMOVED_DEAD_LITERALS[name].copy()
+    expected_added = Counter()
+    for old, new, count in LITERAL_REPLACEMENTS.get(name, ()):
+        if before[old] != count or after[new] != count:
+            return False
+        expected_removed[old] += count
+        expected_added[new] += count
+    return before - after == expected_removed and after - before == expected_added
+
 def literals(path):
     pattern=r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"'
     # Adjacent literals joined by + are one value, so re-wrapping a long prompt is not a change.
@@ -33,9 +203,12 @@ def literals(path):
     return [m.group() for m in re.finditer(pattern,text) if m.group().startswith('"')]
 def inspect(source_only=False,core_classes=None,mpp=None,mpe=None,ui_apk=None):
     errors=[];facts={}
+    dependencies = source_dependencies(R)
+    errors.extend(dependencies['errors'])
+    facts['source_dependencies'] = dependencies
     for module,banned in [('translation-core',CORE_BANNED),('caption-shared',CORE_BANNED+UI_BANNED),('ui',UI_BANNED),('presentation',UI_BANNED)]:
         for path in (R/module/'src/main/java').rglob('*.java'):
-            source=re.sub(r'//[^\n]*|/\*[\s\S]*?\*/','',path.read_text(encoding='utf-8-sig'))
+            source=source_code(path.read_text(encoding='utf-8-sig'))
             for name in banned:
                 if re.search(r'\b'+name+r'\b',source):errors.append(f'{path.relative_to(R)} depends on {name}')
             if module=='translation-core' and re.search(r'\bimport\s+android\.(app|view|widget)\.',source):errors.append(f'{path.relative_to(R)} imports a UI component')
@@ -45,12 +218,6 @@ def inspect(source_only=False,core_classes=None,mpp=None,mpe=None,ui_apk=None):
         if sha((R/row['destination']).read_bytes())!=row['sha256']:errors.append('unrecorded core adaptation: '+row['destination'])
     for row in provenance.get('new_files',[]):
         if sha((R/row['path']).read_bytes())!=row['sha256']:errors.append('unrecorded core adapter: '+row['path'])
-    entry=json.loads((R/'docs/ui-preservation.json').read_text(encoding='utf-8'))
-    protected=[]
-    for row in entry['files']:
-        if '/captionlocales/' in row['path'] or row['path'].startswith('localization/') or row['path'].startswith('ui/src/') and not row['path'].endswith(('CaptionOverlayV2.java','CaptionActions.java')):
-            if (R/row['path']).exists():protected.append(row['path'])
-    facts['latest_ui_localization_exact_files']=len(protected)
     for row in provenance.get('protected_abi',[]):
         text=(R/row['path']).read_text(encoding='utf-8-sig')
         signatures=sorted(re.sub(r'\s+',' ',m.group(1)).strip() for m in re.finditer(r'(public\s+static\s+[\w<>?,\[\]. ]+\s+\w+\s*\([^)]*\))\s*\{',text))
@@ -60,12 +227,16 @@ def inspect(source_only=False,core_classes=None,mpp=None,mpe=None,ui_apk=None):
     for name in ['RebuildApi','RebuildProtocol']:
         original=literals(R/'translation-core/upstream'/(name+'.java.txt'))
         current=literals(R/'translation-core/src/main/java/app/yydarlinker/deepseekcaptions'/(name+'.java'))
-        if name=='RebuildProtocol':current.remove('"1.4.0"')
-        # Only literals of code removed as dead may disappear; none may be added or altered.
-        gone=Counter(original)-Counter(current);added=Counter(current)-Counter(original)
-        if added or any(k not in REMOVED_DEAD_LITERALS for k in gone):errors.append('upstream prompt/protocol literals changed: '+name)
+        if name=='RebuildProtocol':
+            if current.count('"1.4.0"') != 1:
+                errors.append('upstream prompt/protocol literals changed: '+name)
+            else:
+                current.remove('"1.4.0"')
+        if not literal_contract(name,original,current):
+            errors.append('upstream prompt/protocol literals changed: '+name)
     facts['pinned_core']={k:provenance[k] for k in ['repository','branch','commit']}
-    facts['prompt_and_protocol_literals_unchanged']=not any('literals changed' in e for e in errors)
+    facts['prompt_and_protocol_literals_unchanged']=False  # D3 explicitly changes FIDELITY_PROMPT.
+    facts['prompt_and_protocol_literals_authorized']=not any('literals changed' in e for e in errors)
     settings=(R/'settings.gradle.kts').read_text(encoding='utf-8-sig')
     if ':caption-core' in settings or 'archive/' in settings:errors.append('retired implementation included in Gradle settings')
     preview=(R/'ui-preview/build.gradle.kts').read_text(encoding='utf-8-sig')
@@ -115,7 +286,7 @@ def inspect(source_only=False,core_classes=None,mpp=None,mpe=None,ui_apk=None):
                     if (PREFIX+name).encode() in dex:errors.append('UI preview contains a translator: '+name)
                 if b'android.permission.INTERNET' in z.read('AndroidManifest.xml').replace(b'\x00',b''):errors.append('UI preview requests INTERNET')
             facts['independent_ui_apk']={'path':str(ui_apk.resolve()),'sha256':sha(ui_apk.read_bytes()),'translation_core_present':False}
-    facts['errors']=errors;facts['scope']='Actual sources, independently compiled core constants and package content; not an OEM or semantic-quality certification.'
+    facts['errors']=errors;facts['scope']='Main source ownership and legacy name guards; compiled constants scan only the supplied core classes, not the extension; package exclusions/provenance/ABI/protocol remain separate. No dynamic/reflection reachability, OEM or semantic-quality certification.'
     return facts
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--source-only',action='store_true');p.add_argument('--output',type=Path,default=R/'validation/boundaries.json')

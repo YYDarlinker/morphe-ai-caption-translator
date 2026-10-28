@@ -90,7 +90,6 @@ final class CaptionApplication extends TranslationRuntime.Host
                 break;
             case PLAYER_TYPE:
                 CaptionOverlay.setPlayerType(value);
-                RebuildController.player(value);
                 break;
             case CONFIGURATION:
                 RebuildController.refresh(c);
@@ -197,12 +196,6 @@ final class CaptionApplication extends TranslationRuntime.Host
     }
 
     @Override
-    boolean translates() {
-        CaptionNativeProjection.Snapshot selected = CaptionSessionReconciler.currentSelection();
-        return selectionOn() && selected != null && selected.translated;
-    }
-
-    @Override
     String target() {
         CaptionNativeProjection.Snapshot selected = CaptionSessionReconciler.currentSelection();
         return selected == null ? "" : selected.target();
@@ -211,21 +204,6 @@ final class CaptionApplication extends TranslationRuntime.Host
     @Override
     boolean authoredTrack(String url) {
         return SourceTrackPolicy.authored(url);
-    }
-
-    @Override
-    boolean isShorts() {
-        return CaptionSurface.isShorts();
-    }
-
-    @Override
-    boolean isCompactType(String type) {
-        return CaptionPlayerAuthority.isCompactType(type);
-    }
-
-    @Override
-    boolean authoritativeType() {
-        return CaptionPlayerAuthority.hasAuthoritativeType();
     }
 
     @Override
@@ -313,6 +291,15 @@ final class CaptionApplication extends TranslationRuntime.Host
     @Override
     void clearSourceCache(Context c) {
         SourceCaptionCache.clear(c);
+    }
+
+    @Override
+    void cacheClearFinished(Context c, boolean success) {
+        android.widget.Toast.makeText(
+                        c,
+                        CaptionStrings.get(c, success ? "message_e8b2177e1cd3" : "config_operation_uncertain"),
+                        android.widget.Toast.LENGTH_SHORT)
+                .show();
     }
 
     @Override

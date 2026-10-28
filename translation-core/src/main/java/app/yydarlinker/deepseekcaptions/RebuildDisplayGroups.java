@@ -382,11 +382,6 @@ final class RebuildDisplayGroups {
         return "";
     }
 
-    private static boolean opening(int c) {
-        int type = Character.getType(c);
-        return type == Character.START_PUNCTUATION || type == Character.INITIAL_QUOTE_PUNCTUATION;
-    }
-
     private static boolean punctuation(int c) {
         switch (Character.getType(c)) {
             case Character.CONNECTOR_PUNCTUATION:

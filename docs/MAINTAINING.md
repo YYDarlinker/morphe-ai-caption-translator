@@ -1,5 +1,7 @@
 # Maintaining the independent bundle
 
+集中工程治理和分页简化实验已经收尾。日常优化由可复现缺陷、实际功能需求、测量到的瓶颈或明确维护障碍驱动；减少行数不作为独立任务。新功能另开普通分支，保持待手机验收的maint1固定候选。
+
 Start with [project state](PROJECT-STATE.md), [development](DEVELOPMENT.md) and the relevant part of [architecture](ARCHITECTURE.md). State owns current package identity, known issues and pending external work. A maintainer does not need to read old task cards or chat histories.
 
 ## Make a bounded change

@@ -1,9 +1,9 @@
 ## [1.5.9](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.8...v1.5.9) (2026-10-30)
 
-### 🐛 Bug Fixes
-
-* keep caption leads with their first point ([4438fac](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/4438fac5f8ecfec608ee719e3bb234e4a6b6b446))
-* preserve verified local caption maintenance baseline ([36fbb45](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/36fbb45cfab6f69ff6068c52890eb9ee050a3c5a))
+- Reduce missing translated text when a passage spans several source subtitle lines.
+- Preserve the timing of adjacent translated passages when they are displayed together.
+- Improve page breaks around sentence continuations and introductory words, and avoid splitting words across overflow pages.
+- Fix clipped opening captions when entering fullscreen.
 
 ## [1.5.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.7...v1.5.8) (2026-10-26)
 

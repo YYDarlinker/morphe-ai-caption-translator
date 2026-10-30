@@ -70,7 +70,7 @@ Use a chat-completion endpoint compatible with the request protocol, and compare
 ## Available patches
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.5.8](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.8)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patch total
+> **[v1.5.9](https://github.com/YYDarlinker/morphe-ai-caption-translator/releases/tag/v1.5.9)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;1 patch total
 <details open>
 <summary>📦 YouTube&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>

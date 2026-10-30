@@ -1,13 +1,13 @@
 # Compatibility and evidence
 
-The compat2 host repair binds official Morphe Patches 2.0.0 and Patcher 2.0.0. Declarations come from `patches/src/main/kotlin/app/yydarlinker/patches/shared/Constants.kt`; published 1.5.9 metadata remains historical. Official 2.0.0 declares exactly three YouTube targets at or above 21.30.216: **21.30.216**, **21.42.241** and **21.43.523**. The last two remain experimental. This is a discrete list, not a continuous range or a promise for unpublished versions. [PROJECT-STATE](PROJECT-STATE.md) records the exact candidate, completed evidence and phone status.
+Release 1.6.0 includes the compat2 host repair for official Morphe Patches 2.0.0 and Patcher 2.0.0. Declarations come from `patches/src/main/kotlin/app/yydarlinker/patches/shared/Constants.kt`. Published 1.6.0 metadata contains these declarations. Official 2.0.0 declares exactly three YouTube targets at or above 21.30.216: **21.30.216**, **21.42.241** and **21.43.523**. The last two remain experimental. This is a discrete list, not a continuous range or a promise for unpublished versions. [PROJECT-STATE](PROJECT-STATE.md) records the exact published package, completed evidence and phone status.
 
 | YouTube | Declaration | APK minSdk | Evidence boundary |
 | --- | --- | --- | --- |
-| 21.43.523 | 2.0.0 experimental | 29 | code1561307650 original input; candidate combination and phone status in state |
-| 21.42.241 | 2.0.0 experimental | 29 | code1561304923 original input; candidate combination and phone status in state |
-| 21.30.216 | 2.0.0 regular target | 29 | User-supplied code1561187872 original input; candidate combination and phone status in state |
-| 21.41.525 | retained 1.48.0 experimental | 29 | Exact SECONDARY/code1561303419 input; old API compatibility is checked separately from new 2.0.0 targets |
+| 21.43.523 | 2.0.0 experimental | 29 | code1561307650 original input; published 1.6.0 resource/DEX combination passed; phone acceptance pending |
+| 21.42.241 | 2.0.0 experimental | 29 | code1561304923 original input; published 1.6.0 resource/DEX combination passed; phone acceptance pending |
+| 21.30.216 | 2.0.0 regular target | 29 | User-supplied code1561187872 original input; published 1.6.0 resource/DEX combination passed; phone acceptance pending |
+| 21.41.525 | retained 1.48.0 experimental | 29 | Exact SECONDARY/code1561303419 input; published 1.6.0 resource/DEX combination passed with official 1.48.0; phone acceptance pending |
 | 21.28.208 | 2.0.0 regular target | 29 | Historical code1561185128 resource/DEX proof with 1.48.0; no new 2.0.0 phone acceptance |
 | 21.23.492 | 2.0.0 regular target | 28 | Historical structural checks, not latest candidate device acceptance |
 | 21.20.405 | retained 1.48.0 regular target | 28 | User-reported earlier successful m7b/1.5.8 use; no current composition or installed-version readback for that phone |
@@ -29,6 +29,7 @@ The harness rejects an undeclared input APK and missing current official target 
 
 ## Separate evidence layers
 
+- Published 1.6.0: `release-1.6.0`, 595985 bytes; SHA-256 `c85730fb15761ad4e1eb15315ad1a1fea45466334b0b1c18c7787dc58b2bb37a`. The downloaded asset matches the final CI package and its embedded MPE matches the same-run tested MPE. All 952 application tests executed without failures or skips; strict release checks, anonymous main/dev Manager downloads and GitHub build provenance verification passed. The exact public MPP passed resource recompilation and final DEX audits for the three official 2.0.0 targets above and the retained 1.48.0/21.41.525-SECONDARY combination. Its patch DEX matches compat2; sound1 behavior is excluded. Formal 1.6.0 phone acceptance remains pending.
 - Published 1.5.9: `release-1.5.9`, 592605 bytes; SHA-256 `2db598581814ae50110da1daaa763821d79e0226480101df99922e888b3907ae`. The exact corrected asset passed strict bundle checks, the historical 21.41.525/21.28.208 resource/DEX combinations with official 1.48.0 and anonymous main/dev Manager-chain downloads. Phone acceptance is not newly established. The original release job failed after a later Gradle rebuild changed its identity; the user authorized restoring the same job's verified artifact without changing the tag. That failed job did not emit an attestation.
 - Published 1.5.8: immutable release MPP and historical strict CI/finite desktop compositions. Its public SHA-256 is 5c9dfb19a3b0b88f55516bfca38bf47ee18ed3f282511b6b6401c37e8c5db686 (600263 bytes).
 - Local candidate: see state for source fingerprint, package identity, same-package composition results and the latest phone limitation. Previous candidate proof applies only to its actual inputs.

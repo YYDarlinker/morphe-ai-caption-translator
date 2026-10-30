@@ -73,7 +73,7 @@ HTTP_PROXY/HTTPS_PROXY are process inputs applied as JVM proxy properties withou
 # Explicit build task:
 .\tools\workspace\dev.cmd :patches:buildAndroid --offline
 # One final candidate; use current gradle.properties identity and a fresh run ID:
-.\tools\workspace\verify-full.cmd -RunId my-change-01 -ExpectedVersion 1.5.8 -ExpectedBuildId local-1.5.8-overflow1 -Offline -RerunTests
+.\tools\workspace\verify-full.cmd -RunId my-change-01 -ExpectedVersion 1.5.8 -ExpectedBuildId local-1.5.8-reading1 -Offline -RerunTests
 ```
 
 The frontends launch Windows PowerShell without a profile. Missing tools/package settings fail before Gradle. Offline requires pre-resolved inputs; omit offline only for authorized online resolution. Use `Enter-Dev.ps1` plus `--init-script tools/workspace/workspace.init.gradle` for ad-hoc Gradle. `tools/Verify.ps1` and `tools/Enter-Workspace.ps1` remain small supported aliases; ignored `.devenv/` aliases are not prerequisites.

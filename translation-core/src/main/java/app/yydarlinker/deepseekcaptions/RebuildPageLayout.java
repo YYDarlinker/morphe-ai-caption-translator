@@ -367,7 +367,7 @@ final class RebuildPageLayout {
             }
             // Never end a page on a clause that introduces what follows: step back to the last
             // boundary that closes a thought, as long as the page keeps at least one clause.
-            int chosen = best;
+            int chosen = first;
             for (int i = best; i >= first; i--) {
                 int start = i == first ? from : cuts.get(i - 1);
                 if (!leadClause(text.substring(start, cuts.get(i)), leadLimit)) {

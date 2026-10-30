@@ -6,11 +6,32 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
 
 /** ASR lacks punctuation; an event boundary still needs positive evidence before being erased. */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,manifest=Config.NONE)
 public class AutomaticPageBoundaryTest {
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    public void aFittingFirstPointDoesNotLeaveItsLeadWithAnOverflowingHeading() {
+        String text = "接下来我们依次说明三个方面：首先，设备的实际使用成本往往高于最初公布的采购价格，原因并不是任何项目隐瞒，而是不同地区统计的服务范围和维护周期存在差别。";
+        CaptionRenderSpec spec = CaptionLanguageContext.explicit("en", "zh-Hans").renderSpec;
+        CaptionPresentationBudget geometry = new CaptionPresentationBudget(2025, 48, 60.717945f, spec);
+        int pointEnd = text.indexOf("，", text.indexOf("首先，") + 3) + 1;
+        String point = text.substring(text.indexOf("首先，"), pointEnd);
+        assertFalse("exercise overflowing packing, not the fitting-text balance path",
+                spec.fits(text, geometry.preferredPx, geometry.width, 2));
+        assertTrue(spec.fits(point, geometry.preferredPx, geometry.width, 1));
+        assertTrue(spec.fits(text.substring(0, pointEnd), geometry.preferredPx, geometry.width, 2));
+        List<CaptionDisplayPage> pages = TranslationPresentation.pages(text, 1000, 13000, geometry, spec);
+        assertFalse(pages.isEmpty());
+        for (CaptionDisplayPage page : pages)
+            assertFalse("keep the available first point with its lead", page.text.endsWith("首先，"));
+        assertEquals(1000, pages.get(0).start);
+        assertEquals(13000, pages.get(pages.size() - 1).end);
+    }
+
     @Test public void independentLongEventsDoNotMergeJustBecauseTheyOmitFullStops() {
         RebuildSource source=RebuildContractTest.source(
                 "The annual report is finished now essentially we will inspect the accounts and explain the new budget",500);

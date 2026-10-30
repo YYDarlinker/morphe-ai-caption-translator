@@ -15,6 +15,7 @@ The two selected desktop inputs have package com.google.android.youtube and the 
 
 ## Separate evidence layers
 
+- Published 1.5.9: `release-1.5.9`, 592605 bytes; SHA-256 `2db598581814ae50110da1daaa763821d79e0226480101df99922e888b3907ae`. The exact corrected asset passed strict bundle checks, both finite resource/DEX combinations above and anonymous main/dev Manager-chain downloads. Phone acceptance is not newly established. The original release job failed after a later Gradle rebuild changed its identity; the user authorized restoring the same job's verified artifact without changing the tag. That failed job did not emit an attestation.
 - Published 1.5.8: immutable release MPP and historical strict CI/finite desktop compositions. Its public SHA-256 is 5c9dfb19a3b0b88f55516bfca38bf47ee18ed3f282511b6b6401c37e8c5db686 (600263 bytes).
 - Local candidate: see state for source fingerprint, package identity, same-package composition results and the latest phone limitation. Previous candidate proof applies only to its actual inputs.
 - Desktop composition: verifies selected resources and final DEX under specified official roots. Unsigned APK outputs are local evidence, not installable release assets or a universal device matrix.

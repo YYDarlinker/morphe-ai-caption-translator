@@ -129,4 +129,31 @@ final class RebuildDisplayPlanning {
         return "，。！？；：,!?;:".indexOf(last) >= 0 || RebuildSource.terminal(text);
     }
 
+    CaptionEventTimeline timeline(RebuildDisplayGroups.Unit unit) {
+        // Authored projection has its own cue contract. Single events retain their original pager.
+        if (blocks.get(unit.block).authored || unit.events.size() < 2)
+            return new CaptionEventTimeline(new int[]{0}, new long[0], new long[0], anchors(unit));
+        int count = unit.events.size(), at = 0;
+        int[] offsets = new int[count + 1];
+        long[] starts = new long[count], ends = new long[count];
+        for (int i = 0; i < count; i++) {
+            RebuildProtocol.Event event = unit.events.get(i);
+            offsets[i] = at;
+            at += unit.separators.get(i).length() + event.text.trim().length();
+            starts[i] = event.start;
+            ends[i] = event.end;
+        }
+        offsets[count] = at;
+        return new CaptionEventTimeline(offsets, starts, ends, anchors(unit));
+    }
+
+    boolean awaitingContinuation(RebuildDisplayGroups.Unit unit, RebuildPlanner.Block block) {
+        if (block.authored || unit.to >= block.to || unit.events.isEmpty()
+                || unit.text.trim().isEmpty()) return false;
+        RebuildProtocol.Event last = unit.events.get(unit.events.size() - 1);
+        return !RebuildPlanner.hardBreakBefore(source, last.to + 1)
+                && source.words.get(last.to + 1).start - last.end < RebuildDisplayGroups.MAX_BRIDGE_MS
+                && RebuildDisplayGroups.requiresContinuation(source, languageContext, last);
+    }
+
 }

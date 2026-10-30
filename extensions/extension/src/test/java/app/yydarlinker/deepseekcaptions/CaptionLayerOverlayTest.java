@@ -245,6 +245,33 @@ public class CaptionLayerOverlayTest {
         fail("caption never became visible");
     }
 
+    @Test
+    public void openingCaptionCommitsItsOwnBoundsWhileThePlayerDefersLayout() throws Exception {
+        CaptionOverlay.showStatus("翻译中…", () -> true);
+        layout();
+        int waitingWidth = text().getWidth();
+        plane.suppressLayout(true);
+        try {
+            CaptionOverlay.showEvent("开头这一页应当完整显示，边缘文字不能被旧的等待框裁剪。", () -> true,
+                    "opening:deferred", 1000, 61000, 2000,
+                    CaptionLanguageContext.explicit("en", "zh-Hans").renderSpec);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (!text().getText().toString().contains("开头") && System.nanoTime() < deadline) {
+                idle();
+                Thread.sleep(2);
+            }
+            assertTrue("new caption reached the real TextView", text().getText().toString().contains("开头"));
+            assertTrue("the caption needs a wider box than the waiting label", text().getMeasuredWidth() > waitingWidth);
+            assertEquals("a visible layout must not retain the previous page's clipping width",
+                    text().getMeasuredWidth(), text().getWidth());
+            assertEquals(text().getMeasuredHeight(), text().getHeight());
+            assertEquals("the parent frame and the text commit together", anchor().getLayoutParams().width,
+                    anchor().getWidth());
+        } finally {
+            plane.suppressLayout(false);
+        }
+    }
+
     private void awaitPlan(int innerWidth) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (System.nanoTime() < deadline) {

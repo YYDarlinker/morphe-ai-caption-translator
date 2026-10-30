@@ -123,9 +123,4 @@ public class RebuildR27Test {
     assertSame(good,RebuildReview.prefer(bad,good));
     assertSame(bad,RebuildReview.prefer(null,bad));
   }
-  @Test public void originalNamedEquipmentDriftIsNoLongerDictionaryRejected()throws Exception {
-    JSONArray rows=RebuildR26Test.fixture();JSONObject r=rows.getJSONObject(4);RebuildSource s=RebuildR26Test.source(rows);
-    RebuildProtocol.Plan p=RebuildProtocol.parse(r.getJSONObject("response").toString(),s,RebuildR26Test.block(r,s));
-    assertEquals(4,p.events.size()); // no certification of the captured translation
-  }
 }

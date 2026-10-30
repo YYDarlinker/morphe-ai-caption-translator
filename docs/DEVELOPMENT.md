@@ -73,12 +73,16 @@ HTTP_PROXY/HTTPS_PROXY are process inputs applied as JVM proxy properties withou
 # Explicit build task:
 .\tools\workspace\dev.cmd :patches:buildAndroid --offline
 # One final candidate; use current gradle.properties identity and a fresh run ID:
-.\tools\workspace\verify-full.cmd -RunId my-change-01 -ExpectedVersion 1.5.8 -ExpectedBuildId local-1.5.8-maint1 -Offline -RerunTests
+.\tools\workspace\verify-full.cmd -RunId my-change-01 -ExpectedVersion 1.5.8 -ExpectedBuildId local-1.5.8-overflow1 -Offline -RerunTests
 ```
 
 The frontends launch Windows PowerShell without a profile. Missing tools/package settings fail before Gradle. Offline requires pre-resolved inputs; omit offline only for authorized online resolution. Use `Enter-Dev.ps1` plus `--init-script tools/workspace/workspace.init.gradle` for ad-hoc Gradle. `tools/Verify.ps1` and `tools/Enter-Workspace.ps1` remain small supported aliases; ignored `.devenv/` aliases are not prerequisites.
 
 Full verification runs source/provenance/localization/tool contracts, both suites, UI fixture assembly, MPP build, exact MPP/MPE identity, compiled/package boundaries and credential scanning. It recreates the two Java test destinations, disables their compiled-test cache reuse and requires reset receipts; stale deleted test classes cannot count. Missing/zero/all-skipped/failed tests or changed inputs fail. No real model, publication, composition or installation occurs.
+
+The token-cost golden test accepts `-Pgolden.write=<absolute-review-file>` to write a proposal, then deliberately fails. Review changes against the contract before replacing the fixture; regeneration is not a passing check. Ordinary UI tests keep their assertions and drawing checks without writing historical screenshot/JSON ledgers.
+
+Both canonical frontends disable live translation. Optional `src/liveTest` probes require separate authorization, a complete provider configuration and positive `live.maxRequests`, `live.maxTokens` and `live.elapsedSeconds` budgets. A zero-provider/zero-call run cannot establish streaming success. Live probes are not part of the default application-test count.
 
 Candidate assets: `build/maintenance/M1a/<run-id>/`. Evidence: `validation/runs/<run-id>/`. M1a and ordinary `build/n39/gradle` are inherited output contracts, not extra active versions. Extension intermediates stay in `extensions/extension/build/` for R8. Save same-run reports/receipts/required compiled evidence before subsequent builds.
 

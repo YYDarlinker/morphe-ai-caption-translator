@@ -185,7 +185,7 @@ def main(argv=None):
         tasks = TEST_TASKS + BUILD_TASKS + ((':patches:generatePatchesList',) if a.mode == 'release' else ())
         command = gradle + list(tasks) + ['--no-daemon', '--no-parallel', '--console=plain',
                 '--init-script', 'tools/verification.init.gradle', '-Pverification.receipt=' + str(receipt_path),
-                '-Pverification.buildRoot=' + build_root, '-Ptranslation.live=false', '-Pscheduler.output=' + str(evidence / 'test-evidence')]
+                '-Pverification.buildRoot=' + build_root, '-Ptranslation.live=false']
         if a.mode == 'release':
             command += ['-PcaptionBuildId=' + build_id]
         if a.rerun_tests:

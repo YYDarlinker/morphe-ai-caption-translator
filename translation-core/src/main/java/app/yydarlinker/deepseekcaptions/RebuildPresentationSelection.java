@@ -18,7 +18,7 @@ final class RebuildPresentationSelection {
     static final class Selected {
         String text, fallbackReason, displayEmptyReason, eventId, gapGate;
         long eventStart, eventEnd;
-        long[] anchors;
+        CaptionEventTimeline timeline;
         int index;
         boolean status, inBlock, provisional, clearUncovered, repairPage;
 
@@ -26,7 +26,7 @@ final class RebuildPresentationSelection {
             text = fallbackReason = displayEmptyReason = gapGate = "";
             eventId = "none";
             eventStart = eventEnd = -1;
-            anchors = null;
+            timeline = null;
             index = -1;
             status = inBlock = provisional = clearUncovered = repairPage = false;
         }
@@ -130,11 +130,19 @@ final class RebuildPresentationSelection {
             List<RebuildDisplayGroups.Unit> units, long time, String translating) {
         int index = selected.index;
         RebuildDisplayGroups.Unit unit = plan == null ? null : cursor.select(index, plan.events, units, time);
+        if (unit != null && selected.provisional && view.state() == RebuildController.RUNNING
+                && unit.to == plan.events.get(plan.events.size() - 1).to
+                && planning.awaitingContinuation(unit, block)) {
+            selected.text = translating;
+            selected.status = true;
+            selected.fallbackReason = "pending_continuation";
+            return;
+        }
         if (unit != null) {
             selected.eventId = unit.id();
             selected.eventStart = unit.start;
             selected.eventEnd = unit.end;
-            selected.anchors = anchors(source, unit);
+            selected.timeline = planning.timeline(unit);
             selected.text = unit.text;
             if (selected.text.isEmpty()) selected.displayEmptyReason = "non_speech";
             if (!selected.text.isEmpty()) {

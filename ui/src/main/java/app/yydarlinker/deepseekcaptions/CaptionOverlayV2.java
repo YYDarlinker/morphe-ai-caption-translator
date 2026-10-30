@@ -104,7 +104,7 @@ final class CaptionOverlay {
     private static long pendingStart = -1, pendingEnd = -1, pendingPosition = -1;
     private static boolean pendingStatus, pendingWaiting;
     private static CaptionRenderSpec pendingRenderSpec = CaptionRenderSpec.LEGACY;
-    private static long[] pendingSourceAnchors;
+    private static CaptionEventTimeline pendingSourceTimeline;
     private static List<CaptionPageLayout.Page> pendingPages = Collections.emptyList();
     private static int shownPage = -1;
 
@@ -323,7 +323,7 @@ final class CaptionOverlay {
             long end,
             long at,
             CaptionRenderSpec spec,
-            long[] sourceAnchors) {
+            CaptionEventTimeline sourceTimeline) {
         // A failed or withheld event carries no text and clears the box.
         if (text == null || text.trim().isEmpty()) {
             hide(guard);
@@ -342,7 +342,7 @@ final class CaptionOverlay {
                 false,
                 spec,
                 CaptionContracts.hash(text),
-                sourceAnchors);
+                sourceTimeline);
     }
 
     private static void show(
@@ -356,7 +356,7 @@ final class CaptionOverlay {
             boolean waiting,
             CaptionRenderSpec spec,
             String canonicalHash,
-            long[] sourceAnchors) {
+            CaptionEventTimeline sourceTimeline) {
         if (g != null && !g.isValid()) return;
         long command = g == null ? COMMAND.incrementAndGet() : COMMAND.get();
         final long renderEpoch = playerRenderEpoch;
@@ -365,7 +365,7 @@ final class CaptionOverlay {
                     if (!accepts(g, command, renderEpoch)) return;
                     pendingRenderSpec = spec;
                     pendingCanonicalHash = canonicalHash;
-                    pendingSourceAnchors = sourceAnchors;
+                    pendingSourceTimeline = sourceTimeline;
                     pendingText = s == null ? "" : s;
                     pendingIdentity = id;
                     pendingStart = start;
@@ -456,7 +456,7 @@ final class CaptionOverlay {
         pendingStart = -1;
         pendingEnd = -1;
         pendingIdentity = "";
-        pendingSourceAnchors = null;
+        pendingSourceTimeline = null;
         pendingPages = Collections.emptyList();
         shownPage = -1;
         stableTextWidth = 0;
@@ -856,6 +856,13 @@ final class CaptionOverlay {
         }
 
         @Override
+        public void scrollTo(int x, int y) {
+            // Pages already fit this non-editable viewport. TextView's deferred caret/centering
+            // scroll must not move its text and the custom background onto different clip edges.
+            super.scrollTo(0, 0);
+        }
+
+        @Override
         protected void onDraw(Canvas canvas) {
             drawCaptionBackground(canvas);
             super.onDraw(canvas);
@@ -952,7 +959,7 @@ final class CaptionOverlay {
                 + "|"
                 + Float.floatToIntBits(budget.preferredPx)
                 + "|"
-                + java.util.Arrays.toString(pendingSourceAnchors);
+                + String.valueOf(pendingSourceTimeline);
     }
 
     /** The pages of the pending event; laid out off the main thread, empty until they are ready. */
@@ -967,13 +974,14 @@ final class CaptionOverlay {
         List<CaptionPageLayout.Page> ready = LAYOUTS.get(key);
         if (ready != null) return ready;
         final String body = pendingText, identity = pendingIdentity;
+        final CaptionEventTimeline timeline = pendingSourceTimeline;
         final long start = pendingStart, end = pendingEnd;
         final RenderGuard guard = currentGuard;
         LAYOUTS.request(
                 key,
                 () ->
                         CaptionActions.displayPages(
-                                body, start, end, budget, spec, pendingSourceAnchors),
+                                body, start, end, budget, spec, timeline),
                 pages ->
                         MAIN.post(
                                 () -> {
@@ -1407,10 +1415,10 @@ final class CaptionOverlay {
                 && videoWidth < contentWidth) fit = videoWidth / (float) contentWidth;
         float scale = captionScale(glyphTransition.displayedPx(), glyphLocalPx, anchorScale) * fit;
         if (!(scale > 0f) || Float.isNaN(scale) || Float.isInfinite(scale)) return;
+        text.setPivotX(text.getWidth() / 2f);
+        text.setPivotY(text.getHeight() / 2f);
         if (Math.abs(text.getScaleX() - scale) > .002f
                 || Math.abs(text.getScaleY() - scale) > .002f) {
-            text.setPivotX(text.getWidth() / 2f);
-            text.setPivotY(text.getHeight() / 2f);
             text.setScaleX(scale);
             text.setScaleY(scale);
         }
@@ -1571,10 +1579,10 @@ final class CaptionOverlay {
         String key = planKey(budget, spec);
         String body = pendingText;
         long start = pendingStart, end = pendingEnd;
-        long[] anchors = pendingSourceAnchors;
+        CaptionEventTimeline timeline = pendingSourceTimeline;
         LAYOUTS.prefetch(
                 key,
-                () -> CaptionActions.displayPages(body, start, end, budget, spec, anchors));
+                () -> CaptionActions.displayPages(body, start, end, budget, spec, timeline));
     }
 
     // ---- Render ----
@@ -2197,6 +2205,19 @@ final class CaptionOverlay {
         boxHeight = height;
         boxClass = presentationDecision.currentClass();
         CaptionHorizontalPlacement.position(parent, anchor, nextLeft, nextTop, boxWidth, boxHeight);
+        if (anchor.isLayoutRequested() || text.isLayoutRequested()
+                || anchor.getWidth() != width || anchor.getHeight() != height
+                || text.getWidth() != text.getMeasuredWidth()
+                || text.getHeight() != text.getMeasuredHeight()) {
+            // The player may defer its own traversal during fullscreen entry. Commit only our
+            // measured subtree now: new text must never draw through the preceding page's bounds.
+            // Geometry-only pre-draw uses translate(), and never enters this content commit.
+            anchor.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
+            int left = parent.getPaddingLeft(), top = parent.getPaddingTop();
+            anchor.layout(left, top, left + width, top + height);
+            applyCommentScale(owner, text);
+        }
         if (sizeChanged && DeepSeekConfig.displayTextDebugEnabled(owner)) {
             FrameLayout currentHost = hostRef.get();
             CaptionDiagnostics.mark(

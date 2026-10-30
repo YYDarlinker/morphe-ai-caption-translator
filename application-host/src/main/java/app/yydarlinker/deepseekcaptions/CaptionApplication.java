@@ -418,11 +418,11 @@ final class CaptionApplication extends TranslationRuntime.Host
             long end,
             long at,
             CaptionRenderSpec spec,
-            long[] sourceAnchors) {
+            CaptionEventTimeline sourceTimeline) {
         display(
                 () ->
                         CaptionOverlay.showEvent(
-                                text, guard(g), id, start, end, at, spec, sourceAnchors));
+                                text, guard(g), id, start, end, at, spec, sourceTimeline));
     }
 
     /** A display fault must never take the host app down: the next tick draws the caption again. */
@@ -451,8 +451,8 @@ final class CaptionApplication extends TranslationRuntime.Host
             long end,
             CaptionPresentationBudget geometry,
             CaptionRenderSpec spec,
-            long[] sourceAnchors) {
-        return TranslationPresentation.pages(text, start, end, geometry, spec, sourceAnchors);
+            CaptionEventTimeline sourceTimeline) {
+        return TranslationPresentation.pages(text, start, end, geometry, spec, sourceTimeline);
     }
 
     @Override

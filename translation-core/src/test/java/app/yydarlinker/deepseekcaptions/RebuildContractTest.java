@@ -413,11 +413,12 @@ public class RebuildContractTest {
   }
 
   @Test
-  public void acceptedParagraphKeepsReviewRiskButRemainsDisplayable() throws Exception {
+  public void acceptedParagraphIsPaginatedLocallyWithoutPaidSemanticRepair() throws Exception {
     RebuildSource s = source(String.join(" ", Collections.nCopies(30, "word")), 400);
     String text = String.join("", Collections.nCopies(70, "字")) + "。第二句。";
     RebuildProtocol.Plan p=RebuildProtocol.parse(reply(block(s), new JSONArray().put(event(0,29,text))),s,block(s));
-    assertTrue(p.issues.stream().anyMatch(issue -> issue.code.equals("paragraph") && issue.repair));
+    assertTrue(p.issues.stream().anyMatch(issue -> issue.code.equals("paragraph") && !issue.repair));
+    assertFalse(RebuildReview.shouldRepair(p,1,0,0,12000));
     List<RebuildDisplayGroups.Unit> units=RebuildDisplayGroups.partition(0,p.events,s,CaptionLanguageContext.LEGACY,null,null);
     assertEquals(1,units.size());assertFalse(units.get(0).blocked);assertEquals(text,units.get(0).text);
   }

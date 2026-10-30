@@ -161,7 +161,7 @@ class VerificationContract(unittest.TestCase):
             (protocol, protocol_text.replace('"block_identity"', '"not_whitelisted"', 1), 'unlisted-protocol'),
             (protocol, protocol_text.replace('" "', 'null', 1), 'extra-legacy-deletion'),
             (protocol, protocol_text + '\nclass ExtraSpace { String s = " "; }\n', 'legacy-count-changed'),
-            (protocol, protocol_text + '\nclass ExtraPrompt { String s = ' + integration.D3_FIDELITY_NEW + '; }\n', 'prompt-count-changed'),
+            (protocol, protocol_text + '\nclass ExtraPrompt { String s = ' + '"An unauthorized extra prompt."' + '; }\n', 'prompt-count-changed'),
             (api, api_text + '\nclass ExtraApiLiteral { String s = "not_whitelisted"; }\n', 'unlisted-api'),
         ]
         for path, changed, label in literal_mutations:

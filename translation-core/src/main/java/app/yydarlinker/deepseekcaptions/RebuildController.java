@@ -1942,7 +1942,7 @@ final class RebuildController {
         int generation;
         long revision, submission, selectedAt, observedAt;
         long eventStart = -1, eventEnd = -1;
-        long[] eventAnchors = null;
+        CaptionEventTimeline eventTimeline = null;
         synchronized (s) {
             if (!current(s) || !s.visible) return;
             generation = s.generation;
@@ -1979,7 +1979,7 @@ final class RebuildController {
             eventId = selected.eventId;
             eventStart = selected.eventStart;
             eventEnd = selected.eventEnd;
-            eventAnchors = selected.anchors;
+            eventTimeline = selected.timeline;
             status = selected.status;
             String signature = (status ? "status:" : "caption:") + eventId + "|" + text + "|";
             if (signature.equals(s.lastShown) && s.appliedRenderRevision == s.renderRevision) {
@@ -2074,7 +2074,7 @@ final class RebuildController {
                     s.authored
                             ? s.languageContext.renderSpec.withAuthored()
                             : s.languageContext.renderSpec,
-                    eventAnchors);
+                    eventTimeline);
         if (TranslationRuntime.debugEnabled(s.context))
             TranslationRuntime.mark(
                     s.context,

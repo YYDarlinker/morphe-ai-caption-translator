@@ -1,6 +1,6 @@
 # Maintaining the independent bundle
 
-集中工程治理和分页简化实验已经收尾。日常优化由可复现缺陷、实际功能需求、测量到的瓶颈或明确维护障碍驱动；减少行数不作为独立任务。新功能另开普通分支，保持待手机验收的maint1固定候选。
+集中工程治理和分页简化实验已经收尾。日常优化由可复现缺陷、实际功能需求、测量到的瓶颈或明确维护障碍驱动；减少行数不作为独立任务。新功能另开普通分支，与当前缺陷修复候选隔离；具体身份及手机验收状态见PROJECT-STATE。
 
 Start with [project state](PROJECT-STATE.md), [development](DEVELOPMENT.md) and the relevant part of [architecture](ARCHITECTURE.md). State owns current package identity, known issues and pending external work. A maintainer does not need to read old task cards or chat histories.
 
@@ -14,6 +14,16 @@ Start with [project state](PROJECT-STATE.md), [development](DEVELOPMENT.md) and 
 6. Record actual results and unverified boundaries under `validation/runs/<run-id>/`. Update state and its mirror together. Source delivery, device observation and publication are distinct; see [releasing](RELEASING.md).
 
 Keep the incremental daily loop. Full verification deliberately rebuilds Java test destinations to reject deleted-test bytecode. Do not repeat full builds merely because a review moves to another chat.
+
+## Maintain tests by failure detection
+
+- Name the user behaviour or contract a test protects and where its expected result comes from. A captured subtitle, fixed Unicode cluster, signed URL or failed-cache case is worth retaining when it detects a meaningful error; specificity alone is not redundancy.
+- Exercise the project entry point. Constructing a generic Android widget and filling in the expected attributes does not verify the addon that configures it. Keep source/ABI/resource checks for declarations that are themselves contracts; prefer actual execution for behaviour.
+- Remove a weaker duplicate only after identifying the retained stronger assertions and the setup differences. Use a small controlled fault or real historical failure when equivalence is uncertain. Equal coverage or one shared failing mutant does not prove universal redundancy.
+- Keep one current specification for generated data. Runtime localization checks compare the input catalog with compiled XML and lookup; golden export fixtures pin observable text, with common raw output stored once. Regeneration writes a proposal and fails until reviewed.
+- Separate measurements and evidence exports from assertions. Ordinary tests need not write historical screenshot/JSON ledgers. SDK matrices belong where platform behaviour matters; a zero-call live run and a stale compiled class never count as successful validation.
+
+Stop test governance after confirmed low-value assets are removed, changed contracts have relevant evidence, the ordinary checks pass and production inputs remain protected. Do not add a test framework, permanent fault-injection service or another recurring audit solely for this review.
 
 ## What is enough to maintain
 

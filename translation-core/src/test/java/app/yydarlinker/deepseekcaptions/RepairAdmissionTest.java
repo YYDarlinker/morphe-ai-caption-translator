@@ -541,10 +541,12 @@ public class RepairAdmissionTest {
     @Test public void d7ContradictoryQuotationUsesExistingBoundedHoleRepair() throws Exception {
         source=D7CoverageRegressionTest.source();block=RebuildContractTest.block(source);
         RebuildController.Session s=session();RebuildProtocol.Plan p=d7Partial(s);
-        respond(success(5,block.to));hole(s);
+        respond(success(block.from,block.to));hole(s);
         assertEquals(1,server.getRequestCount());assertEquals(1,attempts.get());
         assertTrue(s.work.slots[0].accepted.holes.isEmpty());
-        assertEquals(p.events.get(0).text,s.work.slots[0].accepted.events.get(0).text);
+        assertTrue("ambiguous original text was not displayed as a prefix",p.events.isEmpty());
+        assertEquals(block.from,s.work.slots[0].accepted.events.get(0).from);
+        assertEquals(block.to,s.work.slots[0].accepted.events.get(0).to);
         hole(s);assertEquals(1,server.getRequestCount());
     }
     @Test public void d7ContradictoryQuotationRespectsSpentBudgetAndRetirement() throws Exception {

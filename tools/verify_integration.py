@@ -107,93 +107,13 @@ def constants(path):
         else:raise ValueError(f'unknown constant tag {tag}')
         i+=1
     return out
-# Pinned, file-specific historical deletions with exact occurrence counts.
-# D3 adds exactly one complete FIDELITY prompt replacement; no other literal delta is allowed.
-REMOVED_DEAD_LITERALS = {
-    'RebuildApi': Counter({'"HTTP_CONFIG"': 1}),
-    'RebuildProtocol': Counter({
-        '" "': 4, r'"\\s+"': 3, '"paragraph"': 1,
-        '"numeric_substitution"': 1, '"layout_overflow"': 1,
-        r'"(?<![\\p{L}\\p{N}])[+-]?\\d+(?:,\\d{3})*(?:\\.\\d+)?"': 1,
-        '","': 1,
-    }),
-}
-D3_FIDELITY_OLD = (
-    '" Before writing the final JSON, silently check each source predicate and its object, place, '
-    'negation, modality and comparison direction against the translation. Copying source does NOT '
-    'satisfy meaning coverage. Never drop a conclusion such as a pace probably cannot continue just '
-    'because an introductory clause mentions caveats. Read comparison continuations in context: '
-    "'more impressed with A ... than/then they are with B' describes a comparison, not people "
-    'jointly participating with B. ASR then/than may be ambiguous; do not rewrite source. Do not '
-    'attach a following subject to the previous sentence (growth that would follow / X reduced...). '
-    'Use context to translate the grammatical function of an owned fragment, not to import new '
-    "facts. Military SAM/SAMs may mean surface-to-air missiles, whereas a person's name Sam does "
-    'not. avoid_event_end_after contains soft source-dependency hints; choose a different coherent '
-    'range when possible. Do not finish an event on a subject before its verb or inside a noun '
-    'phrase. A tank fleet is a force of tanks, not a naval fleet. Licensed/unlicensed describes '
-    'authorization, not automatically legal/illegal. Do not turn adjacent source numbers into a '
-    'numeric range, model designation, or unit relationship unless the source explicitly expresses '
-    'it; preserve unresolved ASR ambiguity locally. For long multi-clause passages prefer multiple '
-    'source-aligned events at the preferred font budget. Never shorten a translation to satisfy that'
-    ' budget. An actual complete utterance overrides lexical hints. Preserve trailing '
-    'place/direction complements, and distinguish a following subject plus finite verb from the '
-    'preceding relative clause. In not always, keep the negation over always, not over the main '
-    'verb. A product of can mean depends on, not multiplication. When adjacent ASR numbers cannot be'
-    ' resolved from source, explicitly preserve uncertainty locally rather than silently dropping '
-    'one or inventing a model. Keep list markers with their following clause. If the plan would '
-    'contain many short events, consolidate them into fewer clause-complete events while keeping '
-    'every source token and its source-owned time range. Resolve polysemous words by the subject '
-    'matter, and render colloquial interjections by their discourse function and intensity in the '
-    'target language. Attach time and degree modifiers to the action or thought they actually '
-    'modify, including in spoken asides. When a compressed or awkward explanatory statement would '
-    'repeat its abstract head noun on both sides of the verb in the target language, restate the '
-    'underlying action or relation idiomatically instead of producing an empty definition. Use '
-    'neighboring context to disambiguate, never to add facts or words outside the owned source '
-    "range. After selecting each event's IDs, copy every corresponding source token into that "
-    'event\'s source field in order; do not shift even a short conjunction into an adjacent event."'
-)
-D3_FIDELITY_NEW = (
-    '" Before writing the final JSON, silently check each source predicate and its object, place, '
-    'negation, modality and comparison direction against the translation. Copying source does NOT '
-    'satisfy meaning coverage. Preserve conclusions and their negation, including its scope. Read '
-    'comparison continuations in context and preserve comparison direction. ASR then/than may be '
-    'ambiguous; do not rewrite source. Do not attach a following subject to the previous sentence. '
-    'Use context to translate the grammatical function of an owned fragment, not to import new '
-    'facts. avoid_event_end_after contains soft source-dependency hints; choose a different coherent'
-    ' range when possible. Do not finish an event on a subject before its verb or inside a noun '
-    'phrase. Do not turn adjacent source numbers into a numeric range, model designation, or unit '
-    'relationship unless the source explicitly expresses it; preserve unresolved ASR ambiguity '
-    'locally. For long multi-clause passages prefer multiple source-aligned events at the preferred '
-    'font budget. Never shorten a translation to satisfy that budget. An actual complete utterance '
-    'overrides lexical hints. Preserve trailing place/direction complements, and distinguish a '
-    'following subject plus finite verb from the preceding relative clause. In not always, keep the '
-    'negation over always, not over the main verb. When adjacent ASR numbers cannot be resolved from'
-    ' source, explicitly preserve uncertainty locally rather than silently dropping one or inventing'
-    ' a model. Keep list markers with their following clause. If the plan would contain many short '
-    'events, consolidate them into fewer clause-complete events while keeping every source token and'
-    ' its source-owned time range. Resolve polysemous words by the subject matter, and render '
-    'colloquial interjections by their discourse function and intensity in the target language. '
-    'Attach time and degree modifiers to the action or thought they actually modify, including in '
-    'spoken asides. When a compressed or awkward explanatory statement would repeat its abstract '
-    'head noun on both sides of the verb in the target language, restate the underlying action or '
-    'relation idiomatically instead of producing an empty definition. Use neighboring context to '
-    'disambiguate, never to add facts or words outside the owned source range. After selecting each '
-    "event's IDs, copy every corresponding source token into that event's source field in order; do "
-    'not shift even a short conjunction into an adjacent event."'
-)
-
-LITERAL_REPLACEMENTS = {'RebuildProtocol': ((D3_FIDELITY_OLD, D3_FIDELITY_NEW, 1),)}
+# Reviewed source-quote wire policy. Hash the complete literal multiset, including counts.
+# Snapshots remain independently hash-pinned by provenance; no arbitrary literal change is allowed.
+PINNED_LITERAL_COUNTS_SHA256 = {'RebuildApi': '9c4bf64fd6fa5acfd6509d26d176c49f083d3dec0126a078e572137c6703c287', 'RebuildProtocol': 'adbc7a11c060a473688a5aff228cd1ffa5e9776810fcc2fd75cb800b3aade866'}
 
 def literal_contract(name, original, current):
-    before, after = Counter(original), Counter(current)
-    expected_removed = REMOVED_DEAD_LITERALS[name].copy()
-    expected_added = Counter()
-    for old, new, count in LITERAL_REPLACEMENTS.get(name, ()):
-        if before[old] != count or after[new] != count:
-            return False
-        expected_removed[old] += count
-        expected_added[new] += count
-    return before - after == expected_removed and after - before == expected_added
+    counts = sorted(Counter(current).items())
+    return sha(json.dumps(counts, separators=(',', ':')).encode()) == PINNED_LITERAL_COUNTS_SHA256[name]
 
 def literals(path):
     pattern=r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"'
@@ -235,7 +155,7 @@ def inspect(source_only=False,core_classes=None,mpp=None,mpe=None,ui_apk=None):
         if not literal_contract(name,original,current):
             errors.append('upstream prompt/protocol literals changed: '+name)
     facts['pinned_core']={k:provenance[k] for k in ['repository','branch','commit']}
-    facts['prompt_and_protocol_literals_unchanged']=False  # D3 explicitly changes FIDELITY_PROMPT.
+    facts['prompt_and_protocol_literals_unchanged']=False  # Source-only wire and fidelity guidance are explicit local adaptations.
     facts['prompt_and_protocol_literals_authorized']=not any('literals changed' in e for e in errors)
     settings=(R/'settings.gradle.kts').read_text(encoding='utf-8-sig')
     if ':caption-core' in settings or 'archive/' in settings:errors.append('retired implementation included in Gradle settings')

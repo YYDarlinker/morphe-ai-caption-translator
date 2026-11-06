@@ -1,3 +1,9 @@
+## [1.6.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.6.0...v1.6.1) (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* keep usable translated captions visible through partial replies ([b4a615b](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/b4a615b4761270e62ea9ea052a091c9a94916e2f))
+
 ## [1.6.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.9...v1.6.0) (2026-10-30)
 
 ### ✨ New Features

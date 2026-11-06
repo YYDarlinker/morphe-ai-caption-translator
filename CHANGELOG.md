@@ -1,8 +1,9 @@
 ## [1.6.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.6.0...v1.6.1) (2026-11-06)
 
-### 🐛 Bug Fixes
-
-* keep usable translated captions visible through partial replies ([b4a615b](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/b4a615b4761270e62ea9ea052a091c9a94916e2f))
+- Fix captions getting stuck on “Translating…” when a speaker marker is omitted.
+- Keep usable translated passages visible when other passages are missing or invalid.
+- Prevent stray formatting characters from appearing in captions, retaining readable text where possible.
+- Avoid unnecessary translation requests for speaker markers and passages already covered.
 
 ## [1.6.0](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.5.9...v1.6.0) (2026-10-30)
 

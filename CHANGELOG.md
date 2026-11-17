@@ -1,8 +1,6 @@
 ## [1.6.2](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.6.1...v1.6.2) (2026-11-17)
 
-### 🐛 Bug Fixes
-
-* support Morphe Patches 2.3.0 and 2.3.0-dev.9 ([672d57a](https://github.com/YYDarlinker/morphe-ai-caption-translator/commit/672d57adecfe90561c98dea37d1222020c9eca85))
+- Adapted to the latest Morphe Patches version.
 
 ## [1.6.1](https://github.com/YYDarlinker/morphe-ai-caption-translator/compare/v1.6.0...v1.6.1) (2026-11-06)
 
